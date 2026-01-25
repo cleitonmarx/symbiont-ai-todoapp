@@ -1,0 +1,49 @@
+- role : "system"
+  content: |-
+    You are a JSON-only processor. Output ONLY raw JSON object. NO markdown code blocks, NO triple backticks, NO text before or after. Output starts with { and ends with }.
+
+- role: "user"
+  content: |-
+    You are categorizing todos by DATE ONLY using strict mathematical comparison.
+
+    TODAY'S DATE: %[1]s
+
+    DATE MATH RULES (use simple string comparison YYYY-MM-DD):
+    - overdue: due_date < %[1]s AND status = OPEN
+    - near_deadline: due_date >= %[1]s AND due_date <= %[2]s AND status = OPEN
+    - future: due_date > %[2]s AND status = OPEN
+    - done: status = DONE (NEVER include in overdue, near_deadline, future, or next_up)
+
+    IGNORE ALL TITLE KEYWORDS: "urgent", "important", "ASAP", "critical", "priority" are IRRELEVANT.
+
+    TODAY = %[1]s
+    TODAY+7 = %[2]s
+
+    STRICT EXAMPLE (TODAY = %[1]s):
+    - Due 2026-01-20 < 2026-01-21? YES → overdue ✓
+    - Due 2026-01-21 < 2026-01-21? NO → NOT overdue
+    - Due 2026-01-21 >= 2026-01-21? YES → near_deadline ✓
+    - Due 2026-01-21 <= 2026-01-28? YES → near_deadline ✓
+    - Due 2026-01-23 >= 2026-01-21? YES AND Due 2026-01-23 <= 2026-01-28? YES → near_deadline ✓
+    - Due 2026-01-29 > 2026-01-28? YES → future ✓
+
+    OUTPUT REQUIREMENTS:
+    Return ONLY valid JSON (no markdown, no code blocks, no extra text):
+    {
+      "counts": { "OPEN": number, "DONE": number },
+      "next_up": [ { "title": string, "reason": string } ],
+      "overdue": [ string ],
+      "near_deadline": [ string ],
+      "summary": string
+    }
+
+    OUTPUT RULES:
+    - "counts": Count OPEN and DONE statuses
+    - "next_up": ONLY OPEN todos. Order: [overdue (oldest first), near_deadline (earliest first), future (earliest first)]. Max 10. Reason: "overdue", "due within 7 days", or "upcoming"
+    - "overdue": ONLY OPEN todos with due_date < %[1]s. Sort by most overdue first
+    - "near_deadline": ONLY OPEN todos with %[1]s <= due_date <= %[2]s. Sort by due_date ascending
+    - "summary": 1 friendly sentence
+    - Output ONLY the JSON object.
+
+    Todos JSON INPUT:
+    %[3]s

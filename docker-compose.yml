@@ -1,0 +1,45 @@
+include:
+  - docker-compose.deps.yml 
+
+services:
+  todoapp:
+    build:
+      context: ../..
+      dockerfile: ./examples/todoapp/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=todoappdb
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root-token
+      - VAULT_MOUNT_PATH=secret
+      - VAULT_SECRET_PATH=todoapp
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8681
+      - PUBSUB_PROJECT_ID=local-dev
+      - PUBSUB_TOPIC_ID=Todo
+      - PUBSUB_SUBSCRIPTION_ID=todo_summary_generator
+      - LLM_MODEL_HOST=http://model-runner.docker.internal
+      - LLM_MODEL=ai/gpt-oss
+    models:
+      - gpt-oss
+      - mistral
+    depends_on:
+      jaeger:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+      pubsub-emulator:
+        condition: service_healthy
+  
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    ports:
+      - "6831:6831/udp"
+      - "16686:16686"
+      - "4318:4318"

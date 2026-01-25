@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: todoapp
+      POSTGRES_PASSWORD: todoapppass
+      POSTGRES_DB: todoappdb
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U todoapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vault:
+    image: hashicorp/vault:1.15
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "sh", "/vault-health.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    volumes:
+      - ./scripts/vault-init.sh:/vault-init.sh:ro
+      - ./scripts/vault-health.sh:/vault-health.sh:ro
+    entrypoint: /bin/sh
+    command: 
+      - -c
+      - |
+        vault server -dev -dev-root-token-id=root-token -dev-listen-address=0.0.0.0:8200 &
+        VAULT_PID=$$!
+        sleep 5
+        sh /vault-init.sh
+        wait $$VAULT_PID
+
+  pubsub-emulator:
+    image: marcelcorso/gcloud-pubsub-emulator:latest
+    platform: linux/amd64
+    ports:
+      - "8681:8681"
+    environment:
+      PUBSUB_PROJECT1: local-dev,Todo:todo_summary_generator
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8681"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+models:
+  gpt-oss:
+    model: ai/gpt-oss:latest
+  mistral:
+    model: ai/mistral:latest
+  

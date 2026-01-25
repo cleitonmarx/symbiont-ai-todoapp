@@ -1,0 +1,694 @@
+openapi: 3.0.3
+info:
+  title: Todo API
+  version: 1.0.0
+  description: >
+    This API allows creating, updating, and listing todos.
+    When a todo is marked as DONE, and a summary generated via AI.
+tags:
+  - name: Todos
+    description: Todo creation, updates, and listing.
+  - name: Board
+    description: AI-generated summary of the todo board.
+  - name: AI Chat
+    description: Chat with the AI assistant about your todos.
+
+paths:
+  /api/v1/todos:
+    post:
+      tags: [Todos]
+      operationId: createTodo
+      summary: Create a todo
+      description: >
+        Creates a new todo in OPEN state.
+      requestBody:
+        required: true
+        description: Payload to create a todo.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTodoRequest'
+            examples:
+              create:
+                summary: Create a new OPEN todo
+                value:
+                  title: Buy milk
+      responses:
+        "201":
+          description: Todo created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+              examples:
+                created:
+                  summary: Newly created todo
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    title: "Buy milk"
+                    status: "OPEN"
+                    due_date: "2026-02-01"
+                    created_at: "2026-01-19T19:20:30Z"
+                    updated_at: "2026-01-19T19:20:30Z"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+    get:
+      tags: [Todos]
+      operationId: listTodos
+      summary: List todos
+      description: >
+        Lists todos with pagination support.
+        Optionally filter by status.
+      parameters:
+        - in: query
+          name: status
+          required: false
+          description: Filter todos by status.
+          schema:
+            $ref: '#/components/schemas/TodoStatus'
+        - in: query
+          name: pagesize
+          required: true
+          description: Maximum number of todos to return (server may cap).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - in: query
+          name: page
+          required: true
+          description: >
+            Opaque cursor from a prior ListTodosResp to fetch the next page.
+            Omit or set to null to fetch the first page.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Todos list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTodosResp'
+              examples:
+                list:
+                  summary: Mixed list showing todos with various statuses
+                  value:
+                    items:
+                      - id: "550e8400-e29b-41d4-a716-446655440000"
+                        title: "Buy milk"
+                        status: "OPEN"
+                        due_date: "2026-02-01"
+                        created_at: "2026-01-19T19:20:30Z"
+                        updated_at: "2026-01-19T19:20:30Z"
+                      - id: "c1c1a8de-0dbe-4a6e-9b0d-8f8e0a04e9b1"
+                        title: "Submit taxes"
+                        status: "DONE"
+                        due_date: "2026-03-15"
+                        created_at: "2026-01-18T11:00:00Z"
+                        updated_at: "2026-01-19T10:15:00Z"
+                      - id: "2a6b1bb2-9b03-4bfb-9f1c-7ec3bfb00cb0"
+                        title: "Book dentist appointment"
+                        status: "DONE"
+                        due_date: "2026-02-10"
+                        created_at: "2026-01-17T08:10:00Z"
+                        updated_at: "2026-01-19T10:16:10Z"
+                      - id: "7e2f2f54-8f6d-4c55-9d62-089e0c4b0e60"
+                        title: "Pay electricity bill"
+                        status: "DONE"
+                        due_date: "2026-01-20"
+                        created_at: "2026-01-16T08:10:00Z"
+                        updated_at: "2026-01-16T08:10:02Z"
+                    next_page: "2"
+                    page:
+
+  /api/v1/todos/{todo_id}:
+    patch:
+      tags: [Todos]
+      operationId: updateTodo
+      summary: Update a todo
+      description: >
+        Partially updates a todo. Supports renaming and/or completing a todo.
+      parameters:
+        - in: path
+          name: todo_id
+          required: true
+          description: Todo identifier (UUID).
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        description: Fields to update. Provide at least one field.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTodoRequest'
+            examples:
+              rename:
+                summary: Rename an OPEN todo
+                value:
+                  title: "Buy milk and eggs"
+              complete:
+                summary: Complete a todo.
+                value:
+                  status: "DONE"
+              renameAndComplete:
+                summary: Rename and complete in one request
+                value:
+                  title: "Buy milk and eggs"
+                  status: "DONE"
+      responses:
+        "200":
+          description: Todo updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+              examples:
+                completed:
+                  summary: Todo completed.
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    title: "Buy milk"
+                    status: "DONE"
+                    due_date: "2026-02-01"
+                    created_at: "2026-01-19T19:20:30Z"
+                    updated_at: "2026-01-19T19:21:10Z"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Todos]
+      operationId: deleteTodo
+      summary: Delete a todo
+      description: >
+        Deletes a todo by its ID.
+      parameters:
+        - in: path
+          name: todo_id
+          required: true
+          description: Todo identifier (UUID).
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Todo deleted successfully. No content.
+        "404":
+          $ref: '#/components/responses/NotFound'
+  
+  /api/v1/board/summary:
+    get:
+      summary: Get AI-generated board summary
+      description: >
+        Returns the latest AI-generated summary of the todo board.
+        The summary is generated asynchronously and reflects the most
+        recent known state of the board.
+      operationId: getBoardSummary
+      tags:
+        - Board
+      responses:
+        "200":
+          description: Current board summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BoardSummary"
+        "404":
+          description: Summary not available yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResp"
+
+  /api/v1/chat:
+    post:
+      operationId: streamChat
+      tags: [AI Chat]
+      summary: Stream assistant response for a user message (single global chat)
+      description: >
+        Streams Server-Sent Events (SSE). Events: meta, delta, done, error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatStreamRequest"
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                example:
+                  summary: Example SSE events
+                  value: |
+                    event: meta
+                    data: {"conversation_id":"global","user_message_id":"2b81d8d2-2a90-4b4f-83e5-9b7a1e4e0b9c","assistant_message_id":"0f7d6ef6-1f2a-4e0c-9f6d-7d7c7c2e1a11","started_at":"2026-01-23T22:10:00Z"}
+
+                    event: delta
+                    data: {"text":"You have 2 overdue todos:"}
+
+                    event: done
+                    data: {"assistant_message_id":"0f7d6ef6-1f2a-4e0c-9f6d-7d7c7c2e1a11","completed_at":"2026-01-23T22:10:05Z","usage":{"prompt_tokens":123,"completion_tokens":45,"total_tokens":168}}
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResp"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResp"
+
+  /api/v1/chat/messages:
+    get:
+      operationId: listChatMessages
+      summary: Fetch chat history (single global chat)
+      tags: [AI Chat]
+      parameters:
+        - in: query
+          name: pagesize
+          required: true
+          description: Maximum number of messages to return (server may cap).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 200
+        - in: query
+          name: page
+          required: true
+          description: >
+            Opaque cursor from a prior ListChatMessagesResp to fetch the next page.
+            Omit or set to null to fetch the first page.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Message history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatHistoryResp"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResp"
+
+    delete:
+      operationId: clearChatMessages
+      summary: Clear chat history (single global chat)
+      tags: [AI Chat]
+      responses:
+        "204":
+          description: Cleared
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResp"
+
+
+components:
+  responses:
+    BadRequest:
+      description: The request payload was invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResp'
+          examples:
+            emptyTitle:
+              summary: Validation error
+              value:
+                error:
+                  code: "BAD_REQUEST"
+                  message: "title must not be empty"
+    NotFound:
+      description: The requested todo does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResp'
+          examples:
+            missingTodo:
+              summary: Todo not found
+              value:
+                error:
+                  code: "NOT_FOUND"
+                  message: "todo not found"
+
+  schemas:
+    CreateTodoRequest:
+      type: object
+      additionalProperties: false
+      required: [title, due_date]
+      description: Request payload for creating a todo.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: >
+            Human-readable todo title. Must be non-empty.
+          example: "Buy milk"
+        due_date:
+          type: string
+          format: date
+          description: Calendar due date (date only, no time component).
+          example: "2026-02-01"
+
+    UpdateTodoRequest:
+      type: object
+      additionalProperties: false
+      description: >
+        Partial update payload. Provide at least one of: title, status, due_date.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: >
+            New title for the todo. Must be non-empty if provided.
+          example: "Buy milk and eggs"
+        status:
+          $ref: '#/components/schemas/TodoStatus'
+        due_date:
+          type: string
+          format: date
+          description: Updated calendar due date (date only).
+          example: "2026-02-02"
+      anyOf:
+        - required: [title]
+        - required: [status]
+        - required: [due_date]
+
+    ListTodosResp:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      description: A paginated list of todos.
+      properties:
+        items:
+          type: array
+          description: List of todos.
+          items:
+            $ref: '#/components/schemas/Todo'
+        page:
+          type: integer
+          description: >
+            Opaque cursor to fetch the current page of results.
+            Omit or set to null when fetching the first page.
+          example: "1"
+        previous_page:
+          type: integer
+          nullable: true
+          description: >
+            Opaque cursor to fetch the previous page of results.
+            Null if there is no previous page.
+          example: "0"
+        next_page:
+          type: integer
+          nullable: true
+          description: >
+            Opaque cursor to fetch the next page of results.
+            Null if there are no more pages.
+          example: "2"
+
+    Todo:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - status
+        - due_date
+        - created_at
+        - updated_at
+      description: >
+        A todo item.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the todo.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+        title:
+          type: string
+          description: Human-readable todo title.
+          example: "Buy milk"
+
+        status:
+          $ref: '#/components/schemas/TodoStatus'
+
+        due_date:
+          type: string
+          format: date
+          description: Calendar due date (date only, no time component).
+          example: "2026-02-01"
+
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the todo was created.
+          example: "2026-01-19T19:20:30Z"
+
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp when the todo was last updated.
+          example: "2026-01-19T19:21:10Z"
+
+    TodoStatus:
+      type: string
+      description: >
+        Todo lifecycle status.
+        OPEN means the todo is active.
+        DONE means the todo has been completed.
+      enum: [OPEN, DONE]
+      example: "OPEN"
+
+    ErrorResp:
+      type: object
+      additionalProperties: false
+      required: [error]
+      description: Standard error envelope.
+      properties:
+        error:
+          type: object
+          $ref: '#/components/schemas/Error'
+    
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      description: Error details.
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code.
+          enum: [BAD_REQUEST, NOT_FOUND, INTERNAL_ERROR]
+          example: "BAD_REQUEST"
+        message:
+          type: string
+          description: Human-readable error message.
+          example: "title must not be empty"
+
+
+    BoardSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - counts
+        - next_up
+        - overdue
+        - near_deadline
+        - summary
+      properties:
+        counts:
+          $ref: '#/components/schemas/TodoStatusCounts'
+        next_up:
+          type: array
+          description: >
+            Prioritized list of up to three todos recommended for completion next.
+          items:
+            $ref: '#/components/schemas/NextUpTodoItem'
+        overdue:
+          type: array
+          description: Titles of overdue todos.
+          items:
+            type: string
+          example:
+            - "Pay electricity bill"
+            - "Renew car insurance"
+        near_deadline:
+          type: array
+          description: Titles of todos approaching their due date.
+          items:
+            type: string
+          example:
+            - "Schedule annual medical checkup"
+        summary:
+          type: string
+          description: Short, user-facing summary of the board state.
+          example: "You have three overdue tasks that need immediate attention."
+
+    TodoStatusCounts:
+      type: object
+      description: Count of todos per status.
+      additionalProperties: false
+      required:
+        - OPEN
+        - DONE
+      properties:
+        OPEN:
+          type: integer
+          description: Number of open todos.
+          example: 7
+        DONE:
+          type: integer
+          description: Number of completed todos.
+          example: 2
+
+    NextUpTodoItem:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - reason
+      properties:
+        title:
+          type: string
+          example: "Pay electricity bill"
+        reason:
+          type: string
+          example: "Overdue"
+
+    ### AI Chat Schemas
+
+    ChatStreamRequest:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+
+    ChatHistoryResp:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, messages, page]
+      properties:
+        conversation_id:
+          type: string
+          enum: [global]
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+        page:
+          type: integer
+          description: >
+            Opaque cursor for the current page of results.
+          example: 1
+        previous_page:
+          type: integer
+          nullable: true
+          description: >
+            Opaque cursor to fetch the previous page of results.
+            Null if there is no previous page.
+          example: null
+        next_page:
+          type: integer
+          nullable: true
+          description: >
+            Opaque cursor to fetch the next page of results.
+            Null if there are no more pages.
+          example: 2
+
+    ChatMessage:
+      type: object
+      additionalProperties: false
+      required: [id, role, content, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    # SSE payload schemas (for documentation; not directly enforced by OpenAPI for text/event-stream)
+    SseMeta:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, user_message_id, assistant_message_id, started_at]
+      properties:
+        conversation_id:
+          type: string
+          enum: [global]
+        user_message_id:
+          type: string
+          format: uuid
+        assistant_message_id:
+          type: string
+          format: uuid
+        started_at:
+          type: string
+          format: date-time
+
+    SseDelta:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text:
+          type: string
+
+    SseDone:
+      type: object
+      additionalProperties: false
+      required: [assistant_message_id, completed_at]
+      properties:
+        assistant_message_id:
+          type: string
+          format: uuid
+        completed_at:
+          type: string
+          format: date-time
+        usage:
+          $ref: "#/components/schemas/TokenUsage"
+
+    TokenUsage:
+      type: object
+      additionalProperties: false
+      properties:
+        prompt_tokens:
+          type: integer
+          minimum: 0
+        completion_tokens:
+          type: integer
+          minimum: 0
+        total_tokens:
+          type: integer
+          minimum: 0

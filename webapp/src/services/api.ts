@@ -96,10 +96,21 @@ export const getBoardSummary = async (): Promise<BoardSummary | null> => {
   }
 };
 
-// Function to stream chat responses
+// Function to stream chat responses. NOTE: axious does not support streaming natively.
+// export const streamChat = async (message: string) => {
+//   const response = await apiClient.post('/api/v1/chat', { message });
+//   return response.data;
+// };
+
+// Function to stream chat responses (using fetch for streaming support)
 export const streamChat = async (message: string) => {
-  const response = await apiClient.post('/api/v1/chat', { message });
-  return response.data;
+  const response = await fetch(`${API_BASE_URL}/api/v1/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  // The consumer should handle response.body as a stream
+  return response;
 };
 
 // Function to fetch chat history

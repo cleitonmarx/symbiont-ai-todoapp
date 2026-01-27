@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { fetchChatMessages, clearChatMessages } from '../services/api';
+import { fetchChatMessages, clearChatMessages, streamChat } from '../services/api';
 import type { ChatMessage } from '../types';
 
 interface UseChatReturn {
@@ -44,13 +44,7 @@ export const useChat = (): UseChatReturn => {
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      const response = await fetch('/api/v1/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message }),
-      });
+      const response = await streamChat(message);
 
       if (!response.body) {
         throw new Error('No response body');

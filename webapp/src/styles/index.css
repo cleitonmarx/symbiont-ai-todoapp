@@ -11,19 +11,19 @@
   --sb-success: #4A9DD4;
   --sb-warning: #FFB84D;
   --sb-danger: #E74C3C;
-  
+
   /* Spacing */
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
-  
+
   /* Border radius */
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -179,6 +179,7 @@ body {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -200,6 +201,7 @@ body {
     transform: translateY(20px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -722,29 +724,34 @@ button:disabled {
     border-right: none;
     border-bottom: 1px solid var(--sb-border);
 
-  .modal-dialog {
-    width: 95%;
-    max-width: 450px;
+    .modal-dialog {
+      width: 95%;
+      max-width: 450px;
+    }
+
+    .todo-item {
+      grid-template-columns: 1fr;
+    }
+
+    .filter-group {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .pagination {
+      flex-direction: column;
+      gap: var(--spacing-md);
+    }
+
+    justify-content: center;
+
+    .pagination-buttons {
+      width: 100%;
+    }
+
+    padding: var(--spacing-md);
   }
 
-  .todo-item {
-    grid-template-columns: 1fr;
-  }
-
-  .filter-group {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .pagination {
-    flex-direction: column;
-    gap: var(--spacing-md);
-  }    justify-content: center;
-
-  .pagination-buttons {
-    width: 100%;
-  } padding: var(--spacing-md);
-  }
   .pagination-buttons button {
     flex: 1;
   }

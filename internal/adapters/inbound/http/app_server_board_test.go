@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/openapi"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases/mocks"
 	"github.com/google/uuid"
@@ -23,8 +23,8 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 	tests := map[string]struct {
 		setupMocks     func(*mocks.MockGetBoardSummary)
 		expectedStatus int
-		expectedBody   *openapi.BoardSummary
-		expectedError  *openapi.ErrorResp
+		expectedBody   *gen.BoardSummary
+		expectedError  *gen.ErrorResp
 	}{
 		"success": {
 			setupMocks: func(m *mocks.MockGetBoardSummary) {
@@ -51,12 +51,12 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 				}, nil)
 			},
 			expectedStatus: http.StatusOK,
-			expectedBody: &openapi.BoardSummary{
-				Counts: openapi.TodoStatusCounts{
+			expectedBody: &gen.BoardSummary{
+				Counts: gen.TodoStatusCounts{
 					OPEN: 5,
 					DONE: 3,
 				},
-				NextUp: []openapi.NextUpTodoItem{
+				NextUp: []gen.NextUpTodoItem{
 					{
 						Title:  "Buy groceries",
 						Reason: "Due tomorrow",
@@ -74,9 +74,9 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 					Return(domain.BoardSummary{}, domain.NewNotFoundErr("board summary not found"))
 			},
 			expectedStatus: http.StatusNotFound,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.NOTFOUND,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.NOTFOUND,
 					Message: "board summary not found",
 				},
 			},
@@ -88,9 +88,9 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 					Return(domain.BoardSummary{}, errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.INTERNALERROR,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.INTERNALERROR,
 					Message: "internal server error",
 				},
 			},
@@ -114,14 +114,14 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			if tt.expectedBody != nil {
-				var response openapi.BoardSummary
+				var response gen.BoardSummary
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				assert.NoError(t, err)
 				assert.Equal(t, *tt.expectedBody, response)
 			}
 
 			if tt.expectedError != nil {
-				var response openapi.ErrorResp
+				var response gen.ErrorResp
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedError.Error, response.Error)

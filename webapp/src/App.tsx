@@ -3,9 +3,11 @@ import CreateTodoForm from './components/CreateTodoForm';
 import TodoList from './components/TodoList';
 import { useTodos } from './hooks/useTodos';
 import Chat from './components/Chat';
+import BatchModal from './components/BatchModal';
 
 const App: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false); // start hidden by default
+  const [batchOpen, setBatchOpen] = useState(false);
   const { 
     todos, 
     boardSummary,
@@ -20,6 +22,7 @@ const App: React.FC = () => {
     previousPage,
     nextPage,
     goToPage,
+    refetch, 
   } = useTodos();
 
   return (
@@ -33,6 +36,11 @@ const App: React.FC = () => {
       <div className="app-main">
         <div className="sidebar-toolbar">
           <CreateTodoForm onCreateTodo={createTodo} />
+          <BatchModal
+            open={batchOpen}
+            onClose={() => setBatchOpen(false)}
+            onBatchComplete={refetch} // <-- This will reload todos after batch ops
+          />
         </div>
         <div className="content-area">
           {error && (

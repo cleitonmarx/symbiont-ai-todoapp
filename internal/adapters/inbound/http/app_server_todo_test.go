@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/openapi"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases/mocks"
@@ -32,10 +32,10 @@ var (
 		CreatedAt: time.Date(2026, 1, 22, 10, 30, 0, 0, time.UTC),
 		UpdatedAt: time.Date(2026, 1, 22, 10, 30, 0, 0, time.UTC),
 	}
-	restTodo = openapi.Todo{
+	restTodo = gen.Todo{
 		Id:        openapi_types.UUID(domainTodo.ID),
 		Title:     domainTodo.Title,
-		Status:    openapi.DONE,
+		Status:    gen.DONE,
 		DueDate:   openapi_types.Date{Time: domainTodo.DueDate},
 		CreatedAt: domainTodo.CreatedAt,
 		UpdatedAt: domainTodo.UpdatedAt,
@@ -47,11 +47,11 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 		requestBody    []byte
 		setupMocks     func(*mocks.MockCreateTodo)
 		expectedStatus int
-		expectedBody   *openapi.Todo
-		expectedError  *openapi.ErrorResp
+		expectedBody   *gen.Todo
+		expectedError  *gen.ErrorResp
 	}{
 		"success": {
-			requestBody: serializeJSON(t, openapi.CreateTodoJSONRequestBody{
+			requestBody: serializeJSON(t, gen.CreateTodoJSONRequestBody{
 				Title:   "Buy groceries",
 				DueDate: openapi_types.Date{Time: dueDate},
 			}),
@@ -63,7 +63,7 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 			expectedBody:   &restTodo,
 		},
 		"bad-request": {
-			requestBody: serializeJSON(t, openapi.CreateTodoJSONRequestBody{
+			requestBody: serializeJSON(t, gen.CreateTodoJSONRequestBody{
 				DueDate: openapi_types.Date{Time: dueDate},
 			}),
 			setupMocks: func(m *mocks.MockCreateTodo) {
@@ -72,9 +72,9 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 					Return(domain.Todo{}, domain.NewValidationErr("title is required"))
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.BADREQUEST,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.BADREQUEST,
 					Message: "title is required",
 				},
 			},
@@ -83,15 +83,15 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 			requestBody:    []byte(`{"title": "Test todo", "due_date": "invalid-date"}`),
 			setupMocks:     func(m *mocks.MockCreateTodo) {},
 			expectedStatus: http.StatusBadRequest,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.BADREQUEST,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.BADREQUEST,
 					Message: "invalid request body: parsing time \"invalid-date\" as \"2006-01-02\": cannot parse \"invalid-date\" as \"2006\"",
 				},
 			},
 		},
 		"internal-server-error": {
-			requestBody: serializeJSON(t, openapi.CreateTodoJSONRequestBody{
+			requestBody: serializeJSON(t, gen.CreateTodoJSONRequestBody{
 				Title:   "Test todo",
 				DueDate: openapi_types.Date{Time: time.Time{}},
 			}),
@@ -101,9 +101,9 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 					Return(domain.Todo{}, errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.INTERNALERROR,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.INTERNALERROR,
 					Message: "internal server error",
 				},
 			},
@@ -125,12 +125,12 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
-			openapi.Handler(server).ServeHTTP(w, req)
+			gen.Handler(server).ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			if tt.expectedBody != nil {
-				var response openapi.Todo
+				var response gen.Todo
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedBody.Id, response.Id)
@@ -139,7 +139,7 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 			}
 
 			if tt.expectedError != nil {
-				var response openapi.ErrorResp
+				var response gen.ErrorResp
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedError.Error, response.Error)
@@ -154,11 +154,11 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 	tests := map[string]struct {
 		page           int
 		pageSize       int
-		todoStatus     *openapi.TodoStatus
+		todoStatus     *gen.TodoStatus
 		setupMocks     func(*mocks.MockListTodos)
 		expectedStatus int
-		expectedBody   *openapi.ListTodosResp
-		expectedError  *openapi.ErrorResp
+		expectedBody   *gen.ListTodosResp
+		expectedError  *gen.ErrorResp
 	}{
 		"success-with-todos": {
 			page:     1,
@@ -169,8 +169,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 					Return([]domain.Todo{domainTodo}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
-			expectedBody: &openapi.ListTodosResp{
-				Items: []openapi.Todo{toOpenAPITodo(domainTodo)},
+			expectedBody: &gen.ListTodosResp{
+				Items: []gen.Todo{toTodo(domainTodo)},
 				Page:  1,
 			},
 		},
@@ -183,8 +183,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 					Return([]domain.Todo{}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
-			expectedBody: &openapi.ListTodosResp{
-				Items: []openapi.Todo{},
+			expectedBody: &gen.ListTodosResp{
+				Items: []gen.Todo{},
 				Page:  1,
 			},
 		},
@@ -197,8 +197,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 					Return([]domain.Todo{domainTodo}, true, nil)
 			},
 			expectedStatus: http.StatusOK,
-			expectedBody: &openapi.ListTodosResp{
-				Items:        []openapi.Todo{toOpenAPITodo(domainTodo)},
+			expectedBody: &gen.ListTodosResp{
+				Items:        []gen.Todo{toTodo(domainTodo)},
 				Page:         2,
 				NextPage:     common.Ptr(3),
 				PreviousPage: common.Ptr(1),
@@ -207,8 +207,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 		"success-with-status-filter": {
 			page:     1,
 			pageSize: 10,
-			todoStatus: func() *openapi.TodoStatus {
-				s := openapi.DONE
+			todoStatus: func() *gen.TodoStatus {
+				s := gen.DONE
 				return &s
 			}(),
 			setupMocks: func(m *mocks.MockListTodos) {
@@ -224,8 +224,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 					Return([]domain.Todo{domainTodo}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
-			expectedBody: &openapi.ListTodosResp{
-				Items: []openapi.Todo{restTodo},
+			expectedBody: &gen.ListTodosResp{
+				Items: []gen.Todo{restTodo},
 				Page:  1,
 			},
 		},
@@ -238,9 +238,9 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 					Return(nil, false, errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.INTERNALERROR,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.INTERNALERROR,
 					Message: "internal server error",
 				},
 			},
@@ -269,19 +269,19 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			openapi.Handler(server).ServeHTTP(w, req)
+			gen.Handler(server).ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			if tt.expectedBody != nil {
-				var response openapi.ListTodosResp
+				var response gen.ListTodosResp
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				assert.NoError(t, err)
 				assert.Equal(t, *tt.expectedBody, response)
 			}
 
 			if tt.expectedError != nil {
-				var response openapi.ErrorResp
+				var response gen.ErrorResp
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				assert.NoError(t, err)
 				assert.Equal(t, *tt.expectedError, response)
@@ -298,14 +298,14 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 		requestBody    []byte
 		setupMocks     func(*mocks.MockUpdateTodo)
 		expectedStatus int
-		expectedBody   *openapi.Todo
-		expectedError  *openapi.ErrorResp
+		expectedBody   *gen.Todo
+		expectedError  *gen.ErrorResp
 	}{
 		"success": {
 			todoID: domainTodo.ID.String(),
-			requestBody: serializeJSON(t, openapi.UpdateTodoJSONRequestBody{
+			requestBody: serializeJSON(t, gen.UpdateTodoJSONRequestBody{
 				Title:   common.Ptr("Buy groceries"),
-				Status:  common.Ptr(openapi.DONE),
+				Status:  common.Ptr(gen.DONE),
 				DueDate: &openapi_types.Date{Time: dueDate},
 			}),
 			setupMocks: func(m *mocks.MockUpdateTodo) {
@@ -318,8 +318,8 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 		},
 		"todo-not-found": {
 			todoID: domainTodo.ID.String(),
-			requestBody: serializeJSON(t, openapi.UpdateTodoJSONRequestBody{
-				Status: common.Ptr(openapi.DONE),
+			requestBody: serializeJSON(t, gen.UpdateTodoJSONRequestBody{
+				Status: common.Ptr(gen.DONE),
 			}),
 			setupMocks: func(m *mocks.MockUpdateTodo) {
 				m.EXPECT().
@@ -327,9 +327,9 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 					Return(domain.Todo{}, domain.NewNotFoundErr("todo not found"))
 			},
 			expectedStatus: http.StatusNotFound,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.NOTFOUND,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.NOTFOUND,
 					Message: "todo not found",
 				},
 			},
@@ -339,9 +339,9 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 			requestBody:    []byte(`{"status": "INVALID_STATUS"}`),
 			setupMocks:     func(m *mocks.MockUpdateTodo) {},
 			expectedStatus: http.StatusBadRequest,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.BADREQUEST,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.BADREQUEST,
 					Message: "invalid request body: unknown TodoStatus value: INVALID_STATUS",
 				},
 			},
@@ -351,17 +351,17 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 			requestBody:    []byte(`{"title": "Test todo", "due_date": "invalid-date"}`),
 			setupMocks:     func(m *mocks.MockUpdateTodo) {},
 			expectedStatus: http.StatusBadRequest,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.BADREQUEST,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.BADREQUEST,
 					Message: "invalid request body: error reading 'due_date': parsing time \"invalid-date\" as \"2006-01-02\": cannot parse \"invalid-date\" as \"2006\"",
 				},
 			},
 		},
 		"use-case-error": {
 			todoID: domainTodo.ID.String(),
-			requestBody: serializeJSON(t, openapi.UpdateTodoJSONRequestBody{
-				Status: common.Ptr(openapi.DONE),
+			requestBody: serializeJSON(t, gen.UpdateTodoJSONRequestBody{
+				Status: common.Ptr(gen.DONE),
 			}),
 			setupMocks: func(m *mocks.MockUpdateTodo) {
 				m.EXPECT().
@@ -369,9 +369,9 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 					Return(domain.Todo{}, errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.INTERNALERROR,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.INTERNALERROR,
 					Message: "internal server error",
 				},
 			},
@@ -390,17 +390,17 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
-			openapi.Handler(server).ServeHTTP(w, req)
+			gen.Handler(server).ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			if tt.expectedBody != nil {
-				var response openapi.Todo
+				var response gen.Todo
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				assert.NoError(t, err)
 				assert.Equal(t, *tt.expectedBody, response)
 			}
 			if tt.expectedError != nil {
-				var response openapi.ErrorResp
+				var response gen.ErrorResp
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				assert.NoError(t, err)
 				assert.Equal(t, *tt.expectedError, response)
@@ -408,197 +408,6 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 		})
 	}
 
-}
-
-func TestTodoAppServer_ClearChatMessages(t *testing.T) {
-	tests := map[string]struct {
-		setupMocks     func(*mocks.MockDeleteConversation)
-		expectedStatus int
-		expectedError  *openapi.ErrorResp
-	}{
-		"success": {
-			setupMocks: func(m *mocks.MockDeleteConversation) {
-				m.EXPECT().
-					Execute(mock.Anything).
-					Return(nil)
-			},
-			expectedStatus: http.StatusNoContent,
-		},
-		"use-case-error": {
-			setupMocks: func(m *mocks.MockDeleteConversation) {
-				m.EXPECT().
-					Execute(mock.Anything).
-					Return(errors.New("database error"))
-			},
-			expectedStatus: http.StatusInternalServerError,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.INTERNALERROR,
-					Message: "internal server error",
-				},
-			},
-		},
-	}
-
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			mockDeleteConversation := mocks.NewMockDeleteConversation(t)
-			tt.setupMocks(mockDeleteConversation)
-
-			server := &TodoAppServer{
-				DeleteConversationUseCase: mockDeleteConversation,
-			}
-
-			req := httptest.NewRequest(http.MethodDelete, "/api/v1/chat/messages", nil)
-			w := httptest.NewRecorder()
-
-			server.ClearChatMessages(w, req)
-
-			assert.Equal(t, tt.expectedStatus, w.Code)
-
-			if tt.expectedError != nil {
-				var response openapi.ErrorResp
-				err := json.Unmarshal(w.Body.Bytes(), &response)
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedError.Error, response.Error)
-			}
-
-			mockDeleteConversation.AssertExpectations(t)
-		})
-	}
-}
-
-func TestTodoAppServer_ListChatMessages(t *testing.T) {
-	fixedTime := time.Date(2026, 1, 22, 10, 30, 0, 0, time.UTC)
-	fixedID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
-
-	domainMessage := domain.ChatMessage{
-		ID:        fixedID,
-		ChatRole:  "user",
-		Content:   "Hello, how are you?",
-		CreatedAt: fixedTime,
-	}
-
-	openAPIMessage := openapi.ChatMessage{
-		Id:        fixedID,
-		Role:      openapi.ChatMessageRole("user"),
-		Content:   "Hello, how are you?",
-		CreatedAt: fixedTime,
-	}
-
-	tests := map[string]struct {
-		page           int
-		pageSize       int
-		setupMocks     func(*mocks.MockListChatMessages)
-		expectedStatus int
-		expectedBody   *openapi.ChatHistoryResp
-		expectedError  *openapi.ErrorResp
-	}{
-		"success-with-messages": {
-			page:     1,
-			pageSize: 10,
-			setupMocks: func(m *mocks.MockListChatMessages) {
-				m.EXPECT().
-					Query(mock.Anything, 1, 10).
-					Return([]domain.ChatMessage{domainMessage}, false, nil)
-			},
-			expectedStatus: http.StatusOK,
-			expectedBody: &openapi.ChatHistoryResp{
-				ConversationId: domain.GlobalConversationID,
-				Messages:       []openapi.ChatMessage{openAPIMessage},
-				Page:           1,
-			},
-		},
-		"success-with-no-messages": {
-			page:     1,
-			pageSize: 10,
-			setupMocks: func(m *mocks.MockListChatMessages) {
-				m.EXPECT().
-					Query(mock.Anything, 1, 10).
-					Return([]domain.ChatMessage{}, false, nil)
-			},
-			expectedStatus: http.StatusOK,
-			expectedBody: &openapi.ChatHistoryResp{
-				ConversationId: domain.GlobalConversationID,
-				Messages:       []openapi.ChatMessage{},
-				Page:           1,
-			},
-		},
-		"success-with-next-and-previous-page": {
-			page:     2,
-			pageSize: 10,
-			setupMocks: func(m *mocks.MockListChatMessages) {
-				m.EXPECT().
-					Query(mock.Anything, 2, 10).
-					Return([]domain.ChatMessage{domainMessage}, true, nil)
-			},
-			expectedStatus: http.StatusOK,
-			expectedBody: &openapi.ChatHistoryResp{
-				ConversationId: domain.GlobalConversationID,
-				Messages:       []openapi.ChatMessage{openAPIMessage},
-				Page:           2,
-				NextPage:       common.Ptr(3),
-				PreviousPage:   common.Ptr(1),
-			},
-		},
-		"use-case-error": {
-			page:     1,
-			pageSize: 10,
-			setupMocks: func(m *mocks.MockListChatMessages) {
-				m.EXPECT().
-					Query(mock.Anything, 1, 10).
-					Return(nil, false, errors.New("database error"))
-			},
-			expectedStatus: http.StatusInternalServerError,
-			expectedError: &openapi.ErrorResp{
-				Error: openapi.Error{
-					Code:    openapi.INTERNALERROR,
-					Message: "internal server error",
-				},
-			},
-		},
-	}
-
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			mockListChatMessages := mocks.NewMockListChatMessages(t)
-			tt.setupMocks(mockListChatMessages)
-
-			server := &TodoAppServer{
-				ListChatMessagesUseCase: mockListChatMessages,
-			}
-
-			u, err := url.Parse("http://localhost/api/v1/chat/messages")
-			assert.NoError(t, err)
-			q := u.Query()
-			q.Set("page", strconv.Itoa(tt.page))
-			q.Set("pagesize", strconv.Itoa(tt.pageSize))
-			u.RawQuery = q.Encode()
-			req := httptest.NewRequest(http.MethodGet, u.String(), nil)
-
-			w := httptest.NewRecorder()
-
-			openapi.Handler(server).ServeHTTP(w, req)
-
-			assert.Equal(t, tt.expectedStatus, w.Code)
-
-			if tt.expectedBody != nil {
-				var response openapi.ChatHistoryResp
-				err := json.Unmarshal(w.Body.Bytes(), &response)
-				assert.NoError(t, err)
-				assert.Equal(t, *tt.expectedBody, response)
-			}
-
-			if tt.expectedError != nil {
-				var response openapi.ErrorResp
-				err := json.Unmarshal(w.Body.Bytes(), &response)
-				assert.NoError(t, err)
-				assert.Equal(t, *tt.expectedError, response)
-			}
-
-			mockListChatMessages.AssertExpectations(t)
-		})
-	}
 }
 
 // serializeJSON is a helper function to marshal a value to JSON for test requests.

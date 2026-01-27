@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/openapi"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 )
 
 func (api TodoAppServer) ClearChatMessages(w http.ResponseWriter, r *http.Request) {
 	err := api.DeleteConversationUseCase.Execute(r.Context())
 	if err != nil {
-		respondError(w, toOpenAPIError(err))
+		respondError(w, toError(err))
 		return
 	}
 
@@ -20,16 +20,16 @@ func (api TodoAppServer) ClearChatMessages(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request, params openapi.ListChatMessagesParams) {
+func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request, params gen.ListChatMessagesParams) {
 	messages, hasMore, err := api.ListChatMessagesUseCase.Query(r.Context(), params.Page, params.Pagesize)
 	if err != nil {
-		respondError(w, toOpenAPIError(err))
+		respondError(w, toError(err))
 		return
 	}
 
-	resp := openapi.ChatHistoryResp{
+	resp := gen.ChatHistoryResp{
 		ConversationId: domain.GlobalConversationID,
-		Messages:       []openapi.ChatMessage{},
+		Messages:       []gen.ChatMessage{},
 		Page:           params.Page,
 	}
 	if hasMore {
@@ -42,12 +42,7 @@ func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request
 	}
 
 	for _, msg := range messages {
-		resp.Messages = append(resp.Messages, openapi.ChatMessage{
-			Id:        msg.ID,
-			Role:      openapi.ChatMessageRole(msg.ChatRole),
-			Content:   msg.Content,
-			CreatedAt: msg.CreatedAt,
-		})
+		resp.Messages = append(resp.Messages, toChatMessage(msg))
 	}
 
 	respondJSON(w, http.StatusOK, resp)
@@ -55,11 +50,11 @@ func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request
 }
 
 func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
-	req := openapi.StreamChatJSONRequestBody{}
+	req := gen.StreamChatJSONRequestBody{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, openapi.ErrorResp{
-			Error: openapi.Error{
-				Code:    openapi.BADREQUEST,
+		respondError(w, gen.ErrorResp{
+			Error: gen.Error{
+				Code:    gen.BADREQUEST,
 				Message: "invalid request body",
 			},
 		})
@@ -68,9 +63,9 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		errResp := openapi.ErrorResp{
-			Error: openapi.Error{
-				Code:    openapi.INTERNALERROR,
+		errResp := gen.ErrorResp{
+			Error: gen.Error{
+				Code:    gen.INTERNALERROR,
 				Message: "streaming not supported",
 			},
 		}
@@ -103,6 +98,6 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		api.Logger.Printf("StreamChat: error during streaming: %v", err)
-		respondError(w, toOpenAPIError(err))
+		respondError(w, toError(err))
 	}
 }

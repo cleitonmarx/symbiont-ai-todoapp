@@ -1,0 +1,42 @@
+type Todo {
+  id: UUID!
+  title: String!
+  status: TodoStatus!
+  due_date: Date!
+  created_at: Time!
+  updated_at: Time!
+}
+
+type TodoPage {
+  items: [Todo!]!
+  page: Int!
+  nextPage: Int
+  previousPage: Int
+}
+
+input updateTodoParams {
+  id: UUID!
+  title: String
+  status: TodoStatus
+  due_date: Date
+}
+
+enum TodoStatus {
+  OPEN
+  DONE
+}
+
+
+
+type Query {
+  listTodos(status: TodoStatus, page: Int! = 1, pageSize: Int! = 50): TodoPage!
+}
+
+type Mutation {
+  updateTodo(params: updateTodoParams!): Todo!
+  deleteTodo(id: UUID!): Boolean!
+}
+
+scalar UUID
+scalar Time
+scalar Date

@@ -4,26 +4,26 @@ type domainErr struct {
 	message string
 }
 
-func (e *domainErr) Error() string {
+func (e domainErr) Error() string {
 	return e.message
 }
 
 type NotFoundErr struct {
-	*domainErr
+	domainErr
 }
 
 func NewNotFoundErr(message string) *NotFoundErr {
 	return &NotFoundErr{
-		domainErr: &domainErr{message: message},
+		domainErr: domainErr{message: message},
 	}
 }
 
 type ValidationErr struct {
-	*domainErr
+	domainErr
 }
 
 func NewValidationErr(message string) *ValidationErr {
 	return &ValidationErr{
-		domainErr: &domainErr{message: message},
+		domainErr: domainErr{message: message},
 	}
 }

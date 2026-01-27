@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -46,4 +47,16 @@ func TestDeleteConversationImpl_Execute(t *testing.T) {
 			assert.Equal(t, tt.expectedErr, err)
 		})
 	}
+}
+
+func TestInitDeleteConversation_Initialize(t *testing.T) {
+	idc := InitDeleteConversation{}
+
+	_, err := idc.Initialize(context.Background())
+	assert.NoError(t, err)
+
+	uc, err := depend.Resolve[DeleteConversation]()
+	assert.NoError(t, err)
+	assert.NotNil(t, uc)
+
 }

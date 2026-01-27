@@ -3,10 +3,12 @@ package usecases
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	domain_mocks "github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain/mocks"
 	"github.com/google/uuid"
@@ -34,9 +36,10 @@ func TestUpdateTodoImpl_Execute(t *testing.T) {
 		expectedErr     error
 	}{
 		"success": {
-			id:     fixedUUID,
-			title:  &todo.Title,
-			status: &todo.Status,
+			id:      fixedUUID,
+			title:   &todo.Title,
+			status:  &todo.Status,
+			dueDate: &todo.DueDate,
 			setExpectations: func(uow *domain_mocks.MockUnitOfWork, timeProvider *domain_mocks.MockCurrentTimeProvider) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 				repo := domain_mocks.NewMockTodoRepository(t)
@@ -50,7 +53,7 @@ func TestUpdateTodoImpl_Execute(t *testing.T) {
 						return fn(uow)
 					})
 
-				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, nil)
+				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, true, nil)
 				repo.EXPECT().UpdateTodo(mock.Anything, mock.MatchedBy(func(t domain.Todo) bool {
 					return t.ID == fixedUUID && t.Title == todo.Title && t.UpdatedAt.Equal(fixedTime)
 				})).Return(nil)
@@ -66,13 +69,32 @@ func TestUpdateTodoImpl_Execute(t *testing.T) {
 			expectedTodo: todo,
 			expectedErr:  nil,
 		},
+		"invalid-update-data": {
+			id:    fixedUUID,
+			title: common.Ptr(""),
+			setExpectations: func(uow *domain_mocks.MockUnitOfWork, timeProvider *domain_mocks.MockCurrentTimeProvider) {
+				timeProvider.EXPECT().Now().Return(fixedTime)
+				repo := domain_mocks.NewMockTodoRepository(t)
+
+				uow.EXPECT().Todo().Return(repo)
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
+						return fn(uow)
+					})
+
+				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, true, nil)
+			},
+			expectedTodo: domain.Todo{},
+			expectedErr:  domain.NewValidationErr("title cannot be empty"),
+		},
 		"todo-not-found": {
 			id: fixedUUID,
 			setExpectations: func(uow *domain_mocks.MockUnitOfWork, timeProvider *domain_mocks.MockCurrentTimeProvider) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
 				repo := domain_mocks.NewMockTodoRepository(t)
-				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(domain.Todo{}, errors.New("not found"))
+				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(domain.Todo{}, false, nil)
 
 				uow.EXPECT().Todo().Return(repo)
 				uow.EXPECT().
@@ -83,14 +105,32 @@ func TestUpdateTodoImpl_Execute(t *testing.T) {
 
 			},
 			expectedTodo: domain.Todo{},
-			expectedErr:  errors.New("not found"),
+			expectedErr:  domain.NewNotFoundErr(fmt.Sprintf("todo with ID %s not found", fixedUUID)),
 		},
-		"repository-error": {
+		"get-todo-fails": {
 			id: fixedUUID,
 			setExpectations: func(uow *domain_mocks.MockUnitOfWork, timeProvider *domain_mocks.MockCurrentTimeProvider) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 				repo := domain_mocks.NewMockTodoRepository(t)
-				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, nil)
+				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(domain.Todo{}, false, errors.New("database error"))
+
+				uow.EXPECT().Todo().Return(repo)
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
+						return fn(uow)
+					})
+
+			},
+			expectedTodo: domain.Todo{},
+			expectedErr:  errors.New("database error"),
+		},
+		"update-fails": {
+			id: fixedUUID,
+			setExpectations: func(uow *domain_mocks.MockUnitOfWork, timeProvider *domain_mocks.MockCurrentTimeProvider) {
+				timeProvider.EXPECT().Now().Return(fixedTime)
+				repo := domain_mocks.NewMockTodoRepository(t)
+				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, true, nil)
 				repo.EXPECT().UpdateTodo(mock.Anything, mock.Anything).Return(errors.New("database error"))
 
 				uow.EXPECT().Todo().Return(repo)

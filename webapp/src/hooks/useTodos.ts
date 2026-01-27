@@ -19,7 +19,7 @@ interface UseTodosReturn {
   deleteTodo: (id: string) => void;
 }
 
-export const useTodos = (): UseTodosReturn => {
+export const useTodos = (): UseTodosReturn & { refetch: () => void } => {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilterState] = useState<TodoStatus | 'ALL'>('ALL');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -41,7 +41,7 @@ export const useTodos = (): UseTodosReturn => {
     queryFn: () => getTodos(
       statusFilter === 'ALL' ? undefined : statusFilter,
       currentPage,
-      6 // You can adjust this value as needed
+      4
     ),
     retry: 1,
   });
@@ -142,5 +142,6 @@ export const useTodos = (): UseTodosReturn => {
     previousPage,
     nextPage,
     goToPage: setCurrentPage,
+    refetch,
   };
 };

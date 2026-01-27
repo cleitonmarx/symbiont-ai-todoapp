@@ -9,13 +9,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/openapi"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
-var _ openapi.ServerInterface = (*TodoAppServer)(nil)
+var _ gen.ServerInterface = (*TodoAppServer)(nil)
 
 // TodoAppServer is the HTTP server adapter for the TodoApp application.
 //
@@ -54,9 +54,9 @@ func (api TodoAppServer) Run(ctx context.Context) error {
 	mux.Handle("/", http.FileServerFS(sub))
 
 	// get an `http.Handler` that we can use
-	h := openapi.HandlerWithOptions(api, openapi.StdHTTPServerOptions{
+	h := gen.HandlerWithOptions(api, gen.StdHTTPServerOptions{
 		BaseRouter: mux,
-		Middlewares: []openapi.MiddlewareFunc{
+		Middlewares: []gen.MiddlewareFunc{
 			otelhttp.NewMiddleware(
 				"todoapp-api",
 				otelhttp.WithSpanNameFormatter(tracing.SpanNameFormatter),

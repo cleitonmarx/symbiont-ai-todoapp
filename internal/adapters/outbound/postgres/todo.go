@@ -3,17 +3,14 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/Masterminds/squirrel"
-	"github.com/google/uuid"
-	_ "github.com/lib/pq"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -27,7 +24,7 @@ var (
 	}
 )
 
-// TodoRepository is an in-memory implementation of domain.Repository for Todos.
+// TodoRepository implements the domain.TodoRepository interface using PostgreSQL as the storage backend.
 type TodoRepository struct {
 	sb squirrel.StatementBuilderType
 }
@@ -162,7 +159,7 @@ func (tr TodoRepository) DeleteTodo(ctx context.Context, id uuid.UUID) error {
 }
 
 // GetTodo retrieves a todo by its ID.
-func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo, error) {
+func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo, bool, error) {
 	spanCtx, span := tracing.Start(ctx)
 	defer span.End()
 
@@ -185,12 +182,12 @@ func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo
 
 	if tracing.RecordErrorAndStatus(span, err) {
 		if err == sql.ErrNoRows {
-			return domain.Todo{}, fmt.Errorf("todo with id %s not found", id)
+			return domain.Todo{}, false, nil
 		}
-		return domain.Todo{}, err
+		return domain.Todo{}, false, err
 	}
 
-	return todo, nil
+	return todo, true, nil
 }
 
 // InitTodoRepository is a Symbiont initializer for TodoRepository.

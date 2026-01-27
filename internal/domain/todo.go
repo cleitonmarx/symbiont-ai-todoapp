@@ -27,6 +27,27 @@ type Todo struct {
 	UpdatedAt time.Time  `json:"updated_at"`
 }
 
+func (t Todo) Validate(now time.Time) error {
+	if t.Title == "" {
+		return NewValidationErr("title cannot be empty")
+	}
+	if len(t.Title) < 3 || len(t.Title) > 200 {
+		err := NewValidationErr("title must be between 3 and 200 characters")
+		return err
+	}
+	if t.DueDate.IsZero() {
+		return NewValidationErr("due_date cannot be empty")
+	}
+	if t.DueDate.Truncate(24 * time.Hour).Before(now.Add(-48 * time.Hour).Truncate(24 * time.Hour)) {
+		return NewValidationErr("due_date cannot be more than 48 hours in the past")
+	}
+	if t.Status != TodoStatus_OPEN && t.Status != TodoStatus_DONE {
+		return NewValidationErr("status must be either OPEN or DONE")
+	}
+
+	return nil
+}
+
 // ListTodosParams represents the parameters for listing todo items.
 type ListTodosParams struct {
 	Status *TodoStatus
@@ -57,5 +78,5 @@ type TodoRepository interface {
 	DeleteTodo(ctx context.Context, id uuid.UUID) error
 
 	// GetTodo retrieves a todo item by its unique identifier.
-	GetTodo(ctx context.Context, id uuid.UUID) (Todo, error)
+	GetTodo(ctx context.Context, id uuid.UUID) (Todo, bool, error)
 }

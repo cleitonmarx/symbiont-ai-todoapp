@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/XSAM/otelsql"
 	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/exaring/otelpgx"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	pgx "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	pgxvector "github.com/pgvector/pgvector-go/pgx"
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 )
 
@@ -41,14 +45,26 @@ func (di *InitDB) Initialize(ctx context.Context) (context.Context, error) {
 		di.DBName,
 	)
 
-	db, err := otelsql.Open("postgres", dsn, otelsql.WithAttributes(
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("create connection pool: %w", err)
+	}
+
+	cfg.ConnConfig.Tracer = otelpgx.NewTracer(otelpgx.WithTracerAttributes(
 		semconv.DBSystemNamePostgreSQL,
 		semconv.DBNamespace(di.DBName),
 	))
-	if err != nil {
-		return ctx, fmt.Errorf("failed to connect to database: %w", err)
+
+	cfg.AfterConnect = func(ctx context.Context, pgconn *pgx.Conn) error {
+		return pgxvector.RegisterTypes(ctx, pgconn)
 	}
-	di.db = db
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return ctx, fmt.Errorf("failed to create pgx pool: %w", err)
+	}
+
+	di.db = stdlib.OpenDBFromPool(pool)
 
 	// Run migrations
 	if !di.skipMigration {

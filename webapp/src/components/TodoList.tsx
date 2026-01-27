@@ -107,14 +107,14 @@ export const TodoList: React.FC<TodoListProps> = ({
                   onClick={onPreviousPage}
                   disabled={previousPage === null}
                 >
-                  ← Previous
+                  ←
                 </button>
                 <button
                   className="btn-secondary"
                   onClick={onNextPage}
                   disabled={nextPage === null}
                 >
-                  Next →
+                  →
                 </button>
               </div>
             </div>

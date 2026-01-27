@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: postgres:15
+    #image: postgres:15
+    image:  pgvector/pgvector:pg15
     environment:
       POSTGRES_USER: todoapp
       POSTGRES_PASSWORD: todoapppass
@@ -59,6 +60,7 @@ services:
 models:
   gpt-oss:
     model: ai/gpt-oss:latest
-  mistral:
-    model: ai/mistral:latest
+    context_size: 8192
+  qwen3-embedding:
+    model: ai/qwen3-embedding:latest
   

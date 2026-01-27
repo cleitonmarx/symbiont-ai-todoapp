@@ -99,6 +99,7 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 		setExpectations func(mock sqlmock.Sqlmock)
 		id              uuid.UUID
 		expectedTodo    domain.Todo
+		expectedFound   bool
 		expectedErr     bool
 	}{
 		"success": {
@@ -117,8 +118,8 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 					WithArgs(fixedUUID).
 					WillReturnRows(rows)
 			},
-			expectedTodo: todo,
-			expectedErr:  false,
+			expectedTodo:  todo,
+			expectedFound: true,
 		},
 		"not-found": {
 			id: fixedUUID,
@@ -128,7 +129,6 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 					WillReturnError(sql.ErrNoRows)
 			},
 			expectedTodo: domain.Todo{},
-			expectedErr:  true,
 		},
 		"database-error": {
 			id: fixedUUID,
@@ -151,11 +151,12 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 			tt.setExpectations(mock)
 
 			repo := NewTodoRepository(db)
-			got, gotErr := repo.GetTodo(context.Background(), tt.id)
+			got, gotFound, gotErr := repo.GetTodo(context.Background(), tt.id)
 			if tt.expectedErr {
 				assert.Error(t, gotErr)
 			} else {
 				assert.NoError(t, gotErr)
+				assert.Equal(t, tt.expectedFound, gotFound)
 				assert.Equal(t, tt.expectedTodo, got)
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())

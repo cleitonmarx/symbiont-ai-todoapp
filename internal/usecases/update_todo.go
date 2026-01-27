@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/cleitonmarx/symbiont/depend"
@@ -34,14 +35,14 @@ func (uti UpdateTodoImpl) Execute(ctx context.Context, id uuid.UUID, title *stri
 	defer span.End()
 
 	now := uti.timeProvider.Now()
-	if err := validateUpdateTodoInputParams(title, status, dueDate, now); tracing.RecordErrorAndStatus(span, err) {
-		return domain.Todo{}, err
-	}
 	var todo domain.Todo
 	err := uti.uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
-		td, err := uow.Todo().GetTodo(spanCtx, id)
+		td, found, err := uow.Todo().GetTodo(spanCtx, id)
 		if err != nil {
 			return err
+		}
+		if !found {
+			return domain.NewNotFoundErr(fmt.Sprintf("todo with ID %s not found", id))
 		}
 
 		if title != nil {
@@ -51,14 +52,18 @@ func (uti UpdateTodoImpl) Execute(ctx context.Context, id uuid.UUID, title *stri
 		if status != nil {
 			td.Status = *status
 		}
+
 		if dueDate != nil {
 			td.DueDate = *dueDate
 		}
 
 		td.UpdatedAt = now
 
-		err = uow.Todo().UpdateTodo(spanCtx, td)
-		if err != nil {
+		if err := td.Validate(now); err != nil {
+			return err
+		}
+
+		if err := uow.Todo().UpdateTodo(spanCtx, td); err != nil {
 			return err
 		}
 
@@ -75,31 +80,6 @@ func (uti UpdateTodoImpl) Execute(ctx context.Context, id uuid.UUID, title *stri
 	}
 
 	return todo, nil
-}
-
-func validateUpdateTodoInputParams(title *string, status *domain.TodoStatus, dueDate *time.Time, now time.Time) error {
-	if title != nil {
-		if len(*title) < 3 || len(*title) > 200 {
-			err := domain.NewValidationErr("title must be between 3 and 200 characters")
-			return err
-		}
-	}
-
-	if dueDate != nil {
-		if dueDate.Truncate(24 * time.Hour).Before(now.Add(-48 * time.Hour).Truncate(24 * time.Hour)) {
-			err := domain.NewValidationErr("due_date cannot be in the past 2 days")
-			return err
-		}
-	}
-
-	if status != nil {
-		if *status != domain.TodoStatus_OPEN && *status != domain.TodoStatus_DONE {
-			err := domain.NewValidationErr("invalid status value")
-			return err
-		}
-	}
-
-	return nil
 }
 
 // InitUpdateTodo initializes the UpdateTodo use case and registers it in the dependency container.

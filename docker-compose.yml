@@ -8,6 +8,7 @@ services:
       dockerfile: ./examples/todoapp/Dockerfile
     ports:
       - "8080:8080"
+      - "8085:8085"
     environment:
       - PORT=8080
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
@@ -26,7 +27,7 @@ services:
       - LLM_MODEL=ai/gpt-oss
     models:
       - gpt-oss
-      - mistral
+      - qwen3-embedding
     depends_on:
       jaeger:
         condition: service_started

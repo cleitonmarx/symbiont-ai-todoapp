@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
@@ -11,7 +12,7 @@ import (
 
 // DeleteTodo defines the interface for the DeleteTodo use case.
 type DeleteTodo interface {
-	Execute(ctx context.Context, todoID uuid.UUID) error
+	Execute(ctx context.Context, id uuid.UUID) error
 }
 
 // DeleteTodoImpl is the implementation of the DeleteTodo use case.
@@ -29,25 +30,29 @@ func NewDeleteTodo(uow domain.UnitOfWork, timeProvider domain.CurrentTimeProvide
 }
 
 // Execute deletes a todo item by its ID.
-func (dti DeleteTodoImpl) Execute(ctx context.Context, todoID uuid.UUID) error {
+func (dti DeleteTodoImpl) Execute(ctx context.Context, id uuid.UUID) error {
 	spanCtx, span := tracing.Start(ctx)
 	defer span.End()
 
 	return dti.uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
-		_, err := uow.Todo().GetTodo(spanCtx, todoID) // Ensure the todo exists
+		_, found, err := uow.Todo().GetTodo(spanCtx, id) // Ensure the todo exists
 		if err != nil {
 			return err
 		}
-		err = uow.Todo().DeleteTodo(spanCtx, todoID)
+		if !found {
+			return domain.NewNotFoundErr(fmt.Sprintf("todo with ID %s not found", id))
+		}
+		err = uow.Todo().DeleteTodo(spanCtx, id)
 		if err != nil {
 			return err
 		}
 
 		return uow.Outbox().RecordEvent(spanCtx, domain.TodoEvent{
 			Type:      domain.TodoEventType_TODO_DELETED,
-			TodoID:    todoID,
+			TodoID:    id,
 			CreatedAt: dti.timeProvider.Now(),
 		})
+
 	})
 }
 

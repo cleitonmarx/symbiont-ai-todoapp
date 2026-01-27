@@ -1,22 +1,28 @@
 {
-  "name": "todo-email-demo",
+  "name": "todo-webapp",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "generategql": "graphql-codegen"
   },
   "dependencies": {
     "@tanstack/react-query": "^4.0.0",
     "axios": "^0.21.1",
+    "graphql": "^16.12.0",
     "marked": "^17.0.1",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "^6.1.1",
+    "@graphql-codegen/typed-document-node": "^6.1.5",
+    "@graphql-codegen/typescript": "^5.0.7",
+    "@graphql-codegen/typescript-operations": "^5.0.7",
     "@types/react": "^18.3.27",
-    "@types/react-dom": "^17.0.0",
+    "@types/react-dom": "^17.0.26",
     "@vitejs/plugin-react": "^1.0.0",
     "typescript": "^4.5.0",
     "vite": "^2.6.0"

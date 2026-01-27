@@ -1,0 +1,15 @@
+query ListTodos($status: TodoStatus, $page: Int!, $pageSize: Int!) {
+  listTodos(status: $status, page: $page, pageSize: $pageSize) {
+    items {
+      id
+      title
+      status
+      due_date
+      #created_at
+      #updated_at
+    }
+    page
+    nextPage
+    previousPage
+  }
+}

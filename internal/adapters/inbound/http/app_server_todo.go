@@ -6,15 +6,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/openapi"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, params openapi.ListTodosParams) {
-	resp := openapi.ListTodosResp{
-		Items: []openapi.Todo{},
+func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, params gen.ListTodosParams) {
+	resp := gen.ListTodosResp{
+		Items: []gen.Todo{},
 		Page:  params.Page,
 	}
 	var queryParams []domain.ListTodoOptions
@@ -24,12 +24,12 @@ func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, param
 
 	todos, hasMore, err := api.ListTodosUseCase.Query(r.Context(), params.Page, params.Pagesize, queryParams...)
 	if err != nil {
-		respondError(w, toOpenAPIError(err))
+		respondError(w, toError(err))
 		return
 	}
 
 	for _, t := range todos {
-		resp.Items = append(resp.Items, toOpenAPITodo(t))
+		resp.Items = append(resp.Items, toTodo(t))
 	}
 	if hasMore {
 		nextPage := params.Page + 1
@@ -44,10 +44,10 @@ func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, param
 }
 
 func (api TodoAppServer) CreateTodo(w http.ResponseWriter, r *http.Request) {
-	var req openapi.CreateTodoJSONRequestBody
+	var req gen.CreateTodoJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errResp := openapi.ErrorResp{}
-		errResp.Error.Code = openapi.BADREQUEST
+		errResp := gen.ErrorResp{}
+		errResp.Error.Code = gen.BADREQUEST
 		errResp.Error.Message = fmt.Sprintf("invalid request body: %v", err)
 
 		respondError(w, errResp)
@@ -56,17 +56,17 @@ func (api TodoAppServer) CreateTodo(w http.ResponseWriter, r *http.Request) {
 
 	todo, err := api.CreateTodoUseCase.Execute(r.Context(), req.Title, req.DueDate.Time)
 	if err != nil {
-		respondError(w, toOpenAPIError(err))
+		respondError(w, toError(err))
 		return
 	}
 
-	respondJSON(w, http.StatusCreated, toOpenAPITodo(todo))
+	respondJSON(w, http.StatusCreated, toTodo(todo))
 }
 func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todoId openapi_types.UUID) {
-	var req openapi.UpdateTodoJSONRequestBody
+	var req gen.UpdateTodoJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errResp := openapi.ErrorResp{}
-		errResp.Error.Code = openapi.BADREQUEST
+		errResp := gen.ErrorResp{}
+		errResp.Error.Code = gen.BADREQUEST
 		errResp.Error.Message = fmt.Sprintf("invalid request body: %v", err)
 
 		respondError(w, errResp)
@@ -77,9 +77,9 @@ func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todo
 	if req.DueDate != nil {
 		dueDate = &req.DueDate.Time
 	}
-	if req.Status != nil && *req.Status != openapi.DONE && *req.Status != openapi.OPEN {
-		errResp := openapi.ErrorResp{}
-		errResp.Error.Code = openapi.BADREQUEST
+	if req.Status != nil && *req.Status != gen.DONE && *req.Status != gen.OPEN {
+		errResp := gen.ErrorResp{}
+		errResp.Error.Code = gen.BADREQUEST
 		errResp.Error.Message = fmt.Sprintf("invalid request body: unknown TodoStatus value: %s", *req.Status)
 
 		respondError(w, errResp)
@@ -94,36 +94,19 @@ func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todo
 		dueDate,
 	)
 	if err != nil {
-		respondError(w, toOpenAPIError(err))
+		respondError(w, toError(err))
 		return
 	}
 
-	respondJSON(w, http.StatusOK, toOpenAPITodo(todo))
+	respondJSON(w, http.StatusOK, toTodo(todo))
 }
 
 func (api TodoAppServer) DeleteTodo(w http.ResponseWriter, r *http.Request, todoId openapi_types.UUID) {
-	err := api.DeleteTodoUseCase.Execute(r.Context(), uuid.UUID(todoId))
+	err := api.DeleteTodoUseCase.Execute(r.Context(), todoId)
 	if err != nil {
-		respondError(w, toOpenAPIError(err))
+		respondError(w, toError(err))
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func respondJSON(w http.ResponseWriter, statusCode int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	_ = json.NewEncoder(w).Encode(payload)
-}
-
-func respondError(w http.ResponseWriter, err openapi.ErrorResp) {
-	statusCode := http.StatusInternalServerError
-	switch err.Error.Code {
-	case openapi.BADREQUEST:
-		statusCode = http.StatusBadRequest
-	case openapi.NOTFOUND:
-		statusCode = http.StatusNotFound
-	}
-	respondJSON(w, statusCode, err)
 }

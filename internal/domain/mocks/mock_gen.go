@@ -1109,7 +1109,7 @@ func (_c *MockTodoRepository_DeleteTodo_Call) RunAndReturn(run func(ctx context.
 }
 
 // GetTodo provides a mock function for the type MockTodoRepository
-func (_mock *MockTodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo, error) {
+func (_mock *MockTodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo, bool, error) {
 	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
@@ -1117,8 +1117,9 @@ func (_mock *MockTodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (dom
 	}
 
 	var r0 domain.Todo
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) (domain.Todo, error)); ok {
+	var r1 bool
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) (domain.Todo, bool, error)); ok {
 		return returnFunc(ctx, id)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) domain.Todo); ok {
@@ -1126,12 +1127,17 @@ func (_mock *MockTodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (dom
 	} else {
 		r0 = ret.Get(0).(domain.Todo)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID) bool); ok {
 		r1 = returnFunc(ctx, id)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
-	return r0, r1
+	if returnFunc, ok := ret.Get(2).(func(context.Context, uuid.UUID) error); ok {
+		r2 = returnFunc(ctx, id)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
 }
 
 // MockTodoRepository_GetTodo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTodo'
@@ -1164,12 +1170,12 @@ func (_c *MockTodoRepository_GetTodo_Call) Run(run func(ctx context.Context, id 
 	return _c
 }
 
-func (_c *MockTodoRepository_GetTodo_Call) Return(todo domain.Todo, err error) *MockTodoRepository_GetTodo_Call {
-	_c.Call.Return(todo, err)
+func (_c *MockTodoRepository_GetTodo_Call) Return(todo domain.Todo, b bool, err error) *MockTodoRepository_GetTodo_Call {
+	_c.Call.Return(todo, b, err)
 	return _c
 }
 
-func (_c *MockTodoRepository_GetTodo_Call) RunAndReturn(run func(ctx context.Context, id uuid.UUID) (domain.Todo, error)) *MockTodoRepository_GetTodo_Call {
+func (_c *MockTodoRepository_GetTodo_Call) RunAndReturn(run func(ctx context.Context, id uuid.UUID) (domain.Todo, bool, error)) *MockTodoRepository_GetTodo_Call {
 	_c.Call.Return(run)
 	return _c
 }

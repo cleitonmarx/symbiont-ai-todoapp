@@ -218,8 +218,8 @@ func (_m *MockDeleteTodo) EXPECT() *MockDeleteTodo_Expecter {
 }
 
 // Execute provides a mock function for the type MockDeleteTodo
-func (_mock *MockDeleteTodo) Execute(ctx context.Context, todoID uuid.UUID) error {
-	ret := _mock.Called(ctx, todoID)
+func (_mock *MockDeleteTodo) Execute(ctx context.Context, id uuid.UUID) error {
+	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Execute")
@@ -227,7 +227,7 @@ func (_mock *MockDeleteTodo) Execute(ctx context.Context, todoID uuid.UUID) erro
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
-		r0 = returnFunc(ctx, todoID)
+		r0 = returnFunc(ctx, id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -241,12 +241,12 @@ type MockDeleteTodo_Execute_Call struct {
 
 // Execute is a helper method to define mock.On call
 //   - ctx context.Context
-//   - todoID uuid.UUID
-func (_e *MockDeleteTodo_Expecter) Execute(ctx interface{}, todoID interface{}) *MockDeleteTodo_Execute_Call {
-	return &MockDeleteTodo_Execute_Call{Call: _e.mock.On("Execute", ctx, todoID)}
+//   - id uuid.UUID
+func (_e *MockDeleteTodo_Expecter) Execute(ctx interface{}, id interface{}) *MockDeleteTodo_Execute_Call {
+	return &MockDeleteTodo_Execute_Call{Call: _e.mock.On("Execute", ctx, id)}
 }
 
-func (_c *MockDeleteTodo_Execute_Call) Run(run func(ctx context.Context, todoID uuid.UUID)) *MockDeleteTodo_Execute_Call {
+func (_c *MockDeleteTodo_Execute_Call) Run(run func(ctx context.Context, id uuid.UUID)) *MockDeleteTodo_Execute_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -269,7 +269,7 @@ func (_c *MockDeleteTodo_Execute_Call) Return(err error) *MockDeleteTodo_Execute
 	return _c
 }
 
-func (_c *MockDeleteTodo_Execute_Call) RunAndReturn(run func(ctx context.Context, todoID uuid.UUID) error) *MockDeleteTodo_Execute_Call {
+func (_c *MockDeleteTodo_Execute_Call) RunAndReturn(run func(ctx context.Context, id uuid.UUID) error) *MockDeleteTodo_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }

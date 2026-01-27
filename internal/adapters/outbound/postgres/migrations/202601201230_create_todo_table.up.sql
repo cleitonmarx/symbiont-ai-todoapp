@@ -1,8 +1,12 @@
+CREATE EXTENSION vector;
+
+
 CREATE TABLE todos (
     id                 UUID PRIMARY KEY,
     title              TEXT NOT NULL,
     status             TEXT NOT NULL,
     due_date           DATE NOT NULL,
+    embedding          VECTOR(1536),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -10,7 +14,7 @@ CREATE TABLE todos (
 
 CREATE INDEX IF NOT EXISTS idx_todos_created_at_desc ON todos(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_todos_status_created_at ON todos(status, created_at DESC);
-
+CREATE INDEX ON todos USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
 CREATE TABLE board_summary (
     id UUID PRIMARY KEY,

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain/mocks"
 	"github.com/stretchr/testify/assert"
@@ -91,11 +92,23 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 
 func createChatMessages(count int, role domain.ChatRole) []domain.ChatMessage {
 	messages := make([]domain.ChatMessage, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		messages[i] = domain.ChatMessage{
 			ChatRole: role,
 			Content:  "Test message",
 		}
 	}
 	return messages
+}
+
+func TestInitListChatMessages_Initialize(t *testing.T) {
+	idc := InitListChatMessages{}
+
+	_, err := idc.Initialize(context.Background())
+	assert.NoError(t, err)
+
+	uc, err := depend.Resolve[ListChatMessages]()
+	assert.NoError(t, err)
+	assert.NotNil(t, uc)
+
 }

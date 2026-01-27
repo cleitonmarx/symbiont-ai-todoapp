@@ -5,6 +5,7 @@ import (
 	stdlog "log"
 
 	"github.com/cleitonmarx/symbiont"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/workers"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/outbound/config"
@@ -50,6 +51,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 		).
 		Host(
 			&http.TodoAppServer{},
+			&graphql.TodoGraphQLServer{},
 			&workers.TodoEventSubscriber{},
 			&workers.MessageRelay{},
 		)

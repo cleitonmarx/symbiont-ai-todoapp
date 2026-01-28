@@ -4,8 +4,8 @@ include:
 services:
   todoapp:
     build:
-      context: ../..
-      dockerfile: ./examples/todoapp/Dockerfile
+      context: .
+      dockerfile: ./Dockerfile
     ports:
       - "8080:8080"
       - "8085:8085"
@@ -24,7 +24,9 @@ services:
       - PUBSUB_TOPIC_ID=Todo
       - PUBSUB_SUBSCRIPTION_ID=todo_summary_generator
       - LLM_MODEL_HOST=http://model-runner.docker.internal
-      - LLM_MODEL=ai/gpt-oss
+      - LLM_MODEL=gpt-oss
+      - LLM_EMBEDDING_MODEL=qwen3-embedding
+      - SUMMARY_BATCH_INTERVAL=1s
     models:
       - gpt-oss
       - qwen3-embedding

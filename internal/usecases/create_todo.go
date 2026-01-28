@@ -20,14 +20,18 @@ type CreateTodoImpl struct {
 	uow          domain.UnitOfWork
 	timeProvider domain.CurrentTimeProvider
 	createUUID   func() uuid.UUID
+	llmClient    domain.LLMClient
+	llmModel     string
 }
 
 // NewCreateTodoImpl creates a new instance of CreateTodoImpl.
-func NewCreateTodoImpl(uow domain.UnitOfWork, timeProvider domain.CurrentTimeProvider) CreateTodoImpl {
+func NewCreateTodoImpl(uow domain.UnitOfWork, timeProvider domain.CurrentTimeProvider, llmClient domain.LLMClient, llmModel string) CreateTodoImpl {
 	return CreateTodoImpl{
 		uow:          uow,
 		timeProvider: timeProvider,
 		createUUID:   uuid.New,
+		llmClient:    llmClient,
+		llmModel:     llmModel,
 	}
 }
 
@@ -50,6 +54,12 @@ func (cti CreateTodoImpl) Execute(ctx context.Context, title string, dueDate tim
 	if err := todo.Validate(now); tracing.RecordErrorAndStatus(span, err) {
 		return domain.Todo{}, err
 	}
+
+	embedding, err := cti.llmClient.Embed(spanCtx, cti.llmModel, todo.ToLLMInput())
+	if err != nil {
+		return domain.Todo{}, err
+	}
+	todo.Embedding = embedding
 
 	if err := cti.uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
 		err := uow.Todo().CreateTodo(spanCtx, todo)
@@ -74,10 +84,12 @@ func (cti CreateTodoImpl) Execute(ctx context.Context, title string, dueDate tim
 type InitCreateTodo struct {
 	Uow         domain.UnitOfWork          `resolve:""`
 	TimeService domain.CurrentTimeProvider `resolve:""`
+	LLMClient   domain.LLMClient           `resolve:""`
+	Model       string                     `config:"LLM_EMBEDDING_MODEL"`
 }
 
 // Initialize initializes the CreateTodoImpl use case and registers it in the dependency container.
 func (ict InitCreateTodo) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[CreateTodo](NewCreateTodoImpl(ict.Uow, ict.TimeService))
+	depend.Register[CreateTodo](NewCreateTodoImpl(ict.Uow, ict.TimeService, ict.LLMClient, ict.Model))
 	return ctx, nil
 }

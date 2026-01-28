@@ -15,35 +15,12 @@ import (
 )
 
 func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
-	fixedUUID := func() uuid.UUID {
-		return uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
-	}
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
-
-	todos := []domain.Todo{
-		{
-			ID:        fixedUUID(),
-			Title:     "Open task 1",
-			Status:    domain.TodoStatus_OPEN,
-			DueDate:   fixedTime.AddDate(0, 0, 5),
-			CreatedAt: fixedTime,
-			UpdatedAt: fixedTime,
-		},
-		{
-			ID:        uuid.MustParse("323e4567-e89b-12d3-a456-426614174000"),
-			Title:     "Done task 1",
-			Status:    domain.TodoStatus_DONE,
-			DueDate:   fixedTime.AddDate(0, 0, -1),
-			CreatedAt: fixedTime,
-			UpdatedAt: fixedTime,
-		},
-	}
-
 	boardSummary := domain.BoardSummary{
 		ID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 		Content: domain.BoardSummaryContent{
 			Counts: domain.TodoStatusCounts{
-				Open: 1,
+				Open: 2,
 				Done: 1,
 			},
 			NextUp: []domain.NextUpTodoItem{
@@ -52,19 +29,21 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 					Reason: "Due in 5 days",
 				},
 			},
-			Overdue:      []string{},
-			NearDeadline: []string{"Done task 1"},
-			Summary:      "You have 1 open todo and 1 completed todo.",
+			Overdue:      []string{"Todo task 2"},
+			NearDeadline: []string{"Open task 3"},
+			Summary:      "You have 2 open todos, 1 overdue todo, and 1 completed todo.",
 		},
 		Model:         "mistral",
 		GeneratedAt:   fixedTime,
 		SourceVersion: 1,
 	}
 
+	calculated := boardSummary.Content
+	calculated.Summary = ""
+
 	tests := map[string]struct {
 		setExpectations func(
 			*domain_mocks.MockBoardSummaryRepository,
-			*domain_mocks.MockTodoRepository,
 			*domain_mocks.MockCurrentTimeProvider,
 			*domain_mocks.MockLLMClient,
 		)
@@ -73,17 +52,20 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 		"success": {
 			setExpectations: func(
 				sr *domain_mocks.MockBoardSummaryRepository,
-				td *domain_mocks.MockTodoRepository,
 				tp *domain_mocks.MockCurrentTimeProvider,
 				c *domain_mocks.MockLLMClient,
 			) {
-				td.EXPECT().ListTodos(
-					mock.Anything,
-					1,
-					1000,
-				).Return(todos, false, nil)
 
 				tp.EXPECT().Now().Return(fixedTime)
+
+				sr.EXPECT().CalculateSummaryContent(mock.Anything).
+					Return(
+						calculated,
+						nil,
+					)
+
+				sr.EXPECT().GetLatestSummary(mock.Anything).
+					Return(domain.BoardSummary{}, false, nil)
 
 				c.EXPECT().Chat(
 					mock.Anything,
@@ -92,16 +74,10 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 							len(req.Messages) == 2 &&
 							req.Messages[0].Role == "system" &&
 							req.Messages[1].Role == "user" &&
-							strings.Contains(req.Messages[0].Content, "You are a JSON-only processor") &&
-							strings.Contains(req.Messages[1].Content, "Open task 1")
+							strings.Contains(req.Messages[0].Content, "You are a helpful assistant that summarizes todo lists") &&
+							strings.Contains(req.Messages[1].Content, `"counts":{"OPEN":2,"DONE":1}`)
 					}),
-				).Return(`{
-					"counts": { "OPEN": 1, "DONE": 1 },
-					"next_up": [ { "title": "Open task 1", "reason": "Due in 5 days" } ],
-					"overdue": [],
-					"near_deadline": [ "Done task 1" ],
-					"summary": "You have 1 open todo and 1 completed todo."
-				}`, nil)
+				).Return("You have 2 open todos, 1 overdue todo, and 1 completed todo.", nil)
 
 				sr.EXPECT().StoreSummary(
 					mock.Anything,
@@ -110,35 +86,22 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"list-todos-error": {
-			setExpectations: func(
-				sr *domain_mocks.MockBoardSummaryRepository,
-				td *domain_mocks.MockTodoRepository,
-				tp *domain_mocks.MockCurrentTimeProvider,
-				c *domain_mocks.MockLLMClient,
-			) {
-				td.EXPECT().ListTodos(
-					mock.Anything,
-					1,
-					1000,
-				).Return(nil, false, assert.AnError)
-			},
-			expectedErr: assert.AnError,
-		},
 		"llm-client-error": {
 			setExpectations: func(
 				sr *domain_mocks.MockBoardSummaryRepository,
-				td *domain_mocks.MockTodoRepository,
 				tp *domain_mocks.MockCurrentTimeProvider,
 				c *domain_mocks.MockLLMClient,
 			) {
-				td.EXPECT().ListTodos(
-					mock.Anything,
-					1,
-					1000,
-				).Return(todos, false, nil)
-
 				tp.EXPECT().Now().Return(fixedTime)
+
+				sr.EXPECT().CalculateSummaryContent(mock.Anything).
+					Return(
+						calculated,
+						nil,
+					)
+
+				sr.EXPECT().GetLatestSummary(mock.Anything).
+					Return(domain.BoardSummary{}, false, nil)
 
 				c.EXPECT().Chat(
 					mock.Anything,
@@ -147,20 +110,48 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 			},
 			expectedErr: assert.AnError,
 		},
+		"store-summary-error": {
+			setExpectations: func(
+				sr *domain_mocks.MockBoardSummaryRepository,
+				tp *domain_mocks.MockCurrentTimeProvider,
+				c *domain_mocks.MockLLMClient,
+			) {
+				tp.EXPECT().Now().Return(fixedTime)
+
+				sr.EXPECT().CalculateSummaryContent(mock.Anything).
+					Return(
+						calculated,
+						nil,
+					)
+
+				sr.EXPECT().GetLatestSummary(mock.Anything).
+					Return(domain.BoardSummary{}, false, nil)
+
+				c.EXPECT().Chat(
+					mock.Anything,
+					mock.Anything,
+				).Return("You have 2 open todos, 1 overdue todo, and 1 completed todo.", nil)
+
+				sr.EXPECT().StoreSummary(
+					mock.Anything,
+					boardSummary,
+				).Return(assert.AnError)
+			},
+			expectedErr: assert.AnError,
+		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			sr := domain_mocks.NewMockBoardSummaryRepository(t)
-			td := domain_mocks.NewMockTodoRepository(t)
 			tp := domain_mocks.NewMockCurrentTimeProvider(t)
 			c := domain_mocks.NewMockLLMClient(t)
 
 			if tt.setExpectations != nil {
-				tt.setExpectations(sr, td, tp, c)
+				tt.setExpectations(sr, tp, c)
 			}
 
-			gbs := NewGenerateBoardSummaryImpl(sr, td, tp, c, "mistral", nil)
+			gbs := NewGenerateBoardSummaryImpl(sr, tp, c, "mistral", nil)
 
 			err := gbs.Execute(context.Background())
 			assert.Equal(t, tt.expectedErr, err)

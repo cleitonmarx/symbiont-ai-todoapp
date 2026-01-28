@@ -147,6 +147,29 @@ func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, on
 	return onEvent(domain.LLMStreamEventType_Done, done)
 }
 
+func (a LLMClient) Embed(ctx context.Context, model, input string) ([]float64, error) {
+	spanCtx, span := tracing.Start(ctx)
+	defer span.End()
+
+	req := EmbeddingsRequest{
+		Model: model,
+		Input: input,
+	}
+
+	resp, err := a.client.Embeddings(spanCtx, req)
+	if tracing.RecordErrorAndStatus(span, err) {
+		return nil, err
+	}
+
+	if len(resp.Data) == 0 {
+		err := errors.New("no embedding data in response")
+		tracing.RecordErrorAndStatus(span, err)
+		return nil, err
+	}
+
+	return resp.Data[0].Embedding, nil
+}
+
 // estimateTokenCount estimates tokens from messages
 func estimateTokenCount(messages []ChatMessage) int {
 	totalWords := 0

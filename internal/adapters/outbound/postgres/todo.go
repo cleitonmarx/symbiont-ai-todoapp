@@ -9,6 +9,7 @@ import (
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
 	"github.com/google/uuid"
+	"github.com/pgvector/pgvector-go"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -48,7 +49,6 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 		Select(
 			todoFields...,
 		).From("todos").
-		OrderBy("created_at DESC").
 		Limit(uint64(pageSize + 1)). // fetch one extra to determine if there's more
 		Offset(uint64((page - 1) * pageSize))
 
@@ -59,6 +59,15 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 
 	if params.Status != nil {
 		qry = qry.Where(squirrel.Eq{"status": *params.Status})
+	}
+
+	if len(params.Embedding) > 0 {
+		qry = qry.OrderByClause(squirrel.Expr(
+			"embedding <-> ? ASC",
+			pgvector.NewVector(toFloat32Truncated(params.Embedding)),
+		)).OrderBy("created_at DESC")
+	} else {
+		qry = qry.OrderBy("created_at DESC")
 	}
 
 	rows, err := qry.QueryContext(spanCtx)
@@ -103,13 +112,20 @@ func (tr TodoRepository) CreateTodo(ctx context.Context, todo domain.Todo) error
 	_, err := tr.sb.
 		Insert("todos").
 		Columns(
-			todoFields...,
+			"id",
+			"title",
+			"status",
+			"due_date",
+			"embedding",
+			"created_at",
+			"updated_at",
 		).
 		Values(
 			todo.ID,
 			todo.Title,
 			todo.Status,
 			todo.DueDate,
+			pgvector.NewVector(toFloat32Truncated(todo.Embedding)),
 			todo.CreatedAt,
 			todo.UpdatedAt,
 		).
@@ -132,6 +148,7 @@ func (tr TodoRepository) UpdateTodo(ctx context.Context, todo domain.Todo) error
 		Set("title", todo.Title).
 		Set("status", todo.Status).
 		Set("due_date", todo.DueDate).
+		Set("embedding", pgvector.NewVector(toFloat32Truncated(todo.Embedding))).
 		Set("updated_at", todo.UpdatedAt).
 		Where(squirrel.Eq{"id": todo.ID}).
 		ExecContext(spanCtx)
@@ -199,4 +216,15 @@ type InitTodoRepository struct {
 func (tr InitTodoRepository) Initialize(ctx context.Context) (context.Context, error) {
 	depend.Register[domain.TodoRepository](NewTodoRepository(tr.DB))
 	return ctx, nil
+}
+
+func toFloat32Truncated(input []float64) []float32 {
+	f32 := make([]float32, len(input))
+	for i, v := range input {
+		f32[i] = float32(v)
+	}
+	if len(f32) > 1536 {
+		f32 = f32[:1536]
+	}
+	return f32
 }

@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -28,7 +29,6 @@ type GenerateBoardSummary interface {
 // GenerateBoardSummaryImpl is the implementation of the GenerateBoardSummary use case.
 type GenerateBoardSummaryImpl struct {
 	summaryRepo  domain.BoardSummaryRepository
-	todoRepo     domain.TodoRepository
 	timeProvider domain.CurrentTimeProvider
 	llmClient    domain.LLMClient
 	model        string
@@ -39,7 +39,6 @@ type GenerateBoardSummaryImpl struct {
 // NewGenerateBoardSummaryImpl creates a new instance of GenerateBoardSummaryImpl.
 func NewGenerateBoardSummaryImpl(
 	bsr domain.BoardSummaryRepository,
-	td domain.TodoRepository,
 	tp domain.CurrentTimeProvider,
 	c domain.LLMClient,
 	m string,
@@ -48,7 +47,6 @@ func NewGenerateBoardSummaryImpl(
 ) GenerateBoardSummaryImpl {
 	return GenerateBoardSummaryImpl{
 		summaryRepo:  bsr,
-		todoRepo:     td,
 		timeProvider: tp,
 		llmClient:    c,
 		model:        m,
@@ -61,16 +59,7 @@ func (gs GenerateBoardSummaryImpl) Execute(ctx context.Context) error {
 	spanCtx, span := tracing.Start(ctx)
 	defer span.End()
 
-	todos, _, err := gs.todoRepo.ListTodos(
-		spanCtx,
-		1,
-		1000,
-	)
-	if tracing.RecordErrorAndStatus(span, err) {
-		return err
-	}
-
-	summary, err := gs.generateBoardSummary(spanCtx, todos)
+	summary, err := gs.generateBoardSummary(spanCtx)
 	if tracing.RecordErrorAndStatus(span, err) {
 		return err
 	}
@@ -87,9 +76,23 @@ func (gs GenerateBoardSummaryImpl) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context, todos []domain.Todo) (domain.BoardSummary, error) {
+func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context) (domain.BoardSummary, error) {
+
+	new, err := gs.summaryRepo.CalculateSummaryContent(ctx)
+	if err != nil {
+		return domain.BoardSummary{}, fmt.Errorf("failed to calculate summary content: %w", err)
+	}
+
+	previous, found, err := gs.summaryRepo.GetLatestSummary(ctx)
+	if err != nil {
+		return domain.BoardSummary{}, fmt.Errorf("failed to get latest summary: %w", err)
+	}
+	if !found {
+		previous.Content.Summary = "no previous summary"
+	}
+
 	now := gs.timeProvider.Now()
-	promptMessages, err := buildPromptMessages(todos, now)
+	promptMessages, err := buildPromptMessages(new, previous.Content, now)
 	if err != nil {
 		return domain.BoardSummary{}, fmt.Errorf("failed to build prompt: %w", err)
 	}
@@ -98,7 +101,7 @@ func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context, tod
 		Model:       gs.model,
 		Stream:      false,
 		Temperature: common.Ptr[float64](0),
-		TopP:        common.Ptr(0.1),
+		TopP:        common.Ptr(0.7),
 		Messages:    promptMessages,
 	}
 
@@ -107,47 +110,33 @@ func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context, tod
 		return domain.BoardSummary{}, err
 	}
 
-	summary, err := parseResponse(content)
-	if err != nil {
-		return domain.BoardSummary{}, fmt.Errorf("failed to parse LLM response: %w", err)
-	}
+	new.Summary = strings.TrimSpace(content)
 
-	summary.ID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
-	summary.Model = gs.model
-	summary.GeneratedAt = now
-	summary.SourceVersion = 1
+	summary := domain.BoardSummary{
+		ID:            uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		Content:       new,
+		Model:         gs.model,
+		GeneratedAt:   now,
+		SourceVersion: 1,
+	}
 
 	return summary, nil
-}
-
-// parseResponse extracts the BoardSummary from the LLM response.
-func parseResponse(response string) (domain.BoardSummary, error) {
-	// Extract JSON from response (in case there's extra text)
-	jsonStart := strings.Index(response, "{")
-	jsonEnd := strings.LastIndex(response, "}") + 1
-
-	if jsonStart == -1 || jsonEnd <= jsonStart {
-		return domain.BoardSummary{}, fmt.Errorf("no JSON found in response: %s", response)
-	}
-
-	jsonStr := response[jsonStart:jsonEnd]
-
-	var content domain.BoardSummaryContent
-	if err := json.Unmarshal([]byte(jsonStr), &content); err != nil {
-		return domain.BoardSummary{}, fmt.Errorf("failed to unmarshal JSON: %w", err)
-	}
-
-	return domain.BoardSummary{
-		Content: content,
-	}, nil
 }
 
 //go:embed prompts/summary.yml
 var summaryPrompt embed.FS
 
 // buildPromptMessages constructs the LLM messages for the summary prompt.
-func buildPromptMessages(todos []domain.Todo, now time.Time) ([]domain.LLMChatMessage, error) {
-	todosJSON := buildTodosJSON(todos)
+func buildPromptMessages(new domain.BoardSummaryContent, previous domain.BoardSummaryContent, now time.Time) ([]domain.LLMChatMessage, error) {
+	inputJSON, err := marshalSummaryContent(new)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal summary content: %w", err)
+	}
+
+	previousJSON, err := marshalSummaryContent(previous)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal previous summary content: %w", err)
+	}
 
 	file, err := summaryPrompt.Open("prompts/summary.yml")
 	if err != nil {
@@ -165,10 +154,10 @@ func buildPromptMessages(todos []domain.Todo, now time.Time) ([]domain.LLMChatMe
 		if msg.Role != "user" {
 			continue
 		}
-		msg.Content = fmt.Sprintf(msg.Content,
-			now.Format(time.DateOnly),
-			now.AddDate(0, 0, 7).Format(time.DateOnly),
-			todosJSON,
+		msg.Content = fmt.Sprintf(
+			msg.Content,
+			inputJSON,
+			previousJSON,
 		)
 		messages[i] = msg
 	}
@@ -176,10 +165,24 @@ func buildPromptMessages(todos []domain.Todo, now time.Time) ([]domain.LLMChatMe
 	return messages, nil
 }
 
+func marshalSummaryContent(sc domain.BoardSummaryContent) (string, error) {
+	summaryContentJSON, err := json.MarshalIndent(sc, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal summary content: %w", err)
+	}
+
+	var buf bytes.Buffer
+	err = json.Compact(&buf, summaryContentJSON)
+	if err != nil {
+		return "", fmt.Errorf("failed to compact summary content JSON: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
 // InitGenerateBoardSummary initializes the GenerateBoardSummary use case.
 type InitGenerateBoardSummary struct {
 	SummaryRepo  domain.BoardSummaryRepository `resolve:""`
-	TodoRepo     domain.TodoRepository         `resolve:""`
 	TimeProvider domain.CurrentTimeProvider    `resolve:""`
 	LLMClient    domain.LLMClient              `resolve:""`
 	Model        string                        `config:"LLM_MODEL"`
@@ -189,7 +192,7 @@ type InitGenerateBoardSummary struct {
 func (igbs InitGenerateBoardSummary) Initialize(ctx context.Context) (context.Context, error) {
 	queue, _ := depend.Resolve[CompletedSummaryQueue]()
 	depend.Register[GenerateBoardSummary](NewGenerateBoardSummaryImpl(
-		igbs.SummaryRepo, igbs.TodoRepo, igbs.TimeProvider, igbs.LLMClient, igbs.Model, queue,
+		igbs.SummaryRepo, igbs.TimeProvider, igbs.LLMClient, igbs.Model, queue,
 	))
 	return ctx, nil
 }

@@ -209,8 +209,8 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
                   : 'No todos selected'}
                 </div>
                 <div className="pagination-buttons">
-                  <button className="btn-secondary" disabled={!hasPreviousPage} onClick={() => setBatchPage(batchPage - 1)}>←</button>
-                  <button className="btn-secondary" disabled={!hasNextPage} onClick={() => setBatchPage(batchPage + 1)}>→</button>
+                  <button className="btn-primary" disabled={!hasPreviousPage} onClick={() => setBatchPage(batchPage - 1)}>←</button>
+                  <button className="btn-primary" disabled={!hasNextPage} onClick={() => setBatchPage(batchPage + 1)}>→</button>
                 </div>
               </div>
               

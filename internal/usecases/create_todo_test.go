@@ -23,26 +23,41 @@ func TestCreateTodoImpl_Execute(t *testing.T) {
 		ID:        fixedUUID(),
 		Title:     "My new todo",
 		Status:    domain.TodoStatus_OPEN,
+		Embedding: []float64{0.1, 0.2, 0.3},
 		CreatedAt: fixedTime,
 		UpdatedAt: fixedTime,
 		DueDate:   fixedTime,
 	}
 
 	tests := map[string]struct {
-		setExpectations func(uow *domain_mocks.MockUnitOfWork, timeProvider *domain_mocks.MockCurrentTimeProvider)
-		title           string
-		dueDate         time.Time
-		expectedTodo    domain.Todo
-		expectedErr     error
+		setExpectations func(
+			uow *domain_mocks.MockUnitOfWork,
+			timeProvider *domain_mocks.MockCurrentTimeProvider,
+			llmClient *domain_mocks.MockLLMClient,
+		)
+		title        string
+		dueDate      time.Time
+		expectedTodo domain.Todo
+		expectedErr  error
 	}{
 		"success": {
 			title:   "My new todo",
 			dueDate: fixedTime,
-			setExpectations: func(uow *domain_mocks.MockUnitOfWork, timeProvider *domain_mocks.MockCurrentTimeProvider) {
+			setExpectations: func(
+				uow *domain_mocks.MockUnitOfWork,
+				timeProvider *domain_mocks.MockCurrentTimeProvider,
+				llmClient *domain_mocks.MockLLMClient,
+			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
 				repo := domain_mocks.NewMockTodoRepository(t)
 				outbox := domain_mocks.NewMockOutboxRepository(t)
+
+				llmClient.EXPECT().Embed(
+					mock.Anything,
+					"model-name",
+					"Task: My new todo | Status: OPEN | Due: 2024-01-01",
+				).Return([]float64{0.1, 0.2, 0.3}, nil)
 
 				uow.EXPECT().Todo().Return(repo)
 				uow.EXPECT().Outbox().Return(outbox)
@@ -72,34 +87,51 @@ func TestCreateTodoImpl_Execute(t *testing.T) {
 		"validation-error-short-title": {
 			title:   "Hi",
 			dueDate: fixedTime,
-			setExpectations: func(uow *domain_mocks.MockUnitOfWork, timeProvider *domain_mocks.MockCurrentTimeProvider) {
+			setExpectations: func(
+				uow *domain_mocks.MockUnitOfWork,
+				timeProvider *domain_mocks.MockCurrentTimeProvider,
+				llmClient *domain_mocks.MockLLMClient,
+			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 			},
 			expectedTodo: domain.Todo{},
 			expectedErr:  domain.NewValidationErr("title must be between 3 and 200 characters"),
 		},
-		"validation-error-long-title": {
-			title: func() string {
-				longTitle := ""
-				for range 201 {
-					longTitle += "a"
-				}
-				return longTitle
-			}(),
+		"embedding-error": {
+			title:   "My new todo",
 			dueDate: fixedTime,
-			setExpectations: func(uow *domain_mocks.MockUnitOfWork, timeProvider *domain_mocks.MockCurrentTimeProvider) {
+			setExpectations: func(
+				uow *domain_mocks.MockUnitOfWork,
+				timeProvider *domain_mocks.MockCurrentTimeProvider,
+				llmClient *domain_mocks.MockLLMClient,
+			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
+
+				llmClient.EXPECT().Embed(
+					mock.Anything,
+					"model-name",
+					"Task: My new todo | Status: OPEN | Due: 2024-01-01",
+				).Return(nil, errors.New("LLM service unavailable"))
 			},
 			expectedTodo: domain.Todo{},
-			expectedErr:  domain.NewValidationErr("title must be between 3 and 200 characters"),
+			expectedErr:  errors.New("LLM service unavailable"),
 		},
 		"repository-error": {
 			title:   "My new todo",
 			dueDate: fixedTime,
-			setExpectations: func(uow *domain_mocks.MockUnitOfWork, timeProvider *domain_mocks.MockCurrentTimeProvider) {
+			setExpectations: func(
+				uow *domain_mocks.MockUnitOfWork,
+				timeProvider *domain_mocks.MockCurrentTimeProvider,
+				llmClient *domain_mocks.MockLLMClient,
+			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
 				repo := domain_mocks.NewMockTodoRepository(t)
+				llmClient.EXPECT().Embed(
+					mock.Anything,
+					"model-name",
+					"Task: My new todo | Status: OPEN | Due: 2024-01-01",
+				).Return([]float64{0.1, 0.2, 0.3}, nil)
 
 				uow.EXPECT().Todo().Return(repo)
 				uow.EXPECT().
@@ -121,11 +153,12 @@ func TestCreateTodoImpl_Execute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			uow := domain_mocks.NewMockUnitOfWork(t)
 			timeProvider := domain_mocks.NewMockCurrentTimeProvider(t)
+			llmClient := domain_mocks.NewMockLLMClient(t)
 			if tt.setExpectations != nil {
-				tt.setExpectations(uow, timeProvider)
+				tt.setExpectations(uow, timeProvider, llmClient)
 			}
 
-			cti := NewCreateTodoImpl(uow, timeProvider)
+			cti := NewCreateTodoImpl(uow, timeProvider, llmClient, "model-name")
 			cti.createUUID = fixedUUID
 
 			got, gotErr := cti.Execute(context.Background(), tt.title, tt.dueDate)

@@ -1,7 +1,9 @@
 services:
   postgres:
-    #image: postgres:15
-    image:  pgvector/pgvector:pg15
+    image:  pgvector/pgvector:pg18-trixie
+    entrypoint: >
+      sh -c "echo 'CREATE EXTENSION IF NOT EXISTS vector;' > /docker-entrypoint-initdb.d/init_vector.sql 
+      && exec docker-entrypoint.sh postgres"
     environment:
       POSTGRES_USER: todoapp
       POSTGRES_PASSWORD: todoapppass
@@ -59,8 +61,7 @@ services:
 
 models:
   gpt-oss:
-    model: ai/gpt-oss:latest
+    model: gpt-oss:latest
     context_size: 8192
   qwen3-embedding:
-    model: ai/qwen3-embedding:latest
-  
+    model: qwen3-embedding:latest

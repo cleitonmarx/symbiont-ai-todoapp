@@ -29,6 +29,9 @@ var (
 // SpanNameFormatter formats span names for HTTP requests.
 // It uses the HTTP method and URL path as the span name.
 func SpanNameFormatter(_ string, r *http.Request) string {
+	if r.Pattern != "" {
+		return r.Pattern
+	}
 	return fmt.Sprintf("%s %s", r.Method, r.URL.Path)
 }
 

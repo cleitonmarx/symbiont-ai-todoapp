@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/stretchr/testify/assert"
 )
@@ -315,4 +316,105 @@ func TestLLMClientAdapter_Chat_ValidationErrors(t *testing.T) {
 			assert.Error(t, err)
 		})
 	}
+}
+
+func TestLLMClientAdapter_Embed(t *testing.T) {
+	tests := map[string]struct {
+		response    string
+		statusCode  int
+		model       string
+		input       string
+		expectErr   bool
+		expectedVec []float32
+	}{
+		"success": {
+			response: `{
+                "model": "ai/qwen3-embedding",
+                "object": "list",
+                "usage": { "prompt_tokens": 6, "total_tokens": 6 },
+                "data": [
+                    {
+                        "embedding": [1.1, 2.2, 3.3],
+                        "index": 0,
+                        "object": "embedding"
+                    }
+                ]
+            }`,
+			statusCode:  http.StatusOK,
+			model:       "ai/qwen3-embedding",
+			input:       "A dog is an animal",
+			expectedVec: []float32{1.1, 2.2, 3.3},
+		},
+		"no-embedding-data": {
+			response: `{
+                "model": "ai/qwen3-embedding",
+                "object": "list",
+                "usage": { "prompt_tokens": 6, "total_tokens": 6 },
+                "data": []
+            }`,
+			statusCode: http.StatusOK,
+			model:      "ai/qwen3-embedding",
+			input:      "A dog is an animal",
+			expectErr:  true,
+		},
+		"server-error": {
+			response:   `Internal Server Error`,
+			statusCode: http.StatusInternalServerError,
+			model:      "ai/qwen3-embedding",
+			input:      "A dog is an animal",
+			expectErr:  true,
+		},
+		"invalid-json": {
+			response:   `{invalid json}`,
+			statusCode: http.StatusOK,
+			model:      "ai/qwen3-embedding",
+			input:      "A dog is an animal",
+			expectErr:  true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.response)) //nolint:errcheck
+			}))
+			defer server.Close()
+
+			client := NewDRMAPIClient(server.URL, "", server.Client())
+			adapter := NewLLMClientAdapter(client)
+
+			vec, err := adapter.Embed(context.Background(), tt.model, tt.input)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedVec, vec)
+		})
+	}
+}
+
+func TestInitLLMClient_Initialize(t *testing.T) {
+	i := InitLLMClient{}
+
+	_, err := i.Initialize(context.Background())
+	assert.NoError(t, err)
+
+	r, err := depend.Resolve[domain.LLMClient]()
+	assert.NotNil(t, r)
+	assert.NoError(t, err)
+}
+
+func Test(t *testing.T) {
+	client := NewDRMAPIClient("http://localhost:12434", "", http.DefaultClient)
+
+	adapter := NewLLMClientAdapter(client)
+	resp, err := adapter.Embed(context.Background(), "qwen3-embedding", "A dog is an animal")
+	assert.NoError(t, err)
+
+	fmt.Println("Embedding:", resp)
+
 }

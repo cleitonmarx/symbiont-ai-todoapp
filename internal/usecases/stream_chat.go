@@ -3,7 +3,6 @@ package usecases
 import (
 	"context"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -23,41 +22,51 @@ type StreamChat interface {
 
 // StreamChatImpl is the implementation of the StreamChat use case
 type StreamChatImpl struct {
-	chatMessageRepo domain.ChatMessageRepository
-	todoRepo        domain.TodoRepository
-	llmClient       domain.LLMClient
-	llmModel        string
+	chatMessageRepo    domain.ChatMessageRepository
+	todoRepo           domain.TodoRepository
+	llmClient          domain.LLMClient
+	llmModel           string
+	llmEmbreddingModel string
 }
 
 // NewStreamChatImpl creates a new instance of StreamChatImpl
-func NewStreamChatImpl(chatMessageRepo domain.ChatMessageRepository, todoRepo domain.TodoRepository, llmClient domain.LLMClient, llmModel string) StreamChatImpl {
+func NewStreamChatImpl(chatMessageRepo domain.ChatMessageRepository, todoRepo domain.TodoRepository, llmClient domain.LLMClient, llmModel string, llmEmbeddingModel string) StreamChatImpl {
 	return StreamChatImpl{
-		chatMessageRepo: chatMessageRepo,
-		todoRepo:        todoRepo,
-		llmClient:       llmClient,
-		llmModel:        llmModel,
+		chatMessageRepo:    chatMessageRepo,
+		todoRepo:           todoRepo,
+		llmClient:          llmClient,
+		llmModel:           llmModel,
+		llmEmbreddingModel: llmEmbeddingModel,
 	}
 }
 
-// buildTodosJSON creates the todos JSON for the prompt
-func buildTodosJSON(todos []domain.Todo) string {
-	jsonBytes, _ := json.Marshal(todos)
-	return string(jsonBytes)
+// buildTodosInput creates the
+func buildTodosInput(todos []domain.Todo) string {
+	b := strings.Builder{}
+	for _, t := range todos {
+		b.WriteString(t.ToLLMInput() + "\n")
+	}
+	return b.String()
 }
 
 //go:embed prompts/chat.yml
 var chatPrompt embed.FS
 
 // buildSystemPrompt creates a system prompt with current todos context
-func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context) ([]domain.LLMChatMessage, error) {
-	// Fetch all todos
-	todos, _, err := sc.todoRepo.ListTodos(ctx, 1, 1000)
+func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, userMsg string) ([]domain.LLMChatMessage, error) {
+	embed, err := sc.llmClient.Embed(ctx, sc.llmEmbreddingModel, userMsg)
 	if err != nil {
 		return nil, err
 	}
 
-	// Build todos JSON
-	todosJSON := buildTodosJSON(todos)
+	// Fetch all todos related to the embedding
+	todos, _, err := sc.todoRepo.ListTodos(ctx, 1, 30, domain.WithEmbedding(embed))
+	if err != nil {
+		return nil, err
+	}
+
+	// Build todos input
+	todosInput := buildTodosInput(todos)
 
 	file, err := chatPrompt.Open("prompts/chat.yml")
 	if err != nil {
@@ -74,7 +83,7 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context) ([]domain.LLMCha
 	for i, msg := range messages {
 		if msg.Role == domain.ChatRole_System {
 			msg.Content = fmt.Sprintf(msg.Content,
-				todosJSON,
+				todosInput,
 			)
 			messages[i] = msg
 		}
@@ -89,7 +98,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 	defer span.End()
 
 	// Build system prompt with todo context
-	systemPrompt, err := sc.buildSystemPrompt(spanCtx)
+	systemPrompt, err := sc.buildSystemPrompt(spanCtx, userMessage)
 	if tracing.RecordErrorAndStatus(span, err) {
 		return err
 	}
@@ -226,10 +235,11 @@ type InitStreamChat struct {
 	TodoRepo        domain.TodoRepository        `resolve:""`
 	LLMClient       domain.LLMClient             `resolve:""`
 	LLMModel        string                       `config:"LLM_MODEL"`
+	EmbeddingModel  string                       `config:"LLM_EMBEDDING_MODEL"`
 }
 
 // Initialize registers the StreamChat use case in the dependency container
 func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[StreamChat](NewStreamChatImpl(i.ChatMessageRepo, i.TodoRepo, i.LLMClient, i.LLMModel))
+	depend.Register[StreamChat](NewStreamChatImpl(i.ChatMessageRepo, i.TodoRepo, i.LLMClient, i.LLMModel, i.EmbeddingModel))
 	return ctx, nil
 }

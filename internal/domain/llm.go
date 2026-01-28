@@ -71,4 +71,7 @@ type LLMClient interface {
 
 	// Chat sends a chat request to the LLM and returns the full assistant response
 	Chat(ctx context.Context, req LLMChatRequest) (string, error)
+
+	// Embed generates an embedding vector for the given input text
+	Embed(ctx context.Context, model, input string) ([]float64, error)
 }

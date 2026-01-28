@@ -23,8 +23,9 @@ type Todo struct {
 	Title     string     `json:"title"`
 	DueDate   time.Time  `json:"due_date"`
 	Status    TodoStatus `json:"status"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	Embedding []float64
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func (t Todo) Validate(now time.Time) error {
@@ -48,9 +49,15 @@ func (t Todo) Validate(now time.Time) error {
 	return nil
 }
 
+// ToLLMInput formats the todo item as a string suitable for LLM input.
+func (t Todo) ToLLMInput() string {
+	return "Task: " + t.Title + " | Status: " + string(t.Status) + " | Due: " + t.DueDate.Format(time.DateOnly)
+}
+
 // ListTodosParams represents the parameters for listing todo items.
 type ListTodosParams struct {
-	Status *TodoStatus
+	Status    *TodoStatus
+	Embedding []float64
 }
 
 // ListTodoOptions defines a function type for modifying ListTodosParams.
@@ -60,6 +67,13 @@ type ListTodoOptions func(*ListTodosParams)
 func WithStatus(status TodoStatus) ListTodoOptions {
 	return func(params *ListTodosParams) {
 		params.Status = &status
+	}
+}
+
+// WithEmbedding is a ListTodoOptions that filters todos by their embedding similarity to the provided embedding.
+func WithEmbedding(embedding []float64) ListTodoOptions {
+	return func(params *ListTodosParams) {
+		params.Embedding = embedding
 	}
 }
 

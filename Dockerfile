@@ -3,7 +3,7 @@ FROM node:18-alpine AS webapp-builder
 
 WORKDIR /webapp
 
-COPY examples/todoapp/webapp/ ./
+COPY webapp/ ./
 
 RUN npm install --legacy-peer-deps
 
@@ -14,23 +14,24 @@ FROM golang:1.25.3 AS go-builder
 
 WORKDIR /build
 
-# Copy the parent symbiont module to /build
+COPY go.mod go.sum ./
+
+RUN go mod download -x
+
 COPY . .
 
-WORKDIR /build/examples/todoapp
+##WORKDIR /build/todoapp
 
 # Copy webapp static files
 COPY --from=webapp-builder /webapp/dist ./internal/adapters/inbound/http/webappdist
 
-RUN go mod download
-
-RUN CGO_ENABLED=0 GOOS=linux go build -o todoapp ./cmd/todoapp
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o todoapp ./cmd/todoapp
 
 ## Minimal runtime image
 FROM scratch
 
 COPY --from=go-builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY --from=go-builder /build/examples/todoapp/todoapp .
+COPY --from=go-builder /build/todoapp .
 
 CMD ["/todoapp"]

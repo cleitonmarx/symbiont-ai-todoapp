@@ -232,3 +232,74 @@ func (c DRMAPIClient) ChatStream(ctx context.Context, req ChatRequest, onChunk C
 
 	return scanner.Err()
 }
+
+// EmbeddingsRequest represents the request payload for the embeddings endpoint.
+type EmbeddingsRequest struct {
+	Model string      `json:"model"`
+	Input interface{} `json:"input"` // string or []string
+}
+
+// EmbeddingsUsage represents the token usage for embeddings
+type EmbeddingsUsage struct {
+	PromptTokens int `json:"prompt_tokens"`
+	TotalTokens  int `json:"total_tokens"`
+}
+
+// EmbeddingData represents a single embedding
+type EmbeddingData struct {
+	Embedding []float64 `json:"embedding"`
+	Index     int       `json:"index"`
+	Object    string    `json:"object"`
+}
+
+// EmbeddingsResponse represents the response from the embeddings endpoint.
+type EmbeddingsResponse struct {
+	Model  string          `json:"model"`
+	Object string          `json:"object"`
+	Usage  EmbeddingsUsage `json:"usage"`
+	Data   []EmbeddingData `json:"data"`
+}
+
+// Embeddings calls the /engines/v1/embeddings endpoint.
+func (c DRMAPIClient) Embeddings(ctx context.Context, req EmbeddingsRequest) (*EmbeddingsResponse, error) {
+	endpoint, err := url.JoinPath(c.baseURL, "/engines/v1/embeddings")
+	if err != nil {
+		return nil, fmt.Errorf("invalid base URL: %w", err)
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	resp, err := c.http.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("http do: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("non-2xx response: %s: %s", resp.Status, string(respBody))
+	}
+
+	var out EmbeddingsResponse
+	if err := json.Unmarshal(respBody, &out); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	return &out, nil
+}

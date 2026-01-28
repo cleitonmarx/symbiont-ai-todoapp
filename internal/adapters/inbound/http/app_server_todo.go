@@ -24,6 +24,7 @@ func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, param
 
 	todos, hasMore, err := api.ListTodosUseCase.Query(r.Context(), params.Page, params.Pagesize, queryParams...)
 	if err != nil {
+		api.Logger.Printf("Error listing todos: %v", err)
 		respondError(w, toError(err))
 		return
 	}
@@ -56,6 +57,7 @@ func (api TodoAppServer) CreateTodo(w http.ResponseWriter, r *http.Request) {
 
 	todo, err := api.CreateTodoUseCase.Execute(r.Context(), req.Title, req.DueDate.Time)
 	if err != nil {
+		api.Logger.Printf("Error creating todo: %v", err)
 		respondError(w, toError(err))
 		return
 	}
@@ -81,7 +83,6 @@ func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todo
 		errResp := gen.ErrorResp{}
 		errResp.Error.Code = gen.BADREQUEST
 		errResp.Error.Message = fmt.Sprintf("invalid request body: unknown TodoStatus value: %s", *req.Status)
-
 		respondError(w, errResp)
 		return
 	}
@@ -94,6 +95,7 @@ func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todo
 		dueDate,
 	)
 	if err != nil {
+		api.Logger.Printf("Error updating todo: %v", err)
 		respondError(w, toError(err))
 		return
 	}
@@ -104,6 +106,7 @@ func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todo
 func (api TodoAppServer) DeleteTodo(w http.ResponseWriter, r *http.Request, todoId openapi_types.UUID) {
 	err := api.DeleteTodoUseCase.Execute(r.Context(), todoId)
 	if err != nil {
+		api.Logger.Printf("Error deleting todo: %v", err)
 		respondError(w, toError(err))
 		return
 	}

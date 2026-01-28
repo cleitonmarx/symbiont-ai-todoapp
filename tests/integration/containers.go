@@ -36,7 +36,7 @@ func (i *InitDockerCompose) Initialize(ctx context.Context) (context.Context, er
 
 func (i InitDockerCompose) Close() {
 	if i.compose != nil {
-		cancelCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		cancelCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 
 		err := i.compose.Down(

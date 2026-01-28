@@ -462,6 +462,80 @@ func (_c *MockLLMClient_ChatStream_Call) RunAndReturn(run func(ctx context.Conte
 	return _c
 }
 
+// Embed provides a mock function for the type MockLLMClient
+func (_mock *MockLLMClient) Embed(ctx context.Context, model string, input string) ([]float64, error) {
+	ret := _mock.Called(ctx, model, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Embed")
+	}
+
+	var r0 []float64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) ([]float64, error)); ok {
+		return returnFunc(ctx, model, input)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) []float64); ok {
+		r0 = returnFunc(ctx, model, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]float64)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, model, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockLLMClient_Embed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Embed'
+type MockLLMClient_Embed_Call struct {
+	*mock.Call
+}
+
+// Embed is a helper method to define mock.On call
+//   - ctx context.Context
+//   - model string
+//   - input string
+func (_e *MockLLMClient_Expecter) Embed(ctx interface{}, model interface{}, input interface{}) *MockLLMClient_Embed_Call {
+	return &MockLLMClient_Embed_Call{Call: _e.mock.On("Embed", ctx, model, input)}
+}
+
+func (_c *MockLLMClient_Embed_Call) Run(run func(ctx context.Context, model string, input string)) *MockLLMClient_Embed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockLLMClient_Embed_Call) Return(float64s []float64, err error) *MockLLMClient_Embed_Call {
+	_c.Call.Return(float64s, err)
+	return _c
+}
+
+func (_c *MockLLMClient_Embed_Call) RunAndReturn(run func(ctx context.Context, model string, input string) ([]float64, error)) *MockLLMClient_Embed_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockOutboxRepository creates a new instance of MockOutboxRepository. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockOutboxRepository(t interface {
@@ -771,6 +845,66 @@ type MockBoardSummaryRepository_Expecter struct {
 
 func (_m *MockBoardSummaryRepository) EXPECT() *MockBoardSummaryRepository_Expecter {
 	return &MockBoardSummaryRepository_Expecter{mock: &_m.Mock}
+}
+
+// CalculateSummaryContent provides a mock function for the type MockBoardSummaryRepository
+func (_mock *MockBoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (domain.BoardSummaryContent, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CalculateSummaryContent")
+	}
+
+	var r0 domain.BoardSummaryContent
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (domain.BoardSummaryContent, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) domain.BoardSummaryContent); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		r0 = ret.Get(0).(domain.BoardSummaryContent)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBoardSummaryRepository_CalculateSummaryContent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CalculateSummaryContent'
+type MockBoardSummaryRepository_CalculateSummaryContent_Call struct {
+	*mock.Call
+}
+
+// CalculateSummaryContent is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockBoardSummaryRepository_Expecter) CalculateSummaryContent(ctx interface{}) *MockBoardSummaryRepository_CalculateSummaryContent_Call {
+	return &MockBoardSummaryRepository_CalculateSummaryContent_Call{Call: _e.mock.On("CalculateSummaryContent", ctx)}
+}
+
+func (_c *MockBoardSummaryRepository_CalculateSummaryContent_Call) Run(run func(ctx context.Context)) *MockBoardSummaryRepository_CalculateSummaryContent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBoardSummaryRepository_CalculateSummaryContent_Call) Return(boardSummaryContent domain.BoardSummaryContent, err error) *MockBoardSummaryRepository_CalculateSummaryContent_Call {
+	_c.Call.Return(boardSummaryContent, err)
+	return _c
+}
+
+func (_c *MockBoardSummaryRepository_CalculateSummaryContent_Call) RunAndReturn(run func(ctx context.Context) (domain.BoardSummaryContent, error)) *MockBoardSummaryRepository_CalculateSummaryContent_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // GetLatestSummary provides a mock function for the type MockBoardSummaryRepository

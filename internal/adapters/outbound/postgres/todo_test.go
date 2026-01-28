@@ -11,6 +11,7 @@ import (
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/google/uuid"
+	"github.com/pgvector/pgvector-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,12 +36,13 @@ func TestTodoRepository_CreateTodo(t *testing.T) {
 		"success": {
 			todo: todo,
 			setExpectations: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("INSERT INTO todos (id,title,status,due_date,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6)").
+				mock.ExpectExec("INSERT INTO todos (id,title,status,due_date,embedding,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7)").
 					WithArgs(
 						todo.ID,
 						todo.Title,
 						todo.Status,
 						todo.DueDate,
+						pgvector.NewVector(toFloat32Truncated(todo.Embedding)),
 						todo.CreatedAt,
 						todo.UpdatedAt,
 					).
@@ -51,12 +53,13 @@ func TestTodoRepository_CreateTodo(t *testing.T) {
 		"database-error": {
 			todo: todo,
 			setExpectations: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("INSERT INTO todos (id,title,status,due_date,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6)").
+				mock.ExpectExec("INSERT INTO todos (id,title,status,due_date,embedding,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7)").
 					WithArgs(
 						todo.ID,
 						todo.Title,
 						todo.Status,
 						todo.DueDate,
+						pgvector.NewVector(toFloat32Truncated(todo.Embedding)),
 						todo.CreatedAt,
 						todo.UpdatedAt,
 					).
@@ -185,11 +188,12 @@ func TestTodoRepository_UpdateTodo(t *testing.T) {
 		"success": {
 			todo: todo,
 			setExpectations: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("UPDATE todos SET title = $1, status = $2, due_date = $3, updated_at = $4 WHERE id = $5").
+				mock.ExpectExec("UPDATE todos SET title = $1, status = $2, due_date = $3, embedding = $4, updated_at = $5 WHERE id = $6").
 					WithArgs(
 						todo.Title,
 						todo.Status,
 						todo.DueDate,
+						pgvector.NewVector(toFloat32Truncated(todo.Embedding)),
 						todo.UpdatedAt,
 						todo.ID,
 					).
@@ -200,11 +204,12 @@ func TestTodoRepository_UpdateTodo(t *testing.T) {
 		"database-error": {
 			todo: todo,
 			setExpectations: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("UPDATE todos SET title = $1, status = $2, due_date = $3, updated_at = $4 WHERE id = $5").
+				mock.ExpectExec("UPDATE todos SET title = $1, status = $2, due_date = $3, embedding = $4, updated_at = $5 WHERE id = $6").
 					WithArgs(
 						todo.Title,
 						todo.Status,
 						todo.DueDate,
+						pgvector.NewVector(toFloat32Truncated(todo.Embedding)),
 						todo.UpdatedAt,
 						todo.ID,
 					).
@@ -365,10 +370,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 			page:     1,
 			pageSize: 10,
 			opts: []domain.ListTodoOptions{
-				func(params *domain.ListTodosParams) {
-					status := domain.TodoStatus_DONE
-					params.Status = &status
-				},
+				domain.WithStatus(domain.TodoStatus_DONE),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(todoFields).
@@ -390,24 +392,28 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 			expectedHasMore: false,
 			expectedErr:     false,
 		},
-		"large-page-size": {
+		"filter-by-embedding": {
 			page:     1,
-			pageSize: 1000,
+			pageSize: 10,
+			opts: []domain.ListTodoOptions{
+				domain.WithEmbedding([]float64{0.1, 0.2, 0.3}),
+			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(todoFields).
 					AddRow(
-						fixedUUID1,
-						"Todo 1",
+						fixedUUID2,
+						"Todo 2",
 						domain.TodoStatus_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY created_at DESC LIMIT 1001 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY embedding <-> $1 ASC, created_at DESC LIMIT 11 OFFSET 0").
+					WithArgs(pgvector.NewVector([]float32{0.1, 0.2, 0.3})).
 					WillReturnRows(rows)
 			},
 			expectedTodos: []domain.Todo{
-				{ID: fixedUUID1, Title: "Todo 1", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: false,
 			expectedErr:     false,

@@ -41,5 +41,6 @@ type NextUpTodoItem struct {
 // BoardSummaryRepository defines the interface for storing and retrieving board summaries.
 type BoardSummaryRepository interface {
 	StoreSummary(ctx context.Context, summary BoardSummary) error
+	CalculateSummaryContent(ctx context.Context) (BoardSummaryContent, error)
 	GetLatestSummary(ctx context.Context) (BoardSummary, bool, error)
 }

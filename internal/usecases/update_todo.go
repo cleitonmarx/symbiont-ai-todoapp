@@ -17,15 +17,19 @@ type UpdateTodo interface {
 
 // UpdateTodoImpl is the implementation of the UpdateTodo use case.
 type UpdateTodoImpl struct {
-	uow          domain.UnitOfWork          `resolve:""`
-	timeProvider domain.CurrentTimeProvider `resolve:""`
+	uow          domain.UnitOfWork
+	timeProvider domain.CurrentTimeProvider
+	llmClient    domain.LLMClient
+	model        string
 }
 
 // NewUpdateTodoImpl creates a new instance of UpdateTodoImpl.
-func NewUpdateTodoImpl(uow domain.UnitOfWork, timeProvider domain.CurrentTimeProvider) UpdateTodoImpl {
+func NewUpdateTodoImpl(uow domain.UnitOfWork, timeProvider domain.CurrentTimeProvider, llmClient domain.LLMClient, model string) UpdateTodoImpl {
 	return UpdateTodoImpl{
 		uow:          uow,
 		timeProvider: timeProvider,
+		llmClient:    llmClient,
+		model:        model,
 	}
 }
 
@@ -63,6 +67,12 @@ func (uti UpdateTodoImpl) Execute(ctx context.Context, id uuid.UUID, title *stri
 			return err
 		}
 
+		embedding, err := uti.llmClient.Embed(spanCtx, uti.model, td.ToLLMInput())
+		if err != nil {
+			return err
+		}
+		td.Embedding = embedding
+
 		if err := uow.Todo().UpdateTodo(spanCtx, td); err != nil {
 			return err
 		}
@@ -86,10 +96,12 @@ func (uti UpdateTodoImpl) Execute(ctx context.Context, id uuid.UUID, title *stri
 type InitUpdateTodo struct {
 	Uow         domain.UnitOfWork          `resolve:""`
 	TimeService domain.CurrentTimeProvider `resolve:""`
+	LLMClient   domain.LLMClient           `resolve:""`
+	Model       string                     `config:"LLM_EMBEDDING_MODEL"`
 }
 
 // Initialize initializes the UpdateTodoImpl use case.
 func (iut InitUpdateTodo) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[UpdateTodo](NewUpdateTodoImpl(iut.Uow, iut.TimeService))
+	depend.Register[UpdateTodo](NewUpdateTodoImpl(iut.Uow, iut.TimeService, iut.LLMClient, iut.Model))
 	return ctx, nil
 }

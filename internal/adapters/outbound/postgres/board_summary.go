@@ -119,6 +119,93 @@ func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (domain.
 	return summary, true, nil
 }
 
+func (bsr BoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (domain.BoardSummaryContent, error) {
+	spanCtx, span := tracing.Start(ctx)
+	defer span.End()
+
+	var countsJSON, overdueJSON, nearDeadlineJSON, nextUpJSON []byte
+	var content domain.BoardSummaryContent
+
+	err := bsr.pqsql.
+		Select(
+			"stats.counts",
+			"near_deadline.overdue",
+			"near_deadline.near_deadline",
+			"next_tasks.next_up",
+		).
+		From("stats, near_deadline, next_tasks").
+		Prefix(boardSummaryCTEQry).
+		QueryRowContext(spanCtx).
+		Scan(&countsJSON, &overdueJSON, &nearDeadlineJSON, &nextUpJSON)
+	if tracing.RecordErrorAndStatus(span, err) {
+		return domain.BoardSummaryContent{}, err
+	}
+
+	// Unmarshal each field into the struct
+	if err := json.Unmarshal(countsJSON, &content.Counts); err != nil {
+		return domain.BoardSummaryContent{}, fmt.Errorf("counts unmarshal error: %w", err)
+	}
+	if err := json.Unmarshal(overdueJSON, &content.Overdue); err != nil {
+		return domain.BoardSummaryContent{}, fmt.Errorf("overdue unmarshal error: %w", err)
+	}
+	if err := json.Unmarshal(nearDeadlineJSON, &content.NearDeadline); err != nil {
+		return domain.BoardSummaryContent{}, fmt.Errorf("near_deadline unmarshal error: %w", err)
+	}
+	if err := json.Unmarshal(nextUpJSON, &content.NextUp); err != nil {
+		return domain.BoardSummaryContent{}, fmt.Errorf("next_up unmarshal error: %w", err)
+	}
+
+	return content, nil
+}
+
+var boardSummaryCTEQry = `
+WITH task_data AS (
+    SELECT 
+        status,
+        title,
+        due_date,
+        CASE 
+            WHEN due_date < CURRENT_DATE AND status != 'DONE' THEN 'overdue'
+            WHEN due_date >= CURRENT_DATE AND due_date <= CURRENT_DATE + 7 AND status != 'DONE' THEN 'near_deadline'
+            WHEN status = 'OPEN' THEN 'next_up'
+            ELSE 'other'
+        END as category
+    FROM todos
+    ORDER BY due_date ASC
+),
+stats AS (
+    SELECT 
+        jsonb_build_object(
+            'DONE', COUNT(*) FILTER (WHERE status = 'DONE'),
+            'OPEN', COUNT(*) FILTER (WHERE status = 'OPEN')
+        ) as counts
+    FROM task_data
+),
+near_deadline AS (
+    SELECT
+        (SELECT COALESCE(jsonb_agg(title), '[]') FROM (
+            SELECT title FROM task_data WHERE category = 'overdue' ORDER BY due_date ASC LIMIT 5
+        ) t) as overdue,
+        (SELECT COALESCE(jsonb_agg(title), '[]') FROM (
+            SELECT title FROM task_data WHERE category = 'near_deadline' ORDER BY due_date ASC LIMIT 5
+        ) t) as near_deadline
+),
+next_tasks AS (
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+        'title', title,
+        'reason', CASE 
+            WHEN due_date <= CURRENT_DATE + 7 THEN 'due within 7 days'
+            WHEN due_date > CURRENT_DATE + 7 AND due_date < CURRENT_DATE + 30 THEN 'upcoming'
+            ELSE 'future'
+        END
+    )), '[]') as next_up
+    FROM (
+        SELECT title, due_date FROM task_data 
+        WHERE category IN ('near_deadline', 'next_up')
+        LIMIT 5
+    ) sub
+)`
+
 // InitBoardSummaryRepository is a Symbiont initializer for BoardSummaryRepository.
 type InitBoardSummaryRepository struct {
 	DB *sql.DB `resolve:""`

@@ -103,14 +103,14 @@ export const TodoList: React.FC<TodoListProps> = ({
               </div>
               <div className="pagination-buttons">
                 <button
-                  className="btn-secondary"
+                  className="btn-primary"
                   onClick={onPreviousPage}
                   disabled={previousPage === null}
                 >
                   ←
                 </button>
                 <button
-                  className="btn-secondary"
+                  className="btn-primary"
                   onClick={onNextPage}
                   disabled={nextPage === null}
                 >

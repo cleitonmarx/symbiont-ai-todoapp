@@ -28,8 +28,20 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"success-with-usage": {
 			userMessage: "Hello, how are you?",
 			setupMocks: func(chatRepo *mocks.MockChatMessageRepository, todoRepo *mocks.MockTodoRepository, client *mocks.MockLLMClient) {
+				client.EXPECT().
+					Embed(mock.Anything, "test-embedding-model", "Hello, how are you?").
+					Return([]float64{0.1, 0.2, 0.3}, nil)
+
 				todoRepo.EXPECT().
-					ListTodos(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					ListTodos(mock.Anything, 1, 30, mock.Anything).
+					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOptions) {
+						// Verify that the embedding option is provided
+						params := &domain.ListTodosParams{}
+						for _, opt := range opts {
+							opt(params)
+						}
+						assert.NotNil(t, params.Embedding)
+					}).
 					Return([]domain.Todo{{Title: "Test Todo"}}, false, nil)
 
 				// history: empty
@@ -94,6 +106,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"success-without-usage": {
 			userMessage: "Test",
 			setupMocks: func(chatRepo *mocks.MockChatMessageRepository, todoRepo *mocks.MockTodoRepository, client *mocks.MockLLMClient) {
+				client.EXPECT().
+					Embed(mock.Anything, "test-embedding-model", "Test").
+					Return([]float64{0.1, 0.2, 0.3}, nil)
+
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return([]domain.Todo{}, false, nil)
@@ -145,16 +161,32 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"list-todos-error": {
 			userMessage: "Test",
 			setupMocks: func(chatRepo *mocks.MockChatMessageRepository, todoRepo *mocks.MockTodoRepository, client *mocks.MockLLMClient) {
+				client.EXPECT().
+					Embed(mock.Anything, "test-embedding-model", "Test").
+					Return([]float64{0.1, 0.2, 0.3}, nil)
+
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil, false, errors.New("list todos error"))
-				// no ListChatMessages needed; returns early
 			},
 			expectErr: true,
 		},
-		"llm-client-error": {
+		"llm-embed-error": {
 			userMessage: "Test",
 			setupMocks: func(chatRepo *mocks.MockChatMessageRepository, todoRepo *mocks.MockTodoRepository, client *mocks.MockLLMClient) {
+				client.EXPECT().
+					Embed(mock.Anything, "test-embedding-model", "Test").
+					Return(nil, errors.New("embed error"))
+			},
+			expectErr: true,
+		},
+		"llm-chat-error": {
+			userMessage: "Test",
+			setupMocks: func(chatRepo *mocks.MockChatMessageRepository, todoRepo *mocks.MockTodoRepository, client *mocks.MockLLMClient) {
+				client.EXPECT().
+					Embed(mock.Anything, "test-embedding-model", "Test").
+					Return([]float64{0.1, 0.2, 0.3}, nil)
+
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return([]domain.Todo{}, false, nil)
@@ -173,6 +205,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"user-message-save-error": {
 			userMessage: "Test",
 			setupMocks: func(chatRepo *mocks.MockChatMessageRepository, todoRepo *mocks.MockTodoRepository, client *mocks.MockLLMClient) {
+				client.EXPECT().
+					Embed(mock.Anything, "test-embedding-model", "Test").
+					Return([]float64{0.1, 0.2, 0.3}, nil)
+
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return([]domain.Todo{}, false, nil)
@@ -211,6 +247,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"assistant-message-save-error": {
 			userMessage: "Test",
 			setupMocks: func(chatRepo *mocks.MockChatMessageRepository, todoRepo *mocks.MockTodoRepository, client *mocks.MockLLMClient) {
+				client.EXPECT().
+					Embed(mock.Anything, "test-embedding-model", "Test").
+					Return([]float64{0.1, 0.2, 0.3}, nil)
+
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return([]domain.Todo{}, false, nil)
@@ -263,7 +303,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 
 			tt.setupMocks(chatRepo, todoRepo, client)
 
-			useCase := NewStreamChatImpl(chatRepo, todoRepo, client, "test-model")
+			useCase := NewStreamChatImpl(chatRepo, todoRepo, client, "test-model", "test-embedding-model")
 
 			var capturedContent string
 			err := useCase.Execute(context.Background(), tt.userMessage, func(eventType domain.LLMStreamEventType, data any) error {

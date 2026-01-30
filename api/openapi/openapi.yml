@@ -638,7 +638,7 @@ components:
           type: string
           format: date-time
 
-    # SSE payload schemas (for documentation; not directly enforced by OpenAPI for text/event-stream)
+    # SSE payload schemas
     SseMeta:
       type: object
       additionalProperties: false

@@ -8,14 +8,10 @@ exec:
   layout: single-file # Only other option is "follow-schema," ie multi-file.
 
   # Only for single-file layout:
-  filename: todo_app_schema_gen.go
+  filename: schema_gen.go
 
 model:
   filename: models_gen.go
-  package: gen
-resolver:
-  layout: single-file
-  filename: resolvers_gen.go
   package: gen
 
 models:

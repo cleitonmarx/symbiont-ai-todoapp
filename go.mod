@@ -2,8 +2,6 @@ module github.com/cleitonmarx/symbiont/examples/todoapp
 
 go 1.25.3
 
-//replace github.com/cleitonmarx/symbiont => ../../
-
 require (
 	cloud.google.com/go/pubsub/v2 v2.3.0
 	github.com/99designs/gqlgen v0.17.86
@@ -18,6 +16,7 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/pgvector/pgvector-go v0.3.0
+	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/compose v0.40.0

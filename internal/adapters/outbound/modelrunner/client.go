@@ -123,23 +123,9 @@ func (c DRMAPIClient) Chat(ctx context.Context, req ChatRequest) (*ChatResponse,
 		return nil, errors.New("messages are required")
 	}
 
-	endpoint, err := url.JoinPath(c.baseURL, "/v1/chat/completions")
+	httpReq, err := c.newPostRequest(ctx, "/v1/chat/completions", req)
 	if err != nil {
-		return nil, fmt.Errorf("invalid base URL: %w", err)
-	}
-
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if c.apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+		return nil, err
 	}
 
 	resp, err := c.http.Do(httpReq)
@@ -174,27 +160,13 @@ func (c DRMAPIClient) ChatStream(ctx context.Context, req ChatRequest, onChunk C
 		return errors.New("messages are required")
 	}
 
-	endpoint, err := url.JoinPath(c.baseURL, "/v1/chat/completions")
-	if err != nil {
-		return fmt.Errorf("invalid base URL: %w", err)
-	}
-
 	req.Stream = true
 
-	body, err := json.Marshal(req)
+	httpReq, err := c.newPostRequest(ctx, "/v1/chat/completions", req)
 	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
+		return err
 	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "text/event-stream")
-	if c.apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
-	}
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
@@ -262,30 +234,16 @@ type EmbeddingsResponse struct {
 
 // Embeddings calls the /engines/v1/embeddings endpoint.
 func (c DRMAPIClient) Embeddings(ctx context.Context, req EmbeddingsRequest) (*EmbeddingsResponse, error) {
-	endpoint, err := url.JoinPath(c.baseURL, "/engines/v1/embeddings")
+	httpReq, err := c.newPostRequest(ctx, "/engines/v1/embeddings", req)
 	if err != nil {
-		return nil, fmt.Errorf("invalid base URL: %w", err)
-	}
-
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if c.apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+		return nil, err
 	}
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("http do: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -302,4 +260,28 @@ func (c DRMAPIClient) Embeddings(ctx context.Context, req EmbeddingsRequest) (*E
 	}
 
 	return &out, nil
+}
+
+func (c DRMAPIClient) newPostRequest(ctx context.Context, path string, body any) (*http.Request, error) {
+	endpoint, err := url.JoinPath(c.baseURL, path)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base URL: %w", err)
+	}
+	var bodyReader io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("marshal request: %w", err)
+		}
+		bodyReader = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+	return req, nil
 }

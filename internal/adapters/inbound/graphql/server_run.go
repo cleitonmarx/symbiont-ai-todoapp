@@ -14,6 +14,7 @@ import (
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
+	"github.com/rs/cors"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -35,7 +36,9 @@ func (s *TodoGraphQLServer) Run(ctx context.Context) error {
 	h.AddTransport(transport.GET{})
 	h.Use(extension.Introspection{})
 
-	mux.Handle("/v1/query", corsMiddleware(
+	corsHandler := cors.AllowAll()
+
+	mux.Handle("/v1/query", corsHandler.Handler(
 		otelhttp.NewHandler(
 			h,
 			"",
@@ -78,18 +81,4 @@ func (s *TodoGraphQLServer) IsReady(ctx context.Context) error {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	return nil
-}
-
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }

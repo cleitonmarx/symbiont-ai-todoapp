@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"time"
 )
 
@@ -25,4 +26,17 @@ func (d *Date) UnmarshalGQL(v any) error {
 func (d Date) MarshalGQL(w io.Writer) {
 	t := time.Time(d)
 	fmt.Fprintf(w, `"%s"`, t.Format(time.DateOnly)) //nolint:errcheck
+}
+
+func (d *Date) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return d.UnmarshalGQL(s)
+}
+
+func (d Date) MarshalJSON() ([]byte, error) {
+	t := time.Time(d)
+	return fmt.Appendf(nil, `"%s"`, t.Format(time.DateOnly)), nil
 }

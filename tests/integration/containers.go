@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"github.com/testcontainers/testcontainers-go/modules/compose"
@@ -48,5 +49,22 @@ func (i InitDockerCompose) Close() {
 		if err != nil {
 			log.Printf("failed to stop docker compose: %v", err)
 		}
+	}
+}
+
+type initEnvVars struct {
+	envVars map[string]string
+}
+
+func (i *initEnvVars) Initialize(ctx context.Context) (context.Context, error) {
+	for key, value := range i.envVars {
+		os.Setenv(key, value) //nolint:errcheck
+	}
+	return ctx, nil
+}
+
+func (i *initEnvVars) Close() {
+	for key := range i.envVars {
+		os.Unsetenv(key) //nolint:errcheck
 	}
 }

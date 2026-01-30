@@ -23,62 +23,53 @@ func TestTodo_ToLLMInput(t *testing.T) {
 func TestTodo_Validate(t *testing.T) {
 	now := time.Date(2024, 7, 15, 0, 0, 0, 0, time.UTC)
 
-	tests := []struct {
-		name    string
+	tests := map[string]struct {
 		todo    Todo
 		now     time.Time
 		wantErr bool
 		errMsg  string
 	}{
-		{
-			name:    "valid-todo-open",
+		"valid-todo-open": {
 			todo:    Todo{Title: "Finish report", Status: TodoStatus_OPEN, DueDate: now.Add(24 * time.Hour)},
 			now:     now,
 			wantErr: false,
 		},
-		{
-			name:    "valid-todo-done",
+		"valid-todo-done": {
 			todo:    Todo{Title: "Finish report", Status: TodoStatus_DONE, DueDate: now.Add(24 * time.Hour)},
 			now:     now,
 			wantErr: false,
 		},
-		{
-			name:    "empty-title",
+		"empty-title": {
 			todo:    Todo{Title: "", Status: TodoStatus_OPEN, DueDate: now.Add(24 * time.Hour)},
 			now:     now,
 			wantErr: true,
 			errMsg:  "title cannot be empty",
 		},
-		{
-			name:    "title-too-short",
+		"title-too-short": {
 			todo:    Todo{Title: "Hi", Status: TodoStatus_OPEN, DueDate: now.Add(24 * time.Hour)},
 			now:     now,
 			wantErr: true,
 			errMsg:  "title must be between 3 and 200 characters",
 		},
-		{
-			name:    "title-too-long",
+		"title-too-long": {
 			todo:    Todo{Title: strings.Repeat("a", 201), Status: TodoStatus_OPEN, DueDate: now.Add(24 * time.Hour)},
 			now:     now,
 			wantErr: true,
 			errMsg:  "title must be between 3 and 200 characters",
 		},
-		{
-			name:    "empty-due-date",
+		"empty-due-date": {
 			todo:    Todo{Title: "Finish report", Status: TodoStatus_OPEN, DueDate: time.Time{}},
 			now:     now,
 			wantErr: true,
 			errMsg:  "due_date cannot be empty",
 		},
-		{
-			name:    "due-date-more-than-48h-in-the-past",
+		"due-date-more-than-48h-in-the-past": {
 			todo:    Todo{Title: "Finish report", Status: TodoStatus_OPEN, DueDate: now.Add(-49 * time.Hour)},
 			now:     now,
 			wantErr: true,
 			errMsg:  "due_date cannot be more than 48 hours in the past",
 		},
-		{
-			name:    "invalid-status",
+		"invalid-status": {
 			todo:    Todo{Title: "Finish report", Status: "IN_PROGRESS", DueDate: now.Add(24 * time.Hour)},
 			now:     now,
 			wantErr: true,
@@ -86,8 +77,8 @@ func TestTodo_Validate(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			err := tt.todo.Validate(tt.now)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -97,6 +88,55 @@ func TestTodo_Validate(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestListTodoOptions_WithStatus_WithEmbedding(t *testing.T) {
+	status := TodoStatus_OPEN
+	embedding := []float64{0.1, 0.2, 0.3}
+
+	tests := map[string]struct {
+		opts     []ListTodoOptions
+		wantStat *TodoStatus
+		wantEmb  []float64
+	}{
+		"with-status-and-embedding": {
+			opts:     []ListTodoOptions{WithStatus(status), WithEmbedding(embedding)},
+			wantStat: &status,
+			wantEmb:  embedding,
+		},
+		"with-status-only": {
+			opts:     []ListTodoOptions{WithStatus(status)},
+			wantStat: &status,
+			wantEmb:  nil,
+		},
+		"with-embedding-only": {
+			opts:     []ListTodoOptions{WithEmbedding(embedding)},
+			wantStat: nil,
+			wantEmb:  embedding,
+		},
+		"with-no-options": {
+			opts:     nil,
+			wantStat: nil,
+			wantEmb:  nil,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			params := &ListTodosParams{}
+			for _, opt := range tt.opts {
+				opt(params)
+			}
+			if tt.wantStat != nil {
+				if assert.NotNil(t, params.Status, "Status should not be nil") {
+					assert.Equal(t, *tt.wantStat, *params.Status)
+				}
+			} else {
+				assert.Nil(t, params.Status)
+			}
+			assert.Equal(t, tt.wantEmb, params.Embedding)
 		})
 	}
 }

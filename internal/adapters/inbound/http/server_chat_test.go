@@ -312,9 +312,6 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 	}
 }
 
-// ptr is a helper for pointer to int
-func ptr(i int) *int { return &i }
-
 // mockFlusherRecorder is a ResponseRecorder that implements http.Flusher
 type mockFlusherRecorder struct {
 	*httptest.ResponseRecorder

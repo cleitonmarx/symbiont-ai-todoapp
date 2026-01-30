@@ -102,6 +102,7 @@ func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context) (do
 		Stream:      false,
 		Temperature: common.Ptr[float64](0),
 		TopP:        common.Ptr(0.7),
+		MaxTokens:   common.Ptr(1024),
 		Messages:    promptMessages,
 	}
 

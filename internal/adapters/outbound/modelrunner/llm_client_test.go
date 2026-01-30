@@ -325,7 +325,7 @@ func TestLLMClientAdapter_Embed(t *testing.T) {
 		model       string
 		input       string
 		expectErr   bool
-		expectedVec []float32
+		expectedVec []float64
 	}{
 		"success": {
 			response: `{
@@ -343,7 +343,7 @@ func TestLLMClientAdapter_Embed(t *testing.T) {
 			statusCode:  http.StatusOK,
 			model:       "ai/qwen3-embedding",
 			input:       "A dog is an animal",
-			expectedVec: []float32{1.1, 2.2, 3.3},
+			expectedVec: []float64{1.1, 2.2, 3.3},
 		},
 		"no-embedding-data": {
 			response: `{
@@ -406,15 +406,4 @@ func TestInitLLMClient_Initialize(t *testing.T) {
 	r, err := depend.Resolve[domain.LLMClient]()
 	assert.NotNil(t, r)
 	assert.NoError(t, err)
-}
-
-func Test(t *testing.T) {
-	client := NewDRMAPIClient("http://localhost:12434", "", http.DefaultClient)
-
-	adapter := NewLLMClientAdapter(client)
-	resp, err := adapter.Embed(context.Background(), "qwen3-embedding", "A dog is an animal")
-	assert.NoError(t, err)
-
-	fmt.Println("Embedding:", resp)
-
 }

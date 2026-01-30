@@ -61,7 +61,7 @@ services:
 
 models:
   gpt-oss:
-    model: gpt-oss:latest
-    context_size: 8192
-  qwen3-embedding:
-    model: qwen3-embedding:latest
+    model: gpt-oss:20B-UD-Q4_K_XL
+  embeddinggemma:
+    model: embeddinggemma:300M-Q8_0
+    

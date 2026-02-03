@@ -35,82 +35,6 @@ func NewDRMAPIClient(baseURL string, apiKey string, httpClient *http.Client) DRM
 	}
 }
 
-// ChatRequest is an OpenAI-compatible chat completions request
-type ChatRequest struct {
-	Model       string        `json:"model"`
-	Messages    []ChatMessage `json:"messages"`
-	Stream      bool          `json:"stream,omitempty"`
-	Temperature *float64      `json:"temperature,omitempty"`
-	MaxTokens   *int          `json:"max_tokens,omitempty"`
-	TopP        *float64      `json:"top_p,omitempty"`
-}
-
-// ChatMessage is an OpenAI-compatible message
-type ChatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-// ChatResponse is an OpenAI-compatible response
-type ChatResponse struct {
-	ID      string   `json:"id"`
-	Object  string   `json:"object"`
-	Created int64    `json:"created"`
-	Model   string   `json:"model"`
-	Choices []Choice `json:"choices"`
-	Usage   *Usage   `json:"usage,omitempty"`
-}
-
-// Choice represents a completion choice
-type Choice struct {
-	Index        int     `json:"index"`
-	FinishReason string  `json:"finish_reason"`
-	Message      Message `json:"message"`
-}
-
-// Message represents the assistant message
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-// Usage represents token usage
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
-// StreamChunk represents a streaming response chunk from llama.cpp
-type StreamChunk struct {
-	ID      string              `json:"id"`
-	Object  string              `json:"object"`
-	Created int64               `json:"created"`
-	Model   string              `json:"model"`
-	Choices []StreamChunkChoice `json:"choices"`
-	Usage   *Usage              `json:"usage,omitempty"`
-	Timings *Timings            `json:"timings,omitempty"`
-}
-
-// StreamChunkChoice represents a choice in a streaming chunk
-type StreamChunkChoice struct {
-	Index        int              `json:"index"`
-	FinishReason *string          `json:"finish_reason"`
-	Delta        StreamChunkDelta `json:"delta"`
-}
-
-// StreamChunkDelta represents the delta content
-type StreamChunkDelta struct {
-	Role    *string `json:"role,omitempty"`
-	Content string  `json:"content"`
-}
-
-// Timings contains llama.cpp performance metrics
-type Timings struct {
-	PromptN    int `json:"prompt_n"`
-	PredictedN int `json:"predicted_n"`
-}
-
 // ChunkCallback is called for each streaming chunk
 type ChunkCallback func(chunk StreamChunk) error
 
@@ -139,7 +63,7 @@ func (c DRMAPIClient) Chat(ctx context.Context, req ChatRequest) (*ChatResponse,
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("non-2xx response: %s: %s", resp.Status, string(respBody))
 	}
 
@@ -174,7 +98,7 @@ func (c DRMAPIClient) ChatStream(ctx context.Context, req ChatRequest, onChunk C
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("non-2xx response: %s: %s", resp.Status, string(b))
 	}
@@ -203,33 +127,6 @@ func (c DRMAPIClient) ChatStream(ctx context.Context, req ChatRequest, onChunk C
 	}
 
 	return scanner.Err()
-}
-
-// EmbeddingsRequest represents the request payload for the embeddings endpoint.
-type EmbeddingsRequest struct {
-	Model string      `json:"model"`
-	Input interface{} `json:"input"` // string or []string
-}
-
-// EmbeddingsUsage represents the token usage for embeddings
-type EmbeddingsUsage struct {
-	PromptTokens int `json:"prompt_tokens"`
-	TotalTokens  int `json:"total_tokens"`
-}
-
-// EmbeddingData represents a single embedding
-type EmbeddingData struct {
-	Embedding []float64 `json:"embedding"`
-	Index     int       `json:"index"`
-	Object    string    `json:"object"`
-}
-
-// EmbeddingsResponse represents the response from the embeddings endpoint.
-type EmbeddingsResponse struct {
-	Model  string          `json:"model"`
-	Object string          `json:"object"`
-	Usage  EmbeddingsUsage `json:"usage"`
-	Data   []EmbeddingData `json:"data"`
 }
 
 // Embeddings calls the /engines/v1/embeddings endpoint.

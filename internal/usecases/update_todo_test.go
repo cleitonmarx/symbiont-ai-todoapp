@@ -3,14 +3,11 @@ package usecases
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/cleitonmarx/symbiont/depend"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	domain_mocks "github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,221 +16,206 @@ import (
 func TestUpdateTodoImpl_Execute(t *testing.T) {
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
-	todo := domain.Todo{
+	newTitle := "Updated Todo"
+	newStatus := domain.TodoStatus_DONE
+	newDueDate := time.Date(2024, 2, 15, 0, 0, 0, 0, time.UTC)
+
+	expectedTodo := domain.Todo{
 		ID:        fixedUUID,
-		Title:     "Updated Todo",
-		Status:    domain.TodoStatus_OPEN,
-		Embedding: []float64{0.4, 0.5, 0.6},
-		DueDate:   fixedTime,
+		Title:     newTitle,
+		Status:    newStatus,
+		DueDate:   newDueDate,
+		CreatedAt: fixedTime,
+		UpdatedAt: fixedTime,
 	}
 
 	tests := map[string]struct {
+		id              uuid.UUID
+		title           *string
+		status          *domain.TodoStatus
+		dueDate         *time.Time
 		setExpectations func(
-			uow *domain_mocks.MockUnitOfWork,
-			timeProvider *domain_mocks.MockCurrentTimeProvider,
-			llmClient *domain_mocks.MockLLMClient)
-		id           uuid.UUID
-		title        *string
-		status       *domain.TodoStatus
-		dueDate      *time.Time
+			uow *domain.MockUnitOfWork,
+			modifier *MockTodoUpdater,
+		)
 		expectedTodo domain.Todo
 		expectedErr  error
 	}{
-		"success": {
+		"success-update-all-fields": {
 			id:      fixedUUID,
-			title:   &todo.Title,
-			status:  &todo.Status,
-			dueDate: &todo.DueDate,
+			title:   &newTitle,
+			status:  &newStatus,
+			dueDate: &newDueDate,
 			setExpectations: func(
-				uow *domain_mocks.MockUnitOfWork,
-				timeProvider *domain_mocks.MockCurrentTimeProvider,
-				llmClient *domain_mocks.MockLLMClient,
+				uow *domain.MockUnitOfWork,
+				modifier *MockTodoUpdater,
 			) {
-				timeProvider.EXPECT().Now().Return(fixedTime)
-				llmClient.EXPECT().Embed(
-					mock.Anything,
-					"model-name",
-					"Task: Updated Todo | Status: OPEN | Due: 2024-01-01",
-				).Return([]float64{0.4, 0.5, 0.6}, nil)
+				modifier.EXPECT().
+					Update(mock.Anything, uow, fixedUUID, &newTitle, &newStatus, &newDueDate).
+					Return(expectedTodo, nil)
 
-				repo := domain_mocks.NewMockTodoRepository(t)
-				outbox := domain_mocks.NewMockOutboxRepository(t)
-
-				uow.EXPECT().Todo().Return(repo)
-				uow.EXPECT().Outbox().Return(outbox)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
 						return fn(uow)
 					})
-
-				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, true, nil)
-				repo.EXPECT().UpdateTodo(mock.Anything, mock.MatchedBy(func(t domain.Todo) bool {
-					return t.ID == fixedUUID && t.Title == todo.Title && t.UpdatedAt.Equal(fixedTime)
-				})).Return(nil)
-
-				outbox.EXPECT().RecordEvent(
-					mock.Anything,
-					domain.TodoEvent{
-						Type:   domain.TodoEventType_TODO_UPDATED,
-						TodoID: fixedUUID,
-					},
-				).Return(nil)
 			},
-			expectedTodo: todo,
+			expectedTodo: expectedTodo,
 			expectedErr:  nil,
 		},
-		"invalid-update-data": {
-			id:    fixedUUID,
-			title: common.Ptr(""),
+		"success-update-title-only": {
+			id:      fixedUUID,
+			title:   &newTitle,
+			status:  nil,
+			dueDate: nil,
 			setExpectations: func(
-				uow *domain_mocks.MockUnitOfWork,
-				timeProvider *domain_mocks.MockCurrentTimeProvider,
-				llmClient *domain_mocks.MockLLMClient,
+				uow *domain.MockUnitOfWork,
+				modifier *MockTodoUpdater,
 			) {
-				timeProvider.EXPECT().Now().Return(fixedTime)
-				repo := domain_mocks.NewMockTodoRepository(t)
 
-				uow.EXPECT().Todo().Return(repo)
+				modifier.EXPECT().
+					Update(mock.Anything, uow, fixedUUID, &newTitle, (*domain.TodoStatus)(nil), (*time.Time)(nil)).
+					Return(expectedTodo, nil)
+
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
 						return fn(uow)
 					})
-
-				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, true, nil)
 			},
-			expectedTodo: domain.Todo{},
-			expectedErr:  domain.NewValidationErr("title cannot be empty"),
+			expectedTodo: expectedTodo,
+			expectedErr:  nil,
 		},
-		"embedding-fails": {
-			id:    fixedUUID,
-			title: &todo.Title,
+		"success-update-status-only": {
+			id:      fixedUUID,
+			title:   nil,
+			status:  &newStatus,
+			dueDate: nil,
 			setExpectations: func(
-				uow *domain_mocks.MockUnitOfWork,
-				timeProvider *domain_mocks.MockCurrentTimeProvider,
-				llmClient *domain_mocks.MockLLMClient,
+				uow *domain.MockUnitOfWork,
+				modifier *MockTodoUpdater,
 			) {
-				timeProvider.EXPECT().Now().Return(fixedTime)
+				modifier.EXPECT().
+					Update(mock.Anything, uow, fixedUUID, (*string)(nil), &newStatus, (*time.Time)(nil)).
+					Return(expectedTodo, nil)
 
-				llmClient.EXPECT().Embed(
-					mock.Anything,
-					"model-name",
-					"Task: Updated Todo | Status: OPEN | Due: 2024-01-01",
-				).Return(nil, errors.New("embedding service error"))
-
-				repo := domain_mocks.NewMockTodoRepository(t)
-
-				uow.EXPECT().Todo().Return(repo)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
 						return fn(uow)
 					})
-
-				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, true, nil)
 			},
-			expectedTodo: domain.Todo{},
-			expectedErr:  errors.New("embedding service error"),
+			expectedTodo: expectedTodo,
+			expectedErr:  nil,
 		},
-		"todo-not-found": {
-			id: fixedUUID,
+		"success-update-duedate-only": {
+			id:      fixedUUID,
+			title:   nil,
+			status:  nil,
+			dueDate: &newDueDate,
 			setExpectations: func(
-				uow *domain_mocks.MockUnitOfWork,
-				timeProvider *domain_mocks.MockCurrentTimeProvider,
-				llmClient *domain_mocks.MockLLMClient,
+				uow *domain.MockUnitOfWork,
+				modifier *MockTodoUpdater,
 			) {
-				timeProvider.EXPECT().Now().Return(fixedTime)
+				modifier.EXPECT().
+					Update(mock.Anything, uow, fixedUUID, (*string)(nil), (*domain.TodoStatus)(nil), &newDueDate).
+					Return(expectedTodo, nil)
 
-				repo := domain_mocks.NewMockTodoRepository(t)
-				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(domain.Todo{}, false, nil)
-
-				uow.EXPECT().Todo().Return(repo)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
 						return fn(uow)
 					})
-
 			},
-			expectedTodo: domain.Todo{},
-			expectedErr:  domain.NewNotFoundErr(fmt.Sprintf("todo with ID %s not found", fixedUUID)),
+			expectedTodo: expectedTodo,
+			expectedErr:  nil,
 		},
-		"get-todo-fails": {
-			id: fixedUUID,
+		"modifier-error-not-found": {
+			id:      fixedUUID,
+			title:   &newTitle,
+			status:  nil,
+			dueDate: nil,
 			setExpectations: func(
-				uow *domain_mocks.MockUnitOfWork,
-				timeProvider *domain_mocks.MockCurrentTimeProvider,
-				llmClient *domain_mocks.MockLLMClient,
+				uow *domain.MockUnitOfWork,
+				modifier *MockTodoUpdater,
 			) {
-				timeProvider.EXPECT().Now().Return(fixedTime)
-				repo := domain_mocks.NewMockTodoRepository(t)
+				modifier.EXPECT().
+					Update(mock.Anything, uow, fixedUUID, &newTitle, (*domain.TodoStatus)(nil), (*time.Time)(nil)).
+					Return(domain.Todo{}, errors.New("todo not found"))
 
-				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(domain.Todo{}, false, errors.New("database error"))
-
-				uow.EXPECT().Todo().Return(repo)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
 						return fn(uow)
 					})
-
 			},
 			expectedTodo: domain.Todo{},
-			expectedErr:  errors.New("database error"),
+			expectedErr:  errors.New("todo not found"),
 		},
-		"update-fails": {
-			id: fixedUUID,
+		"modifier-error-validation": {
+			id:      fixedUUID,
+			title:   &newTitle,
+			status:  &newStatus,
+			dueDate: &newDueDate,
 			setExpectations: func(
-				uow *domain_mocks.MockUnitOfWork,
-				timeProvider *domain_mocks.MockCurrentTimeProvider,
-				llmClient *domain_mocks.MockLLMClient,
+				uow *domain.MockUnitOfWork,
+				modifier *MockTodoUpdater,
 			) {
-				timeProvider.EXPECT().Now().Return(fixedTime)
-				llmClient.EXPECT().Embed(
-					mock.Anything,
-					"model-name",
-					"Task: Updated Todo | Status: OPEN | Due: 2024-01-01",
-				).Return([]float64{0.4, 0.5, 0.6}, nil)
+				modifier.EXPECT().
+					Update(mock.Anything, uow, fixedUUID, &newTitle, &newStatus, &newDueDate).
+					Return(domain.Todo{}, errors.New("validation failed"))
 
-				repo := domain_mocks.NewMockTodoRepository(t)
-				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, true, nil)
-				repo.EXPECT().UpdateTodo(mock.Anything, mock.Anything).Return(errors.New("database error"))
-
-				uow.EXPECT().Todo().Return(repo)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
 						return fn(uow)
 					})
-
 			},
 			expectedTodo: domain.Todo{},
-			expectedErr:  errors.New("database error"),
+			expectedErr:  errors.New("validation failed"),
+		},
+		"uow-execute-error": {
+			id:      fixedUUID,
+			title:   &newTitle,
+			status:  nil,
+			dueDate: nil,
+			setExpectations: func(
+				uow *domain.MockUnitOfWork,
+				modifier *MockTodoUpdater,
+			) {
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					Return(errors.New("transaction failed"))
+			},
+			expectedTodo: domain.Todo{},
+			expectedErr:  errors.New("transaction failed"),
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			uow := domain_mocks.NewMockUnitOfWork(t)
-			timeProvider := domain_mocks.NewMockCurrentTimeProvider(t)
-			llmClient := domain_mocks.NewMockLLMClient(t)
+			uow := domain.NewMockUnitOfWork(t)
+			modifier := NewMockTodoUpdater(t)
 			if tt.setExpectations != nil {
-				tt.setExpectations(uow, timeProvider, llmClient)
+				tt.setExpectations(uow, modifier)
 			}
 
-			uti := NewUpdateTodoImpl(uow, timeProvider, llmClient, "model-name")
+			uti := NewUpdateTodoImpl(uow, modifier)
 
 			got, gotErr := uti.Execute(context.Background(), tt.id, tt.title, tt.status, tt.dueDate)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			if tt.expectedErr == nil {
-				assert.Equal(t, tt.id, got.ID)
+				assert.Equal(t, tt.expectedTodo.ID, got.ID)
+				assert.Equal(t, tt.expectedTodo.Title, got.Title)
+				assert.Equal(t, tt.expectedTodo.Status, got.Status)
+				assert.Equal(t, tt.expectedTodo.DueDate, got.DueDate)
 			}
 		})
 	}
 }
 
 func TestInitUpdateTodo_Initialize(t *testing.T) {
+	// Clean up previous registrations if any
 	iut := InitUpdateTodo{}
 
 	ctx, err := iut.Initialize(context.Background())

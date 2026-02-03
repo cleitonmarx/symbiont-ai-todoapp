@@ -6,19 +6,19 @@ import (
 	"testing"
 
 	"github.com/cleitonmarx/symbiont/depend"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain/mocks"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestDeleteConversationImpl_Execute(t *testing.T) {
 	tests := map[string]struct {
-		setExpectations func(repo *mocks.MockChatMessageRepository)
+		setExpectations func(repo *domain.MockChatMessageRepository)
 		expectedErr     error
 	}{
 		"success": {
 			expectedErr: nil,
-			setExpectations: func(repo *mocks.MockChatMessageRepository) {
+			setExpectations: func(repo *domain.MockChatMessageRepository) {
 				repo.EXPECT().
 					DeleteConversation(mock.Anything).
 					Return(nil).
@@ -27,7 +27,7 @@ func TestDeleteConversationImpl_Execute(t *testing.T) {
 		},
 		"repository-error": {
 			expectedErr: errors.New("database error"),
-			setExpectations: func(repo *mocks.MockChatMessageRepository) {
+			setExpectations: func(repo *domain.MockChatMessageRepository) {
 				repo.EXPECT().
 					DeleteConversation(mock.Anything).
 					Return(errors.New("database error")).
@@ -38,7 +38,7 @@ func TestDeleteConversationImpl_Execute(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			repo := mocks.NewMockChatMessageRepository(t)
+			repo := domain.NewMockChatMessageRepository(t)
 			tt.setExpectations(repo)
 
 			uc := NewDeleteConversationImpl(repo)

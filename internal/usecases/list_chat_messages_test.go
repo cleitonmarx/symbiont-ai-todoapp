@@ -7,14 +7,13 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestListChatMessagesImpl_Query(t *testing.T) {
 	tests := map[string]struct {
-		setExpectations func(repo *mocks.MockChatMessageRepository)
+		setExpectations func(repo *domain.MockChatMessageRepository)
 		page            int
 		pageSize        int
 		expectedLen     int
@@ -27,7 +26,7 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 			expectedLen:     50,
 			expectedHasMore: true,
 			expectedErr:     nil,
-			setExpectations: func(repo *mocks.MockChatMessageRepository) {
+			setExpectations: func(repo *domain.MockChatMessageRepository) {
 				repo.EXPECT().
 					ListChatMessages(mock.Anything, 50).
 					Return(createChatMessages(50, domain.ChatRole_User), true, nil).
@@ -40,7 +39,7 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 			expectedLen:     30,
 			expectedHasMore: false,
 			expectedErr:     nil,
-			setExpectations: func(repo *mocks.MockChatMessageRepository) {
+			setExpectations: func(repo *domain.MockChatMessageRepository) {
 				repo.EXPECT().
 					ListChatMessages(mock.Anything, 50).
 					Return(createChatMessages(30, domain.ChatRole_Assistant), false, nil).
@@ -53,7 +52,7 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 			expectedLen:     0,
 			expectedHasMore: false,
 			expectedErr:     errors.New("database error"),
-			setExpectations: func(repo *mocks.MockChatMessageRepository) {
+			setExpectations: func(repo *domain.MockChatMessageRepository) {
 				repo.EXPECT().
 					ListChatMessages(mock.Anything, 50).
 					Return(nil, false, errors.New("database error")).
@@ -66,7 +65,7 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 			expectedLen:     0,
 			expectedHasMore: false,
 			expectedErr:     nil,
-			setExpectations: func(repo *mocks.MockChatMessageRepository) {
+			setExpectations: func(repo *domain.MockChatMessageRepository) {
 				repo.EXPECT().
 					ListChatMessages(mock.Anything, 50).
 					Return([]domain.ChatMessage{}, false, nil).
@@ -77,7 +76,7 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			repo := mocks.NewMockChatMessageRepository(t)
+			repo := domain.NewMockChatMessageRepository(t)
 			tt.setExpectations(repo)
 
 			uc := NewListChatMessagesImpl(repo)

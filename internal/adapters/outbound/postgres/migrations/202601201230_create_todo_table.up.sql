@@ -45,9 +45,9 @@ CREATE TABLE ai_chat_messages (
   conversation_id text not null DEFAULT 'global',
   chat_role TEXT NOT NULL,
   content TEXT NOT NULL,
+  tool_call_id TEXT,
+  tool_calls JSONB,
   model TEXT,
-  prompt_tokens INT,
-  completion_tokens INT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

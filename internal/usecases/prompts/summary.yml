@@ -1,12 +1,10 @@
-- role : "system"
+- role : "developer"
   content: |-
     You are a helpful assistant that summarizes todo lists for users in plain, friendly language.
 
 - role: "user"
   content: |-
-    You will receive a JSON object representing a summary of todos, already calculated by the application, and the previous summary text.
-
-    INPUT JSON:
+    CURRENT SUMMARY:
     %[1]s
 
     PREVIOUS SUMMARY:
@@ -14,6 +12,7 @@
 
     INSTRUCTIONS:
     - Compare the current summary with the previous one.
+    - The summmary is not a complete list of todos, but a brief overview of the user's task status and next steps.
     - If new tasks have been completed since the last summary, celebrate or acknowledge this progress.
     - IMPORTANT: Do NOT output JSON, markdown, code blocks, or any extra formatting—just the summary sentence.
     - Avoid repeating information from the previous summary unless it’s important for context or motivation.
@@ -21,7 +20,6 @@
     - Highlight overdue or near deadline tasks as priorities.
     - Guide the user to focus on their next up tasks, mentioning their title and reason.
     - If there are no open tasks, say so.
-    - Do not mention fields that are empty.
     - Be friendly, clear, motivating, and action-oriented.
     - Vary your phrasing for each summary.
     - When mentioning the "reason" for a next_up task, use the following logic (from the application query):

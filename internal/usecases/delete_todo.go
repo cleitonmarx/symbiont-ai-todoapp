@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
@@ -17,15 +16,15 @@ type DeleteTodo interface {
 
 // DeleteTodoImpl is the implementation of the DeleteTodo use case.
 type DeleteTodoImpl struct {
-	uow          domain.UnitOfWork
-	timeProvider domain.CurrentTimeProvider
+	uow     domain.UnitOfWork
+	deleter TodoDeleter
 }
 
 // NewDeleteTodo creates a new instance of DeleteTodoImpl.
-func NewDeleteTodo(uow domain.UnitOfWork, timeProvider domain.CurrentTimeProvider) DeleteTodoImpl {
+func NewDeleteTodo(uow domain.UnitOfWork, deleter TodoDeleter) DeleteTodoImpl {
 	return DeleteTodoImpl{
-		uow:          uow,
-		timeProvider: timeProvider,
+		uow:     uow,
+		deleter: deleter,
 	}
 }
 
@@ -35,35 +34,19 @@ func (dti DeleteTodoImpl) Execute(ctx context.Context, id uuid.UUID) error {
 	defer span.End()
 
 	return dti.uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
-		_, found, err := uow.Todo().GetTodo(spanCtx, id) // Ensure the todo exists
-		if err != nil {
-			return err
-		}
-		if !found {
-			return domain.NewNotFoundErr(fmt.Sprintf("todo with ID %s not found", id))
-		}
-		err = uow.Todo().DeleteTodo(spanCtx, id)
-		if err != nil {
-			return err
-		}
-
-		return uow.Outbox().RecordEvent(spanCtx, domain.TodoEvent{
-			Type:      domain.TodoEventType_TODO_DELETED,
-			TodoID:    id,
-			CreatedAt: dti.timeProvider.Now(),
-		})
-
+		return dti.deleter.Delete(spanCtx, uow, id)
 	})
 }
 
 // InitDeleteTodo initializes the DeleteTodo use case.
 type InitDeleteTodo struct {
-	Uow          domain.UnitOfWork          `resolve:""`
-	TimeProvider domain.CurrentTimeProvider `resolve:""`
+	Uow         domain.UnitOfWork `resolve:""`
+	TodoDeleter TodoDeleter       `resolve:""`
 }
 
 // Initialize registers the DeleteTodo use case in the dependency container.
 func (i InitDeleteTodo) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[DeleteTodo](NewDeleteTodo(i.Uow, i.TimeProvider))
+	uc := NewDeleteTodo(i.Uow, i.TodoDeleter)
+	depend.Register[DeleteTodo](uc)
 	return ctx, nil
 }

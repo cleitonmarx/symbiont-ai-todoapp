@@ -15,18 +15,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestChatMessageRepository_CreateChatMessage(t *testing.T) {
+func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 	fixedID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2026, 1, 24, 12, 0, 0, 0, time.UTC)
 	msg := domain.ChatMessage{
-		ID:               fixedID,
-		ConversationID:   domain.GlobalConversationID,
-		ChatRole:         domain.ChatRole("user"),
-		Content:          "hello",
-		Model:            "ai/gpt-oss",
-		PromptTokens:     10,
-		CompletionTokens: 5,
-		CreatedAt:        fixedTime,
+		ID:             fixedID,
+		ConversationID: domain.GlobalConversationID,
+		ChatRole:       domain.ChatRole("user"),
+		Content:        "hello",
+		Model:          "ai/gpt-oss",
+		ToolCalls: []domain.LLMStreamEventFunctionCall{
+			{
+				ID:        "id",
+				Index:     0,
+				Function:  "test_func",
+				Arguments: "{\"arg1\":0}",
+			},
+		},
+		CreatedAt: fixedTime,
 	}
 
 	tests := map[string]struct {
@@ -35,15 +41,15 @@ func TestChatMessageRepository_CreateChatMessage(t *testing.T) {
 	}{
 		"success": {
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectExec("INSERT INTO ai_chat_messages (id,conversation_id,chat_role,content,model,prompt_tokens,completion_tokens,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)").
+				m.ExpectExec("INSERT INTO ai_chat_messages (id,conversation_id,chat_role,content,tool_call_id,tool_calls,model,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)").
 					WithArgs(
 						msg.ID,
 						msg.ConversationID,
 						msg.ChatRole,
 						msg.Content,
+						msg.ToolCallID,
+						[]byte(`[{"ID":"id","Index":0,"Function":"test_func","Arguments":"{\"arg1\":0}"}]`),
 						msg.Model,
-						msg.PromptTokens,
-						msg.CompletionTokens,
 						msg.CreatedAt,
 					).
 					WillReturnResult(sqlmock.NewResult(1, 1))
@@ -52,15 +58,15 @@ func TestChatMessageRepository_CreateChatMessage(t *testing.T) {
 		},
 		"database-error": {
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectExec("INSERT INTO ai_chat_messages (id,conversation_id,chat_role,content,model,prompt_tokens,completion_tokens,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)").
+				m.ExpectExec("INSERT INTO ai_chat_messages (id,conversation_id,chat_role,content,tool_call_id,tool_calls,model,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)").
 					WithArgs(
 						msg.ID,
 						msg.ConversationID,
 						msg.ChatRole,
 						msg.Content,
+						msg.ToolCallID,
+						[]byte(`[{"ID":"id","Index":0,"Function":"test_func","Arguments":"{\"arg1\":0}"}]`),
 						msg.Model,
-						msg.PromptTokens,
-						msg.CompletionTokens,
 						msg.CreatedAt,
 					).
 					WillReturnError(errors.New("db error"))
@@ -78,7 +84,7 @@ func TestChatMessageRepository_CreateChatMessage(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewChatMessageRepository(db)
-			gotErr := repo.CreateChatMessage(context.Background(), msg)
+			gotErr := repo.CreateChatMessages(context.Background(), []domain.ChatMessage{msg})
 			assert.Equal(t, tt.err, gotErr)
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -99,9 +105,9 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			domain.GlobalConversationID,
 			domain.ChatRole("user"),
 			"content",
+			nil,
+			nil,
 			"ai/gpt-oss",
-			10,
-			5,
 			ts,
 		}
 	}
@@ -120,14 +126,14 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 					AddRow(row(fixedID3, t3)...).
 					AddRow(row(fixedID2, t2)...).
 					AddRow(row(fixedID1, t1)...)
-				m.ExpectQuery(`SELECT id, conversation_id, chat_role, content, model, prompt_tokens, completion_tokens, created_at FROM ai_chat_messages WHERE conversation_id = \$1 ORDER BY created_at DESC`).
+				m.ExpectQuery("SELECT id, conversation_id, chat_role, content, tool_call_id, tool_calls, model, created_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC").
 					WithArgs(domain.GlobalConversationID).
 					WillReturnRows(rows)
 			},
 			expectedMsgs: []domain.ChatMessage{
-				{ID: fixedID1, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", PromptTokens: 10, CompletionTokens: 5, CreatedAt: t1},
-				{ID: fixedID2, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", PromptTokens: 10, CompletionTokens: 5, CreatedAt: t2},
-				{ID: fixedID3, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", PromptTokens: 10, CompletionTokens: 5, CreatedAt: t3},
+				{ID: fixedID1, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", CreatedAt: t1},
+				{ID: fixedID2, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", CreatedAt: t2},
+				{ID: fixedID3, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", CreatedAt: t3},
 			},
 			expectedHasMore: false,
 			expectErr:       false,
@@ -140,13 +146,13 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 					AddRow(row(fixedID2, t2)...).
 					AddRow(row(fixedID1, t1)...)
 
-				m.ExpectQuery(`SELECT id, conversation_id, chat_role, content, model, prompt_tokens, completion_tokens, created_at FROM ai_chat_messages WHERE conversation_id = \$1 ORDER BY created_at DESC LIMIT 3`).
+				m.ExpectQuery("SELECT id, conversation_id, chat_role, content, tool_call_id, tool_calls, model, created_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 3").
 					WithArgs(domain.GlobalConversationID).
 					WillReturnRows(rows)
 			},
 			expectedMsgs: []domain.ChatMessage{
-				{ID: fixedID2, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", PromptTokens: 10, CompletionTokens: 5, CreatedAt: t2},
-				{ID: fixedID3, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", PromptTokens: 10, CompletionTokens: 5, CreatedAt: t3},
+				{ID: fixedID2, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", CreatedAt: t2},
+				{ID: fixedID3, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", CreatedAt: t3},
 			},
 			expectedHasMore: true,
 			expectErr:       false,
@@ -155,7 +161,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			limit: 0,
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(chatFields)
-				m.ExpectQuery(`SELECT id, conversation_id, chat_role, content, model, prompt_tokens, completion_tokens, created_at FROM ai_chat_messages WHERE conversation_id = \$1 ORDER BY created_at DESC`).
+				m.ExpectQuery("SELECT id, conversation_id, chat_role, content, tool_call_id, tool_calls, model, created_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC").
 					WithArgs(domain.GlobalConversationID).
 					WillReturnRows(rows)
 			},
@@ -166,7 +172,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 		"database-error": {
 			limit: 0,
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectQuery(`SELECT id, conversation_id, chat_role, content, model, prompt_tokens, completion_tokens, created_at FROM ai_chat_messages WHERE conversation_id = \$1 ORDER BY created_at DESC`).
+				m.ExpectQuery("SELECT id, conversation_id, chat_role, content, tool_call_id, tool_calls, model, created_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC").
 					WithArgs(domain.GlobalConversationID).
 					WillReturnError(errors.New("db error"))
 			},
@@ -178,7 +184,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 			assert.NoError(t, err)
 			defer db.Close() //nolint:errcheck
 

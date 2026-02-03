@@ -11,7 +11,7 @@ interface UseChatReturn {
   clearChat: () => Promise<void>;
 }
 
-export const useChat = (): UseChatReturn => {
+export const useChat = (onChatDone?: () => void): UseChatReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,49 +65,79 @@ export const useChat = (): UseChatReturn => {
       };
       setMessages((prev) => [...prev, tempAssistantMsg]);
 
+      const processEvent = (rawEvent: string) => {
+        const lines = rawEvent.split(/\r?\n/).filter(Boolean);
+        let eventType = 'message';
+        const dataLines: string[] = [];
+
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            eventType = line.replace('event:', '').trim();
+          } else if (line.startsWith('data:')) {
+            dataLines.push(line.replace('data:', '').trimStart());
+          }
+        }
+
+        if (dataLines.length === 0) return;
+
+        const dataStr = dataLines.join('\n');
+        try {
+          const data = JSON.parse(dataStr);
+
+          if (eventType === 'meta' && data.AssistantMessageID) {
+            assistantMessageId = data.AssistantMessageID;
+            return;
+          }
+
+          if (eventType === 'delta' && data.Text) {
+            assistantContent += data.Text;
+
+            setMessages((prev) => {
+              const updated = [...prev];
+              const lastIndex = updated.length - 1;
+              const lastMsg = updated[lastIndex];
+              if (lastMsg && lastMsg.role === 'assistant') {
+                updated[lastIndex] = {
+                  ...lastMsg,
+                  id: assistantMessageId || lastMsg.id,
+                  content: assistantContent,
+                };
+              }
+              return updated;
+            });
+            return;
+          }
+
+          if (eventType === 'done') {
+            if (data.AssistantMessageID) {
+              assistantMessageId = data.AssistantMessageID;
+            }
+            setLoading(false);
+            // Call the callback when done
+            onChatDone?.();
+            return;
+          }
+
+          if (eventType === 'error') {
+            setError('Failed to get response from assistant');
+            setLoading(false);
+          }
+        } catch (e) {
+          console.error('Failed to parse SSE data:', e, dataStr);
+        }
+      };
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        const events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() || '';
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
-
-          if (line.startsWith('event: meta')) {
-            continue;
-          } else if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.assistant_message_id) {
-                assistantMessageId = data.assistant_message_id;
-              }
-
-              if (data.text) {
-                assistantContent += data.text;
-                // Update the assistant message in real-time
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  const lastMsg = updated[updated.length - 1];
-                  if (lastMsg && lastMsg.role === 'assistant') {
-                    lastMsg.content = assistantContent;
-                    lastMsg.id = assistantMessageId || lastMsg.id;
-                  }
-                  return updated;
-                });
-              }
-            } catch (e) {
-              console.error('Failed to parse SSE data:', e);
-            }
-          } else if (line.startsWith('event: done')) {
-            setLoading(false);
-          } else if (line.startsWith('event: error')) {
-            setError('Failed to get response from assistant');
-            setLoading(false);
-          }
+        for (const evt of events) {
+          if (!evt.trim()) continue;
+          processEvent(evt);
         }
       }
 
@@ -116,7 +146,7 @@ export const useChat = (): UseChatReturn => {
       setError(err instanceof Error ? err.message : 'Failed to send message');
       setLoading(false);
     }
-  }, []);
+  }, [onChatDone]); // Add onChatDone to dependency array
 
   const clearChat = useCallback(async () => {
     try {

@@ -9,8 +9,12 @@ marked.setOptions({
   gfm: true,
 });
 
-const Chat: React.FC = () => {
-  const { messages, loading, error, loadMessages, sendMessage, clearChat } = useChat();
+interface ChatProps {
+  onChatDone?: () => void;
+}
+
+const Chat: React.FC<ChatProps> = ({ onChatDone }) => {
+  const { messages, loading, error, loadMessages, sendMessage, clearChat } = useChat(onChatDone);
   const [input, setInput] = React.useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);

@@ -37,7 +37,7 @@ func collectStreamEvents(adapter LLMClient, req domain.LLMChatRequest) ([]domain
 	var deltaTexts []string
 	var doneEvent *domain.LLMStreamEventDone
 
-	err := adapter.ChatStream(context.Background(), req, func(eventType domain.LLMStreamEventType, data interface{}) error {
+	err := adapter.ChatStream(context.Background(), req, func(eventType domain.LLMStreamEventType, data any) error {
 		eventTypes = append(eventTypes, eventType)
 
 		switch eventType {
@@ -55,28 +55,21 @@ func collectStreamEvents(adapter LLMClient, req domain.LLMChatRequest) ([]domain
 }
 
 func TestLLMClientAdapter_ChatStream(t *testing.T) {
+	req := domain.LLMChatRequest{
+		Model: "test-model",
+		Messages: []domain.LLMChatMessage{
+			{Role: "user", Content: "test"},
+		},
+	}
 	tests := map[string]struct {
+		req             domain.LLMChatRequest
 		chunks          []StreamChunk
 		expectErr       bool
 		expectedEvents  []domain.LLMStreamEventType
 		expectedContent string
-		validateUsage   func(*testing.T, *domain.LLMStreamEventDone)
 	}{
-		"success-complete-stream": {
-			chunks: []StreamChunk{
-				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "Hello world"}}}},
-				{Usage: &Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15}},
-			},
-			expectedEvents:  []domain.LLMStreamEventType{"meta", "delta", "done"},
-			expectedContent: "Hello world",
-			validateUsage: func(t *testing.T, done *domain.LLMStreamEventDone) {
-				assert.NotNil(t, done.Usage)
-				assert.Equal(t, 10, done.Usage.PromptTokens)
-				assert.Equal(t, 5, done.Usage.CompletionTokens)
-				assert.Equal(t, 15, done.Usage.TotalTokens)
-			},
-		},
 		"multiple-deltas": {
+			req: req,
 			chunks: []StreamChunk{
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "Hello"}}}},
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: " "}}}},
@@ -85,21 +78,8 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 			expectedEvents:  []domain.LLMStreamEventType{"meta", "delta", "delta", "delta", "done"},
 			expectedContent: "Hello world",
 		},
-		"usage-from-timings": {
-			chunks: []StreamChunk{
-				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "test"}}}},
-				{Timings: &Timings{PromptN: 8, PredictedN: 4}},
-			},
-			expectedEvents:  []domain.LLMStreamEventType{"meta", "delta", "done"},
-			expectedContent: "test",
-			validateUsage: func(t *testing.T, done *domain.LLMStreamEventDone) {
-				assert.NotNil(t, done.Usage)
-				assert.Equal(t, 8, done.Usage.PromptTokens)
-				assert.Equal(t, 4, done.Usage.CompletionTokens)
-				assert.Equal(t, 12, done.Usage.TotalTokens)
-			},
-		},
 		"empty-delta": {
+			req: req,
 			chunks: []StreamChunk{
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: ""}}}},
 			},
@@ -107,15 +87,64 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 			expectedContent: "",
 		},
 		"no-usage-fallback": {
+			req: req,
 			chunks: []StreamChunk{
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "test"}}}},
 			},
 			expectedEvents:  []domain.LLMStreamEventType{"meta", "delta", "done"},
 			expectedContent: "test",
-			validateUsage: func(t *testing.T, done *domain.LLMStreamEventDone) {
-				assert.NotNil(t, done.Usage)
-				assert.Greater(t, done.Usage.PromptTokens, 0) // Estimated from message
+		},
+		"with-tool-calls": {
+			req: domain.LLMChatRequest{
+				Model: "test-model",
+				Messages: []domain.LLMChatMessage{
+					{
+						Role: domain.ChatRole_Tool,
+						ToolCalls: []domain.LLMStreamEventFunctionCall{
+							{
+								ID:        "toolcall-1",
+								Function:  "list_todos",
+								Arguments: `{"search_term":"books","page":1,"page_size":5}`,
+							},
+						},
+					},
+				},
+				Tools: []domain.LLMToolDefinition{
+					{
+						Type: "search_web",
+						Function: domain.LLMToolFunction{
+							Name: "search_web",
+							Parameters: domain.LLMToolFunctionParameters{
+								Type: "object",
+								Properties: map[string]domain.LLMToolFunctionParameterDetail{
+									"search_term": {Type: "string", Description: "The search query", Required: true},
+								},
+							},
+						},
+					},
+				},
 			},
+			chunks: []StreamChunk{
+				{
+					Choices: []StreamChunkChoice{
+						{
+							Delta: StreamChunkDelta{
+								ToolCalls: []ToolCallChunk{
+									{
+										ID: "toolcall-1",
+										Function: ToolCallChunkFunction{
+											Name: "list_todos", Arguments: `{"search_term":"books","page":1,"page_size":5}`,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+
+			expectedEvents:  []domain.LLMStreamEventType{"meta", "function_call", "done"},
+			expectedContent: "",
 		},
 	}
 
@@ -127,14 +156,7 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 			client := NewDRMAPIClient(server.URL, "", server.Client())
 			adapter := NewLLMClientAdapter(client)
 
-			req := domain.LLMChatRequest{
-				Model: "test-model",
-				Messages: []domain.LLMChatMessage{
-					{Role: "user", Content: "test"},
-				},
-			}
-
-			eventTypes, deltaTexts, doneEvent, err := collectStreamEvents(adapter, req)
+			eventTypes, deltaTexts, _, err := collectStreamEvents(adapter, tt.req)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -147,9 +169,6 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 			combined := strings.Join(deltaTexts, "")
 			assert.Equal(t, tt.expectedContent, combined)
 
-			if tt.validateUsage != nil && doneEvent != nil {
-				tt.validateUsage(t, doneEvent)
-			}
 		})
 	}
 }

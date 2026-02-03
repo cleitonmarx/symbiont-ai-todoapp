@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,13 +20,13 @@ const (
 
 // Todo represents a todo item in the system.
 type Todo struct {
-	ID        uuid.UUID  `json:"id"`
-	Title     string     `json:"title"`
-	DueDate   time.Time  `json:"due_date"`
-	Status    TodoStatus `json:"status"`
+	ID        uuid.UUID
+	Title     string
+	DueDate   time.Time
+	Status    TodoStatus
 	Embedding []float64
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (t Todo) Validate(now time.Time) error {
@@ -51,7 +52,7 @@ func (t Todo) Validate(now time.Time) error {
 
 // ToLLMInput formats the todo item as a string suitable for LLM input.
 func (t Todo) ToLLMInput() string {
-	return "Task: " + t.Title + " | Status: " + string(t.Status) + " | Due: " + t.DueDate.Format(time.DateOnly)
+	return fmt.Sprintf("ID: %s | Title: %s | Due Date: %s | Status: %s", t.ID.String(), t.Title, t.DueDate.Format(time.DateOnly), t.Status)
 }
 
 // ListTodosParams represents the parameters for listing todo items.

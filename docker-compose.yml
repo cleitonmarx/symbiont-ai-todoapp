@@ -24,11 +24,11 @@ services:
       - PUBSUB_TOPIC_ID=Todo
       - PUBSUB_SUBSCRIPTION_ID=todo_summary_generator
       - LLM_MODEL_HOST=http://model-runner.docker.internal
-      - LLM_MODEL=gpt-oss:20B-UD-Q4_K_XL
+      - LLM_MODEL=qwen2.5:7B-Q4_0
       - LLM_EMBEDDING_MODEL=embeddinggemma:300M-Q8_0
       - SUMMARY_BATCH_INTERVAL=1s
     models:
-      - gpt-oss
+      - qwen2.5
       - embeddinggemma
     depends_on:
       jaeger:

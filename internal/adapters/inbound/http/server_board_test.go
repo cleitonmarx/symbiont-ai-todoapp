@@ -10,7 +10,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases/mocks"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -21,13 +21,13 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 	generatedAt := time.Date(2026, 1, 22, 10, 30, 0, 0, time.UTC)
 
 	tests := map[string]struct {
-		setupMocks     func(*mocks.MockGetBoardSummary)
+		setupUsecases  func(*usecases.MockGetBoardSummary)
 		expectedStatus int
 		expectedBody   *gen.BoardSummary
 		expectedError  *gen.ErrorResp
 	}{
 		"success": {
-			setupMocks: func(m *mocks.MockGetBoardSummary) {
+			setupUsecases: func(m *usecases.MockGetBoardSummary) {
 				m.EXPECT().Query(mock.Anything).Return(domain.BoardSummary{
 					ID:            fixedUUID,
 					Model:         "ai/gpt-oss:latest",
@@ -68,7 +68,7 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 			},
 		},
 		"summary-not-found": {
-			setupMocks: func(m *mocks.MockGetBoardSummary) {
+			setupUsecases: func(m *usecases.MockGetBoardSummary) {
 				m.EXPECT().
 					Query(mock.Anything).
 					Return(domain.BoardSummary{}, domain.NewNotFoundErr("board summary not found"))
@@ -82,7 +82,7 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 			},
 		},
 		"use-case-error": {
-			setupMocks: func(m *mocks.MockGetBoardSummary) {
+			setupUsecases: func(m *usecases.MockGetBoardSummary) {
 				m.EXPECT().
 					Query(mock.Anything).
 					Return(domain.BoardSummary{}, errors.New("database error"))
@@ -99,8 +99,8 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockGetBoardSummary := mocks.NewMockGetBoardSummary(t)
-			tt.setupMocks(mockGetBoardSummary)
+			mockGetBoardSummary := usecases.NewMockGetBoardSummary(t)
+			tt.setupUsecases(mockGetBoardSummary)
 
 			server := &TodoAppServer{
 				GetBoardSummaryUseCase: mockGetBoardSummary,

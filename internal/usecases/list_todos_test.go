@@ -7,7 +7,6 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	domain_mocks "github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -15,7 +14,7 @@ import (
 
 func TestListTodosImpl_Query(t *testing.T) {
 	tests := map[string]struct {
-		setExpectations func(repo *domain_mocks.MockTodoRepository)
+		setExpectations func(repo *domain.MockTodoRepository)
 		page            int
 		pageSize        int
 		expectedTodos   []domain.Todo
@@ -25,7 +24,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 		"success": {
 			page:     1,
 			pageSize: 10,
-			setExpectations: func(repo *domain_mocks.MockTodoRepository) {
+			setExpectations: func(repo *domain.MockTodoRepository) {
 				repo.EXPECT().ListTodos(mock.Anything, 1, 10, mock.Anything).Return([]domain.Todo{
 					{ID: uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"), Title: "Todo 1", Status: domain.TodoStatus_OPEN},
 					{ID: uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"), Title: "Todo 2", Status: domain.TodoStatus_OPEN},
@@ -41,7 +40,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 		"repository-error": {
 			page:     1,
 			pageSize: 10,
-			setExpectations: func(repo *domain_mocks.MockTodoRepository) {
+			setExpectations: func(repo *domain.MockTodoRepository) {
 				repo.EXPECT().ListTodos(mock.Anything, 1, 10, mock.Anything).Return(nil, false, errors.New("database error"))
 			},
 			expectedTodos:   nil,
@@ -52,7 +51,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			repo := domain_mocks.NewMockTodoRepository(t)
+			repo := domain.NewMockTodoRepository(t)
 			if tt.setExpectations != nil {
 				tt.setExpectations(repo)
 			}

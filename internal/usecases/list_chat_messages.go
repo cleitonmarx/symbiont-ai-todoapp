@@ -35,7 +35,15 @@ func (lcm ListChatMessagesImpl) Query(ctx context.Context, page int, pageSize in
 		return nil, false, err
 	}
 
-	return messages, hasMore, nil
+	// Filter out tool messages before returning to the user
+	messagesToReturnToUser := []domain.ChatMessage{}
+	for _, msg := range messages {
+		if msg.ChatRole != domain.ChatRole_Tool && len(msg.Content) > 0 {
+			messagesToReturnToUser = append(messagesToReturnToUser, msg)
+		}
+	}
+
+	return messagesToReturnToUser, hasMore, nil
 }
 
 // InitListChatMessages is the initializer for the ListChatMessages use case

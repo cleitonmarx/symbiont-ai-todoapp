@@ -11,15 +11,38 @@ import (
 type LLMStreamEventType string
 
 const (
-	LLMStreamEventType_Meta  LLMStreamEventType = "meta"
-	LLMStreamEventType_Delta LLMStreamEventType = "delta"
-	LLMStreamEventType_Done  LLMStreamEventType = "done"
+	LLMStreamEventType_Meta         LLMStreamEventType = "meta"
+	LLMStreamEventType_Delta        LLMStreamEventType = "delta"
+	LLMStreamEventType_FunctionCall LLMStreamEventType = "function_call"
+	LLMStreamEventType_Done         LLMStreamEventType = "done"
 )
+
+// LLMTool represents a tool that can be executed by the LLM
+type LLMTool interface {
+	// Tool returns the LLMTool definition
+	Definition() LLMToolDefinition
+	// StatusMessage returns a user-friendly status line for this tool
+	StatusMessage() string
+	// Call executes the tool with the given function call and chat messages
+	Call(context.Context, LLMStreamEventFunctionCall, []LLMChatMessage) LLMChatMessage
+}
+
+// LLMToolRegistry defines the interface for calling registered LLM tools.
+type LLMToolRegistry interface {
+	// Call executes the tool with the given function call and chat messages
+	Call(context.Context, LLMStreamEventFunctionCall, []LLMChatMessage) LLMChatMessage
+	// StatusMessage returns a friendly status message for the given tool name.
+	StatusMessage(functionName string) string
+	// List returns all registered LLM tools.
+	List() []LLMToolDefinition
+}
 
 // LLMChatMessage represents a message in a chat request to the LLM API
 type LLMChatMessage struct {
-	Role    ChatRole
-	Content string
+	Role       ChatRole
+	Content    string
+	ToolCallID *string
+	ToolCalls  []LLMStreamEventFunctionCall
 }
 
 // LLMChatRequest represents a request to the LLM API
@@ -31,13 +54,33 @@ type LLMChatRequest struct {
 	Temperature *float64
 	TopP        *float64
 	MaxTokens   *int
+	Tools       []LLMToolDefinition
 }
 
-// LLMUsage represents token usage information from the LLM
-type LLMUsage struct {
-	PromptTokens     int
-	CompletionTokens int
-	TotalTokens      int
+// LLMToolDefinition represents a tool that can be used by the LLM
+type LLMToolDefinition struct {
+	Type     string
+	Function LLMToolFunction
+}
+
+// LLMToolFunction represents a function tool for the LLM
+type LLMToolFunction struct {
+	Description string
+	Name        string
+	Parameters  LLMToolFunctionParameters
+}
+
+// LLMToolFunctionParameters represents the parameters schema for a function tool
+type LLMToolFunctionParameters struct {
+	Type       string
+	Properties map[string]LLMToolFunctionParameterDetail
+}
+
+// LLMToolFunctionParameterDetail represents a single parameter in the function tool schema
+type LLMToolFunctionParameterDetail struct {
+	Type        string
+	Description string
+	Required    bool
 }
 
 // LLMStreamEventMeta contains metadata for a streaming chat session
@@ -50,14 +93,20 @@ type LLMStreamEventMeta struct {
 
 // LLMStreamEventDelta contains a text delta from the stream
 type LLMStreamEventDelta struct {
-	Text string `json:"text"`
+	Text string
+}
+
+type LLMStreamEventFunctionCall struct {
+	ID        string
+	Index     int
+	Function  string
+	Arguments string
 }
 
 // LLMStreamEventDone contains completion metadata and token usage
 type LLMStreamEventDone struct {
 	AssistantMessageID string
 	CompletedAt        string
-	Usage              *LLMUsage
 }
 
 // LLMStreamEventCallback is called for each event in the stream

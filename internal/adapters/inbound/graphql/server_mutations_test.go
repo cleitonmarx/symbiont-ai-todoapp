@@ -9,7 +9,7 @@ import (
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/types"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases/mocks"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -40,10 +40,10 @@ var (
 
 func TestTodoGraphQLServer_UpdateTodo(t *testing.T) {
 	tests := map[string]struct {
-		params      gen.UpdateTodoParams
-		setupMocks  func(*mocks.MockUpdateTodo)
-		expected    *gen.Todo
-		expectError bool
+		params        gen.UpdateTodoParams
+		setupUsecases func(*usecases.MockUpdateTodo)
+		expected      *gen.Todo
+		expectError   bool
 	}{
 		"success": {
 			params: gen.UpdateTodoParams{
@@ -52,7 +52,7 @@ func TestTodoGraphQLServer_UpdateTodo(t *testing.T) {
 				Status:  (*gen.TodoStatus)(&testStatus),
 				DueDate: (*types.Date)(&testNow),
 			},
-			setupMocks: func(m *mocks.MockUpdateTodo) {
+			setupUsecases: func(m *usecases.MockUpdateTodo) {
 				m.EXPECT().
 					Execute(mock.Anything, testID, &testTitle, (*domain.TodoStatus)(&testStatus), (*time.Time)(&testNow)).
 					Return(testTodo, nil)
@@ -64,7 +64,7 @@ func TestTodoGraphQLServer_UpdateTodo(t *testing.T) {
 			params: gen.UpdateTodoParams{
 				ID: testID,
 			},
-			setupMocks: func(m *mocks.MockUpdateTodo) {
+			setupUsecases: func(m *usecases.MockUpdateTodo) {
 				m.EXPECT().
 					Execute(mock.Anything, testID, (*string)(nil), (*domain.TodoStatus)(nil), (*time.Time)(nil)).
 					Return(domain.Todo{}, errors.New("fail"))
@@ -76,8 +76,8 @@ func TestTodoGraphQLServer_UpdateTodo(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockUC := mocks.NewMockUpdateTodo(t)
-			tt.setupMocks(mockUC)
+			mockUC := usecases.NewMockUpdateTodo(t)
+			tt.setupUsecases(mockUC)
 			server := &TodoGraphQLServer{UpdateTodoUsecase: mockUC}
 
 			got, err := server.UpdateTodo(context.Background(), tt.params)
@@ -94,19 +94,19 @@ func TestTodoGraphQLServer_UpdateTodo(t *testing.T) {
 
 func TestTodoGraphQLServer_DeleteTodo(t *testing.T) {
 	tests := map[string]struct {
-		setupMocks  func(*mocks.MockDeleteTodo)
-		expect      bool
-		expectError bool
+		setupUsecases func(*usecases.MockDeleteTodo)
+		expect        bool
+		expectError   bool
 	}{
 		"success": {
-			setupMocks: func(m *mocks.MockDeleteTodo) {
+			setupUsecases: func(m *usecases.MockDeleteTodo) {
 				m.EXPECT().Execute(mock.Anything, testID).Return(nil)
 			},
 			expect:      true,
 			expectError: false,
 		},
 		"error": {
-			setupMocks: func(m *mocks.MockDeleteTodo) {
+			setupUsecases: func(m *usecases.MockDeleteTodo) {
 				m.EXPECT().Execute(mock.Anything, testID).Return(errors.New("fail"))
 			},
 			expect:      false,
@@ -116,8 +116,8 @@ func TestTodoGraphQLServer_DeleteTodo(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockUC := mocks.NewMockDeleteTodo(t)
-			tt.setupMocks(mockUC)
+			mockUC := usecases.NewMockDeleteTodo(t)
+			tt.setupUsecases(mockUC)
 			server := &TodoGraphQLServer{DeleteTodoUsecase: mockUC}
 
 			got, err := server.DeleteTodo(context.Background(), testID)

@@ -17,7 +17,7 @@ import (
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases/mocks"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -25,12 +25,12 @@ import (
 
 func TestTodoAppServer_ClearChatMessages(t *testing.T) {
 	tests := map[string]struct {
-		setupMocks     func(*mocks.MockDeleteConversation)
+		setupUsecases  func(*usecases.MockDeleteConversation)
 		expectedStatus int
 		expectedError  *gen.ErrorResp
 	}{
 		"success": {
-			setupMocks: func(m *mocks.MockDeleteConversation) {
+			setupUsecases: func(m *usecases.MockDeleteConversation) {
 				m.EXPECT().
 					Execute(mock.Anything).
 					Return(nil)
@@ -38,7 +38,7 @@ func TestTodoAppServer_ClearChatMessages(t *testing.T) {
 			expectedStatus: http.StatusNoContent,
 		},
 		"use-case-error": {
-			setupMocks: func(m *mocks.MockDeleteConversation) {
+			setupUsecases: func(m *usecases.MockDeleteConversation) {
 				m.EXPECT().
 					Execute(mock.Anything).
 					Return(errors.New("database error"))
@@ -55,8 +55,8 @@ func TestTodoAppServer_ClearChatMessages(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockDeleteConversation := mocks.NewMockDeleteConversation(t)
-			tt.setupMocks(mockDeleteConversation)
+			mockDeleteConversation := usecases.NewMockDeleteConversation(t)
+			tt.setupUsecases(mockDeleteConversation)
 
 			server := &TodoAppServer{
 				DeleteConversationUseCase: mockDeleteConversation,
@@ -102,7 +102,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 	tests := map[string]struct {
 		page           int
 		pageSize       int
-		setupMocks     func(*mocks.MockListChatMessages)
+		setupUsecases  func(*usecases.MockListChatMessages)
 		expectedStatus int
 		expectedBody   *gen.ChatHistoryResp
 		expectedError  *gen.ErrorResp
@@ -110,7 +110,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 		"success-with-messages": {
 			page:     1,
 			pageSize: 10,
-			setupMocks: func(m *mocks.MockListChatMessages) {
+			setupUsecases: func(m *usecases.MockListChatMessages) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10).
 					Return([]domain.ChatMessage{domainMessage}, false, nil)
@@ -125,7 +125,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 		"success-with-no-messages": {
 			page:     1,
 			pageSize: 10,
-			setupMocks: func(m *mocks.MockListChatMessages) {
+			setupUsecases: func(m *usecases.MockListChatMessages) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10).
 					Return([]domain.ChatMessage{}, false, nil)
@@ -140,7 +140,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 		"success-with-next-and-previous-page": {
 			page:     2,
 			pageSize: 10,
-			setupMocks: func(m *mocks.MockListChatMessages) {
+			setupUsecases: func(m *usecases.MockListChatMessages) {
 				m.EXPECT().
 					Query(mock.Anything, 2, 10).
 					Return([]domain.ChatMessage{domainMessage}, true, nil)
@@ -157,7 +157,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 		"use-case-error": {
 			page:     1,
 			pageSize: 10,
-			setupMocks: func(m *mocks.MockListChatMessages) {
+			setupUsecases: func(m *usecases.MockListChatMessages) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10).
 					Return(nil, false, errors.New("database error"))
@@ -174,8 +174,8 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockListChatMessages := mocks.NewMockListChatMessages(t)
-			tt.setupMocks(mockListChatMessages)
+			mockListChatMessages := usecases.NewMockListChatMessages(t)
+			tt.setupUsecases(mockListChatMessages)
 
 			server := &TodoAppServer{
 				ListChatMessagesUseCase: mockListChatMessages,
@@ -217,14 +217,14 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 func TestTodoAppServer_StreamChat(t *testing.T) {
 	tests := map[string]struct {
 		requestBody    any
-		setupMocks     func(*mocks.MockStreamChat)
+		setupUsecases  func(*usecases.MockStreamChat)
 		expectedStatus int
 		expectedEvents []string
 		expectedError  *gen.ErrorResp
 	}{
 		"success": {
 			requestBody: gen.StreamChatJSONRequestBody{Message: "Hello"},
-			setupMocks: func(m *mocks.MockStreamChat) {
+			setupUsecases: func(m *usecases.MockStreamChat) {
 				m.EXPECT().
 					Execute(mock.Anything, "Hello", mock.Anything).
 					Run(func(ctx context.Context, msg string, cb domain.LLMStreamEventCallback) {
@@ -238,7 +238,7 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 		},
 		"invalid-json": {
 			requestBody:    []byte(`{invalid json}`),
-			setupMocks:     func(m *mocks.MockStreamChat) {},
+			setupUsecases:  func(m *usecases.MockStreamChat) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &gen.ErrorResp{
 				Error: gen.Error{
@@ -249,7 +249,7 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 		},
 		"use-case-error": {
 			requestBody: gen.StreamChatJSONRequestBody{Message: "fail"},
-			setupMocks: func(m *mocks.MockStreamChat) {
+			setupUsecases: func(m *usecases.MockStreamChat) {
 				m.EXPECT().
 					Execute(mock.Anything, "fail", mock.Anything).
 					Return(errors.New("stream error"))
@@ -266,9 +266,9 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockStreamChat := mocks.NewMockStreamChat(t)
-			if tt.setupMocks != nil {
-				tt.setupMocks(mockStreamChat)
+			mockStreamChat := usecases.NewMockStreamChat(t)
+			if tt.setupUsecases != nil {
+				tt.setupUsecases(mockStreamChat)
 			}
 
 			server := &TodoAppServer{

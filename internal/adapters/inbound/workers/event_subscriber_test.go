@@ -9,7 +9,7 @@ import (
 	pubsubV2 "cloud.google.com/go/pubsub/v2"
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"cloud.google.com/go/pubsub/v2/pstest"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases/mocks"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/api/option"
@@ -90,14 +90,14 @@ func TestTodoEventSubscriber_Run(t *testing.T) {
 		interval        time.Duration
 		publishCount    int
 		expectedBatches int
-		setExpectations func(*mocks.MockGenerateBoardSummary)
+		setExpectations func(*usecases.MockGenerateBoardSummary)
 	}{
 		"batch-full-triggers-processing": {
 			batchSize:       5,
 			interval:        50 * time.Millisecond,
 			publishCount:    20,
 			expectedBatches: 2,
-			setExpectations: func(gbs *mocks.MockGenerateBoardSummary) {
+			setExpectations: func(gbs *usecases.MockGenerateBoardSummary) {
 				gbs.EXPECT().Execute(mock.Anything).Return(nil)
 				gbs.EXPECT().Execute(mock.Anything).Return(assert.AnError)
 			},
@@ -107,7 +107,7 @@ func TestTodoEventSubscriber_Run(t *testing.T) {
 			interval:        100 * time.Millisecond,
 			publishCount:    3,
 			expectedBatches: 1,
-			setExpectations: func(gbs *mocks.MockGenerateBoardSummary) {
+			setExpectations: func(gbs *usecases.MockGenerateBoardSummary) {
 				gbs.EXPECT().Execute(mock.Anything).Return(nil)
 			},
 		},
@@ -119,7 +119,7 @@ func TestTodoEventSubscriber_Run(t *testing.T) {
 			defer cancel()
 			client, topicName := setupPubSubServer(t, ctx, "test-topic-"+name, "test-subscription-"+name)
 
-			gbs := mocks.NewMockGenerateBoardSummary(t)
+			gbs := usecases.NewMockGenerateBoardSummary(t)
 			if tt.setExpectations != nil {
 				tt.setExpectations(gbs)
 			}

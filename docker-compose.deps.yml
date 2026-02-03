@@ -60,8 +60,9 @@ services:
 
 
 models:
-  gpt-oss:
-    model: gpt-oss:20B-UD-Q4_K_XL
+  qwen2.5:
+    model: qwen2.5:7B-Q4_0
+    context_size: 16384
   embeddinggemma:
     model: embeddinggemma:300M-Q8_0
     

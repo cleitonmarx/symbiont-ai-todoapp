@@ -2,13 +2,12 @@
 // github.com/vektra/mockery
 // template: testify
 
-package mocks
+package domain
 
 import (
 	"context"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -40,44 +39,44 @@ func (_m *MockChatMessageRepository) EXPECT() *MockChatMessageRepository_Expecte
 	return &MockChatMessageRepository_Expecter{mock: &_m.Mock}
 }
 
-// CreateChatMessage provides a mock function for the type MockChatMessageRepository
-func (_mock *MockChatMessageRepository) CreateChatMessage(ctx context.Context, message domain.ChatMessage) error {
-	ret := _mock.Called(ctx, message)
+// CreateChatMessages provides a mock function for the type MockChatMessageRepository
+func (_mock *MockChatMessageRepository) CreateChatMessages(ctx context.Context, messages []ChatMessage) error {
+	ret := _mock.Called(ctx, messages)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CreateChatMessage")
+		panic("no return value specified for CreateChatMessages")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.ChatMessage) error); ok {
-		r0 = returnFunc(ctx, message)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []ChatMessage) error); ok {
+		r0 = returnFunc(ctx, messages)
 	} else {
 		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// MockChatMessageRepository_CreateChatMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateChatMessage'
-type MockChatMessageRepository_CreateChatMessage_Call struct {
+// MockChatMessageRepository_CreateChatMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateChatMessages'
+type MockChatMessageRepository_CreateChatMessages_Call struct {
 	*mock.Call
 }
 
-// CreateChatMessage is a helper method to define mock.On call
+// CreateChatMessages is a helper method to define mock.On call
 //   - ctx context.Context
-//   - message domain.ChatMessage
-func (_e *MockChatMessageRepository_Expecter) CreateChatMessage(ctx interface{}, message interface{}) *MockChatMessageRepository_CreateChatMessage_Call {
-	return &MockChatMessageRepository_CreateChatMessage_Call{Call: _e.mock.On("CreateChatMessage", ctx, message)}
+//   - messages []ChatMessage
+func (_e *MockChatMessageRepository_Expecter) CreateChatMessages(ctx interface{}, messages interface{}) *MockChatMessageRepository_CreateChatMessages_Call {
+	return &MockChatMessageRepository_CreateChatMessages_Call{Call: _e.mock.On("CreateChatMessages", ctx, messages)}
 }
 
-func (_c *MockChatMessageRepository_CreateChatMessage_Call) Run(run func(ctx context.Context, message domain.ChatMessage)) *MockChatMessageRepository_CreateChatMessage_Call {
+func (_c *MockChatMessageRepository_CreateChatMessages_Call) Run(run func(ctx context.Context, messages []ChatMessage)) *MockChatMessageRepository_CreateChatMessages_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 domain.ChatMessage
+		var arg1 []ChatMessage
 		if args[1] != nil {
-			arg1 = args[1].(domain.ChatMessage)
+			arg1 = args[1].([]ChatMessage)
 		}
 		run(
 			arg0,
@@ -87,12 +86,12 @@ func (_c *MockChatMessageRepository_CreateChatMessage_Call) Run(run func(ctx con
 	return _c
 }
 
-func (_c *MockChatMessageRepository_CreateChatMessage_Call) Return(err error) *MockChatMessageRepository_CreateChatMessage_Call {
+func (_c *MockChatMessageRepository_CreateChatMessages_Call) Return(err error) *MockChatMessageRepository_CreateChatMessages_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockChatMessageRepository_CreateChatMessage_Call) RunAndReturn(run func(ctx context.Context, message domain.ChatMessage) error) *MockChatMessageRepository_CreateChatMessage_Call {
+func (_c *MockChatMessageRepository_CreateChatMessages_Call) RunAndReturn(run func(ctx context.Context, messages []ChatMessage) error) *MockChatMessageRepository_CreateChatMessages_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -149,24 +148,24 @@ func (_c *MockChatMessageRepository_DeleteConversation_Call) RunAndReturn(run fu
 }
 
 // ListChatMessages provides a mock function for the type MockChatMessageRepository
-func (_mock *MockChatMessageRepository) ListChatMessages(ctx context.Context, limit int) ([]domain.ChatMessage, bool, error) {
+func (_mock *MockChatMessageRepository) ListChatMessages(ctx context.Context, limit int) ([]ChatMessage, bool, error) {
 	ret := _mock.Called(ctx, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListChatMessages")
 	}
 
-	var r0 []domain.ChatMessage
+	var r0 []ChatMessage
 	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int) ([]domain.ChatMessage, bool, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) ([]ChatMessage, bool, error)); ok {
 		return returnFunc(ctx, limit)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int) []domain.ChatMessage); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) []ChatMessage); ok {
 		r0 = returnFunc(ctx, limit)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]domain.ChatMessage)
+			r0 = ret.Get(0).([]ChatMessage)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, int) bool); ok {
@@ -212,12 +211,12 @@ func (_c *MockChatMessageRepository_ListChatMessages_Call) Run(run func(ctx cont
 	return _c
 }
 
-func (_c *MockChatMessageRepository_ListChatMessages_Call) Return(chatMessages []domain.ChatMessage, b bool, err error) *MockChatMessageRepository_ListChatMessages_Call {
+func (_c *MockChatMessageRepository_ListChatMessages_Call) Return(chatMessages []ChatMessage, b bool, err error) *MockChatMessageRepository_ListChatMessages_Call {
 	_c.Call.Return(chatMessages, b, err)
 	return _c
 }
 
-func (_c *MockChatMessageRepository_ListChatMessages_Call) RunAndReturn(run func(ctx context.Context, limit int) ([]domain.ChatMessage, bool, error)) *MockChatMessageRepository_ListChatMessages_Call {
+func (_c *MockChatMessageRepository_ListChatMessages_Call) RunAndReturn(run func(ctx context.Context, limit int) ([]ChatMessage, bool, error)) *MockChatMessageRepository_ListChatMessages_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -250,7 +249,7 @@ func (_m *MockTodoEventPublisher) EXPECT() *MockTodoEventPublisher_Expecter {
 }
 
 // PublishEvent provides a mock function for the type MockTodoEventPublisher
-func (_mock *MockTodoEventPublisher) PublishEvent(ctx context.Context, event domain.OutboxEvent) error {
+func (_mock *MockTodoEventPublisher) PublishEvent(ctx context.Context, event OutboxEvent) error {
 	ret := _mock.Called(ctx, event)
 
 	if len(ret) == 0 {
@@ -258,7 +257,7 @@ func (_mock *MockTodoEventPublisher) PublishEvent(ctx context.Context, event dom
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.OutboxEvent) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, OutboxEvent) error); ok {
 		r0 = returnFunc(ctx, event)
 	} else {
 		r0 = ret.Error(0)
@@ -273,20 +272,20 @@ type MockTodoEventPublisher_PublishEvent_Call struct {
 
 // PublishEvent is a helper method to define mock.On call
 //   - ctx context.Context
-//   - event domain.OutboxEvent
+//   - event OutboxEvent
 func (_e *MockTodoEventPublisher_Expecter) PublishEvent(ctx interface{}, event interface{}) *MockTodoEventPublisher_PublishEvent_Call {
 	return &MockTodoEventPublisher_PublishEvent_Call{Call: _e.mock.On("PublishEvent", ctx, event)}
 }
 
-func (_c *MockTodoEventPublisher_PublishEvent_Call) Run(run func(ctx context.Context, event domain.OutboxEvent)) *MockTodoEventPublisher_PublishEvent_Call {
+func (_c *MockTodoEventPublisher_PublishEvent_Call) Run(run func(ctx context.Context, event OutboxEvent)) *MockTodoEventPublisher_PublishEvent_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 domain.OutboxEvent
+		var arg1 OutboxEvent
 		if args[1] != nil {
-			arg1 = args[1].(domain.OutboxEvent)
+			arg1 = args[1].(OutboxEvent)
 		}
 		run(
 			arg0,
@@ -301,7 +300,372 @@ func (_c *MockTodoEventPublisher_PublishEvent_Call) Return(err error) *MockTodoE
 	return _c
 }
 
-func (_c *MockTodoEventPublisher_PublishEvent_Call) RunAndReturn(run func(ctx context.Context, event domain.OutboxEvent) error) *MockTodoEventPublisher_PublishEvent_Call {
+func (_c *MockTodoEventPublisher_PublishEvent_Call) RunAndReturn(run func(ctx context.Context, event OutboxEvent) error) *MockTodoEventPublisher_PublishEvent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockLLMTool creates a new instance of MockLLMTool. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockLLMTool(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockLLMTool {
+	mock := &MockLLMTool{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockLLMTool is an autogenerated mock type for the LLMTool type
+type MockLLMTool struct {
+	mock.Mock
+}
+
+type MockLLMTool_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockLLMTool) EXPECT() *MockLLMTool_Expecter {
+	return &MockLLMTool_Expecter{mock: &_m.Mock}
+}
+
+// Call provides a mock function for the type MockLLMTool
+func (_mock *MockLLMTool) Call(context1 context.Context, lLMStreamEventFunctionCall LLMStreamEventFunctionCall, lLMChatMessages []LLMChatMessage) LLMChatMessage {
+	ret := _mock.Called(context1, lLMStreamEventFunctionCall, lLMChatMessages)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Call")
+	}
+
+	var r0 LLMChatMessage
+	if returnFunc, ok := ret.Get(0).(func(context.Context, LLMStreamEventFunctionCall, []LLMChatMessage) LLMChatMessage); ok {
+		r0 = returnFunc(context1, lLMStreamEventFunctionCall, lLMChatMessages)
+	} else {
+		r0 = ret.Get(0).(LLMChatMessage)
+	}
+	return r0
+}
+
+// MockLLMTool_Call_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Call'
+type MockLLMTool_Call_Call struct {
+	*mock.Call
+}
+
+// Call is a helper method to define mock.On call
+//   - context1 context.Context
+//   - lLMStreamEventFunctionCall LLMStreamEventFunctionCall
+//   - lLMChatMessages []LLMChatMessage
+func (_e *MockLLMTool_Expecter) Call(context1 interface{}, lLMStreamEventFunctionCall interface{}, lLMChatMessages interface{}) *MockLLMTool_Call_Call {
+	return &MockLLMTool_Call_Call{Call: _e.mock.On("Call", context1, lLMStreamEventFunctionCall, lLMChatMessages)}
+}
+
+func (_c *MockLLMTool_Call_Call) Run(run func(context1 context.Context, lLMStreamEventFunctionCall LLMStreamEventFunctionCall, lLMChatMessages []LLMChatMessage)) *MockLLMTool_Call_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 LLMStreamEventFunctionCall
+		if args[1] != nil {
+			arg1 = args[1].(LLMStreamEventFunctionCall)
+		}
+		var arg2 []LLMChatMessage
+		if args[2] != nil {
+			arg2 = args[2].([]LLMChatMessage)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockLLMTool_Call_Call) Return(lLMChatMessage LLMChatMessage) *MockLLMTool_Call_Call {
+	_c.Call.Return(lLMChatMessage)
+	return _c
+}
+
+func (_c *MockLLMTool_Call_Call) RunAndReturn(run func(context1 context.Context, lLMStreamEventFunctionCall LLMStreamEventFunctionCall, lLMChatMessages []LLMChatMessage) LLMChatMessage) *MockLLMTool_Call_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Definition provides a mock function for the type MockLLMTool
+func (_mock *MockLLMTool) Definition() LLMToolDefinition {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Definition")
+	}
+
+	var r0 LLMToolDefinition
+	if returnFunc, ok := ret.Get(0).(func() LLMToolDefinition); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(LLMToolDefinition)
+	}
+	return r0
+}
+
+// MockLLMTool_Definition_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Definition'
+type MockLLMTool_Definition_Call struct {
+	*mock.Call
+}
+
+// Definition is a helper method to define mock.On call
+func (_e *MockLLMTool_Expecter) Definition() *MockLLMTool_Definition_Call {
+	return &MockLLMTool_Definition_Call{Call: _e.mock.On("Definition")}
+}
+
+func (_c *MockLLMTool_Definition_Call) Run(run func()) *MockLLMTool_Definition_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockLLMTool_Definition_Call) Return(lLMToolDefinition LLMToolDefinition) *MockLLMTool_Definition_Call {
+	_c.Call.Return(lLMToolDefinition)
+	return _c
+}
+
+func (_c *MockLLMTool_Definition_Call) RunAndReturn(run func() LLMToolDefinition) *MockLLMTool_Definition_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StatusMessage provides a mock function for the type MockLLMTool
+func (_mock *MockLLMTool) StatusMessage() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for StatusMessage")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockLLMTool_StatusMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StatusMessage'
+type MockLLMTool_StatusMessage_Call struct {
+	*mock.Call
+}
+
+// StatusMessage is a helper method to define mock.On call
+func (_e *MockLLMTool_Expecter) StatusMessage() *MockLLMTool_StatusMessage_Call {
+	return &MockLLMTool_StatusMessage_Call{Call: _e.mock.On("StatusMessage")}
+}
+
+func (_c *MockLLMTool_StatusMessage_Call) Run(run func()) *MockLLMTool_StatusMessage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockLLMTool_StatusMessage_Call) Return(s string) *MockLLMTool_StatusMessage_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockLLMTool_StatusMessage_Call) RunAndReturn(run func() string) *MockLLMTool_StatusMessage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockLLMToolRegistry creates a new instance of MockLLMToolRegistry. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockLLMToolRegistry(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockLLMToolRegistry {
+	mock := &MockLLMToolRegistry{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockLLMToolRegistry is an autogenerated mock type for the LLMToolRegistry type
+type MockLLMToolRegistry struct {
+	mock.Mock
+}
+
+type MockLLMToolRegistry_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockLLMToolRegistry) EXPECT() *MockLLMToolRegistry_Expecter {
+	return &MockLLMToolRegistry_Expecter{mock: &_m.Mock}
+}
+
+// Call provides a mock function for the type MockLLMToolRegistry
+func (_mock *MockLLMToolRegistry) Call(context1 context.Context, lLMStreamEventFunctionCall LLMStreamEventFunctionCall, lLMChatMessages []LLMChatMessage) LLMChatMessage {
+	ret := _mock.Called(context1, lLMStreamEventFunctionCall, lLMChatMessages)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Call")
+	}
+
+	var r0 LLMChatMessage
+	if returnFunc, ok := ret.Get(0).(func(context.Context, LLMStreamEventFunctionCall, []LLMChatMessage) LLMChatMessage); ok {
+		r0 = returnFunc(context1, lLMStreamEventFunctionCall, lLMChatMessages)
+	} else {
+		r0 = ret.Get(0).(LLMChatMessage)
+	}
+	return r0
+}
+
+// MockLLMToolRegistry_Call_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Call'
+type MockLLMToolRegistry_Call_Call struct {
+	*mock.Call
+}
+
+// Call is a helper method to define mock.On call
+//   - context1 context.Context
+//   - lLMStreamEventFunctionCall LLMStreamEventFunctionCall
+//   - lLMChatMessages []LLMChatMessage
+func (_e *MockLLMToolRegistry_Expecter) Call(context1 interface{}, lLMStreamEventFunctionCall interface{}, lLMChatMessages interface{}) *MockLLMToolRegistry_Call_Call {
+	return &MockLLMToolRegistry_Call_Call{Call: _e.mock.On("Call", context1, lLMStreamEventFunctionCall, lLMChatMessages)}
+}
+
+func (_c *MockLLMToolRegistry_Call_Call) Run(run func(context1 context.Context, lLMStreamEventFunctionCall LLMStreamEventFunctionCall, lLMChatMessages []LLMChatMessage)) *MockLLMToolRegistry_Call_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 LLMStreamEventFunctionCall
+		if args[1] != nil {
+			arg1 = args[1].(LLMStreamEventFunctionCall)
+		}
+		var arg2 []LLMChatMessage
+		if args[2] != nil {
+			arg2 = args[2].([]LLMChatMessage)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockLLMToolRegistry_Call_Call) Return(lLMChatMessage LLMChatMessage) *MockLLMToolRegistry_Call_Call {
+	_c.Call.Return(lLMChatMessage)
+	return _c
+}
+
+func (_c *MockLLMToolRegistry_Call_Call) RunAndReturn(run func(context1 context.Context, lLMStreamEventFunctionCall LLMStreamEventFunctionCall, lLMChatMessages []LLMChatMessage) LLMChatMessage) *MockLLMToolRegistry_Call_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// List provides a mock function for the type MockLLMToolRegistry
+func (_mock *MockLLMToolRegistry) List() []LLMToolDefinition {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for List")
+	}
+
+	var r0 []LLMToolDefinition
+	if returnFunc, ok := ret.Get(0).(func() []LLMToolDefinition); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]LLMToolDefinition)
+		}
+	}
+	return r0
+}
+
+// MockLLMToolRegistry_List_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'List'
+type MockLLMToolRegistry_List_Call struct {
+	*mock.Call
+}
+
+// List is a helper method to define mock.On call
+func (_e *MockLLMToolRegistry_Expecter) List() *MockLLMToolRegistry_List_Call {
+	return &MockLLMToolRegistry_List_Call{Call: _e.mock.On("List")}
+}
+
+func (_c *MockLLMToolRegistry_List_Call) Run(run func()) *MockLLMToolRegistry_List_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockLLMToolRegistry_List_Call) Return(lLMToolDefinitions []LLMToolDefinition) *MockLLMToolRegistry_List_Call {
+	_c.Call.Return(lLMToolDefinitions)
+	return _c
+}
+
+func (_c *MockLLMToolRegistry_List_Call) RunAndReturn(run func() []LLMToolDefinition) *MockLLMToolRegistry_List_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StatusMessage provides a mock function for the type MockLLMToolRegistry
+func (_mock *MockLLMToolRegistry) StatusMessage(functionName string) string {
+	ret := _mock.Called(functionName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StatusMessage")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(functionName)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockLLMToolRegistry_StatusMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StatusMessage'
+type MockLLMToolRegistry_StatusMessage_Call struct {
+	*mock.Call
+}
+
+// StatusMessage is a helper method to define mock.On call
+//   - functionName string
+func (_e *MockLLMToolRegistry_Expecter) StatusMessage(functionName interface{}) *MockLLMToolRegistry_StatusMessage_Call {
+	return &MockLLMToolRegistry_StatusMessage_Call{Call: _e.mock.On("StatusMessage", functionName)}
+}
+
+func (_c *MockLLMToolRegistry_StatusMessage_Call) Run(run func(functionName string)) *MockLLMToolRegistry_StatusMessage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockLLMToolRegistry_StatusMessage_Call) Return(s string) *MockLLMToolRegistry_StatusMessage_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockLLMToolRegistry_StatusMessage_Call) RunAndReturn(run func(functionName string) string) *MockLLMToolRegistry_StatusMessage_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -334,7 +698,7 @@ func (_m *MockLLMClient) EXPECT() *MockLLMClient_Expecter {
 }
 
 // Chat provides a mock function for the type MockLLMClient
-func (_mock *MockLLMClient) Chat(ctx context.Context, req domain.LLMChatRequest) (string, error) {
+func (_mock *MockLLMClient) Chat(ctx context.Context, req LLMChatRequest) (string, error) {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
@@ -343,15 +707,15 @@ func (_mock *MockLLMClient) Chat(ctx context.Context, req domain.LLMChatRequest)
 
 	var r0 string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.LLMChatRequest) (string, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, LLMChatRequest) (string, error)); ok {
 		return returnFunc(ctx, req)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.LLMChatRequest) string); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, LLMChatRequest) string); ok {
 		r0 = returnFunc(ctx, req)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.LLMChatRequest) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, LLMChatRequest) error); ok {
 		r1 = returnFunc(ctx, req)
 	} else {
 		r1 = ret.Error(1)
@@ -366,20 +730,20 @@ type MockLLMClient_Chat_Call struct {
 
 // Chat is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req domain.LLMChatRequest
+//   - req LLMChatRequest
 func (_e *MockLLMClient_Expecter) Chat(ctx interface{}, req interface{}) *MockLLMClient_Chat_Call {
 	return &MockLLMClient_Chat_Call{Call: _e.mock.On("Chat", ctx, req)}
 }
 
-func (_c *MockLLMClient_Chat_Call) Run(run func(ctx context.Context, req domain.LLMChatRequest)) *MockLLMClient_Chat_Call {
+func (_c *MockLLMClient_Chat_Call) Run(run func(ctx context.Context, req LLMChatRequest)) *MockLLMClient_Chat_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 domain.LLMChatRequest
+		var arg1 LLMChatRequest
 		if args[1] != nil {
-			arg1 = args[1].(domain.LLMChatRequest)
+			arg1 = args[1].(LLMChatRequest)
 		}
 		run(
 			arg0,
@@ -394,13 +758,13 @@ func (_c *MockLLMClient_Chat_Call) Return(s string, err error) *MockLLMClient_Ch
 	return _c
 }
 
-func (_c *MockLLMClient_Chat_Call) RunAndReturn(run func(ctx context.Context, req domain.LLMChatRequest) (string, error)) *MockLLMClient_Chat_Call {
+func (_c *MockLLMClient_Chat_Call) RunAndReturn(run func(ctx context.Context, req LLMChatRequest) (string, error)) *MockLLMClient_Chat_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ChatStream provides a mock function for the type MockLLMClient
-func (_mock *MockLLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
+func (_mock *MockLLMClient) ChatStream(ctx context.Context, req LLMChatRequest, onEvent LLMStreamEventCallback) error {
 	ret := _mock.Called(ctx, req, onEvent)
 
 	if len(ret) == 0 {
@@ -408,7 +772,7 @@ func (_mock *MockLLMClient) ChatStream(ctx context.Context, req domain.LLMChatRe
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.LLMChatRequest, domain.LLMStreamEventCallback) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, LLMChatRequest, LLMStreamEventCallback) error); ok {
 		r0 = returnFunc(ctx, req, onEvent)
 	} else {
 		r0 = ret.Error(0)
@@ -423,25 +787,25 @@ type MockLLMClient_ChatStream_Call struct {
 
 // ChatStream is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req domain.LLMChatRequest
-//   - onEvent domain.LLMStreamEventCallback
+//   - req LLMChatRequest
+//   - onEvent LLMStreamEventCallback
 func (_e *MockLLMClient_Expecter) ChatStream(ctx interface{}, req interface{}, onEvent interface{}) *MockLLMClient_ChatStream_Call {
 	return &MockLLMClient_ChatStream_Call{Call: _e.mock.On("ChatStream", ctx, req, onEvent)}
 }
 
-func (_c *MockLLMClient_ChatStream_Call) Run(run func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback)) *MockLLMClient_ChatStream_Call {
+func (_c *MockLLMClient_ChatStream_Call) Run(run func(ctx context.Context, req LLMChatRequest, onEvent LLMStreamEventCallback)) *MockLLMClient_ChatStream_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 domain.LLMChatRequest
+		var arg1 LLMChatRequest
 		if args[1] != nil {
-			arg1 = args[1].(domain.LLMChatRequest)
+			arg1 = args[1].(LLMChatRequest)
 		}
-		var arg2 domain.LLMStreamEventCallback
+		var arg2 LLMStreamEventCallback
 		if args[2] != nil {
-			arg2 = args[2].(domain.LLMStreamEventCallback)
+			arg2 = args[2].(LLMStreamEventCallback)
 		}
 		run(
 			arg0,
@@ -457,7 +821,7 @@ func (_c *MockLLMClient_ChatStream_Call) Return(err error) *MockLLMClient_ChatSt
 	return _c
 }
 
-func (_c *MockLLMClient_ChatStream_Call) RunAndReturn(run func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error) *MockLLMClient_ChatStream_Call {
+func (_c *MockLLMClient_ChatStream_Call) RunAndReturn(run func(ctx context.Context, req LLMChatRequest, onEvent LLMStreamEventCallback) error) *MockLLMClient_ChatStream_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -621,23 +985,23 @@ func (_c *MockOutboxRepository_DeleteEvent_Call) RunAndReturn(run func(ctx conte
 }
 
 // FetchPendingEvents provides a mock function for the type MockOutboxRepository
-func (_mock *MockOutboxRepository) FetchPendingEvents(ctx context.Context, limit int) ([]domain.OutboxEvent, error) {
+func (_mock *MockOutboxRepository) FetchPendingEvents(ctx context.Context, limit int) ([]OutboxEvent, error) {
 	ret := _mock.Called(ctx, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FetchPendingEvents")
 	}
 
-	var r0 []domain.OutboxEvent
+	var r0 []OutboxEvent
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int) ([]domain.OutboxEvent, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) ([]OutboxEvent, error)); ok {
 		return returnFunc(ctx, limit)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int) []domain.OutboxEvent); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) []OutboxEvent); ok {
 		r0 = returnFunc(ctx, limit)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]domain.OutboxEvent)
+			r0 = ret.Get(0).([]OutboxEvent)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, int) error); ok {
@@ -678,18 +1042,18 @@ func (_c *MockOutboxRepository_FetchPendingEvents_Call) Run(run func(ctx context
 	return _c
 }
 
-func (_c *MockOutboxRepository_FetchPendingEvents_Call) Return(outboxEvents []domain.OutboxEvent, err error) *MockOutboxRepository_FetchPendingEvents_Call {
+func (_c *MockOutboxRepository_FetchPendingEvents_Call) Return(outboxEvents []OutboxEvent, err error) *MockOutboxRepository_FetchPendingEvents_Call {
 	_c.Call.Return(outboxEvents, err)
 	return _c
 }
 
-func (_c *MockOutboxRepository_FetchPendingEvents_Call) RunAndReturn(run func(ctx context.Context, limit int) ([]domain.OutboxEvent, error)) *MockOutboxRepository_FetchPendingEvents_Call {
+func (_c *MockOutboxRepository_FetchPendingEvents_Call) RunAndReturn(run func(ctx context.Context, limit int) ([]OutboxEvent, error)) *MockOutboxRepository_FetchPendingEvents_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // RecordEvent provides a mock function for the type MockOutboxRepository
-func (_mock *MockOutboxRepository) RecordEvent(ctx context.Context, event domain.TodoEvent) error {
+func (_mock *MockOutboxRepository) RecordEvent(ctx context.Context, event TodoEvent) error {
 	ret := _mock.Called(ctx, event)
 
 	if len(ret) == 0 {
@@ -697,7 +1061,7 @@ func (_mock *MockOutboxRepository) RecordEvent(ctx context.Context, event domain
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TodoEvent) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, TodoEvent) error); ok {
 		r0 = returnFunc(ctx, event)
 	} else {
 		r0 = ret.Error(0)
@@ -712,20 +1076,20 @@ type MockOutboxRepository_RecordEvent_Call struct {
 
 // RecordEvent is a helper method to define mock.On call
 //   - ctx context.Context
-//   - event domain.TodoEvent
+//   - event TodoEvent
 func (_e *MockOutboxRepository_Expecter) RecordEvent(ctx interface{}, event interface{}) *MockOutboxRepository_RecordEvent_Call {
 	return &MockOutboxRepository_RecordEvent_Call{Call: _e.mock.On("RecordEvent", ctx, event)}
 }
 
-func (_c *MockOutboxRepository_RecordEvent_Call) Run(run func(ctx context.Context, event domain.TodoEvent)) *MockOutboxRepository_RecordEvent_Call {
+func (_c *MockOutboxRepository_RecordEvent_Call) Run(run func(ctx context.Context, event TodoEvent)) *MockOutboxRepository_RecordEvent_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 domain.TodoEvent
+		var arg1 TodoEvent
 		if args[1] != nil {
-			arg1 = args[1].(domain.TodoEvent)
+			arg1 = args[1].(TodoEvent)
 		}
 		run(
 			arg0,
@@ -740,7 +1104,7 @@ func (_c *MockOutboxRepository_RecordEvent_Call) Return(err error) *MockOutboxRe
 	return _c
 }
 
-func (_c *MockOutboxRepository_RecordEvent_Call) RunAndReturn(run func(ctx context.Context, event domain.TodoEvent) error) *MockOutboxRepository_RecordEvent_Call {
+func (_c *MockOutboxRepository_RecordEvent_Call) RunAndReturn(run func(ctx context.Context, event TodoEvent) error) *MockOutboxRepository_RecordEvent_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -848,22 +1212,22 @@ func (_m *MockBoardSummaryRepository) EXPECT() *MockBoardSummaryRepository_Expec
 }
 
 // CalculateSummaryContent provides a mock function for the type MockBoardSummaryRepository
-func (_mock *MockBoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (domain.BoardSummaryContent, error) {
+func (_mock *MockBoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (BoardSummaryContent, error) {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CalculateSummaryContent")
 	}
 
-	var r0 domain.BoardSummaryContent
+	var r0 BoardSummaryContent
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) (domain.BoardSummaryContent, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (BoardSummaryContent, error)); ok {
 		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) domain.BoardSummaryContent); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) BoardSummaryContent); ok {
 		r0 = returnFunc(ctx)
 	} else {
-		r0 = ret.Get(0).(domain.BoardSummaryContent)
+		r0 = ret.Get(0).(BoardSummaryContent)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
 		r1 = returnFunc(ctx)
@@ -897,34 +1261,34 @@ func (_c *MockBoardSummaryRepository_CalculateSummaryContent_Call) Run(run func(
 	return _c
 }
 
-func (_c *MockBoardSummaryRepository_CalculateSummaryContent_Call) Return(boardSummaryContent domain.BoardSummaryContent, err error) *MockBoardSummaryRepository_CalculateSummaryContent_Call {
+func (_c *MockBoardSummaryRepository_CalculateSummaryContent_Call) Return(boardSummaryContent BoardSummaryContent, err error) *MockBoardSummaryRepository_CalculateSummaryContent_Call {
 	_c.Call.Return(boardSummaryContent, err)
 	return _c
 }
 
-func (_c *MockBoardSummaryRepository_CalculateSummaryContent_Call) RunAndReturn(run func(ctx context.Context) (domain.BoardSummaryContent, error)) *MockBoardSummaryRepository_CalculateSummaryContent_Call {
+func (_c *MockBoardSummaryRepository_CalculateSummaryContent_Call) RunAndReturn(run func(ctx context.Context) (BoardSummaryContent, error)) *MockBoardSummaryRepository_CalculateSummaryContent_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetLatestSummary provides a mock function for the type MockBoardSummaryRepository
-func (_mock *MockBoardSummaryRepository) GetLatestSummary(ctx context.Context) (domain.BoardSummary, bool, error) {
+func (_mock *MockBoardSummaryRepository) GetLatestSummary(ctx context.Context) (BoardSummary, bool, error) {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetLatestSummary")
 	}
 
-	var r0 domain.BoardSummary
+	var r0 BoardSummary
 	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) (domain.BoardSummary, bool, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (BoardSummary, bool, error)); ok {
 		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) domain.BoardSummary); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) BoardSummary); ok {
 		r0 = returnFunc(ctx)
 	} else {
-		r0 = ret.Get(0).(domain.BoardSummary)
+		r0 = ret.Get(0).(BoardSummary)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context) bool); ok {
 		r1 = returnFunc(ctx)
@@ -963,18 +1327,18 @@ func (_c *MockBoardSummaryRepository_GetLatestSummary_Call) Run(run func(ctx con
 	return _c
 }
 
-func (_c *MockBoardSummaryRepository_GetLatestSummary_Call) Return(boardSummary domain.BoardSummary, b bool, err error) *MockBoardSummaryRepository_GetLatestSummary_Call {
+func (_c *MockBoardSummaryRepository_GetLatestSummary_Call) Return(boardSummary BoardSummary, b bool, err error) *MockBoardSummaryRepository_GetLatestSummary_Call {
 	_c.Call.Return(boardSummary, b, err)
 	return _c
 }
 
-func (_c *MockBoardSummaryRepository_GetLatestSummary_Call) RunAndReturn(run func(ctx context.Context) (domain.BoardSummary, bool, error)) *MockBoardSummaryRepository_GetLatestSummary_Call {
+func (_c *MockBoardSummaryRepository_GetLatestSummary_Call) RunAndReturn(run func(ctx context.Context) (BoardSummary, bool, error)) *MockBoardSummaryRepository_GetLatestSummary_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // StoreSummary provides a mock function for the type MockBoardSummaryRepository
-func (_mock *MockBoardSummaryRepository) StoreSummary(ctx context.Context, summary domain.BoardSummary) error {
+func (_mock *MockBoardSummaryRepository) StoreSummary(ctx context.Context, summary BoardSummary) error {
 	ret := _mock.Called(ctx, summary)
 
 	if len(ret) == 0 {
@@ -982,7 +1346,7 @@ func (_mock *MockBoardSummaryRepository) StoreSummary(ctx context.Context, summa
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.BoardSummary) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, BoardSummary) error); ok {
 		r0 = returnFunc(ctx, summary)
 	} else {
 		r0 = ret.Error(0)
@@ -997,20 +1361,20 @@ type MockBoardSummaryRepository_StoreSummary_Call struct {
 
 // StoreSummary is a helper method to define mock.On call
 //   - ctx context.Context
-//   - summary domain.BoardSummary
+//   - summary BoardSummary
 func (_e *MockBoardSummaryRepository_Expecter) StoreSummary(ctx interface{}, summary interface{}) *MockBoardSummaryRepository_StoreSummary_Call {
 	return &MockBoardSummaryRepository_StoreSummary_Call{Call: _e.mock.On("StoreSummary", ctx, summary)}
 }
 
-func (_c *MockBoardSummaryRepository_StoreSummary_Call) Run(run func(ctx context.Context, summary domain.BoardSummary)) *MockBoardSummaryRepository_StoreSummary_Call {
+func (_c *MockBoardSummaryRepository_StoreSummary_Call) Run(run func(ctx context.Context, summary BoardSummary)) *MockBoardSummaryRepository_StoreSummary_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 domain.BoardSummary
+		var arg1 BoardSummary
 		if args[1] != nil {
-			arg1 = args[1].(domain.BoardSummary)
+			arg1 = args[1].(BoardSummary)
 		}
 		run(
 			arg0,
@@ -1025,7 +1389,7 @@ func (_c *MockBoardSummaryRepository_StoreSummary_Call) Return(err error) *MockB
 	return _c
 }
 
-func (_c *MockBoardSummaryRepository_StoreSummary_Call) RunAndReturn(run func(ctx context.Context, summary domain.BoardSummary) error) *MockBoardSummaryRepository_StoreSummary_Call {
+func (_c *MockBoardSummaryRepository_StoreSummary_Call) RunAndReturn(run func(ctx context.Context, summary BoardSummary) error) *MockBoardSummaryRepository_StoreSummary_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1129,7 +1493,7 @@ func (_m *MockTodoRepository) EXPECT() *MockTodoRepository_Expecter {
 }
 
 // CreateTodo provides a mock function for the type MockTodoRepository
-func (_mock *MockTodoRepository) CreateTodo(ctx context.Context, todo domain.Todo) error {
+func (_mock *MockTodoRepository) CreateTodo(ctx context.Context, todo Todo) error {
 	ret := _mock.Called(ctx, todo)
 
 	if len(ret) == 0 {
@@ -1137,7 +1501,7 @@ func (_mock *MockTodoRepository) CreateTodo(ctx context.Context, todo domain.Tod
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.Todo) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, Todo) error); ok {
 		r0 = returnFunc(ctx, todo)
 	} else {
 		r0 = ret.Error(0)
@@ -1152,20 +1516,20 @@ type MockTodoRepository_CreateTodo_Call struct {
 
 // CreateTodo is a helper method to define mock.On call
 //   - ctx context.Context
-//   - todo domain.Todo
+//   - todo Todo
 func (_e *MockTodoRepository_Expecter) CreateTodo(ctx interface{}, todo interface{}) *MockTodoRepository_CreateTodo_Call {
 	return &MockTodoRepository_CreateTodo_Call{Call: _e.mock.On("CreateTodo", ctx, todo)}
 }
 
-func (_c *MockTodoRepository_CreateTodo_Call) Run(run func(ctx context.Context, todo domain.Todo)) *MockTodoRepository_CreateTodo_Call {
+func (_c *MockTodoRepository_CreateTodo_Call) Run(run func(ctx context.Context, todo Todo)) *MockTodoRepository_CreateTodo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 domain.Todo
+		var arg1 Todo
 		if args[1] != nil {
-			arg1 = args[1].(domain.Todo)
+			arg1 = args[1].(Todo)
 		}
 		run(
 			arg0,
@@ -1180,7 +1544,7 @@ func (_c *MockTodoRepository_CreateTodo_Call) Return(err error) *MockTodoReposit
 	return _c
 }
 
-func (_c *MockTodoRepository_CreateTodo_Call) RunAndReturn(run func(ctx context.Context, todo domain.Todo) error) *MockTodoRepository_CreateTodo_Call {
+func (_c *MockTodoRepository_CreateTodo_Call) RunAndReturn(run func(ctx context.Context, todo Todo) error) *MockTodoRepository_CreateTodo_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1243,23 +1607,23 @@ func (_c *MockTodoRepository_DeleteTodo_Call) RunAndReturn(run func(ctx context.
 }
 
 // GetTodo provides a mock function for the type MockTodoRepository
-func (_mock *MockTodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo, bool, error) {
+func (_mock *MockTodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (Todo, bool, error) {
 	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTodo")
 	}
 
-	var r0 domain.Todo
+	var r0 Todo
 	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) (domain.Todo, bool, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) (Todo, bool, error)); ok {
 		return returnFunc(ctx, id)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) domain.Todo); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) Todo); ok {
 		r0 = returnFunc(ctx, id)
 	} else {
-		r0 = ret.Get(0).(domain.Todo)
+		r0 = ret.Get(0).(Todo)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID) bool); ok {
 		r1 = returnFunc(ctx, id)
@@ -1304,18 +1668,18 @@ func (_c *MockTodoRepository_GetTodo_Call) Run(run func(ctx context.Context, id 
 	return _c
 }
 
-func (_c *MockTodoRepository_GetTodo_Call) Return(todo domain.Todo, b bool, err error) *MockTodoRepository_GetTodo_Call {
+func (_c *MockTodoRepository_GetTodo_Call) Return(todo Todo, b bool, err error) *MockTodoRepository_GetTodo_Call {
 	_c.Call.Return(todo, b, err)
 	return _c
 }
 
-func (_c *MockTodoRepository_GetTodo_Call) RunAndReturn(run func(ctx context.Context, id uuid.UUID) (domain.Todo, bool, error)) *MockTodoRepository_GetTodo_Call {
+func (_c *MockTodoRepository_GetTodo_Call) RunAndReturn(run func(ctx context.Context, id uuid.UUID) (Todo, bool, error)) *MockTodoRepository_GetTodo_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ListTodos provides a mock function for the type MockTodoRepository
-func (_mock *MockTodoRepository) ListTodos(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOptions) ([]domain.Todo, bool, error) {
+func (_mock *MockTodoRepository) ListTodos(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions) ([]Todo, bool, error) {
 	var tmpRet mock.Arguments
 	if len(opts) > 0 {
 		tmpRet = _mock.Called(ctx, page, pageSize, opts)
@@ -1328,25 +1692,25 @@ func (_mock *MockTodoRepository) ListTodos(ctx context.Context, page int, pageSi
 		panic("no return value specified for ListTodos")
 	}
 
-	var r0 []domain.Todo
+	var r0 []Todo
 	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...domain.ListTodoOptions) ([]domain.Todo, bool, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...ListTodoOptions) ([]Todo, bool, error)); ok {
 		return returnFunc(ctx, page, pageSize, opts...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...domain.ListTodoOptions) []domain.Todo); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...ListTodoOptions) []Todo); ok {
 		r0 = returnFunc(ctx, page, pageSize, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]domain.Todo)
+			r0 = ret.Get(0).([]Todo)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, int, int, ...domain.ListTodoOptions) bool); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int, int, ...ListTodoOptions) bool); ok {
 		r1 = returnFunc(ctx, page, pageSize, opts...)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, int, int, ...domain.ListTodoOptions) error); ok {
+	if returnFunc, ok := ret.Get(2).(func(context.Context, int, int, ...ListTodoOptions) error); ok {
 		r2 = returnFunc(ctx, page, pageSize, opts...)
 	} else {
 		r2 = ret.Error(2)
@@ -1363,13 +1727,13 @@ type MockTodoRepository_ListTodos_Call struct {
 //   - ctx context.Context
 //   - page int
 //   - pageSize int
-//   - opts ...domain.ListTodoOptions
+//   - opts ...ListTodoOptions
 func (_e *MockTodoRepository_Expecter) ListTodos(ctx interface{}, page interface{}, pageSize interface{}, opts ...interface{}) *MockTodoRepository_ListTodos_Call {
 	return &MockTodoRepository_ListTodos_Call{Call: _e.mock.On("ListTodos",
 		append([]interface{}{ctx, page, pageSize}, opts...)...)}
 }
 
-func (_c *MockTodoRepository_ListTodos_Call) Run(run func(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOptions)) *MockTodoRepository_ListTodos_Call {
+func (_c *MockTodoRepository_ListTodos_Call) Run(run func(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions)) *MockTodoRepository_ListTodos_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1383,10 +1747,10 @@ func (_c *MockTodoRepository_ListTodos_Call) Run(run func(ctx context.Context, p
 		if args[2] != nil {
 			arg2 = args[2].(int)
 		}
-		var arg3 []domain.ListTodoOptions
-		var variadicArgs []domain.ListTodoOptions
+		var arg3 []ListTodoOptions
+		var variadicArgs []ListTodoOptions
 		if len(args) > 3 {
-			variadicArgs = args[3].([]domain.ListTodoOptions)
+			variadicArgs = args[3].([]ListTodoOptions)
 		}
 		arg3 = variadicArgs
 		run(
@@ -1399,18 +1763,18 @@ func (_c *MockTodoRepository_ListTodos_Call) Run(run func(ctx context.Context, p
 	return _c
 }
 
-func (_c *MockTodoRepository_ListTodos_Call) Return(todos []domain.Todo, b bool, err error) *MockTodoRepository_ListTodos_Call {
+func (_c *MockTodoRepository_ListTodos_Call) Return(todos []Todo, b bool, err error) *MockTodoRepository_ListTodos_Call {
 	_c.Call.Return(todos, b, err)
 	return _c
 }
 
-func (_c *MockTodoRepository_ListTodos_Call) RunAndReturn(run func(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOptions) ([]domain.Todo, bool, error)) *MockTodoRepository_ListTodos_Call {
+func (_c *MockTodoRepository_ListTodos_Call) RunAndReturn(run func(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions) ([]Todo, bool, error)) *MockTodoRepository_ListTodos_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UpdateTodo provides a mock function for the type MockTodoRepository
-func (_mock *MockTodoRepository) UpdateTodo(ctx context.Context, todo domain.Todo) error {
+func (_mock *MockTodoRepository) UpdateTodo(ctx context.Context, todo Todo) error {
 	ret := _mock.Called(ctx, todo)
 
 	if len(ret) == 0 {
@@ -1418,7 +1782,7 @@ func (_mock *MockTodoRepository) UpdateTodo(ctx context.Context, todo domain.Tod
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.Todo) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, Todo) error); ok {
 		r0 = returnFunc(ctx, todo)
 	} else {
 		r0 = ret.Error(0)
@@ -1433,20 +1797,20 @@ type MockTodoRepository_UpdateTodo_Call struct {
 
 // UpdateTodo is a helper method to define mock.On call
 //   - ctx context.Context
-//   - todo domain.Todo
+//   - todo Todo
 func (_e *MockTodoRepository_Expecter) UpdateTodo(ctx interface{}, todo interface{}) *MockTodoRepository_UpdateTodo_Call {
 	return &MockTodoRepository_UpdateTodo_Call{Call: _e.mock.On("UpdateTodo", ctx, todo)}
 }
 
-func (_c *MockTodoRepository_UpdateTodo_Call) Run(run func(ctx context.Context, todo domain.Todo)) *MockTodoRepository_UpdateTodo_Call {
+func (_c *MockTodoRepository_UpdateTodo_Call) Run(run func(ctx context.Context, todo Todo)) *MockTodoRepository_UpdateTodo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 domain.Todo
+		var arg1 Todo
 		if args[1] != nil {
-			arg1 = args[1].(domain.Todo)
+			arg1 = args[1].(Todo)
 		}
 		run(
 			arg0,
@@ -1461,7 +1825,7 @@ func (_c *MockTodoRepository_UpdateTodo_Call) Return(err error) *MockTodoReposit
 	return _c
 }
 
-func (_c *MockTodoRepository_UpdateTodo_Call) RunAndReturn(run func(ctx context.Context, todo domain.Todo) error) *MockTodoRepository_UpdateTodo_Call {
+func (_c *MockTodoRepository_UpdateTodo_Call) RunAndReturn(run func(ctx context.Context, todo Todo) error) *MockTodoRepository_UpdateTodo_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1494,7 +1858,7 @@ func (_m *MockUnitOfWork) EXPECT() *MockUnitOfWork_Expecter {
 }
 
 // Execute provides a mock function for the type MockUnitOfWork
-func (_mock *MockUnitOfWork) Execute(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
+func (_mock *MockUnitOfWork) Execute(ctx context.Context, fn func(uow UnitOfWork) error) error {
 	ret := _mock.Called(ctx, fn)
 
 	if len(ret) == 0 {
@@ -1502,7 +1866,7 @@ func (_mock *MockUnitOfWork) Execute(ctx context.Context, fn func(uow domain.Uni
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, func(uow domain.UnitOfWork) error) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, func(uow UnitOfWork) error) error); ok {
 		r0 = returnFunc(ctx, fn)
 	} else {
 		r0 = ret.Error(0)
@@ -1517,20 +1881,20 @@ type MockUnitOfWork_Execute_Call struct {
 
 // Execute is a helper method to define mock.On call
 //   - ctx context.Context
-//   - fn func(uow domain.UnitOfWork) error
+//   - fn func(uow UnitOfWork) error
 func (_e *MockUnitOfWork_Expecter) Execute(ctx interface{}, fn interface{}) *MockUnitOfWork_Execute_Call {
 	return &MockUnitOfWork_Execute_Call{Call: _e.mock.On("Execute", ctx, fn)}
 }
 
-func (_c *MockUnitOfWork_Execute_Call) Run(run func(ctx context.Context, fn func(uow domain.UnitOfWork) error)) *MockUnitOfWork_Execute_Call {
+func (_c *MockUnitOfWork_Execute_Call) Run(run func(ctx context.Context, fn func(uow UnitOfWork) error)) *MockUnitOfWork_Execute_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 func(uow domain.UnitOfWork) error
+		var arg1 func(uow UnitOfWork) error
 		if args[1] != nil {
-			arg1 = args[1].(func(uow domain.UnitOfWork) error)
+			arg1 = args[1].(func(uow UnitOfWork) error)
 		}
 		run(
 			arg0,
@@ -1545,25 +1909,25 @@ func (_c *MockUnitOfWork_Execute_Call) Return(err error) *MockUnitOfWork_Execute
 	return _c
 }
 
-func (_c *MockUnitOfWork_Execute_Call) RunAndReturn(run func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error) *MockUnitOfWork_Execute_Call {
+func (_c *MockUnitOfWork_Execute_Call) RunAndReturn(run func(ctx context.Context, fn func(uow UnitOfWork) error) error) *MockUnitOfWork_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Outbox provides a mock function for the type MockUnitOfWork
-func (_mock *MockUnitOfWork) Outbox() domain.OutboxRepository {
+func (_mock *MockUnitOfWork) Outbox() OutboxRepository {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Outbox")
 	}
 
-	var r0 domain.OutboxRepository
-	if returnFunc, ok := ret.Get(0).(func() domain.OutboxRepository); ok {
+	var r0 OutboxRepository
+	if returnFunc, ok := ret.Get(0).(func() OutboxRepository); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(domain.OutboxRepository)
+			r0 = ret.Get(0).(OutboxRepository)
 		}
 	}
 	return r0
@@ -1586,30 +1950,30 @@ func (_c *MockUnitOfWork_Outbox_Call) Run(run func()) *MockUnitOfWork_Outbox_Cal
 	return _c
 }
 
-func (_c *MockUnitOfWork_Outbox_Call) Return(outboxRepository domain.OutboxRepository) *MockUnitOfWork_Outbox_Call {
+func (_c *MockUnitOfWork_Outbox_Call) Return(outboxRepository OutboxRepository) *MockUnitOfWork_Outbox_Call {
 	_c.Call.Return(outboxRepository)
 	return _c
 }
 
-func (_c *MockUnitOfWork_Outbox_Call) RunAndReturn(run func() domain.OutboxRepository) *MockUnitOfWork_Outbox_Call {
+func (_c *MockUnitOfWork_Outbox_Call) RunAndReturn(run func() OutboxRepository) *MockUnitOfWork_Outbox_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Todo provides a mock function for the type MockUnitOfWork
-func (_mock *MockUnitOfWork) Todo() domain.TodoRepository {
+func (_mock *MockUnitOfWork) Todo() TodoRepository {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Todo")
 	}
 
-	var r0 domain.TodoRepository
-	if returnFunc, ok := ret.Get(0).(func() domain.TodoRepository); ok {
+	var r0 TodoRepository
+	if returnFunc, ok := ret.Get(0).(func() TodoRepository); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(domain.TodoRepository)
+			r0 = ret.Get(0).(TodoRepository)
 		}
 	}
 	return r0
@@ -1632,12 +1996,12 @@ func (_c *MockUnitOfWork_Todo_Call) Run(run func()) *MockUnitOfWork_Todo_Call {
 	return _c
 }
 
-func (_c *MockUnitOfWork_Todo_Call) Return(todoRepository domain.TodoRepository) *MockUnitOfWork_Todo_Call {
+func (_c *MockUnitOfWork_Todo_Call) Return(todoRepository TodoRepository) *MockUnitOfWork_Todo_Call {
 	_c.Call.Return(todoRepository)
 	return _c
 }
 
-func (_c *MockUnitOfWork_Todo_Call) RunAndReturn(run func() domain.TodoRepository) *MockUnitOfWork_Todo_Call {
+func (_c *MockUnitOfWork_Todo_Call) RunAndReturn(run func() TodoRepository) *MockUnitOfWork_Todo_Call {
 	_c.Call.Return(run)
 	return _c
 }

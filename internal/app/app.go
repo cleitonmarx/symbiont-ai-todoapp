@@ -38,6 +38,12 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&pubsub.InitClient{},
 			&pubsub.InitPublisher{},
 			&modelrunner.InitLLMClient{},
+
+			&usecases.InitTodoCreator{},
+			&usecases.InitTodoDeleter{},
+			&usecases.InitTodoUpdater{},
+			&usecases.InitLLMToolRegistry{},
+
 			&usecases.InitListTodos{},
 			&usecases.InitCreateTodo{},
 			&usecases.InitUpdateTodo{},

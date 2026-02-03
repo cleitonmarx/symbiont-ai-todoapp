@@ -1,19 +1,17 @@
 package usecases
 
 import (
-	"bytes"
 	"context"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
 	"github.com/google/uuid"
+	"github.com/toon-format/toon-go"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -92,7 +90,7 @@ func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context) (do
 	}
 
 	now := gs.timeProvider.Now()
-	promptMessages, err := buildPromptMessages(new, previous.Content, now)
+	promptMessages, err := buildPromptMessages(new, previous.Content)
 	if err != nil {
 		return domain.BoardSummary{}, fmt.Errorf("failed to build prompt: %w", err)
 	}
@@ -128,7 +126,7 @@ func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context) (do
 var summaryPrompt embed.FS
 
 // buildPromptMessages constructs the LLM messages for the summary prompt.
-func buildPromptMessages(new domain.BoardSummaryContent, previous domain.BoardSummaryContent, now time.Time) ([]domain.LLMChatMessage, error) {
+func buildPromptMessages(new domain.BoardSummaryContent, previous domain.BoardSummaryContent) ([]domain.LLMChatMessage, error) {
 	inputJSON, err := marshalSummaryContent(new)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal summary content: %w", err)
@@ -167,18 +165,12 @@ func buildPromptMessages(new domain.BoardSummaryContent, previous domain.BoardSu
 }
 
 func marshalSummaryContent(sc domain.BoardSummaryContent) (string, error) {
-	summaryContentJSON, err := json.MarshalIndent(sc, "", "  ")
+	summaryContentTOON, err := toon.MarshalString(sc, toon.WithLengthMarkers(true))
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal summary content: %w", err)
 	}
 
-	var buf bytes.Buffer
-	err = json.Compact(&buf, summaryContentJSON)
-	if err != nil {
-		return "", fmt.Errorf("failed to compact summary content JSON: %w", err)
-	}
-
-	return buf.String(), nil
+	return summaryContentTOON, nil
 }
 
 // InitGenerateBoardSummary initializes the GenerateBoardSummary use case.

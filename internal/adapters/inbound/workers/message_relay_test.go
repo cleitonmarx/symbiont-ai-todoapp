@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases/mocks"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestMessageRelay_Run(t *testing.T) {
-	md := mocks.NewMockRelayOutbox(t)
+	md := usecases.NewMockRelayOutbox(t)
 
 	md.EXPECT().Execute(mock.Anything).Return(assert.AnError).Once()
 	md.EXPECT().Execute(mock.Anything).Return(nil).Once()

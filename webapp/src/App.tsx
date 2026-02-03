@@ -68,7 +68,7 @@ const App: React.FC = () => {
             />
           )}
         </div>
-        {isChatOpen && <Chat />}
+        {isChatOpen && <Chat onChatDone={refetch} />}
       </div>
       <button
         className="chat-toggle-btn"

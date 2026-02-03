@@ -8,7 +8,6 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	domain_mocks "github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -43,17 +42,17 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 
 	tests := map[string]struct {
 		setExpectations func(
-			*domain_mocks.MockBoardSummaryRepository,
-			*domain_mocks.MockCurrentTimeProvider,
-			*domain_mocks.MockLLMClient,
+			*domain.MockBoardSummaryRepository,
+			*domain.MockCurrentTimeProvider,
+			*domain.MockLLMClient,
 		)
 		expectedErr error
 	}{
 		"success": {
 			setExpectations: func(
-				sr *domain_mocks.MockBoardSummaryRepository,
-				tp *domain_mocks.MockCurrentTimeProvider,
-				c *domain_mocks.MockLLMClient,
+				sr *domain.MockBoardSummaryRepository,
+				tp *domain.MockCurrentTimeProvider,
+				c *domain.MockLLMClient,
 			) {
 
 				tp.EXPECT().Now().Return(fixedTime)
@@ -72,10 +71,10 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 					mock.MatchedBy(func(req domain.LLMChatRequest) bool {
 						return req.Model == "mistral" &&
 							len(req.Messages) == 2 &&
-							req.Messages[0].Role == "system" &&
+							req.Messages[0].Role == "developer" &&
 							req.Messages[1].Role == "user" &&
 							strings.Contains(req.Messages[0].Content, "You are a helpful assistant that summarizes todo lists") &&
-							strings.Contains(req.Messages[1].Content, `"counts":{"OPEN":2,"DONE":1}`)
+							strings.Contains(req.Messages[1].Content, "Open: 2\n  Done: 1")
 					}),
 				).Return("You have 2 open todos, 1 overdue todo, and 1 completed todo.", nil)
 
@@ -88,9 +87,9 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 		},
 		"llm-client-error": {
 			setExpectations: func(
-				sr *domain_mocks.MockBoardSummaryRepository,
-				tp *domain_mocks.MockCurrentTimeProvider,
-				c *domain_mocks.MockLLMClient,
+				sr *domain.MockBoardSummaryRepository,
+				tp *domain.MockCurrentTimeProvider,
+				c *domain.MockLLMClient,
 			) {
 				tp.EXPECT().Now().Return(fixedTime)
 
@@ -112,9 +111,9 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 		},
 		"store-summary-error": {
 			setExpectations: func(
-				sr *domain_mocks.MockBoardSummaryRepository,
-				tp *domain_mocks.MockCurrentTimeProvider,
-				c *domain_mocks.MockLLMClient,
+				sr *domain.MockBoardSummaryRepository,
+				tp *domain.MockCurrentTimeProvider,
+				c *domain.MockLLMClient,
 			) {
 				tp.EXPECT().Now().Return(fixedTime)
 
@@ -143,9 +142,9 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			sr := domain_mocks.NewMockBoardSummaryRepository(t)
-			tp := domain_mocks.NewMockCurrentTimeProvider(t)
-			c := domain_mocks.NewMockLLMClient(t)
+			sr := domain.NewMockBoardSummaryRepository(t)
+			tp := domain.NewMockCurrentTimeProvider(t)
+			c := domain.NewMockLLMClient(t)
 
 			if tt.setExpectations != nil {
 				tt.setExpectations(sr, tp, c)

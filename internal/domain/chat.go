@@ -16,24 +16,26 @@ const (
 	ChatRole_User      ChatRole = "user"
 	ChatRole_Assistant ChatRole = "assistant"
 	ChatRole_System    ChatRole = "system"
+	ChatRole_Developer ChatRole = "developer"
+	ChatRole_Tool      ChatRole = "tool"
 )
 
 // ChatMessage represents an AI chat message in a conversation
 type ChatMessage struct {
-	ID               uuid.UUID
-	ConversationID   string
-	ChatRole         ChatRole
-	Content          string
-	Model            string
-	PromptTokens     int
-	CompletionTokens int
-	CreatedAt        time.Time
+	ID             uuid.UUID
+	ConversationID string
+	ChatRole       ChatRole
+	Content        string
+	ToolCallID     *string
+	ToolCalls      []LLMStreamEventFunctionCall
+	Model          string
+	CreatedAt      time.Time
 }
 
 // ChatMessageRepository defines the interface for chat message persistence
 type ChatMessageRepository interface {
-	// CreateChatMessage persists a chat message for the global conversation
-	CreateChatMessage(ctx context.Context, message ChatMessage) error
+	// CreateChatMessages persists chat messages for the global conversation
+	CreateChatMessages(ctx context.Context, messages []ChatMessage) error
 
 	// ListChatMessages retrieves messages for the global conversation ordered by creation time.
 	// If limit is greater than 0, only the last N messages are returned.

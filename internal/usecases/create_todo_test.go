@@ -8,167 +8,115 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	domain_mocks "github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestCreateTodoImpl_Execute(t *testing.T) {
-	fixedUUID := func() uuid.UUID {
-		return uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
-	}
+	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
-	todo := domain.Todo{
-		ID:        fixedUUID(),
-		Title:     "My new todo",
+	title := "New Todo"
+	dueDate := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
+
+	expectedTodo := domain.Todo{
+		ID:        fixedUUID,
+		Title:     title,
 		Status:    domain.TodoStatus_OPEN,
-		Embedding: []float64{0.1, 0.2, 0.3},
+		DueDate:   dueDate,
 		CreatedAt: fixedTime,
 		UpdatedAt: fixedTime,
-		DueDate:   fixedTime,
 	}
 
 	tests := map[string]struct {
+		title           string
+		dueDate         time.Time
 		setExpectations func(
-			uow *domain_mocks.MockUnitOfWork,
-			timeProvider *domain_mocks.MockCurrentTimeProvider,
-			llmClient *domain_mocks.MockLLMClient,
-		)
-		title        string
-		dueDate      time.Time
+			uow *domain.MockUnitOfWork,
+			creator *MockTodoCreator)
 		expectedTodo domain.Todo
 		expectedErr  error
 	}{
 		"success": {
-			title:   "My new todo",
-			dueDate: fixedTime,
+			title:   title,
+			dueDate: dueDate,
 			setExpectations: func(
-				uow *domain_mocks.MockUnitOfWork,
-				timeProvider *domain_mocks.MockCurrentTimeProvider,
-				llmClient *domain_mocks.MockLLMClient,
+				uow *domain.MockUnitOfWork,
+				creator *MockTodoCreator,
 			) {
-				timeProvider.EXPECT().Now().Return(fixedTime)
+				creator.EXPECT().
+					Create(mock.Anything, uow, title, dueDate).
+					Return(expectedTodo, nil)
 
-				repo := domain_mocks.NewMockTodoRepository(t)
-				outbox := domain_mocks.NewMockOutboxRepository(t)
-
-				llmClient.EXPECT().Embed(
-					mock.Anything,
-					"model-name",
-					"Task: My new todo | Status: OPEN | Due: 2024-01-01",
-				).Return([]float64{0.1, 0.2, 0.3}, nil)
-
-				uow.EXPECT().Todo().Return(repo)
-				uow.EXPECT().Outbox().Return(outbox)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
 						return fn(uow)
 					})
-
-				repo.EXPECT().CreateTodo(
-					mock.Anything,
-					todo,
-				).Return(nil)
-
-				outbox.EXPECT().RecordEvent(
-					mock.Anything,
-					domain.TodoEvent{
-						Type:      domain.TodoEventType_TODO_CREATED,
-						TodoID:    fixedUUID(),
-						CreatedAt: fixedTime,
-					},
-				).Return(nil)
 			},
-			expectedTodo: todo,
+			expectedTodo: expectedTodo,
 			expectedErr:  nil,
 		},
-		"validation-error-short-title": {
-			title:   "Hi",
-			dueDate: fixedTime,
+		"creator-error": {
+			title:   title,
+			dueDate: dueDate,
 			setExpectations: func(
-				uow *domain_mocks.MockUnitOfWork,
-				timeProvider *domain_mocks.MockCurrentTimeProvider,
-				llmClient *domain_mocks.MockLLMClient,
+				uow *domain.MockUnitOfWork,
+				creator *MockTodoCreator,
 			) {
-				timeProvider.EXPECT().Now().Return(fixedTime)
-			},
-			expectedTodo: domain.Todo{},
-			expectedErr:  domain.NewValidationErr("title must be between 3 and 200 characters"),
-		},
-		"embedding-error": {
-			title:   "My new todo",
-			dueDate: fixedTime,
-			setExpectations: func(
-				uow *domain_mocks.MockUnitOfWork,
-				timeProvider *domain_mocks.MockCurrentTimeProvider,
-				llmClient *domain_mocks.MockLLMClient,
-			) {
-				timeProvider.EXPECT().Now().Return(fixedTime)
+				creator.EXPECT().
+					Create(mock.Anything, uow, title, dueDate).
+					Return(domain.Todo{}, errors.New("creation failed"))
 
-				llmClient.EXPECT().Embed(
-					mock.Anything,
-					"model-name",
-					"Task: My new todo | Status: OPEN | Due: 2024-01-01",
-				).Return(nil, errors.New("LLM service unavailable"))
-			},
-			expectedTodo: domain.Todo{},
-			expectedErr:  errors.New("LLM service unavailable"),
-		},
-		"repository-error": {
-			title:   "My new todo",
-			dueDate: fixedTime,
-			setExpectations: func(
-				uow *domain_mocks.MockUnitOfWork,
-				timeProvider *domain_mocks.MockCurrentTimeProvider,
-				llmClient *domain_mocks.MockLLMClient,
-			) {
-				timeProvider.EXPECT().Now().Return(fixedTime)
-
-				repo := domain_mocks.NewMockTodoRepository(t)
-				llmClient.EXPECT().Embed(
-					mock.Anything,
-					"model-name",
-					"Task: My new todo | Status: OPEN | Due: 2024-01-01",
-				).Return([]float64{0.1, 0.2, 0.3}, nil)
-
-				uow.EXPECT().Todo().Return(repo)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
+					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
 						return fn(uow)
 					})
-
-				repo.EXPECT().CreateTodo(
-					mock.Anything,
-					todo,
-				).Return(errors.New("database error"))
 			},
 			expectedTodo: domain.Todo{},
-			expectedErr:  errors.New("database error"),
+			expectedErr:  errors.New("creation failed"),
+		},
+		"uow-execute-error": {
+			title:   title,
+			dueDate: dueDate,
+			setExpectations: func(
+				uow *domain.MockUnitOfWork,
+				creator *MockTodoCreator,
+			) {
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					Return(errors.New("transaction failed"))
+			},
+			expectedTodo: domain.Todo{},
+			expectedErr:  errors.New("transaction failed"),
 		},
 	}
+
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			uow := domain_mocks.NewMockUnitOfWork(t)
-			timeProvider := domain_mocks.NewMockCurrentTimeProvider(t)
-			llmClient := domain_mocks.NewMockLLMClient(t)
+			uow := domain.NewMockUnitOfWork(t)
+			creator := NewMockTodoCreator(t)
 			if tt.setExpectations != nil {
-				tt.setExpectations(uow, timeProvider, llmClient)
+				tt.setExpectations(uow, creator)
 			}
 
-			cti := NewCreateTodoImpl(uow, timeProvider, llmClient, "model-name")
-			cti.createUUID = fixedUUID
+			cti := NewCreateTodoImpl(uow, creator)
 
 			got, gotErr := cti.Execute(context.Background(), tt.title, tt.dueDate)
 			assert.Equal(t, tt.expectedErr, gotErr)
-			assert.Equal(t, tt.expectedTodo, got)
+			if tt.expectedErr == nil {
+				assert.Equal(t, tt.expectedTodo.ID, got.ID)
+				assert.Equal(t, tt.expectedTodo.Title, got.Title)
+				assert.Equal(t, tt.expectedTodo.Status, got.Status)
+				assert.Equal(t, tt.expectedTodo.DueDate, got.DueDate)
+			}
 		})
 	}
 }
 
 func TestInitCreateTodo_Initialize(t *testing.T) {
+	// Clean up previous registrations if any
 	ict := InitCreateTodo{}
 
 	ctx, err := ict.Initialize(context.Background())
@@ -178,5 +126,4 @@ func TestInitCreateTodo_Initialize(t *testing.T) {
 	registeredCreateTodo, err := depend.Resolve[CreateTodo]()
 	assert.NoError(t, err)
 	assert.NotNil(t, registeredCreateTodo)
-
 }

@@ -408,8 +408,11 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY embedding <-> $1 ASC, created_at DESC LIMIT 11 OFFSET 0").
-					WithArgs(pgvector.NewVector([]float32{0.1, 0.2, 0.3})).
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (embedding <=> $1) < 0.5 ORDER BY embedding <#> $2 LIMIT 11 OFFSET 0").
+					WithArgs(
+						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
+						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
+					).
 					WillReturnRows(rows)
 			},
 			expectedTodos: []domain.Todo{

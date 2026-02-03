@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	domain_mocks "github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -51,12 +50,12 @@ func TestGetBoardSummaryImpl_Query(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		setExpectations func(summaryRepo *domain_mocks.MockBoardSummaryRepository)
+		setExpectations func(summaryRepo *domain.MockBoardSummaryRepository)
 		expectedSummary domain.BoardSummary
 		expectedErr     error
 	}{
 		"success": {
-			setExpectations: func(summaryRepo *domain_mocks.MockBoardSummaryRepository) {
+			setExpectations: func(summaryRepo *domain.MockBoardSummaryRepository) {
 				summaryRepo.EXPECT().GetLatestSummary(
 					mock.Anything,
 				).Return(boardSummary, true, nil)
@@ -65,7 +64,7 @@ func TestGetBoardSummaryImpl_Query(t *testing.T) {
 			expectedErr:     nil,
 		},
 		"repository-error": {
-			setExpectations: func(summaryRepo *domain_mocks.MockBoardSummaryRepository) {
+			setExpectations: func(summaryRepo *domain.MockBoardSummaryRepository) {
 				summaryRepo.EXPECT().GetLatestSummary(
 					mock.Anything,
 				).Return(domain.BoardSummary{}, false, errors.New("database error"))
@@ -74,7 +73,7 @@ func TestGetBoardSummaryImpl_Query(t *testing.T) {
 			expectedErr:     errors.New("database error"),
 		},
 		"no-summary-found": {
-			setExpectations: func(summaryRepo *domain_mocks.MockBoardSummaryRepository) {
+			setExpectations: func(summaryRepo *domain.MockBoardSummaryRepository) {
 				summaryRepo.EXPECT().GetLatestSummary(
 					mock.Anything,
 				).Return(domain.BoardSummary{}, false, nil)
@@ -86,7 +85,7 @@ func TestGetBoardSummaryImpl_Query(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			summaryRepo := domain_mocks.NewMockBoardSummaryRepository(t)
+			summaryRepo := domain.NewMockBoardSummaryRepository(t)
 
 			if tt.setExpectations != nil {
 				tt.setExpectations(summaryRepo)
@@ -106,7 +105,7 @@ func TestGetBoardSummaryImpl_Query(t *testing.T) {
 }
 
 func TestInitGetBoardSummary_Initialize(t *testing.T) {
-	summaryRepo := domain_mocks.NewMockBoardSummaryRepository(t)
+	summaryRepo := domain.NewMockBoardSummaryRepository(t)
 
 	igbs := &InitGetBoardSummary{
 		SummaryRepo: summaryRepo,

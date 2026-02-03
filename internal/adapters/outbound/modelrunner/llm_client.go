@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/cleitonmarx/symbiont/depend"
@@ -28,13 +27,7 @@ func (a LLMClient) Chat(ctx context.Context, req domain.LLMChatRequest) (string,
 	spanCtx, span := tracing.Start(ctx)
 	defer span.End()
 
-	adapterReq := ChatRequest{
-		Model:       req.Model,
-		Temperature: req.Temperature,
-		TopP:        req.TopP,
-		MaxTokens:   req.MaxTokens,
-		Messages:    make([]ChatMessage, len(req.Messages)),
-	}
+	adapterReq := toChatRequest(req)
 
 	for i, msg := range req.Messages {
 		adapterReq.Messages[i] = ChatMessage{
@@ -62,17 +55,7 @@ func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, on
 	spanCtx, span := tracing.Start(ctx)
 	defer span.End()
 
-	adapterReq := ChatRequest{
-		Model:    req.Model,
-		Messages: make([]ChatMessage, len(req.Messages)),
-	}
-
-	for i, msg := range req.Messages {
-		adapterReq.Messages[i] = ChatMessage{
-			Role:    string(msg.Role),
-			Content: msg.Content,
-		}
-	}
+	adapterReq := toChatRequest(req)
 
 	// Send meta event
 	meta := domain.LLMStreamEventMeta{
@@ -85,26 +68,14 @@ func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, on
 		return err
 	}
 
-	var finalUsage *Usage
-	estimatedPromptTokens := estimateTokenCount(adapterReq.Messages)
+	var (
+		functionCalls []*domain.LLMStreamEventFunctionCall
+	)
 
 	// Stream chunks
 	err := a.client.ChatStream(spanCtx, adapterReq, func(chunk StreamChunk) error {
-		// Capture usage from chunk
-		if chunk.Usage != nil {
-			finalUsage = chunk.Usage
-		}
 
-		// Extract usage from timings if not provided
-		if chunk.Timings != nil && finalUsage == nil {
-			finalUsage = &Usage{
-				PromptTokens:     chunk.Timings.PromptN,
-				CompletionTokens: chunk.Timings.PredictedN,
-				TotalTokens:      chunk.Timings.PromptN + chunk.Timings.PredictedN,
-			}
-		}
-
-		// Send delta events
+		// Send delta and accumulate function calls
 		for _, choice := range chunk.Choices {
 			if choice.Delta.Content != "" {
 				if err := onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{
@@ -113,8 +84,23 @@ func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, on
 					return err
 				}
 			}
-		}
+			if len(choice.Delta.ToolCalls) > 0 {
+				for _, tc := range choice.Delta.ToolCalls {
+					if len(tc.ID) > 0 {
+						functionCalls = append(functionCalls, &domain.LLMStreamEventFunctionCall{
+							ID:        tc.ID,
+							Index:     tc.Index,
+							Function:  tc.Function.Name,
+							Arguments: tc.Function.Arguments,
+						})
+					} else {
+						fCall := functionCalls[tc.Index]
+						fCall.Arguments += tc.Function.Arguments
+					}
 
+				}
+			}
+		}
 		return nil
 	})
 
@@ -122,27 +108,17 @@ func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, on
 		return err
 	}
 
-	// Fallback for usage estimation
-	if finalUsage == nil {
-		finalUsage = &Usage{
-			PromptTokens:     estimatedPromptTokens,
-			CompletionTokens: 0,
-			TotalTokens:      estimatedPromptTokens,
+	// Send function call events
+	for _, fc := range functionCalls {
+		if err := onEvent(domain.LLMStreamEventType_FunctionCall, *fc); err != nil {
+			return err
 		}
-	} else if finalUsage.PromptTokens < estimatedPromptTokens {
-		finalUsage.PromptTokens = estimatedPromptTokens
-		finalUsage.TotalTokens = finalUsage.PromptTokens + finalUsage.CompletionTokens
 	}
 
 	// Send done event
 	done := domain.LLMStreamEventDone{
 		AssistantMessageID: meta.AssistantMessageID.String(),
 		CompletedAt:        time.Now().UTC().Format(time.RFC3339),
-		Usage: &domain.LLMUsage{
-			PromptTokens:     finalUsage.PromptTokens,
-			CompletionTokens: finalUsage.CompletionTokens,
-			TotalTokens:      finalUsage.TotalTokens,
-		},
 	}
 	return onEvent(domain.LLMStreamEventType_Done, done)
 }
@@ -170,14 +146,63 @@ func (a LLMClient) Embed(ctx context.Context, model, input string) ([]float64, e
 	return resp.Data[0].Embedding, nil
 }
 
-// estimateTokenCount estimates tokens from messages
-func estimateTokenCount(messages []ChatMessage) int {
-	totalWords := 0
-	for _, msg := range messages {
-		totalWords += 4 // message overhead
-		totalWords += len(strings.Fields(msg.Content))
+// toChatRequest converts domain.LLMChatRequest to ChatRequest
+func toChatRequest(req domain.LLMChatRequest) ChatRequest {
+	adapterReq := ChatRequest{
+		Model:       req.Model,
+		Temperature: req.Temperature,
+		Stream:      req.Stream,
+		MaxTokens:   req.MaxTokens,
+		TopP:        req.TopP,
+		Messages:    make([]ChatMessage, len(req.Messages)),
+		Tools:       make([]Tool, len(req.Tools)),
 	}
-	return int(float64(totalWords) * 1.3)
+
+	for i, msg := range req.Messages {
+		adpMsg := ChatMessage{
+			Role:       string(msg.Role),
+			ToolCallID: msg.ToolCallID,
+			Content:    msg.Content,
+		}
+		for _, fc := range msg.ToolCalls {
+			adpMsg.ToolCalls = append(adpMsg.ToolCalls, ToolCall{
+				ID:   fc.ID,
+				Type: "function",
+				Function: ToolCallFunction{
+					Name:      fc.Function,
+					Arguments: fc.Arguments,
+				},
+			})
+		}
+		adapterReq.Messages[i] = adpMsg
+	}
+
+	for i, tool := range req.Tools {
+		t := Tool{
+			Type: tool.Type,
+			Function: ToolFunc{
+				Description: tool.Function.Description,
+				Name:        tool.Function.Name,
+				Parameters: ToolFuncParameters{
+					Type:       tool.Function.Parameters.Type,
+					Properties: make(map[string]ToolFuncParameterDetail),
+				},
+				Required: []string{},
+			},
+		}
+
+		for paramName, paramDetail := range tool.Function.Parameters.Properties {
+			t.Function.Parameters.Properties[paramName] = ToolFuncParameterDetail{
+				Type:        paramDetail.Type,
+				Description: paramDetail.Description,
+			}
+			if paramDetail.Required {
+				t.Function.Required = append(t.Function.Required, paramName)
+			}
+		}
+		adapterReq.Tools[i] = t
+	}
+	return adapterReq
 }
 
 // InitLLMClient initializes the LLMClient dependency

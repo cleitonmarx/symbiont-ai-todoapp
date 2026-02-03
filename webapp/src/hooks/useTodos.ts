@@ -19,6 +19,8 @@ interface UseTodosReturn {
   deleteTodo: (id: string) => void;
 }
 
+const MAX_TODO_PAGE_SIZE = 16;
+
 export const useTodos = (): UseTodosReturn & { refetch: () => void } => {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilterState] = useState<TodoStatus | 'ALL'>('ALL');
@@ -41,7 +43,7 @@ export const useTodos = (): UseTodosReturn & { refetch: () => void } => {
     queryFn: () => getTodos(
       statusFilter === 'ALL' ? undefined : statusFilter,
       currentPage,
-      4
+      MAX_TODO_PAGE_SIZE
     ),
     retry: 1,
   });

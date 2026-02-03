@@ -3,9 +3,14 @@
 package integration
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +19,7 @@ import (
 	gqlmodels "github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/gen"
 	rest "github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/google/uuid"
 
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/app"
@@ -45,7 +51,7 @@ func TestMain(m *testing.M) {
 				"PUBSUB_TOPIC_ID":             "Todo",
 				"PUBSUB_SUBSCRIPTION_ID":      "todo_summary_generator",
 				"LLM_MODEL_HOST":              "http://localhost:12434",
-				"LLM_MODEL":                   "gpt-oss:20B-UD-Q4_K_XL",
+				"LLM_MODEL":                   "qwen2.5:7B-Q4_0",
 				"LLM_EMBEDDING_MODEL":         "embeddinggemma:300M-Q8_0",
 			},
 		},
@@ -55,14 +61,19 @@ func TestMain(m *testing.M) {
 	summaryQueue = make(usecases.CompletedSummaryQueue, 5)
 	depend.Register(summaryQueue)
 
-	restCli, _ = rest.NewClientWithResponses("http://localhost:8080")
+	var err error
+
+	restCli, err = rest.NewClientWithResponses("http://localhost:8080")
+	if err != nil {
+		log.Fatalf("failed to create REST client: %v", err)
+	}
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	shutdownCh := todoApp.RunAsync(cancelCtx)
 
-	err := todoApp.WaitForReadiness(cancelCtx, 10*time.Minute)
+	err = todoApp.WaitForReadiness(cancelCtx, 10*time.Minute)
 	if err != nil {
 		cancel()
 		log.Fatalf("TodoApp app failed to become ready: %v", err)
@@ -214,4 +225,91 @@ func TestTodoApp_GraphQLAPI(t *testing.T) {
 		require.NotNil(t, listResp, "expected non-nil response for ListTodos GraphQL query after deletions")
 		require.Equal(t, 0, len(listResp.Items), "expected 0 todos in the list after deletions")
 	})
+}
+
+func TestTodoAPP_Chat(t *testing.T) {
+
+	t.Run("create-todo", func(t *testing.T) {
+		createResp, err := restCli.CreateTodoWithResponse(t.Context(), rest.CreateTodoJSONRequestBody{
+			Title:   "Integration Test Todo",
+			DueDate: types.Date{Time: time.Now().Add(24 * time.Hour)},
+		})
+		require.NoError(t, err, "failed to call CreateTodo endpoint")
+		require.NotNil(t, createResp.JSON201, "expected non-nil response for CreateTodo")
+	})
+
+	t.Run("chat-fetch-todo", func(t *testing.T) {
+		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
+			Message: "Show me my Integration Test Todo",
+		})
+		require.NoError(t, err, "failed to call StreamChat endpoint")
+		defer chatResp.Body.Close() //nolint:errcheck
+		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
+
+		deltaText := readChatDeltaText(t, chatResp.Body)
+
+		require.Contains(t, deltaText, "🔎 Fetching todos...")
+		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
+		require.Contains(t, deltaText, "OPEN", "expected chat response to contain created todo status")
+		fmt.Println("Chat response:", deltaText)
+
+	})
+
+	t.Run("mark-todo-completed", func(t *testing.T) {
+		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
+			Message: "Mark it as DONE, and the current status: (Status: status) title duedate.",
+		})
+		require.NoError(t, err, "failed to call StreamChat endpoint")
+		defer chatResp.Body.Close() //nolint:errcheck
+		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
+
+		deltaText := readChatDeltaText(t, chatResp.Body)
+
+		require.Contains(t, deltaText, "✏️ Updating your todo...")
+		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
+		require.Contains(t, deltaText, "DONE", "expected chat response to contain created todo status")
+
+		fmt.Println("Chat response:", deltaText)
+	})
+
+	t.Run("delete-todo", func(t *testing.T) {
+		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
+			Message: "Delete my Integration Test Todo.",
+		})
+		require.NoError(t, err, "failed to call StreamChat endpoint")
+		defer chatResp.Body.Close() //nolint:errcheck
+		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
+
+		deltaText := readChatDeltaText(t, chatResp.Body)
+		require.Contains(t, deltaText, "🗑️ Deleting the todo...")
+		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
+		fmt.Println("Chat response:", deltaText)
+	})
+
+}
+
+func readChatDeltaText(t *testing.T, reader io.Reader) string {
+	isDelta := false
+	payload := strings.Builder{}
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if isDelta {
+			isDelta = false
+			dataLine := scanner.Text()
+			dataPayload := strings.TrimSpace(strings.TrimPrefix(dataLine, "data:"))
+			var delta domain.LLMStreamEventDelta
+			err := json.Unmarshal([]byte(dataPayload), &delta)
+			require.NoError(t, err, "failed to unmarshal chat delta payload")
+			payload.WriteString(delta.Text)
+		}
+
+		if strings.HasPrefix(line, "event: delta") {
+			isDelta = true
+		}
+
+	}
+
+	return payload.String()
 }

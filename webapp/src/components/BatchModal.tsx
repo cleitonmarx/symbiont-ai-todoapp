@@ -9,7 +9,7 @@ interface BatchModalProps {
   onBatchComplete: () => void;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 50;
 
 const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete }) => {
   const [show, setShow] = useState(false);

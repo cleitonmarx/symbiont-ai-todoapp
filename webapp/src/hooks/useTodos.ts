@@ -1,7 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTodos, createTodo, updateTodo, getBoardSummary, deleteTodo as deleteTodoApi } from '../services/api';
 import type { Todo, CreateTodoRequest, TodoStatus } from '../types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+
+type TodoSort =
+  | 'createdAtAsc'
+  | 'createdAtDesc'
+  | 'dueDateAsc'
+  | 'dueDateDesc';
 
 interface UseTodosReturn {
   todos: Todo[];
@@ -17,21 +23,38 @@ interface UseTodosReturn {
   nextPage: number | null;
   goToPage: (page: number) => void;
   deleteTodo: (id: string) => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  sortBy: TodoSort;
+  setSortBy: (sort: TodoSort) => void;
+  refetch: () => void;
 }
 
 const MAX_TODO_PAGE_SIZE = 16;
 
-export const useTodos = (): UseTodosReturn & { refetch: () => void } => {
+export const useTodos = (): UseTodosReturn => {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilterState] = useState<TodoStatus | 'ALL'>('ALL');
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<TodoSort>('createdAtAsc');
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [boardSummary, setBoardSummary] = useState<any>(null);
 
-  // Reset page to 1 whenever status filter changes
+  // Debounce search query - only update after 500ms of no typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset page to 1 whenever status filter, debounced search, or sort changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter]);
+  }, [statusFilter, debouncedSearchQuery, sortBy]);
 
   const { 
     data: response, 
@@ -39,16 +62,21 @@ export const useTodos = (): UseTodosReturn & { refetch: () => void } => {
     error, 
     refetch 
   } = useQuery({
-    queryKey: ['todos', statusFilter, currentPage],
+    queryKey: ['todos', statusFilter, currentPage, debouncedSearchQuery, sortBy],
     queryFn: () => getTodos(
       statusFilter === 'ALL' ? undefined : statusFilter,
+      debouncedSearchQuery || undefined,
       currentPage,
-      MAX_TODO_PAGE_SIZE
+      MAX_TODO_PAGE_SIZE,
+      undefined,
+      sortBy
     ),
     retry: 1,
   });
 
-  const todos = response?.items || [];
+  // Memoize todos array to prevent unnecessary re-renders
+  const todos = useMemo(() => response?.items || [], [response?.items]);
+  
   const page = response?.page ?? 1;
   const previousPage = response?.previous_page ?? null;
   const nextPage = response?.next_page ?? null;
@@ -123,6 +151,22 @@ export const useTodos = (): UseTodosReturn & { refetch: () => void } => {
     },
   });
 
+  const handleSetSearchQuery = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
+
+  const handleSetStatusFilter = useCallback((status: TodoStatus | 'ALL') => {
+    setStatusFilterState(status);
+  }, []);
+
+  const handleSetSortBy = useCallback((sort: TodoSort) => {
+    setSortBy(sort);
+  }, []);
+
+  const handleGoToPage = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
+
   return {
     todos,
     boardSummary,
@@ -139,11 +183,15 @@ export const useTodos = (): UseTodosReturn & { refetch: () => void } => {
     },
     deleteTodo: (id: string) => deleteMutation.mutate(id),
     statusFilter,
-    setStatusFilter: setStatusFilterState,
+    setStatusFilter: handleSetStatusFilter,
     page,
     previousPage,
     nextPage,
-    goToPage: setCurrentPage,
+    goToPage: handleGoToPage,
     refetch,
+    searchQuery,
+    setSearchQuery: handleSetSearchQuery,
+    sortBy,
+    setSortBy: handleSetSortBy,
   };
 };

@@ -1,11 +1,12 @@
 # TodoApp - A Complete Symbiont Example
 
-TodoApp is a comprehensive example application demonstrating the capabilities of Symbiont. It's a full-stack todo application with AI-powered board summaries and event-driven architecture.
+TodoApp is a comprehensive example application demonstrating the capabilities of Symbiont. It's a full-stack todo application with LLM-powered and event-driven architecture.
 
 ## Features
 
 - 📝 **Todo Management**: Create, update, and track todos with due dates
-- 🤖 **AI Chat & Summaries**: Interactive LLM-powered chat that streams responses and generates intelligent board summaries from your current todos
+- 🤖 **LLM Chat & Tools**: LLM chat that can use tools to create, update, and delete tasks
+- 📌 **Board Summary**: Board with counters and an LLM-generated summary
 - 🧰 **LLM Tools Integration**: Tool registry enables the chat agent to perform todo operations
 - 🔔 **Event-Driven**: Pub/Sub architecture for asynchronous processing
 - 🔒 **Secrets Management**: HashiCorp Vault integration for secure configuration
@@ -13,7 +14,7 @@ TodoApp is a comprehensive example application demonstrating the capabilities of
 - 🗄️ **PostgreSQL**: Persistent storage with migrations
 - 🎨 **Modern UI**: React + TypeScript frontend
 - 🗃️ **Batch GraphQL Operations**: Efficiently update or delete multiple todos in a single GraphQL request using aliases.
-- 🧠 **AI-Enhanced Search**: PostgreSQL with [pgvector](https://github.com/pgvector/pgvector) extension for semantic search in AI Chat
+- 🧠 **Vector Search**: pgvector + embeddings for similarity search over todos
 
 ## Architecture
 

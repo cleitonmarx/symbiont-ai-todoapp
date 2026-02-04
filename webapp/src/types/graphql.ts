@@ -18,6 +18,11 @@ export type Scalars = {
   UUID: { input: any; output: any; }
 };
 
+export type DateRange = {
+  DueAfter: Scalars['Date']['input'];
+  DueBefore: Scalars['Date']['input'];
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
   deleteTodo: Scalars['Boolean']['output'];
@@ -41,8 +46,11 @@ export type Query = {
 
 
 export type QueryListTodosArgs = {
+  dateRange: InputMaybe<DateRange>;
   page?: Scalars['Int']['input'];
   pageSize?: Scalars['Int']['input'];
+  query: InputMaybe<Scalars['String']['input']>;
+  sortBy: InputMaybe<TodoSortBy>;
   status: InputMaybe<TodoStatus>;
 };
 
@@ -64,6 +72,12 @@ export type TodoPage = {
   previousPage: Maybe<Scalars['Int']['output']>;
 };
 
+export type TodoSortBy =
+  | 'createdAtAsc'
+  | 'createdAtDesc'
+  | 'dueDateAsc'
+  | 'dueDateDesc';
+
 export type TodoStatus =
   | 'DONE'
   | 'OPEN';
@@ -77,12 +91,15 @@ export type UpdateTodoParams = {
 
 export type ListTodosQueryVariables = Exact<{
   status: InputMaybe<TodoStatus>;
+  query: InputMaybe<Scalars['String']['input']>;
   page: Scalars['Int']['input'];
   pageSize: Scalars['Int']['input'];
+  dateRange: InputMaybe<DateRange>;
+  sortBy: InputMaybe<TodoSortBy>;
 }>;
 
 
-export type ListTodosQuery = { __typename?: 'Query', listTodos: { __typename?: 'TodoPage', page: number, nextPage: number | undefined, previousPage: number | undefined, items: Array<{ __typename?: 'Todo', id: any, title: string, status: TodoStatus, due_date: any }> } };
+export type ListTodosQuery = { __typename?: 'Query', listTodos: { __typename?: 'TodoPage', page: number, nextPage: number | undefined, previousPage: number | undefined, items: Array<{ __typename?: 'Todo', id: any, title: string, status: TodoStatus, due_date: any, created_at: any, updated_at: any }> } };
 
 
-export const ListTodosDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListTodos"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"TodoStatus"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"page"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pageSize"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"listTodos"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}},{"kind":"Argument","name":{"kind":"Name","value":"page"},"value":{"kind":"Variable","name":{"kind":"Name","value":"page"}}},{"kind":"Argument","name":{"kind":"Name","value":"pageSize"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pageSize"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"due_date"}}]}},{"kind":"Field","name":{"kind":"Name","value":"page"}},{"kind":"Field","name":{"kind":"Name","value":"nextPage"}},{"kind":"Field","name":{"kind":"Name","value":"previousPage"}}]}}]}}]} as unknown as DocumentNode<ListTodosQuery, ListTodosQueryVariables>;
+export const ListTodosDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListTodos"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"TodoStatus"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"query"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"page"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pageSize"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dateRange"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"DateRange"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sortBy"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"TodoSortBy"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"listTodos"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}},{"kind":"Argument","name":{"kind":"Name","value":"query"},"value":{"kind":"Variable","name":{"kind":"Name","value":"query"}}},{"kind":"Argument","name":{"kind":"Name","value":"page"},"value":{"kind":"Variable","name":{"kind":"Name","value":"page"}}},{"kind":"Argument","name":{"kind":"Name","value":"pageSize"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pageSize"}}},{"kind":"Argument","name":{"kind":"Name","value":"dateRange"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dateRange"}}},{"kind":"Argument","name":{"kind":"Name","value":"sortBy"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sortBy"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"due_date"}},{"kind":"Field","name":{"kind":"Name","value":"created_at"}},{"kind":"Field","name":{"kind":"Name","value":"updated_at"}}]}},{"kind":"Field","name":{"kind":"Name","value":"page"}},{"kind":"Field","name":{"kind":"Name","value":"nextPage"}},{"kind":"Field","name":{"kind":"Name","value":"previousPage"}}]}}]}}]} as unknown as DocumentNode<ListTodosQuery, ListTodosQueryVariables>;

@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/cleitonmarx/symbiont/depend"
@@ -47,10 +46,10 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 	defer span.End()
 
 	if pageSize <= 0 {
-		return nil, false, errors.New("page_size must be greater than 0")
+		return nil, false, domain.NewValidationErr("page_size must be greater than 0")
 	}
 	if page <= 0 {
-		return nil, false, errors.New("page must be greater than 0")
+		return nil, false, domain.NewValidationErr("page must be greater than 0")
 	}
 
 	qry := tr.sb.
@@ -74,6 +73,19 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 			"(embedding <=> ?) < 0.5",
 			pgvector.NewVector(toFloat32Truncated(params.Embedding)),
 		)).OrderByClause("embedding <#> ? ", pgvector.NewVector(toFloat32Truncated(params.Embedding)))
+	}
+	if params.DueAfter != nil && params.DueBefore != nil {
+		qry = qry.Where(squirrel.And{
+			squirrel.GtOrEq{"due_date": *params.DueAfter},
+			squirrel.LtOrEq{"due_date": *params.DueBefore},
+		})
+	}
+	if params.SortBy != nil {
+		if err := params.SortBy.Validate(); err != nil {
+			return nil, false, err
+		}
+		orderClause := params.SortBy.Field + " " + params.SortBy.Direction
+		qry = qry.OrderBy(orderClause)
 	} else {
 		qry = qry.OrderBy("created_at DESC")
 	}

@@ -27,9 +27,20 @@ enum TodoStatus {
 }
 
 
+enum TodoSortBy {
+  createdAtAsc
+  createdAtDesc
+  dueDateAsc
+  dueDateDesc
+}
+
+input DateRange {
+  DueAfter: Date!
+  DueBefore: Date!
+}
 
 type Query {
-  listTodos(status: TodoStatus, page: Int! = 1, pageSize: Int! = 50): TodoPage!
+  listTodos(page: Int! = 1, pageSize: Int! = 50, status: TodoStatus, query: String, dateRange: DateRange, sortBy: TodoSortBy): TodoPage!
 }
 
 type Mutation {

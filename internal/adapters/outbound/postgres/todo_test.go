@@ -315,6 +315,24 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 			expectedHasMore: false,
 			expectedErr:     false,
 		},
+		"invalid-page": {
+			page:     0,
+			pageSize: 10,
+			setExpectations: func(mock sqlmock.Sqlmock) {
+			},
+			expectedTodos:   nil,
+			expectedHasMore: false,
+			expectedErr:     true,
+		},
+		"invalid-page-size": {
+			page:     1,
+			pageSize: 0,
+			setExpectations: func(mock sqlmock.Sqlmock) {
+			},
+			expectedTodos:   nil,
+			expectedHasMore: false,
+			expectedErr:     true,
+		},
 		"has-more-results": {
 			page:     1,
 			pageSize: 2,
@@ -408,7 +426,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (embedding <=> $1) < 0.5 ORDER BY embedding <#> $2 LIMIT 11 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (embedding <=> $1) < 0.5 ORDER BY embedding <#> $2 , created_at DESC LIMIT 11 OFFSET 0").
 					WithArgs(
 						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
 						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
@@ -420,6 +438,84 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 			},
 			expectedHasMore: false,
 			expectedErr:     false,
+		},
+		"filter-by-due-date-range": {
+			page:     1,
+			pageSize: 10,
+			opts: []domain.ListTodoOptions{
+				domain.WithDueDateRange(
+					time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
+					time.Date(2024, 2, 15, 0, 0, 0, 0, time.UTC),
+				),
+			},
+			setExpectations: func(mock sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows(todoFields).
+					AddRow(
+						fixedUUID2,
+						"Todo 2",
+						domain.TodoStatus_OPEN,
+						fixedDueDate,
+						fixedTime,
+						fixedTime,
+					)
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (due_date >= $1 AND due_date <= $2) ORDER BY created_at DESC LIMIT 11 OFFSET 0").
+					WithArgs(
+						time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
+						time.Date(2024, 2, 15, 0, 0, 0, 0, time.UTC),
+					).
+					WillReturnRows(rows)
+			},
+			expectedTodos: []domain.Todo{
+				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			},
+			expectedHasMore: false,
+			expectedErr:     false,
+		},
+		"sort-by-due-date-asc": {
+			page:     1,
+			pageSize: 10,
+			opts: []domain.ListTodoOptions{
+				domain.WithSortBy("dueDateDesc"),
+			},
+			setExpectations: func(mock sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows(todoFields).
+					AddRow(
+						fixedUUID2,
+						"Todo 2",
+						domain.TodoStatus_OPEN,
+						fixedDueDate,
+						fixedTime,
+						fixedTime,
+					).
+					AddRow(
+						fixedUUID1,
+						"Todo 1",
+						domain.TodoStatus_OPEN,
+						fixedDueDate,
+						fixedTime,
+						fixedTime,
+					)
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY due_date DESC LIMIT 11 OFFSET 0").
+					WillReturnRows(rows)
+			},
+			expectedTodos: []domain.Todo{
+				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+				{ID: fixedUUID1, Title: "Todo 1", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			},
+			expectedHasMore: false,
+			expectedErr:     false,
+		},
+		"invalid-sort-by": {
+			page:     1,
+			pageSize: 10,
+			opts: []domain.ListTodoOptions{
+				domain.WithSortBy("invalidSort"),
+			},
+			setExpectations: func(mock sqlmock.Sqlmock) {
+			},
+			expectedTodos:   nil,
+			expectedHasMore: false,
+			expectedErr:     true,
 		},
 	}
 

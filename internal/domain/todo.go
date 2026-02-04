@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -55,10 +56,36 @@ func (t Todo) ToLLMInput() string {
 	return fmt.Sprintf("ID: %s | Title: %s | Due Date: %s | Status: %s", t.ID.String(), t.Title, t.DueDate.Format(time.DateOnly), t.Status)
 }
 
+// TodoSortBy represents sorting criteria for listing todos.
+type TodoSortBy struct {
+	Field     string
+	Direction string
+}
+
+// Validate checks if the TodoSortBy fields are valid.
+func (s *TodoSortBy) Validate() error {
+	allowedFields := map[string]string{
+		"createdAt": "created_at",
+		"dueDate":   "due_date",
+	}
+	val, ok := allowedFields[s.Field]
+	if !ok {
+		return NewValidationErr("invalid sort field: " + s.Field)
+	}
+	if s.Direction != "ASC" && s.Direction != "DESC" {
+		return NewValidationErr("invalid sort direction: " + s.Direction)
+	}
+	s.Field = val
+	return nil
+}
+
 // ListTodosParams represents the parameters for listing todo items.
 type ListTodosParams struct {
 	Status    *TodoStatus
 	Embedding []float64
+	DueAfter  *time.Time
+	DueBefore *time.Time
+	SortBy    *TodoSortBy
 }
 
 // ListTodoOptions defines a function type for modifying ListTodosParams.
@@ -75,6 +102,29 @@ func WithStatus(status TodoStatus) ListTodoOptions {
 func WithEmbedding(embedding []float64) ListTodoOptions {
 	return func(params *ListTodosParams) {
 		params.Embedding = embedding
+	}
+}
+
+// WithDueDateRange is a ListTodoOptions that filters todos by a due date range.
+func WithDueDateRange(dueAfter, dueBefore time.Time) ListTodoOptions {
+	return func(params *ListTodosParams) {
+		params.DueAfter = &dueAfter
+		params.DueBefore = &dueBefore
+	}
+}
+
+// WithSortBy creates a ListTodoOptions to specify sorting criteria.
+func WithSortBy(sort string) ListTodoOptions {
+
+	return func(params *ListTodosParams) {
+		if after, ok := strings.CutSuffix(sort, "Desc"); ok {
+			params.SortBy = &TodoSortBy{Field: after, Direction: "DESC"}
+			return
+		} else if after, ok := strings.CutSuffix(sort, "Asc"); ok {
+			params.SortBy = &TodoSortBy{Field: after, Direction: "ASC"}
+			return
+		}
+		params.SortBy = &TodoSortBy{Field: sort, Direction: ""}
 	}
 }
 

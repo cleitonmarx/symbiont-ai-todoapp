@@ -1,12 +1,12 @@
-query ListTodos($status: TodoStatus, $page: Int!, $pageSize: Int!) {
-  listTodos(status: $status, page: $page, pageSize: $pageSize) {
+query ListTodos($status: TodoStatus, $query: String, $page: Int!, $pageSize: Int!, $dateRange: DateRange, $sortBy: TodoSortBy) {
+  listTodos(status: $status, query: $query, page: $page, pageSize: $pageSize, dateRange: $dateRange, sortBy: $sortBy) {
     items {
       id
       title
       status
       due_date
-      #created_at
-      #updated_at
+      created_at
+      updated_at
     }
     page
     nextPage

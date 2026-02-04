@@ -13,6 +13,11 @@ import (
 	"github.com/google/uuid"
 )
 
+type DateRange struct {
+	DueAfter  types.Date `json:"DueAfter"`
+	DueBefore types.Date `json:"DueBefore"`
+}
+
 type Mutation struct {
 }
 
@@ -40,6 +45,65 @@ type UpdateTodoParams struct {
 	Title   *string     `json:"title,omitempty"`
 	Status  *TodoStatus `json:"status,omitempty"`
 	DueDate *types.Date `json:"due_date,omitempty"`
+}
+
+type TodoSortBy string
+
+const (
+	TodoSortByCreatedAtAsc  TodoSortBy = "createdAtAsc"
+	TodoSortByCreatedAtDesc TodoSortBy = "createdAtDesc"
+	TodoSortByDueDateAsc    TodoSortBy = "dueDateAsc"
+	TodoSortByDueDateDesc   TodoSortBy = "dueDateDesc"
+)
+
+var AllTodoSortBy = []TodoSortBy{
+	TodoSortByCreatedAtAsc,
+	TodoSortByCreatedAtDesc,
+	TodoSortByDueDateAsc,
+	TodoSortByDueDateDesc,
+}
+
+func (e TodoSortBy) IsValid() bool {
+	switch e {
+	case TodoSortByCreatedAtAsc, TodoSortByCreatedAtDesc, TodoSortByDueDateAsc, TodoSortByDueDateDesc:
+		return true
+	}
+	return false
+}
+
+func (e TodoSortBy) String() string {
+	return string(e)
+}
+
+func (e *TodoSortBy) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = TodoSortBy(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid TodoSortBy", str)
+	}
+	return nil
+}
+
+func (e TodoSortBy) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *TodoSortBy) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e TodoSortBy) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }
 
 type TodoStatus string

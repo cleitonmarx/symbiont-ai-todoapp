@@ -45,6 +45,14 @@ const (
 	OPEN TodoStatus = "OPEN"
 )
 
+// Defines values for ListTodosParamsSort.
+const (
+	CreatedAt     ListTodosParamsSort = "createdAt"
+	CreatedAtDesc ListTodosParamsSort = "createdAtDesc"
+	DueDateAsc    ListTodosParamsSort = "dueDateAsc"
+	DueDateDesc   ListTodosParamsSort = "dueDateDesc"
+)
+
 // BoardSummary defines model for BoardSummary.
 type BoardSummary struct {
 	// Counts Count of todos per status.
@@ -105,6 +113,22 @@ type CreateTodoRequest struct {
 	// Title Human-readable todo title. Must be non-empty.
 	Title string `json:"title"`
 }
+
+// DateRange defines model for DateRange.
+type DateRange struct {
+	// DueAfter Filter todos with due_date on or after this date (YYYY-MM-DD).
+	DueAfter *openapi_types.Date `json:"dueAfter,omitempty"`
+
+	// DueBefore Filter todos with due_date on or before this date (YYYY-MM-DD).
+	DueBefore *openapi_types.Date `json:"dueBefore,omitempty"`
+	union     json.RawMessage
+}
+
+// DateRange0 defines model for .
+type DateRange0 = interface{}
+
+// DateRange1 defines model for .
+type DateRange1 = interface{}
 
 // Error Error details.
 type Error struct {
@@ -217,15 +241,25 @@ type ListChatMessagesParams struct {
 
 // ListTodosParams defines parameters for ListTodos.
 type ListTodosParams struct {
-	// Status Filter todos by status.
-	Status *TodoStatus `form:"status,omitempty" json:"status,omitempty"`
-
-	// Pagesize Maximum number of todos to return (server may cap).
-	Pagesize int `form:"pagesize" json:"pagesize"`
+	// PageSize Maximum number of todos to return (server may cap).
+	PageSize int `form:"pageSize" json:"pageSize"`
 
 	// Page Opaque cursor from a prior ListTodosResp to fetch the next page. Omit or set to null to fetch the first page.
 	Page int `form:"page" json:"page"`
+
+	// Status Filter todos by status.
+	Status *TodoStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Query Full-text or semantic search query to retrieve todos most relevant to the provided keywords or context using vector similarity.
+	Query     *string    `form:"query,omitempty" json:"query,omitempty"`
+	DateRange *DateRange `json:"dateRange,omitempty"`
+
+	// Sort Sorting criteria.
+	Sort *ListTodosParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 }
+
+// ListTodosParamsSort defines parameters for ListTodos.
+type ListTodosParamsSort string
 
 // StreamChatJSONRequestBody defines body for StreamChat for application/json ContentType.
 type StreamChatJSONRequestBody = ChatStreamRequest
@@ -235,6 +269,116 @@ type CreateTodoJSONRequestBody = CreateTodoRequest
 
 // UpdateTodoJSONRequestBody defines body for UpdateTodo for application/json ContentType.
 type UpdateTodoJSONRequestBody = UpdateTodoRequest
+
+// AsDateRange0 returns the union data inside the DateRange as a DateRange0
+func (t DateRange) AsDateRange0() (DateRange0, error) {
+	var body DateRange0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromDateRange0 overwrites any union data inside the DateRange as the provided DateRange0
+func (t *DateRange) FromDateRange0(v DateRange0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeDateRange0 performs a merge with any union data inside the DateRange, using the provided DateRange0
+func (t *DateRange) MergeDateRange0(v DateRange0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsDateRange1 returns the union data inside the DateRange as a DateRange1
+func (t DateRange) AsDateRange1() (DateRange1, error) {
+	var body DateRange1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromDateRange1 overwrites any union data inside the DateRange as the provided DateRange1
+func (t *DateRange) FromDateRange1(v DateRange1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeDateRange1 performs a merge with any union data inside the DateRange, using the provided DateRange1
+func (t *DateRange) MergeDateRange1(v DateRange1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t DateRange) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if t.DueAfter != nil {
+		object["dueAfter"], err = json.Marshal(t.DueAfter)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'dueAfter': %w", err)
+		}
+	}
+
+	if t.DueBefore != nil {
+		object["dueBefore"], err = json.Marshal(t.DueBefore)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'dueBefore': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *DateRange) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["dueAfter"]; found {
+		err = json.Unmarshal(raw, &t.DueAfter)
+		if err != nil {
+			return fmt.Errorf("error reading 'dueAfter': %w", err)
+		}
+	}
+
+	if raw, found := object["dueBefore"]; found {
+		err = json.Unmarshal(raw, &t.DueBefore)
+		if err != nil {
+			return fmt.Errorf("error reading 'dueBefore': %w", err)
+		}
+	}
+
+	return err
+}
 
 // AsUpdateTodoRequest0 returns the union data inside the UpdateTodoRequest as a UpdateTodoRequest0
 func (t UpdateTodoRequest) AsUpdateTodoRequest0() (UpdateTodoRequest0, error) {
@@ -795,23 +939,7 @@ func NewListTodosRequest(server string, params *ListTodosParams) (*http.Request,
 	if params != nil {
 		queryValues := queryURL.Query()
 
-		if params.Status != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "status", runtime.ParamLocationQuery, *params.Status); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pagesize", runtime.ParamLocationQuery, params.Pagesize); err != nil {
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageSize", runtime.ParamLocationQuery, params.PageSize); err != nil {
 			return nil, err
 		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 			return nil, err
@@ -833,6 +961,70 @@ func NewListTodosRequest(server string, params *ListTodosParams) (*http.Request,
 					queryValues.Add(k, v2)
 				}
 			}
+		}
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "status", runtime.ParamLocationQuery, *params.Status); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Query != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "query", runtime.ParamLocationQuery, *params.Query); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.DateRange != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("deepObject", true, "dateRange", runtime.ParamLocationQuery, *params.DateRange); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sort != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sort", runtime.ParamLocationQuery, *params.Sort); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
 		}
 
 		queryURL.RawQuery = queryValues.Encode()
@@ -1705,26 +1897,18 @@ func (siw *ServerInterfaceWrapper) ListTodos(w http.ResponseWriter, r *http.Requ
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListTodosParams
 
-	// ------------- Optional query parameter "status" -------------
+	// ------------- Required query parameter "pageSize" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "status", r.URL.Query(), &params.Status)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
-		return
-	}
-
-	// ------------- Required query parameter "pagesize" -------------
-
-	if paramValue := r.URL.Query().Get("pagesize"); paramValue != "" {
+	if paramValue := r.URL.Query().Get("pageSize"); paramValue != "" {
 
 	} else {
-		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "pagesize"})
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "pageSize"})
 		return
 	}
 
-	err = runtime.BindQueryParameter("form", true, true, "pagesize", r.URL.Query(), &params.Pagesize)
+	err = runtime.BindQueryParameter("form", true, true, "pageSize", r.URL.Query(), &params.PageSize)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pagesize", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pageSize", Err: err})
 		return
 	}
 
@@ -1740,6 +1924,38 @@ func (siw *ServerInterfaceWrapper) ListTodos(w http.ResponseWriter, r *http.Requ
 	err = runtime.BindQueryParameter("form", true, true, "page", r.URL.Query(), &params.Page)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "status", r.URL.Query(), &params.Status)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "query", r.URL.Query(), &params.Query)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "dateRange" -------------
+
+	err = runtime.BindQueryParameter("deepObject", true, false, "dateRange", r.URL.Query(), &params.DateRange)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dateRange", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "sort", r.URL.Query(), &params.Sort)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
 		return
 	}
 

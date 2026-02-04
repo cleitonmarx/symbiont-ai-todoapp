@@ -62,13 +62,7 @@ paths:
         Optionally filter by status.
       parameters:
         - in: query
-          name: status
-          required: false
-          description: Filter todos by status.
-          schema:
-            $ref: '#/components/schemas/TodoStatus'
-        - in: query
-          name: pagesize
+          name: pageSize
           required: true
           description: Maximum number of todos to return (server may cap).
           schema:
@@ -84,6 +78,37 @@ paths:
             Omit or set to null to fetch the first page.
           schema:
             type: integer
+        - in: query
+          name: status
+          required: false
+          description: Filter todos by status.
+          schema:
+            $ref: '#/components/schemas/TodoStatus'
+        - in: query
+          name: query
+          required: false
+          description: >
+            Full-text or semantic search query to retrieve todos most relevant to the provided keywords or context using vector similarity.
+          schema:
+            type: string
+        - name: dateRange
+          in: query
+          style: deepObject
+          explode: true
+          schema:
+            $ref: '#/components/schemas/DateRange'
+        - name: sort
+          in: query
+          description: "Sorting criteria."
+          required: false
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - createdAtDesc
+              - dueDateAsc
+              - dueDateDesc
+          
       responses:
         "200":
           description: Todos list.
@@ -638,6 +663,27 @@ components:
           type: string
           format: date-time
 
+    DateRange:
+      type: object
+      additionalProperties: false
+      properties:
+        dueAfter:
+          type: string
+          format: date
+          description: >
+            Filter todos with due_date on or after this date (YYYY-MM-DD).
+        dueBefore:
+          type: string
+          format: date
+          description: >
+            Filter todos with due_date on or before this date (YYYY-MM-DD).
+      oneOf:
+        - required: [dueAfter, dueBefore]
+        - not:
+            anyOf:
+              - required: [dueAfter]
+              - required: [dueBefore]
+
     # SSE payload schemas
     SseMeta:
       type: object
@@ -676,19 +722,3 @@ components:
         completed_at:
           type: string
           format: date-time
-        usage:
-          $ref: "#/components/schemas/TokenUsage"
-
-    TokenUsage:
-      type: object
-      additionalProperties: false
-      properties:
-        prompt_tokens:
-          type: integer
-          minimum: 0
-        completion_tokens:
-          type: integer
-          minimum: 0
-        total_tokens:
-          type: integer
-          minimum: 0

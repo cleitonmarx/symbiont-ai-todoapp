@@ -14,7 +14,7 @@ interface ChatProps {
 }
 
 const Chat: React.FC<ChatProps> = ({ onChatDone }) => {
-  const { messages, loading, error, loadMessages, sendMessage, clearChat } = useChat(onChatDone);
+  const { messages, loading, error, loadMessages, sendMessage, clearChat, stopStream } = useChat(onChatDone);
   const [input, setInput] = React.useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -96,14 +96,24 @@ const Chat: React.FC<ChatProps> = ({ onChatDone }) => {
           placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
           disabled={loading}
         />
-        <button
-          className="chat-send-btn"
-          onClick={handleSend}
-          disabled={loading || !input.trim()}
-          title="Send message"
-        >
-          ✈️
-        </button>
+        {!loading ? (
+          <button
+            className="chat-send-btn"
+            onClick={handleSend}
+            disabled={loading || !input.trim()}
+            title="Send message"
+          >
+            ✈️
+          </button>
+        ) : (
+          <button
+            className="chat-stop-btn"
+            onClick={stopStream}
+            title="Stop stream"
+          >
+            ⏹️
+          </button>
+        )}
       </div>
     </div>
   );

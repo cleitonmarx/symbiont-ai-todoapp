@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { gqlListTodos, gqlBatchUpdateTodos, gqlBatchDeleteTodos } from '../services/graphql';
-import type { ListTodosQuery, TodoStatus } from '../types/graphql';
-
+import type { ListTodosQuery, TodoStatus, TodoSortBy } from '../types/graphql';
 
 interface BatchModalProps {
   open: boolean;
@@ -23,6 +22,12 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'OPEN' | 'DONE'>('OPEN');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // New state variables for date range and sort (fixed property names)
+  const [dueAfter, setDueAfter] = useState('');
+  const [dueBefore, setDueBefore] = useState('');
+  const [sortBy, setSortBy] = useState<TodoSortBy | undefined>(undefined);
 
   // Open modal when parent prop changes
   useEffect(() => {
@@ -35,7 +40,10 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
       setSelected([]);    // Reset selections
       setAction(null);    // Reset action
       setDueDate('');     // Reset due date
-      setBatchPage(1);        // Reset to first page
+      setBatchPage(1);    // Reset to first page
+      setDueAfter('');    // Reset dueAfter
+      setDueBefore('');   // Reset dueBefore
+      setSortBy(undefined); // Reset sortBy
     } else {
       setShow(false);
     }
@@ -45,7 +53,18 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
   const fetchTodos = async (pageToFetch = 1) => {
     setLoading(true);
     try {
-      const data = await gqlListTodos({ status: statusFilter, page: pageToFetch, pageSize: PAGE_SIZE });
+      const data = await gqlListTodos({ 
+        status: statusFilter, 
+        page: pageToFetch, 
+        pageSize: PAGE_SIZE,
+        query: searchQuery || undefined,
+        // Only send dateRange if BOTH dueAfter AND dueBefore have values
+        dateRange: dueAfter && dueBefore ? { 
+          DueAfter: dueAfter, 
+          DueBefore: dueBefore 
+        } : undefined, 
+        sortBy: sortBy || undefined,
+      });
       setHasNextPage(data.nextPage != null);
       setHasPreviousPage(data.previousPage != null);
       setTodos(data.items);
@@ -65,8 +84,7 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
       fetchTodos(1);
     }
     // eslint-disable-next-line
-  }, [show, statusFilter]);
-
+  }, [show, statusFilter, searchQuery, dueAfter, dueBefore, sortBy]);
 
   //Fetch next page when page changes (but not on first render)
   useEffect(() => {
@@ -136,10 +154,12 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
       {show && (
         <div className={`modal-overlay active`} onClick={() => { setShow(false); onClose(); }}>
           <div className="modal-dialog batch-modal-dialog" style={{ maxWidth: '70vw' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Batch Operations</h2>
+            <div className="modal-header" style={{ padding: '0.75rem 1rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Batch Operations</h2>
             </div>
-            <div className="filter-bar" style={{padding: '0.5rem 0.8rem 0.5rem 0.8rem', margin: '0 auto' }}>
+            
+            {/* First row: Status, Date Range, Sort */}
+            <div className="filter-bar" style={{ padding: '0.5rem 1rem', gap: '0.75rem', margin: '0 0 0.5rem 0' }}>
               <div className="filter-group">
                 <label>Status:</label>
                 <div className="filter-buttons">
@@ -154,10 +174,58 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
                   ))}
                 </div>
               </div>
+              
+              {/* Date Range Filters */}
+              <div className="filter-group">
+                <label>Due After:</label>
+                <input
+                  type="date"
+                  value={dueAfter}
+                  onChange={(e) => setDueAfter(e.target.value)}
+                  className="date-input"
+                  style={{ marginRight: '0.5rem' }}
+                />
+              </div>
+              
+              <div className="filter-group">
+                <label>Due Before:</label>
+                <input
+                  type="date"
+                  value={dueBefore}
+                  onChange={(e) => setDueBefore(e.target.value)}
+                  className="date-input"
+                />
+              </div>
+              
+              {/* Sort Filter */}
+              <div className="filter-group">
+                <label>Sort By:</label>
+                <select 
+                  value={sortBy || ''} 
+                  onChange={(e) => setSortBy((e.target.value as TodoSortBy) || undefined)}
+                  className="sort-select"
+                >
+                  <option value="createdAtAsc">Created At</option>
+                  <option value="createdAtDesc">Created At Desc</option>
+                  <option value="dueDateAsc">Due Date Asc</option>
+                  <option value="dueDateDesc">Due Date Desc</option>
+                </select>
+              </div>
+              <div className="filter-group">
+                  <input
+                    type="text"
+                    placeholder="Search todos..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="search-input"
+                    style={{ flex: 1}}
+                  />
+              </div>
             </div>
-            <div className="modal-content" style={{paddingTop:'5px', paddingBottom: '5px'}}>
-              {error && <div className="batch-modal-error">{error}</div>}
-              <div className="batch-modal-grid" >
+            
+            <div className="modal-content" style={{ padding: '0 1rem 0.1rem 1rem' }}>
+              {error && <div className="batch-modal-error" style={{ marginBottom: '0.5rem' }}>{error}</div>}
+              <div className="batch-modal-grid">
                 <table>
                   <thead>
                     <tr>
@@ -169,7 +237,7 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
                             if (el) el.indeterminate = someSelected;
                           }}
                           onChange={handleSelectAllToggle}
-                          disabled={!!action} // <-- Lock selection when confirming
+                          disabled={!!action}
                         />
                       </th>
                       <th>Title</th>
@@ -185,7 +253,7 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
                             type="checkbox"
                             checked={selected.includes(todo.id)}
                             onChange={() => handleSelect(todo.id)}
-                            disabled={!!action} // <-- Lock selection when confirming
+                            disabled={!!action}
                           />
                         </td>
                         <td>{todo.title}</td>
@@ -195,11 +263,10 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
                     ))}
                   </tbody>
                 </table>
-                {loading && <div style={{ textAlign: 'center', padding: '1rem' }}>Loading...</div>}
+                {loading && <div style={{ textAlign: 'center', padding: '0.5rem' }}>Loading...</div>}
               </div>
               
-              
-              <div className="pagination" style={{padding: '0.5rem 0.8rem 0.5rem 0.8rem'}}>
+              <div className="pagination" style={{ padding: '0.5rem 0' }}>
                 <div className="pagination-info">
                   Page {batchPage || 1}
                 </div>
@@ -214,10 +281,8 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
                 </div>
               </div>
               
-              
-              {/* Only show actions if no action is currently selected */}
               {!action && (
-                <div className="batch-modal-actions">
+                <div className="batch-modal-actions" style={{ padding: '0.5rem 0' }}>
                   <button
                     className="btn-primary batch-action-btn"
                     disabled={selected.length === 0 || statusFilter === 'DONE'}
@@ -242,7 +307,7 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
                 </div>
               )}
               {action === 'due' && (
-                <div className="batch-modal-due">
+                <div className="batch-modal-due" style={{ padding: '0.5rem 0' }}>
                   <label htmlFor="batch-due-date">New Due Date</label>
                   <input
                     id="batch-due-date"
@@ -259,7 +324,7 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
                 </div>
               )}
               {action === 'done' && (
-                <div className="batch-modal-confirm">
+                <div className="batch-modal-confirm" style={{ padding: '0.5rem 0' }}>
                   <span>Mark selected todos as done?</span>
                   <div className="modal-footer">
                     <button className="btn-secondary" onClick={() => setAction(null)}>Cancel</button>
@@ -268,7 +333,7 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
                 </div>
               )}
               {action === 'delete' && (
-                <div className="batch-modal-confirm">
+                <div className="batch-modal-confirm" style={{ padding: '0.5rem 0' }}>
                   <span>Delete selected todos?</span>
                   <div className="modal-footer">
                     <button className="btn-secondary" onClick={() => setAction(null)}>Cancel</button>
@@ -277,7 +342,7 @@ const BatchModal: React.FC<BatchModalProps> = ({ open, onClose, onBatchComplete 
                 </div>
               )}
             </div>
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ padding: '0.75rem 1rem' }}>
               <button 
                 type="button" 
                 className="btn-secondary"

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { fetchChatMessages, clearChatMessages, streamChat } from '../services/api';
 import type { ChatMessage } from '../types';
 
@@ -9,12 +9,15 @@ interface UseChatReturn {
   loadMessages: () => Promise<void>;
   sendMessage: (message: string) => Promise<void>;
   clearChat: () => Promise<void>;
+  stopStream: () => void;
 }
 
 export const useChat = (onChatDone?: () => void): UseChatReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const readerRef = useRef<ReadableStreamReader<Uint8Array> | null>(null);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -29,12 +32,32 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
     }
   }, []);
 
+  const stopStream = useCallback(() => {
+    // Cancel the fetch request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Close the reader if it exists
+    if (readerRef.current) {
+      readerRef.current.cancel();
+      readerRef.current = null;
+    }
+
+    setLoading(false);
+    setError('Stream stopped by user');
+  }, []);
+
   const sendMessage = useCallback(async (message: string) => {
     if (!message.trim()) return;
 
     try {
       setLoading(true);
       setError(null);
+
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
 
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
@@ -44,13 +67,13 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      const response = await streamChat(message);
+      const response = await streamChat(message, abortControllerRef.current.signal);
 
       if (!response.body) {
         throw new Error('No response body');
       }
 
-      const reader = response.body.getReader();
+      readerRef.current = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantContent = '';
       let assistantMessageId = '';
@@ -113,14 +136,22 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
               assistantMessageId = data.AssistantMessageID;
             }
             setLoading(false);
-            // Call the callback when done
+            readerRef.current = null;
+            abortControllerRef.current = null;
             onChatDone?.();
             return;
           }
 
           if (eventType === 'error') {
-            setError('Failed to get response from assistant');
+            const errorMsg = data.error === 'stream_cancelled' 
+              ? 'Stream stopped by user'
+              : data.error === 'client_closed'
+              ? 'Connection closed'
+              : 'Failed to get response from assistant';
+            setError(errorMsg);
             setLoading(false);
+            readerRef.current = null;
+            abortControllerRef.current = null;
           }
         } catch (e) {
           console.error('Failed to parse SSE data:', e, dataStr);
@@ -128,7 +159,25 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
       };
 
       while (true) {
-        const { done, value } = await reader.read();
+        // Check if abort was called
+        if (abortControllerRef.current?.signal.aborted) {
+          if (readerRef.current) {
+            readerRef.current.cancel();
+            readerRef.current = null;
+          }
+          setLoading(false);
+          setError('Stream stopped by user');
+          abortControllerRef.current = null;
+          break;
+        }
+
+        // Add null check before reading
+        if (!readerRef.current) {
+          setLoading(false);
+          break;
+        }
+
+        const { done, value } = await readerRef.current.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -142,11 +191,18 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
       }
 
       setLoading(false);
+      readerRef.current = null;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Stream stopped by user');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to send message');
+      }
       setLoading(false);
+      readerRef.current = null;
+      abortControllerRef.current = null;
     }
-  }, [onChatDone]); // Add onChatDone to dependency array
+  }, [onChatDone]);
 
   const clearChat = useCallback(async () => {
     try {
@@ -165,5 +221,6 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
     loadMessages,
     sendMessage,
     clearChat,
+    stopStream,
   };
 };

@@ -30,17 +30,37 @@ apiClient.interceptors.response.use(
 );
 
 export const getTodos = async (
-  status?: string,
+  status?: TodoStatus,
+  query?: string,
   page: number = 1,
-  pagesize: number = 50
+  pageSize: number = 50,
+  dateRange?: { dueAfter?: string; dueBefore?: string }, 
+  sort?: 'createdAtAsc' | 'createdAtDesc' | 'dueDateAsc' | 'dueDateDesc'
 ): Promise<ListTodosResponse> => {
   const params: Record<string, any> = {
     page,
-    pagesize,
+    pageSize: pageSize,
   };
   
   if (status) {
     params.status = status;
+  }
+
+  if (query) {
+    params.query = query;
+  }
+
+  if (dateRange) {
+    if (dateRange.dueAfter) {
+      params.dueAfter = dateRange.dueAfter;
+    }
+    if (dateRange.dueBefore) {
+      params.dueBefore = dateRange.dueBefore;
+    }
+  }
+
+  if (sort) {
+    params.sort = sort;
   }
 
   const response = await apiClient.get<ListTodosResponse>('/api/v1/todos', { params });
@@ -103,13 +123,18 @@ export const getBoardSummary = async (): Promise<BoardSummary | null> => {
 // };
 
 // Function to stream chat responses (using fetch for streaming support)
-export const streamChat = async (message: string) => {
+export const streamChat = async (message: string, signal?: AbortSignal) => {
   const response = await fetch(`${API_BASE_URL}/api/v1/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message }),
+    signal, // Pass the abort signal
   });
-  // The consumer should handle response.body as a stream
+
+  if (!response.ok) {
+    throw new Error('Failed to stream chat');
+  }
+
   return response;
 };
 

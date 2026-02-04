@@ -114,7 +114,7 @@ func TestTodoApp_RestAPI(t *testing.T) {
 	t.Run("list-created-todo", func(t *testing.T) {
 		resp, err := restCli.ListTodosWithResponse(t.Context(), &rest.ListTodosParams{
 			Page:     1,
-			Pagesize: 10,
+			PageSize: 10,
 		})
 
 		require.NoError(t, err, "failed to call ListTodos endpoint")
@@ -158,7 +158,7 @@ func TestTodoApp_RestAPI(t *testing.T) {
 		// Verify todos are deleted
 		listResp, err := restCli.ListTodosWithResponse(t.Context(), &rest.ListTodosParams{
 			Page:     1,
-			Pagesize: 10,
+			PageSize: 10,
 		})
 		require.NoError(t, err, "failed to call ListTodos endpoint after deletions")
 		require.NotNil(t, listResp.JSON200, "expected non-nil response for ListTodos after deletions")
@@ -230,17 +230,24 @@ func TestTodoApp_GraphQLAPI(t *testing.T) {
 func TestTodoAPP_Chat(t *testing.T) {
 
 	t.Run("create-todo", func(t *testing.T) {
-		createResp, err := restCli.CreateTodoWithResponse(t.Context(), rest.CreateTodoJSONRequestBody{
-			Title:   "Integration Test Todo",
-			DueDate: types.Date{Time: time.Now().Add(24 * time.Hour)},
+		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
+			Message: "Create a new todo with title \"Integration Test Todo\", due date tomorrow.",
 		})
-		require.NoError(t, err, "failed to call CreateTodo endpoint")
-		require.NotNil(t, createResp.JSON201, "expected non-nil response for CreateTodo")
+		require.NoError(t, err, "failed to call StreamChat endpoint")
+		defer chatResp.Body.Close() //nolint:errcheck
+		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
+
+		deltaText := readChatDeltaText(t, chatResp.Body)
+
+		require.Contains(t, deltaText, "📝 Creating your todo...")
+		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
+		require.Contains(t, deltaText, "OPEN", "expected chat response to contain created todo status")
+		fmt.Println("Chat response:", deltaText)
 	})
 
 	t.Run("chat-fetch-todo", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
-			Message: "Show me my Integration Test Todo",
+			Message: "Fetch and confirm my Integration Test Todo was created.",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
@@ -274,7 +281,7 @@ func TestTodoAPP_Chat(t *testing.T) {
 
 	t.Run("delete-todo", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
-			Message: "Delete my Integration Test Todo.",
+			Message: "Delete my Integration Test Todo",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
@@ -282,7 +289,6 @@ func TestTodoAPP_Chat(t *testing.T) {
 
 		deltaText := readChatDeltaText(t, chatResp.Body)
 		require.Contains(t, deltaText, "🗑️ Deleting the todo...")
-		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
 		fmt.Println("Chat response:", deltaText)
 	})
 

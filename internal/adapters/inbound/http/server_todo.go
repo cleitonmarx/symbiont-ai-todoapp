@@ -8,6 +8,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
@@ -17,12 +18,21 @@ func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, param
 		Items: []gen.Todo{},
 		Page:  params.Page,
 	}
-	var queryParams []domain.ListTodoOptions
+	var queryParams []usecases.ListTodoOptions
 	if params.Status != nil {
-		queryParams = append(queryParams, domain.WithStatus(domain.TodoStatus(*params.Status)))
+		queryParams = append(queryParams, usecases.WithStatus(domain.TodoStatus(*params.Status)))
+	}
+	if params.Query != nil {
+		queryParams = append(queryParams, usecases.WithSearchQuery(*params.Query))
+	}
+	if params.DateRange.DueAfter != nil && params.DateRange.DueBefore != nil {
+		queryParams = append(queryParams, usecases.WithDueDateRange(params.DateRange.DueAfter.Time, params.DateRange.DueBefore.Time))
+	}
+	if params.Sort != nil {
+		queryParams = append(queryParams, usecases.WithSortBy(string(*params.Sort)))
 	}
 
-	todos, hasMore, err := api.ListTodosUseCase.Query(r.Context(), params.Page, params.Pagesize, queryParams...)
+	todos, hasMore, err := api.ListTodosUseCase.Query(r.Context(), params.Page, params.PageSize, queryParams...)
 	if err != nil {
 		api.Logger.Printf("Error listing todos: %v", err)
 		respondError(w, toError(err))

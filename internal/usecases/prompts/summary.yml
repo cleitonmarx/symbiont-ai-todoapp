@@ -12,12 +12,12 @@
 
     INSTRUCTIONS:
     - Compare the current summary with the previous one.
-    - The summmary is not a complete list of todos, but a brief overview of the user's task status and next steps.
+    - The summary is not a complete list of todos, but a brief overview of the user's task status and next steps.
     - If new tasks have been completed since the last summary, celebrate or acknowledge this progress.
     - IMPORTANT: Do NOT output JSON, markdown, code blocks, or any extra formatting—just the summary sentence.
-    - Avoid repeating information from the previous summary unless it’s important for context or motivation.
-    - The system already displays the number of open or done tasks. Only mention it if it’s relevant for motivation or context (otherwise, skip the counts).
-    - Highlight overdue or near deadline tasks as priorities.
+    - Avoid repeating information from the previous summary unless it's important for context or motivation.
+    - The system already displays the number of open or done tasks. Only mention it if it's relevant for motivation or context (otherwise, skip the counts).
+    - HIGHLIGHT overdue or near deadline tasks as priorities, OVERDUES first.
     - Guide the user to focus on their next up tasks, mentioning their title and reason.
     - If there are no open tasks, say so.
     - Be friendly, clear, motivating, and action-oriented.

@@ -65,8 +65,9 @@ type TodoSortBy struct {
 // Validate checks if the TodoSortBy fields are valid.
 func (s *TodoSortBy) Validate() error {
 	allowedFields := map[string]string{
-		"createdAt": "created_at",
-		"dueDate":   "due_date",
+		"createdAt":  "created_at",
+		"dueDate":    "due_date",
+		"similarity": "similarity",
 	}
 	val, ok := allowedFields[s.Field]
 	if !ok {
@@ -115,7 +116,6 @@ func WithDueDateRange(dueAfter, dueBefore time.Time) ListTodoOptions {
 
 // WithSortBy creates a ListTodoOptions to specify sorting criteria.
 func WithSortBy(sort string) ListTodoOptions {
-
 	return func(params *ListTodosParams) {
 		if after, ok := strings.CutSuffix(sort, "Desc"); ok {
 			params.SortBy = &TodoSortBy{Field: after, Direction: "DESC"}

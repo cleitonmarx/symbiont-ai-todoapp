@@ -7,7 +7,9 @@ type TodoSort =
   | 'createdAtAsc'
   | 'createdAtDesc'
   | 'dueDateAsc'
-  | 'dueDateDesc';
+  | 'dueDateDesc'
+  | 'similarityAsc'
+  | 'similarityDesc';
 
 interface UseTodosReturn {
   todos: Todo[];
@@ -38,7 +40,7 @@ export const useTodos = (): UseTodosReturn => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
-  const [sortBy, setSortBy] = useState<TodoSort>('createdAtAsc');
+  const [sortBy, setSortBy] = useState<TodoSort>('createdAtDesc');
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [boardSummary, setBoardSummary] = useState<any>(null);
 

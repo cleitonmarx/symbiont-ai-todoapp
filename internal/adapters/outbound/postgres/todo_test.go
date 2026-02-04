@@ -426,9 +426,8 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (embedding <=> $1) < 0.5 ORDER BY embedding <#> $2 , created_at DESC LIMIT 11 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (embedding <=> $1) < 0.5 ORDER BY created_at DESC LIMIT 11 OFFSET 0").
 					WithArgs(
-						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
 						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
 					).
 					WillReturnRows(rows)
@@ -504,6 +503,57 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 			},
 			expectedHasMore: false,
 			expectedErr:     false,
+		},
+		"sort-by-similarity": {
+			page:     1,
+			pageSize: 10,
+			opts: []domain.ListTodoOptions{
+				domain.WithEmbedding([]float64{0.1, 0.2, 0.3}),
+				domain.WithSortBy("similarityAsc"),
+			},
+			setExpectations: func(mock sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows(todoFields).
+					AddRow(
+						fixedUUID2,
+						"Todo 2",
+						domain.TodoStatus_OPEN,
+						fixedDueDate,
+						fixedTime,
+						fixedTime,
+					).
+					AddRow(
+						fixedUUID1,
+						"Todo 1",
+						domain.TodoStatus_OPEN,
+						fixedDueDate,
+						fixedTime,
+						fixedTime,
+					)
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (embedding <=> $1) < 0.5 ORDER BY embedding <#> $2 ASC LIMIT 11 OFFSET 0").
+					WithArgs(
+						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
+						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
+					).
+					WillReturnRows(rows)
+			},
+			expectedTodos: []domain.Todo{
+				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+				{ID: fixedUUID1, Title: "Todo 1", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			},
+			expectedHasMore: false,
+			expectedErr:     false,
+		},
+		"no-embedding-for-similarity-sort": {
+			page:     1,
+			pageSize: 10,
+			opts: []domain.ListTodoOptions{
+				domain.WithSortBy("similarityAsc"),
+			},
+			setExpectations: func(mock sqlmock.Sqlmock) {
+			},
+			expectedTodos:   nil,
+			expectedHasMore: false,
+			expectedErr:     true,
 		},
 		"invalid-sort-by": {
 			page:     1,

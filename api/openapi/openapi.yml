@@ -104,10 +104,12 @@ paths:
           schema:
             type: string
             enum:
-              - createdAt
+              - createdAtAsc
               - createdAtDesc
               - dueDateAsc
               - dueDateDesc
+              - similarityAsc
+              - similarityDesc
           
       responses:
         "200":

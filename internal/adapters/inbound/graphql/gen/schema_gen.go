@@ -339,6 +339,8 @@ enum TodoSortBy {
   createdAtDesc
   dueDateAsc
   dueDateDesc
+  similarityAsc
+  similarityDesc
 }
 
 input DateRange {

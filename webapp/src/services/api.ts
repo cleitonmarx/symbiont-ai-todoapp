@@ -35,7 +35,7 @@ export const getTodos = async (
   page: number = 1,
   pageSize: number = 50,
   dateRange?: { dueAfter?: string; dueBefore?: string }, 
-  sort?: 'createdAtAsc' | 'createdAtDesc' | 'dueDateAsc' | 'dueDateDesc'
+  sort?: 'createdAtAsc' | 'createdAtDesc' | 'dueDateAsc' | 'dueDateDesc' | 'similarityAsc' | 'similarityDesc',
 ): Promise<ListTodosResponse> => {
   const params: Record<string, any> = {
     page,

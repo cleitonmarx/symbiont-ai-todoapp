@@ -72,7 +72,7 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 		qry = qry.Where(squirrel.Expr(
 			"(embedding <=> ?) < 0.5",
 			pgvector.NewVector(toFloat32Truncated(params.Embedding)),
-		)).OrderByClause("embedding <#> ? ", pgvector.NewVector(toFloat32Truncated(params.Embedding)))
+		))
 	}
 	if params.DueAfter != nil && params.DueBefore != nil {
 		qry = qry.Where(squirrel.And{
@@ -80,14 +80,9 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 			squirrel.LtOrEq{"due_date": *params.DueBefore},
 		})
 	}
-	if params.SortBy != nil {
-		if err := params.SortBy.Validate(); err != nil {
-			return nil, false, err
-		}
-		orderClause := params.SortBy.Field + " " + params.SortBy.Direction
-		qry = qry.OrderBy(orderClause)
-	} else {
-		qry = qry.OrderBy("created_at DESC")
+	qry, err := applySort(qry, params)
+	if tracing.RecordErrorAndStatus(span, err) {
+		return nil, false, err
 	}
 
 	rows, err := qry.QueryContext(spanCtx)
@@ -122,6 +117,29 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 		return todos, true, nil
 	}
 	return todos, false, nil
+}
+
+// applySort applies sorting to the given squirrel SelectBuilder based on the provided ListTodosParams.
+func applySort(qry squirrel.SelectBuilder, params *domain.ListTodosParams) (squirrel.SelectBuilder, error) {
+	if params.SortBy == nil {
+		return qry.OrderBy("created_at DESC"), nil
+	}
+
+	if err := params.SortBy.Validate(); err != nil {
+		return qry, err
+	}
+
+	if params.SortBy.Field == "similarity" && len(params.Embedding) > 0 {
+		return qry.OrderByClause(squirrel.Expr(
+			"embedding <#> ? "+params.SortBy.Direction,
+			pgvector.NewVector(toFloat32Truncated(params.Embedding)),
+		)), nil
+	} else if params.SortBy.Field == "similarity" && len(params.Embedding) == 0 {
+		return qry, domain.NewValidationErr("embedding must be provided for similarity sorting")
+	}
+
+	orderClause := params.SortBy.Field + " " + params.SortBy.Direction
+	return qry.OrderBy(orderClause), nil
 }
 
 // CreateTodo creates a new todo.

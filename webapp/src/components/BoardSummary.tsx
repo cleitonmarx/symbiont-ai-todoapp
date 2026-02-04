@@ -39,23 +39,10 @@ export const BoardSummary = ({ data }: BoardSummaryProps) => {
           </button>
         )}
       </div>
-
+      
+  
       {showDetails && (
         <div className="board-summary-details">
-          {data.next_up.length > 0 && (
-            <div className="board-summary-section">
-              <h3>Next Up</h3>
-              <ul className="summary-list">
-                {data.next_up.map((item, idx) => (
-                  <li key={idx}>
-                    <span className="item-title">{item.title}</span>
-                    <span className="item-reason">{item.reason}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           {data.overdue.length > 0 && (
             <div className="board-summary-section">
               <h3 className="overdue-title">Overdue</h3>
@@ -73,6 +60,20 @@ export const BoardSummary = ({ data }: BoardSummaryProps) => {
               <ul className="summary-list">
                 {data.near_deadline.map((title, idx) => (
                   <li key={idx}>{title}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {data.next_up.length > 0 && (
+            <div className="board-summary-section">
+              <h3>Next Up</h3>
+              <ul className="summary-list">
+                {data.next_up.map((item, idx) => (
+                  <li key={idx}>
+                    <span className="item-title">{item.title}</span>
+                    <span className="item-reason">{item.reason}</span>
+                  </li>
                 ))}
               </ul>
             </div>

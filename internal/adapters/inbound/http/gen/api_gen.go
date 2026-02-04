@@ -47,10 +47,12 @@ const (
 
 // Defines values for ListTodosParamsSort.
 const (
-	CreatedAt     ListTodosParamsSort = "createdAt"
-	CreatedAtDesc ListTodosParamsSort = "createdAtDesc"
-	DueDateAsc    ListTodosParamsSort = "dueDateAsc"
-	DueDateDesc   ListTodosParamsSort = "dueDateDesc"
+	CreatedAtAsc   ListTodosParamsSort = "createdAtAsc"
+	CreatedAtDesc  ListTodosParamsSort = "createdAtDesc"
+	DueDateAsc     ListTodosParamsSort = "dueDateAsc"
+	DueDateDesc    ListTodosParamsSort = "dueDateDesc"
+	SimilarityAsc  ListTodosParamsSort = "similarityAsc"
+	SimilarityDesc ListTodosParamsSort = "similarityDesc"
 )
 
 // BoardSummary defines model for BoardSummary.

@@ -50,10 +50,12 @@ type UpdateTodoParams struct {
 type TodoSortBy string
 
 const (
-	TodoSortByCreatedAtAsc  TodoSortBy = "createdAtAsc"
-	TodoSortByCreatedAtDesc TodoSortBy = "createdAtDesc"
-	TodoSortByDueDateAsc    TodoSortBy = "dueDateAsc"
-	TodoSortByDueDateDesc   TodoSortBy = "dueDateDesc"
+	TodoSortByCreatedAtAsc   TodoSortBy = "createdAtAsc"
+	TodoSortByCreatedAtDesc  TodoSortBy = "createdAtDesc"
+	TodoSortByDueDateAsc     TodoSortBy = "dueDateAsc"
+	TodoSortByDueDateDesc    TodoSortBy = "dueDateDesc"
+	TodoSortBySimilarityAsc  TodoSortBy = "similarityAsc"
+	TodoSortBySimilarityDesc TodoSortBy = "similarityDesc"
 )
 
 var AllTodoSortBy = []TodoSortBy{
@@ -61,11 +63,13 @@ var AllTodoSortBy = []TodoSortBy{
 	TodoSortByCreatedAtDesc,
 	TodoSortByDueDateAsc,
 	TodoSortByDueDateDesc,
+	TodoSortBySimilarityAsc,
+	TodoSortBySimilarityDesc,
 }
 
 func (e TodoSortBy) IsValid() bool {
 	switch e {
-	case TodoSortByCreatedAtAsc, TodoSortByCreatedAtDesc, TodoSortByDueDateAsc, TodoSortByDueDateDesc:
+	case TodoSortByCreatedAtAsc, TodoSortByCreatedAtDesc, TodoSortByDueDateAsc, TodoSortByDueDateDesc, TodoSortBySimilarityAsc, TodoSortBySimilarityDesc:
 		return true
 	}
 	return false

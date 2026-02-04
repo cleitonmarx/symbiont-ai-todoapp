@@ -76,7 +76,9 @@ export type TodoSortBy =
   | 'createdAtAsc'
   | 'createdAtDesc'
   | 'dueDateAsc'
-  | 'dueDateDesc';
+  | 'dueDateDesc'
+  | 'similarityAsc'
+  | 'similarityDesc';
 
 export type TodoStatus =
   | 'DONE'

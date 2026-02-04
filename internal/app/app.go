@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	stdlog "log"
 
 	"github.com/cleitonmarx/symbiont"
@@ -70,7 +71,7 @@ type ReportLoggerIntrospector struct {
 
 // Introspect generates and logs the introspection report and a Mermaid graph.
 func (i ReportLoggerIntrospector) Introspect(ctx context.Context, r introspection.Report) error {
-	b, err := r.ToJSON()
+	b, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}

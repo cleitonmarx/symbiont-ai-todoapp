@@ -303,7 +303,9 @@ graph TD
 
 ## Prerequisites
 
-- Docker and Docker Compose
+- Docker v29.1.5
+- Docker Compose v5.0.1
+- Docker Model Runner v1.0.7
 - Go 1.25 or higher (for local development)
 - Node.js 18+ (for webapp development)
 
@@ -336,11 +338,7 @@ go test ./...
 Integration tests use testcontainers to automatically spin up and manage all required dependencies (PostgreSQL, Vault, Pub/Sub, Docker Model Runner). No manual setup needed.
 
 ```bash
-# Run integration tests
 go test -tags=integration ./tests/integration/... -v
-
-# Run with timeout
-go test -tags=integration -timeout=5m ./tests/integration/... -v
 ```
 
 Testcontainers automatically:
@@ -360,11 +358,6 @@ View real-time application logs:
 # View logs from Docker container
 docker-compose logs -f todoapp
 
-# View logs with timestamps
-docker-compose logs -f --timestamps todoapp
-
-# View last 100 lines
-docker-compose logs --tail=100 todoapp
 ```
 
 ### Jaeger Tracing

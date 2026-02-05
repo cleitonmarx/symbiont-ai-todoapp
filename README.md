@@ -307,7 +307,7 @@ graph TD
 - Docker Compose v5.0.1
 - Docker Model Runner v1.0.7
 - Go 1.25 or higher (for local development)
-- Node.js 18+ (for webapp development)
+- Node.js 22+ (for webapp development)
 
 ## Quick Start
 

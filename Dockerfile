@@ -1,5 +1,5 @@
 ## Node build stage for webapp
-FROM node:18-alpine AS webapp-builder
+FROM node:22-alpine AS webapp-builder
 
 WORKDIR /webapp
 

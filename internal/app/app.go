@@ -15,7 +15,7 @@ import (
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/outbound/postgres"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/outbound/pubsub"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/outbound/time"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
 	"github.com/cleitonmarx/symbiont/introspection"
 	"github.com/cleitonmarx/symbiont/introspection/mermaid"
@@ -27,8 +27,8 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 		Initialize(initializers...).
 		Initialize(
 			&log.InitLogger{},
-			&tracing.InitOpenTelemetry{},
-			&tracing.InitHttpClient{},
+			&telemetry.InitOpenTelemetry{},
+			&telemetry.InitHttpClient{},
 			&config.InitVaultProvider{},
 			&postgres.InitDB{},
 			&postgres.InitUnitOfWork{},

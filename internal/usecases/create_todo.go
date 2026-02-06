@@ -6,7 +6,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 )
 
 // CreateTodo defines the interface for the CreateTodo use case.
@@ -29,7 +29,7 @@ func NewCreateTodoImpl(uow domain.UnitOfWork, creator TodoCreator) CreateTodoImp
 
 // Execute creates a new todo item.
 func (cti CreateTodoImpl) Execute(ctx context.Context, title string, dueDate time.Time) (domain.Todo, error) {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	var todo domain.Todo
@@ -38,7 +38,7 @@ func (cti CreateTodoImpl) Execute(ctx context.Context, title string, dueDate tim
 		todo, err = cti.creator.Create(spanCtx, uow, title, dueDate)
 		return err
 	})
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return domain.Todo{}, err
 	}
 

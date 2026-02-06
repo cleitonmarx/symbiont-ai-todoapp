@@ -7,7 +7,7 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/google/uuid"
 	"github.com/pgvector/pgvector-go"
 	"go.opentelemetry.io/otel/attribute"
@@ -39,7 +39,7 @@ func NewTodoRepository(br squirrel.BaseRunner) TodoRepository {
 
 // ListTodos lists todos with pagination and optional filters.
 func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOptions) ([]domain.Todo, bool, error) {
-	spanCtx, span := tracing.Start(ctx, trace.WithAttributes(
+	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
 		attribute.Int("page", page),
 		attribute.Int("pageSize", pageSize),
 	))
@@ -81,12 +81,12 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 		})
 	}
 	qry, err := applySort(qry, params)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err
 	}
 
 	rows, err := qry.QueryContext(spanCtx)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -102,13 +102,13 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 			&todo.CreatedAt,
 			&todo.UpdatedAt,
 		)
-		if tracing.RecordErrorAndStatus(span, err) {
+		if telemetry.RecordErrorAndStatus(span, err) {
 			return nil, false, err
 		}
 		todos = append(todos, todo)
 	}
 
-	if err := rows.Err(); tracing.RecordErrorAndStatus(span, err) {
+	if err := rows.Err(); telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err
 	}
 
@@ -144,7 +144,7 @@ func applySort(qry squirrel.SelectBuilder, params *domain.ListTodosParams) (squi
 
 // CreateTodo creates a new todo.
 func (tr TodoRepository) CreateTodo(ctx context.Context, todo domain.Todo) error {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	_, err := tr.sb.
@@ -169,7 +169,7 @@ func (tr TodoRepository) CreateTodo(ctx context.Context, todo domain.Todo) error
 		).
 		ExecContext(spanCtx)
 
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 
@@ -178,7 +178,7 @@ func (tr TodoRepository) CreateTodo(ctx context.Context, todo domain.Todo) error
 
 // UpdateTodo updates an existing todo.
 func (tr TodoRepository) UpdateTodo(ctx context.Context, todo domain.Todo) error {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	_, err := tr.sb.
@@ -191,7 +191,7 @@ func (tr TodoRepository) UpdateTodo(ctx context.Context, todo domain.Todo) error
 		Where(squirrel.Eq{"id": todo.ID}).
 		ExecContext(spanCtx)
 
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 	return nil
@@ -199,7 +199,7 @@ func (tr TodoRepository) UpdateTodo(ctx context.Context, todo domain.Todo) error
 
 // DeleteTodo deletes a todo by its ID.
 func (tr TodoRepository) DeleteTodo(ctx context.Context, id uuid.UUID) error {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	_, err := tr.sb.
@@ -207,7 +207,7 @@ func (tr TodoRepository) DeleteTodo(ctx context.Context, id uuid.UUID) error {
 		Where(squirrel.Eq{"id": id}).
 		ExecContext(spanCtx)
 
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 	return nil
@@ -215,7 +215,7 @@ func (tr TodoRepository) DeleteTodo(ctx context.Context, id uuid.UUID) error {
 
 // GetTodo retrieves a todo by its ID.
 func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo, bool, error) {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	var todo domain.Todo
@@ -235,7 +235,7 @@ func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo
 			&todo.UpdatedAt,
 		)
 
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		if err == sql.ErrNoRows {
 			return domain.Todo{}, false, nil
 		}

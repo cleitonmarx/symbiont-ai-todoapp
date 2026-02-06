@@ -51,18 +51,20 @@ func (tci TodoCreatorImpl) Create(ctx context.Context, uow domain.UnitOfWork, ti
 		return domain.Todo{}, err
 	}
 
-	embedding, err := tci.llmClient.Embed(ctx, tci.llmModel, todo.ToLLMInput())
+	resp, err := tci.llmClient.Embed(ctx, tci.llmModel, todo.ToLLMInput())
 	if err != nil {
 		return domain.Todo{}, err
 	}
-	todo.Embedding = embedding
+
+	RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
+	todo.Embedding = resp.Embedding
 
 	err = uow.Todo().CreateTodo(ctx, todo)
 	if err != nil {
 		return domain.Todo{}, err
 	}
 
-	err = uow.Outbox().RecordEvent(ctx, domain.TodoEvent{
+	err = uow.Outbox().CreateEvent(ctx, domain.TodoEvent{
 		Type:      domain.TodoEventType_TODO_CREATED,
 		TodoID:    todo.ID,
 		CreatedAt: now,

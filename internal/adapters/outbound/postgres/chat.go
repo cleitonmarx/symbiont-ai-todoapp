@@ -9,7 +9,7 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -39,7 +39,7 @@ func NewChatMessageRepository(br squirrel.BaseRunner) ChatMessageRepository {
 
 // CreateChatMessages persists chat messages for the global conversation.
 func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages []domain.ChatMessage) error {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	insertQry := r.sb.
@@ -48,7 +48,7 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 
 	for _, message := range messages {
 		toolCallsJSON, err := json.Marshal(message.ToolCalls)
-		if tracing.RecordErrorAndStatus(span, err) {
+		if telemetry.RecordErrorAndStatus(span, err) {
 			return err
 		}
 		insertQry = insertQry.Values(
@@ -64,7 +64,7 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 	}
 
 	_, err := insertQry.ExecContext(spanCtx)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 	return nil
@@ -73,7 +73,7 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 // ListChatMessages retrieves messages for the global conversation ordered by creation time.
 // If limit > 0, returns up to the latest N messages; hasMore indicates if there are older messages.
 func (r ChatMessageRepository) ListChatMessages(ctx context.Context, limit int) ([]domain.ChatMessage, bool, error) {
-	spanCtx, span := tracing.Start(ctx, trace.WithAttributes(
+	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
 		attribute.Int("limit", limit),
 	))
 	defer span.End()
@@ -89,7 +89,7 @@ func (r ChatMessageRepository) ListChatMessages(ctx context.Context, limit int) 
 	}
 
 	rows, err := qry.QueryContext(spanCtx)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -110,17 +110,17 @@ func (r ChatMessageRepository) ListChatMessages(ctx context.Context, limit int) 
 			&tcJSON,
 			&m.Model,
 			&m.CreatedAt,
-		); tracing.RecordErrorAndStatus(span, err) {
+		); telemetry.RecordErrorAndStatus(span, err) {
 			return nil, false, err
 		}
 		if len(tcJSON) > 0 {
-			if err := json.Unmarshal(tcJSON, &m.ToolCalls); tracing.RecordErrorAndStatus(span, err) {
+			if err := json.Unmarshal(tcJSON, &m.ToolCalls); telemetry.RecordErrorAndStatus(span, err) {
 				return nil, false, err
 			}
 		}
 		msgs = append(msgs, m)
 	}
-	if err := rows.Err(); tracing.RecordErrorAndStatus(span, err) {
+	if err := rows.Err(); telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err
 	}
 
@@ -140,7 +140,7 @@ func (r ChatMessageRepository) ListChatMessages(ctx context.Context, limit int) 
 
 // DeleteConversation removes all messages for the global conversation.
 func (r ChatMessageRepository) DeleteConversation(ctx context.Context) error {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	_, err := r.sb.
@@ -148,7 +148,7 @@ func (r ChatMessageRepository) DeleteConversation(ctx context.Context) error {
 		Where(squirrel.Eq{"conversation_id": domain.GlobalConversationID}).
 		ExecContext(spanCtx)
 
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 	return nil

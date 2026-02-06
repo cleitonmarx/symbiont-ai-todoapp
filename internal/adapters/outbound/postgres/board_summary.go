@@ -9,7 +9,7 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -40,7 +40,7 @@ func NewBoardSummaryRepository(db *sql.DB) BoardSummaryRepository {
 
 // StoreSummary stores a board summary in the database, updating if it already exists.
 func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary domain.BoardSummary) error {
-	spanCtx, span := tracing.Start(ctx, trace.WithAttributes(
+	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
 		attribute.String("summary_id", summary.ID.String()),
 		attribute.String("model", summary.Model),
 	))
@@ -48,7 +48,7 @@ func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary doma
 
 	// Marshal the content to JSON
 	contentJSON, err := json.Marshal(summary.Content)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to marshal summary content: %w", err)
 	}
 
@@ -72,7 +72,7 @@ func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary doma
 
 	_, err = query.ExecContext(spanCtx)
 
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to store summary: %w", err)
 	}
 
@@ -81,7 +81,7 @@ func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary doma
 
 // GetLatestSummary retrieves the most recently generated board summary.
 func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (domain.BoardSummary, bool, error) {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	var summary domain.BoardSummary
@@ -103,7 +103,7 @@ func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (domain.
 			&summary.SourceVersion,
 		)
 
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		if err == sql.ErrNoRows {
 			return domain.BoardSummary{}, false, nil
 		}
@@ -112,7 +112,7 @@ func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (domain.
 
 	// Unmarshal the JSON content
 	err = json.Unmarshal(contentJSON, &summary.Content)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return domain.BoardSummary{}, false, fmt.Errorf("failed to unmarshal summary content: %w", err)
 	}
 
@@ -120,7 +120,7 @@ func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (domain.
 }
 
 func (bsr BoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (domain.BoardSummaryContent, error) {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	var countsJSON, overdueJSON, nearDeadlineJSON, nextUpJSON []byte
@@ -137,7 +137,7 @@ func (bsr BoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (
 		Prefix(boardSummaryCTEQry).
 		QueryRowContext(spanCtx).
 		Scan(&countsJSON, &overdueJSON, &nearDeadlineJSON, &nextUpJSON)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return domain.BoardSummaryContent{}, err
 	}
 

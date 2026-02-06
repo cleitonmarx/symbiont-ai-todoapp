@@ -42,7 +42,7 @@ func (dt TodoDeleterImpl) Delete(ctx context.Context, uow domain.UnitOfWork, id 
 		return err
 	}
 
-	return uow.Outbox().RecordEvent(ctx, domain.TodoEvent{
+	return uow.Outbox().CreateEvent(ctx, domain.TodoEvent{
 		Type:      domain.TodoEventType_TODO_DELETED,
 		TodoID:    id,
 		CreatedAt: dt.timeProvider.Now(),

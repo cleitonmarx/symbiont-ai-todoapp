@@ -10,7 +10,7 @@ import (
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/google/uuid"
 	"go.yaml.in/yaml/v3"
 )
@@ -65,12 +65,12 @@ func NewStreamChatImpl(
 
 // Execute streams a chat response and persists the conversation
 func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEvent domain.LLMStreamEventCallback) error {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	// Fetch chat history and append user message
 	messages, err := sc.fetchChatHistory(spanCtx)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 	messages = append(messages, domain.LLMChatMessage{
@@ -181,7 +181,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 			}
 			return nil
 		})
-		if tracing.RecordErrorAndStatus(span, err) {
+		if telemetry.RecordErrorAndStatus(span, err) {
 			return err
 		}
 	}
@@ -212,7 +212,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 	for i, m := range chatMessages {
 		msgs[i] = *m
 	}
-	if err := sc.chatMessageRepo.CreateChatMessages(spanCtx, msgs); tracing.RecordErrorAndStatus(span, err) {
+	if err := sc.chatMessageRepo.CreateChatMessages(spanCtx, msgs); telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 

@@ -6,7 +6,7 @@ import (
 	pubsubV2 "cloud.google.com/go/pubsub/v2"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -23,7 +23,7 @@ func NewPubSubEventPublisher(client *pubsubV2.Client) PubSubEventPublisher {
 
 // PublishEvent publishes the given event to the appropriate Pub/Sub topic
 func (p PubSubEventPublisher) PublishEvent(ctx context.Context, event domain.OutboxEvent) error {
-	spanCtx, span := tracing.Start(ctx,
+	spanCtx, span := telemetry.Start(ctx,
 		trace.WithAttributes(
 			attribute.String("event_id", event.ID.String()),
 			attribute.String("event_type", event.EventType),

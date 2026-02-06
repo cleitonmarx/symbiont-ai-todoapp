@@ -53,7 +53,7 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 					mock.Anything,
 					"model-name",
 					"ID: 123e4567-e89b-12d3-a456-426614174000 | Title: Updated Todo | Due Date: 2024-01-01 | Status: OPEN",
-				).Return([]float64{0.4, 0.5, 0.6}, nil)
+				).Return(domain.EmbedResponse{Embedding: []float64{0.4, 0.5, 0.6}}, nil)
 
 				repo := domain.NewMockTodoRepository(t)
 				outbox := domain.NewMockOutboxRepository(t)
@@ -66,7 +66,7 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 					return t.ID == fixedUUID && t.Title == todo.Title && t.UpdatedAt.Equal(fixedTime)
 				})).Return(nil)
 
-				outbox.EXPECT().RecordEvent(
+				outbox.EXPECT().CreateEvent(
 					mock.Anything,
 					domain.TodoEvent{
 						Type:   domain.TodoEventType_TODO_UPDATED,
@@ -109,7 +109,7 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 					mock.Anything,
 					"model-name",
 					"ID: 123e4567-e89b-12d3-a456-426614174000 | Title: Updated Todo | Due Date: 2024-01-01 | Status: OPEN",
-				).Return(nil, errors.New("embedding service error"))
+				).Return(domain.EmbedResponse{}, errors.New("embedding service error"))
 
 				repo := domain.NewMockTodoRepository(t)
 
@@ -167,7 +167,7 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 					mock.Anything,
 					"model-name",
 					"ID: 123e4567-e89b-12d3-a456-426614174000 | Title: Updated Todo | Due Date: 2024-01-01 | Status: OPEN",
-				).Return([]float64{0.4, 0.5, 0.6}, nil)
+				).Return(domain.EmbedResponse{Embedding: []float64{0.4, 0.5, 0.6}}, nil)
 
 				repo := domain.NewMockTodoRepository(t)
 				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, true, nil)

@@ -9,7 +9,7 @@ import (
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/google/uuid"
 	"github.com/toon-format/toon-go"
 	"go.yaml.in/yaml/v3"
@@ -54,16 +54,16 @@ func NewGenerateBoardSummaryImpl(
 
 // Execute runs the use case to generate the board summary.
 func (gs GenerateBoardSummaryImpl) Execute(ctx context.Context) error {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	summary, err := gs.generateBoardSummary(spanCtx)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 
 	err = gs.summaryRepo.StoreSummary(spanCtx, summary)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 
@@ -104,12 +104,14 @@ func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context) (do
 		Messages:    promptMessages,
 	}
 
-	content, err := gs.llmClient.Chat(ctx, req)
+	resp, err := gs.llmClient.Chat(ctx, req)
 	if err != nil {
 		return domain.BoardSummary{}, err
 	}
 
-	new.Summary = strings.TrimSpace(content)
+	new.Summary = strings.TrimSpace(resp.Content)
+
+	RecordLLMTokensUsed(ctx, resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
 
 	summary := domain.BoardSummary{
 		ID:            uuid.MustParse("00000000-0000-0000-0000-000000000001"),

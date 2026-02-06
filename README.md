@@ -10,10 +10,10 @@ TodoApp is a comprehensive example application demonstrating the capabilities of
 - 🧰 **LLM Tools Integration**: Tool registry enables the chat agent to perform todo operations
 - 🔔 **Event-Driven**: Pub/Sub architecture for asynchronous processing
 - 🔒 **Secrets Management**: HashiCorp Vault integration for secure configuration
-- 📊 **Observability**: OpenTelemetry tracing with Jaeger
+- 📊 **Observability**: Full observability stack with OpenTelemetry, Jaeger, Prometheus, and Grafana
 - 🗄️ **PostgreSQL**: Persistent storage with migrations
 - 🎨 **Modern UI**: React + TypeScript frontend
-- 🗃️ **Batch GraphQL Operations**: Efficiently update or delete multiple todos in a single GraphQL request using aliases.
+- 🗃️ **Batch GraphQL Operations**: Efficiently update or delete multiple todos in a single GraphQL request using aliases
 - 🧠 **Vector Search**: pgvector + embeddings for similarity search over todos
 
 ## Architecture
@@ -28,6 +28,8 @@ TodoApp is a comprehensive example application demonstrating the capabilities of
 - **Vault**: Secret management for sensitive configuration
 - **Docker Model Runner**: Local LLM inference for board summary generation and AI Chat
 - **Jaeger**: Distributed tracing and monitoring using OpenTelemetry
+- **Prometheus**: Metrics collection and storage with OTLP receiver
+- **Grafana**: Metrics visualization and dashboards
 
 ### 🔗 Generated Dependency Graph (Initializers, Runners, Dependencies, Configs)
 
@@ -323,6 +325,8 @@ The application will be available at:
 - **GraphQL Playground**: http://localhost:8085/
 - **GraphQL API**: http://localhost:8085/v1/query
 - **Jaeger Tracing**: http://localhost:16686
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3000 (admin/admin)
 
 ### Running Tests
 
@@ -357,7 +361,6 @@ View real-time application logs:
 ```bash
 # View logs from Docker container
 docker-compose logs -f todoapp
-
 ```
 
 ### Jaeger Tracing
@@ -373,6 +376,25 @@ Search for traces by:
 - Service name: `todoapp`
 - Operation: `HTTP POST /api/v1/todos`, `GenerateBoardSummary`, etc.
 - Tags: `http.status_code`, `db.statement`, etc.
+
+### Prometheus Metrics
+
+Access Prometheus UI at http://localhost:9090 to:
+- Query metrics using PromQL
+- Explore available metrics
+- Monitor metric collection status
+
+The application exports OpenTelemetry metrics via OTLP to Prometheus, including:
+- **HTTP Server Metrics**: Request duration, RPS, error rates, response sizes
+- **HTTP Client Metrics**: Request duration, RPS by method
+- **Database Metrics**: Query duration, connection pool stats, wait times
+- **LLM Metrics**: Token usage by type (embedding, prompt, completion)
+
+### Grafana Dashboards
+
+Access Grafana at http://localhost:3000 (default credentials: admin/admin).
+
+Pre-configured dashboard: **TodoApp Metrics**
 
 ## Technical Details
 

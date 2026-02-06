@@ -6,7 +6,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 )
 
 // RelayOutbox defines the interface for relaying outbox events
@@ -33,7 +33,7 @@ func NewRelayOutboxImpl(uow domain.UnitOfWork, publisher domain.TodoEventPublish
 
 // Execute processes pending outbox events and relays them
 func (r RelayOutboxImpl) Execute(ctx context.Context) error {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	err := r.Uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
@@ -49,7 +49,7 @@ func (r RelayOutboxImpl) Execute(ctx context.Context) error {
 		}
 		return nil
 	})
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 	return nil

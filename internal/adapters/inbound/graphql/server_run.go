@@ -12,10 +12,9 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/gen"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
 	"github.com/rs/cors"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type TodoGraphQLServer struct {
@@ -39,11 +38,7 @@ func (s *TodoGraphQLServer) Run(ctx context.Context) error {
 	corsHandler := cors.AllowAll()
 
 	mux.Handle("/v1/query", corsHandler.Handler(
-		otelhttp.NewHandler(
-			h,
-			"",
-			otelhttp.WithSpanNameFormatter(tracing.SpanNameFormatter),
-		),
+		telemetry.HttpHandler(h, "todoapp-graphql"),
 	))
 
 	mux.Handle("/", playground.Handler("TodoApp GraphQL", "/v1/query"))

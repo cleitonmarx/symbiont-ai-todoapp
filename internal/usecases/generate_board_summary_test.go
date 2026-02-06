@@ -76,7 +76,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 							strings.Contains(req.Messages[0].Content, "You are a helpful assistant that summarizes todo lists") &&
 							strings.Contains(req.Messages[1].Content, "Open: 2\n  Done: 1")
 					}),
-				).Return("You have 2 open todos, 1 overdue todo, and 1 completed todo.", nil)
+				).Return(domain.LLMChatResponse{Content: "You have 2 open todos, 1 overdue todo, and 1 completed todo."}, nil)
 
 				sr.EXPECT().StoreSummary(
 					mock.Anything,
@@ -105,7 +105,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 				c.EXPECT().Chat(
 					mock.Anything,
 					mock.Anything,
-				).Return("", assert.AnError)
+				).Return(domain.LLMChatResponse{}, assert.AnError)
 			},
 			expectedErr: assert.AnError,
 		},
@@ -129,7 +129,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 				c.EXPECT().Chat(
 					mock.Anything,
 					mock.Anything,
-				).Return("You have 2 open todos, 1 overdue todo, and 1 completed todo.", nil)
+				).Return(domain.LLMChatResponse{Content: "You have 2 open todos, 1 overdue todo, and 1 completed todo."}, nil)
 
 				sr.EXPECT().StoreSummary(
 					mock.Anything,

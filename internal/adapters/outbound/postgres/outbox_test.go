@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestOutboxRepository_RecordEvent(t *testing.T) {
+func TestOutboxRepository_CreateEvent(t *testing.T) {
 	event := domain.TodoEvent{
 		TodoID:    uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 		Type:      domain.TodoEventType("Created"),
@@ -73,7 +73,7 @@ func TestOutboxRepository_RecordEvent(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewOutboxRepository(db)
-			gotErr := repo.RecordEvent(context.Background(), event)
+			gotErr := repo.CreateEvent(context.Background(), event)
 			if tt.err {
 				assert.Error(t, gotErr)
 			} else {

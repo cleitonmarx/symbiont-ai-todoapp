@@ -105,8 +105,25 @@ type LLMStreamEventFunctionCall struct {
 
 // LLMStreamEventDone contains completion metadata and token usage
 type LLMStreamEventDone struct {
+	Usage              LLMUsage
 	AssistantMessageID string
 	CompletedAt        string
+}
+
+type LLMUsage struct {
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
+}
+
+type LLMChatResponse struct {
+	Content string
+	Usage   LLMUsage
+}
+
+type EmbedResponse struct {
+	Embedding   []float64
+	TotalTokens int
 }
 
 // LLMStreamEventCallback is called for each event in the stream
@@ -119,8 +136,8 @@ type LLMClient interface {
 	ChatStream(ctx context.Context, req LLMChatRequest, onEvent LLMStreamEventCallback) error
 
 	// Chat sends a chat request to the LLM and returns the full assistant response
-	Chat(ctx context.Context, req LLMChatRequest) (string, error)
+	Chat(ctx context.Context, req LLMChatRequest) (LLMChatResponse, error)
 
 	// Embed generates an embedding vector for the given input text
-	Embed(ctx context.Context, model, input string) ([]float64, error)
+	Embed(ctx context.Context, model, input string) (EmbedResponse, error)
 }

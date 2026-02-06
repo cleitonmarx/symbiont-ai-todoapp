@@ -203,7 +203,7 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 			Type:      domain.TodoEventType("Deleted"),
 			CreatedAt: time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC),
 		}
-		return uow.Outbox().RecordEvent(context.Background(), event)
+		return uow.Outbox().CreateEvent(context.Background(), event)
 	})
 
 	assert.NoError(t, err)

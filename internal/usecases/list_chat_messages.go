@@ -5,7 +5,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 )
 
 // ListChatMessages defines the interface for the ListChatMessages use case
@@ -27,11 +27,11 @@ func NewListChatMessagesImpl(chatMessageRepo domain.ChatMessageRepository) ListC
 
 // Query retrieves chat messages with pagination support
 func (lcm ListChatMessagesImpl) Query(ctx context.Context, page int, pageSize int) ([]domain.ChatMessage, bool, error) {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	messages, hasMore, err := lcm.ChatMessageRepo.ListChatMessages(spanCtx, pageSize)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err
 	}
 

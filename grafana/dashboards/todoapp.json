@@ -1,0 +1,227 @@
+{
+  "uid": "todoapp",
+  "title": "TodoApp Metrics",
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-15m", "to": "now" },
+  "tags": ["standard", "otel", "prometheus"],
+  "templating": {
+    "list": [
+      {
+        "name": "job",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(http_server_request_duration_seconds_count, job)",
+        "refresh": 2,
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "HTTP Server RPS",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{job=\"$job\"}[5m]))",
+          "legendFormat": "{{http_route}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Server Latency P95",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=\"$job\"}[5m])))",
+          "legendFormat": "{{http_route}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Server Error Rate",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{job=\"$job\", http_response_status_code=~\"5..\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{job=\"$job\"}[5m]))",
+          "legendFormat": "5xx rate",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Server Avg Response Size",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_response_body_size_bytes_sum{job=\"$job\"}[5m])) / sum(rate(http_server_response_body_size_bytes_count{job=\"$job\"}[5m]))",
+          "legendFormat": "avg bytes",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Client RPS",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (http_request_method) (rate(http_client_request_duration_seconds_count{job=\"$job\"}[5m]))",
+          "legendFormat": "{{http_request_method}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Client Latency P95",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, http_request_method) (rate(http_client_request_duration_seconds_bucket{job=\"$job\"}[5m])))",
+          "legendFormat": "{{http_request_method}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
+    },
+    {
+      "type": "timeseries",
+      "title": "DB Operations Rate",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (db_operation_name) (rate(db_client_operation_duration_seconds_count{job=\"$job\"}[5m]))",
+          "legendFormat": "{{db_operation_name}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 }
+    },
+    {
+      "type": "timeseries",
+      "title": "DB Latency P95",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, db_query_summary) (rate(db_client_operation_duration_seconds_bucket{job=\"$job\"}[5m])))",
+          "legendFormat": "{{db_query_summary}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 }
+    },
+    {
+      "type": "timeseries",
+      "title": "DB Connections Open (idle vs inuse)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (status) (db_sql_connection_open{job=\"$job\", status=~\"idle|inuse\"})",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 }
+    },
+    {
+      "type": "timeseries",
+      "title": "DB Connection Wait P95 (ms)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(db_sql_connection_wait_duration_milliseconds_bucket{job=\"$job\"}[5m])))",
+          "legendFormat": "p95 wait",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 }
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM Tokens Used per Day (Embedding vs Prompt+Completion)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "targets": [
+        {
+          "expr": "increase(llm_tokens_used_total{job=\"$job\", token_type=\"embedding\"}[1d])",
+          "legendFormat": "embedding",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(llm_tokens_used_total{job=\"$job\", token_type=~\"prompt|completion\"}[1d]))",
+          "legendFormat": "prompt+completion",
+          "refId": "B"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 }
+    }
+  ]
+}

@@ -7,7 +7,7 @@ import (
 
 	"github.com/Masterminds/squirrel"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/google/uuid"
 )
 
@@ -26,23 +26,26 @@ var (
 	}
 )
 
+// OutboxRepository implements the domain.OutboxRepository interface for Postgres.
 type OutboxRepository struct {
 	sb squirrel.StatementBuilderType
 }
 
+// NewOutboxRepository creates a new instance of OutboxRepository.
 func NewOutboxRepository(br squirrel.BaseRunner) OutboxRepository {
 	return OutboxRepository{
 		sb: squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar).RunWith(br),
 	}
 }
 
-func (op OutboxRepository) RecordEvent(ctx context.Context, event domain.TodoEvent) error {
-	spanCtx, span := tracing.Start(ctx)
+// CreateEvent records a new event in the outbox.
+func (op OutboxRepository) CreateEvent(ctx context.Context, event domain.TodoEvent) error {
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	// Marshal the content to JSON
 	contentJSON, err := json.Marshal(event)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to marshal summary content: %w", err)
 	}
 
@@ -64,7 +67,7 @@ func (op OutboxRepository) RecordEvent(ctx context.Context, event domain.TodoEve
 		).
 		ExecContext(spanCtx)
 
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to insert outbox event: %w", err)
 	}
 

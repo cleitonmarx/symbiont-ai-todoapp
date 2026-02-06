@@ -6,7 +6,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 )
 
 // ListTodoParams holds the parameters for listing todos.
@@ -73,7 +73,7 @@ func NewListTodosImpl(todoRepo domain.TodoRepository, llmClient domain.LLMClient
 
 // Query retrieves a list of todo items with pagination support.
 func (lti ListTodosImpl) Query(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions) ([]domain.Todo, bool, error) {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	params := ListTodoParams{}
@@ -86,11 +86,14 @@ func (lti ListTodosImpl) Query(ctx context.Context, page int, pageSize int, opts
 		queryOpts = append(queryOpts, domain.WithStatus(*params.Status))
 	}
 	if params.Query != nil {
-		embedding, err := lti.llmClient.Embed(spanCtx, lti.llmEmbeddingModel, *params.Query)
-		if tracing.RecordErrorAndStatus(span, err) {
+		resp, err := lti.llmClient.Embed(spanCtx, lti.llmEmbeddingModel, *params.Query)
+		if telemetry.RecordErrorAndStatus(span, err) {
 			return nil, false, err
 		}
-		queryOpts = append(queryOpts, domain.WithEmbedding(embedding))
+
+		RecordLLMTokensEmbedding(spanCtx, resp.TotalTokens)
+
+		queryOpts = append(queryOpts, domain.WithEmbedding(resp.Embedding))
 	}
 	if params.DueAfter != nil && params.DueBefore != nil {
 		queryOpts = append(queryOpts, domain.WithDueDateRange(*params.DueAfter, *params.DueBefore))
@@ -100,7 +103,7 @@ func (lti ListTodosImpl) Query(ctx context.Context, page int, pageSize int, opts
 	}
 
 	todos, hasMore, err := lti.todoRepo.ListTodos(spanCtx, page, pageSize, queryOpts...)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err
 	}
 	return todos, hasMore, nil

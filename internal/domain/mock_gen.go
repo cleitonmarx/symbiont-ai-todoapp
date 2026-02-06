@@ -698,22 +698,22 @@ func (_m *MockLLMClient) EXPECT() *MockLLMClient_Expecter {
 }
 
 // Chat provides a mock function for the type MockLLMClient
-func (_mock *MockLLMClient) Chat(ctx context.Context, req LLMChatRequest) (string, error) {
+func (_mock *MockLLMClient) Chat(ctx context.Context, req LLMChatRequest) (LLMChatResponse, error) {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Chat")
 	}
 
-	var r0 string
+	var r0 LLMChatResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, LLMChatRequest) (string, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, LLMChatRequest) (LLMChatResponse, error)); ok {
 		return returnFunc(ctx, req)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, LLMChatRequest) string); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, LLMChatRequest) LLMChatResponse); ok {
 		r0 = returnFunc(ctx, req)
 	} else {
-		r0 = ret.Get(0).(string)
+		r0 = ret.Get(0).(LLMChatResponse)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, LLMChatRequest) error); ok {
 		r1 = returnFunc(ctx, req)
@@ -753,12 +753,12 @@ func (_c *MockLLMClient_Chat_Call) Run(run func(ctx context.Context, req LLMChat
 	return _c
 }
 
-func (_c *MockLLMClient_Chat_Call) Return(s string, err error) *MockLLMClient_Chat_Call {
-	_c.Call.Return(s, err)
+func (_c *MockLLMClient_Chat_Call) Return(lLMChatResponse LLMChatResponse, err error) *MockLLMClient_Chat_Call {
+	_c.Call.Return(lLMChatResponse, err)
 	return _c
 }
 
-func (_c *MockLLMClient_Chat_Call) RunAndReturn(run func(ctx context.Context, req LLMChatRequest) (string, error)) *MockLLMClient_Chat_Call {
+func (_c *MockLLMClient_Chat_Call) RunAndReturn(run func(ctx context.Context, req LLMChatRequest) (LLMChatResponse, error)) *MockLLMClient_Chat_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -827,24 +827,22 @@ func (_c *MockLLMClient_ChatStream_Call) RunAndReturn(run func(ctx context.Conte
 }
 
 // Embed provides a mock function for the type MockLLMClient
-func (_mock *MockLLMClient) Embed(ctx context.Context, model string, input string) ([]float64, error) {
+func (_mock *MockLLMClient) Embed(ctx context.Context, model string, input string) (EmbedResponse, error) {
 	ret := _mock.Called(ctx, model, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Embed")
 	}
 
-	var r0 []float64
+	var r0 EmbedResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) ([]float64, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (EmbedResponse, error)); ok {
 		return returnFunc(ctx, model, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) []float64); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) EmbedResponse); ok {
 		r0 = returnFunc(ctx, model, input)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]float64)
-		}
+		r0 = ret.Get(0).(EmbedResponse)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = returnFunc(ctx, model, input)
@@ -890,12 +888,12 @@ func (_c *MockLLMClient_Embed_Call) Run(run func(ctx context.Context, model stri
 	return _c
 }
 
-func (_c *MockLLMClient_Embed_Call) Return(float64s []float64, err error) *MockLLMClient_Embed_Call {
-	_c.Call.Return(float64s, err)
+func (_c *MockLLMClient_Embed_Call) Return(embedResponse EmbedResponse, err error) *MockLLMClient_Embed_Call {
+	_c.Call.Return(embedResponse, err)
 	return _c
 }
 
-func (_c *MockLLMClient_Embed_Call) RunAndReturn(run func(ctx context.Context, model string, input string) ([]float64, error)) *MockLLMClient_Embed_Call {
+func (_c *MockLLMClient_Embed_Call) RunAndReturn(run func(ctx context.Context, model string, input string) (EmbedResponse, error)) *MockLLMClient_Embed_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -925,6 +923,63 @@ type MockOutboxRepository_Expecter struct {
 
 func (_m *MockOutboxRepository) EXPECT() *MockOutboxRepository_Expecter {
 	return &MockOutboxRepository_Expecter{mock: &_m.Mock}
+}
+
+// CreateEvent provides a mock function for the type MockOutboxRepository
+func (_mock *MockOutboxRepository) CreateEvent(ctx context.Context, event TodoEvent) error {
+	ret := _mock.Called(ctx, event)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateEvent")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, TodoEvent) error); ok {
+		r0 = returnFunc(ctx, event)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockOutboxRepository_CreateEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateEvent'
+type MockOutboxRepository_CreateEvent_Call struct {
+	*mock.Call
+}
+
+// CreateEvent is a helper method to define mock.On call
+//   - ctx context.Context
+//   - event TodoEvent
+func (_e *MockOutboxRepository_Expecter) CreateEvent(ctx interface{}, event interface{}) *MockOutboxRepository_CreateEvent_Call {
+	return &MockOutboxRepository_CreateEvent_Call{Call: _e.mock.On("CreateEvent", ctx, event)}
+}
+
+func (_c *MockOutboxRepository_CreateEvent_Call) Run(run func(ctx context.Context, event TodoEvent)) *MockOutboxRepository_CreateEvent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 TodoEvent
+		if args[1] != nil {
+			arg1 = args[1].(TodoEvent)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockOutboxRepository_CreateEvent_Call) Return(err error) *MockOutboxRepository_CreateEvent_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockOutboxRepository_CreateEvent_Call) RunAndReturn(run func(ctx context.Context, event TodoEvent) error) *MockOutboxRepository_CreateEvent_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // DeleteEvent provides a mock function for the type MockOutboxRepository
@@ -1048,63 +1103,6 @@ func (_c *MockOutboxRepository_FetchPendingEvents_Call) Return(outboxEvents []Ou
 }
 
 func (_c *MockOutboxRepository_FetchPendingEvents_Call) RunAndReturn(run func(ctx context.Context, limit int) ([]OutboxEvent, error)) *MockOutboxRepository_FetchPendingEvents_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// RecordEvent provides a mock function for the type MockOutboxRepository
-func (_mock *MockOutboxRepository) RecordEvent(ctx context.Context, event TodoEvent) error {
-	ret := _mock.Called(ctx, event)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RecordEvent")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, TodoEvent) error); ok {
-		r0 = returnFunc(ctx, event)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockOutboxRepository_RecordEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RecordEvent'
-type MockOutboxRepository_RecordEvent_Call struct {
-	*mock.Call
-}
-
-// RecordEvent is a helper method to define mock.On call
-//   - ctx context.Context
-//   - event TodoEvent
-func (_e *MockOutboxRepository_Expecter) RecordEvent(ctx interface{}, event interface{}) *MockOutboxRepository_RecordEvent_Call {
-	return &MockOutboxRepository_RecordEvent_Call{Call: _e.mock.On("RecordEvent", ctx, event)}
-}
-
-func (_c *MockOutboxRepository_RecordEvent_Call) Run(run func(ctx context.Context, event TodoEvent)) *MockOutboxRepository_RecordEvent_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 TodoEvent
-		if args[1] != nil {
-			arg1 = args[1].(TodoEvent)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockOutboxRepository_RecordEvent_Call) Return(err error) *MockOutboxRepository_RecordEvent_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockOutboxRepository_RecordEvent_Call) RunAndReturn(run func(ctx context.Context, event TodoEvent) error) *MockOutboxRepository_RecordEvent_Call {
 	_c.Call.Return(run)
 	return _c
 }

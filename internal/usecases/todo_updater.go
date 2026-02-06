@@ -68,11 +68,13 @@ func (tui TodoUpdaterImpl) Update(ctx context.Context, uow domain.UnitOfWork, id
 		return domain.Todo{}, err
 	}
 
-	embedding, err := tui.llmClient.Embed(ctx, tui.model, td.ToLLMInput())
+	resp, err := tui.llmClient.Embed(ctx, tui.model, td.ToLLMInput())
 	if err != nil {
 		return domain.Todo{}, err
 	}
-	td.Embedding = embedding
+
+	RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
+	td.Embedding = resp.Embedding
 
 	if err := uow.Todo().UpdateTodo(ctx, td); err != nil {
 		return domain.Todo{}, err
@@ -80,7 +82,7 @@ func (tui TodoUpdaterImpl) Update(ctx context.Context, uow domain.UnitOfWork, id
 
 	todo = td
 
-	if err = uow.Outbox().RecordEvent(ctx, domain.TodoEvent{
+	if err = uow.Outbox().CreateEvent(ctx, domain.TodoEvent{
 		Type:   domain.TodoEventType_TODO_UPDATED,
 		TodoID: todo.ID,
 	}); err != nil {

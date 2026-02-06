@@ -6,7 +6,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/google/uuid"
 )
 
@@ -31,7 +31,7 @@ func NewUpdateTodoImpl(uow domain.UnitOfWork, modifier TodoUpdater) UpdateTodoIm
 
 // Execute updates an existing todo item identified by id with the provided title and/or status.
 func (uti UpdateTodoImpl) Execute(ctx context.Context, id uuid.UUID, title *string, status *domain.TodoStatus, dueDate *time.Time) (domain.Todo, error) {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	var todo domain.Todo
@@ -44,7 +44,7 @@ func (uti UpdateTodoImpl) Execute(ctx context.Context, id uuid.UUID, title *stri
 		return nil
 	})
 
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return domain.Todo{}, err
 	}
 

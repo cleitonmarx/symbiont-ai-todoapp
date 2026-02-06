@@ -5,7 +5,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 )
 
 type GetBoardSummary interface {
@@ -23,11 +23,11 @@ func NewGetBoardSummaryImpl(r domain.BoardSummaryRepository) GetBoardSummaryImpl
 }
 
 func (gbs GetBoardSummaryImpl) Query(ctx context.Context) (domain.BoardSummary, error) {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	summary, found, err := gbs.summaryRepo.GetLatestSummary(spanCtx)
-	if tracing.RecordErrorAndStatus(span, err) {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return domain.BoardSummary{}, err
 	}
 	if !found {

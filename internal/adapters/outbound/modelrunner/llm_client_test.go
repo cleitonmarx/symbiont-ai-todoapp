@@ -304,7 +304,7 @@ func TestLLMClientAdapter_Chat(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedResp, resp)
+			assert.Equal(t, tt.expectedResp, resp.Content)
 
 			if tt.validateReq != nil && capturedReq != nil {
 				tt.validateReq(t, capturedReq)
@@ -411,7 +411,7 @@ func TestLLMClientAdapter_Embed(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedVec, vec)
+			assert.Equal(t, tt.expectedVec, vec.Embedding)
 		})
 	}
 }

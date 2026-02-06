@@ -173,17 +173,24 @@ func TestLLMToolManager(t *testing.T) {
 
 func TestTodoFetcherTool(t *testing.T) {
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
+	testTodo := domain.Todo{
+		ID:      uuid.New(),
+		Title:   "Test Todo",
+		DueDate: fixedTime,
+		Status:  domain.TodoStatus_OPEN,
+	}
 
 	tests := map[string]struct {
 		setupMocks func(
 			*domain.MockTodoRepository,
 			*domain.MockLLMClient,
+			*domain.MockCurrentTimeProvider,
 		)
 		functionCall domain.LLMStreamEventFunctionCall
 		validateResp func(t *testing.T, resp domain.LLMChatMessage)
 	}{
 		"fetch-todos-success": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -191,14 +198,7 @@ func TestTodoFetcherTool(t *testing.T) {
 						10,
 						mock.Anything,
 					).
-					Return([]domain.Todo{
-						{
-							ID:      uuid.New(),
-							Title:   "Test Todo",
-							DueDate: fixedTime,
-							Status:  domain.TodoStatus_OPEN,
-						},
-					}, false, nil).
+					Return([]domain.Todo{testTodo}, false, nil).
 					Once()
 			},
 			functionCall: domain.LLMStreamEventFunctionCall{
@@ -214,10 +214,10 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 		},
 		"fetch-todos-with-status-and-search": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				llmCli.EXPECT().
 					Embed(mock.Anything, "embedding-model", "urgent").
-					Return([]float64{0.3, 0.4}, nil).
+					Return(domain.EmbedResponse{Embedding: []float64{0.3, 0.4}}, nil).
 					Once()
 
 				todoRepo.EXPECT().
@@ -235,14 +235,7 @@ func TestTodoFetcherTool(t *testing.T) {
 						assert.Equal(t, domain.TodoStatus_OPEN, *param.Status)
 						assert.Equal(t, []float64{0.3, 0.4}, param.Embedding)
 					}).
-					Return([]domain.Todo{
-						{
-							ID:      uuid.New(),
-							Title:   "Urgent Todo",
-							DueDate: fixedTime,
-							Status:  domain.TodoStatus_OPEN,
-						},
-					}, false, nil).
+					Return([]domain.Todo{testTodo}, false, nil).
 					Once()
 
 			},
@@ -259,7 +252,7 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 		},
 		"fetch-todos-with-sortby": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -289,7 +282,12 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 		},
 		"fetch-todos-with-due-date-filters": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				timeProvider.EXPECT().
+					Now().
+					Return(fixedTime).
+					Once()
+
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -307,15 +305,8 @@ func TestTodoFetcherTool(t *testing.T) {
 						assert.Equal(t, expectedDueAfter, *param.DueAfter)
 						assert.Equal(t, expectedDueBefore, *param.DueBefore)
 					}).
-					Return([]domain.Todo{
-						{
-							ID:      uuid.New(),
-							Title:   "Urgent Todo",
-							DueDate: fixedTime,
-							Status:  domain.TodoStatus_OPEN,
-						},
-					}, false, nil)
-
+					Return([]domain.Todo{testTodo}, false, nil).
+					Once()
 			},
 			functionCall: domain.LLMStreamEventFunctionCall{
 				Function:  "fetch_todos",
@@ -330,11 +321,15 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 		},
 		"fetch-todos-invalid-due-after": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				timeProvider.EXPECT().
+					Now().
+					Return(fixedTime).
+					Once()
 			},
 			functionCall: domain.LLMStreamEventFunctionCall{
 				Function:  "fetch_todos",
-				Arguments: `{"page": 1, "page_size": 10, "due_after": "invalid-date"}`,
+				Arguments: `{"page": 1, "page_size": 10, "due_after": "invalid-date", "due_before": "2026-01-30"}`,
 			},
 			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
@@ -342,7 +337,11 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 		},
 		"fetch-todos-invalid-due-before": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				timeProvider.EXPECT().
+					Now().
+					Return(fixedTime).
+					Once()
 			},
 			functionCall: domain.LLMStreamEventFunctionCall{
 				Function:  "fetch_todos",
@@ -355,7 +354,7 @@ func TestTodoFetcherTool(t *testing.T) {
 		},
 
 		"fetch-todos-invalid-arguments": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 			},
 			functionCall: domain.LLMStreamEventFunctionCall{
 				Function:  "fetch_todos",
@@ -367,10 +366,10 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 		},
 		"fetch-todos-embedding-error": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				llmCli.EXPECT().
 					Embed(mock.Anything, "embedding-model", "search").
-					Return(nil, errors.New("embedding failed")).
+					Return(domain.EmbedResponse{}, errors.New("embedding failed")).
 					Once()
 			},
 			functionCall: domain.LLMStreamEventFunctionCall{
@@ -383,10 +382,10 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 		},
 		"fetch-todos-list-error": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				llmCli.EXPECT().
 					Embed(mock.Anything, "embedding-model", "search").
-					Return([]float64{0.1, 0.2}, nil).
+					Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2}}, nil).
 					Once()
 
 				todoRepo.EXPECT().
@@ -404,22 +403,15 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 		},
 		"fetch-todos-has-more": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				llmCli.EXPECT().
 					Embed(mock.Anything, "embedding-model", "search").
-					Return([]float64{0.1, 0.2}, nil).
+					Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2}}, nil).
 					Once()
 
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, 1, 10, mock.Anything).
-					Return([]domain.Todo{
-						{
-							ID:      uuid.New(),
-							Title:   "Test Todo",
-							DueDate: fixedTime,
-							Status:  domain.TodoStatus_OPEN,
-						},
-					}, true, nil).
+					Return([]domain.Todo{testTodo}, true, nil).
 					Once()
 			},
 			functionCall: domain.LLMStreamEventFunctionCall{
@@ -435,10 +427,10 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 		},
 		"fetch-todos-no-results": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				llmCli.EXPECT().
 					Embed(mock.Anything, "embedding-model", "search").
-					Return([]float64{0.1, 0.2}, nil).
+					Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2}}, nil).
 					Once()
 
 				todoRepo.EXPECT().
@@ -461,9 +453,10 @@ func TestTodoFetcherTool(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			todoRepo := domain.NewMockTodoRepository(t)
 			llmCli := domain.NewMockLLMClient(t)
-			tt.setupMocks(todoRepo, llmCli)
+			timeProvider := domain.NewMockCurrentTimeProvider(t)
+			tt.setupMocks(todoRepo, llmCli, timeProvider)
 
-			tool := NewTodoFetcherTool(todoRepo, llmCli, "embedding-model")
+			tool := NewTodoFetcherTool(todoRepo, llmCli, timeProvider, "embedding-model")
 
 			resp := tool.Call(context.Background(), tt.functionCall, []domain.LLMChatMessage{})
 			tt.validateResp(t, resp)
@@ -1017,7 +1010,7 @@ func TestTodoDeleterTool(t *testing.T) {
 
 func TestLLMToolManager_List_And_StatusMessages(t *testing.T) {
 	manager := NewLLMToolManager(
-		NewTodoFetcherTool(nil, nil, ""),
+		NewTodoFetcherTool(nil, nil, nil, ""),
 		NewTodoCreatorTool(nil, nil, nil),
 		NewTodoMetaUpdaterTool(nil, nil),
 		NewTodoDueDateUpdaterTool(nil, nil, nil),

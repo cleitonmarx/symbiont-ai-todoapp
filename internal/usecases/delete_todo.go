@@ -5,7 +5,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/google/uuid"
 )
 
@@ -30,7 +30,7 @@ func NewDeleteTodo(uow domain.UnitOfWork, deleter TodoDeleter) DeleteTodoImpl {
 
 // Execute deletes a todo item by its ID.
 func (dti DeleteTodoImpl) Execute(ctx context.Context, id uuid.UUID) error {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	return dti.uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {

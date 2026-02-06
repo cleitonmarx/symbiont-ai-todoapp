@@ -2,13 +2,19 @@ package modelrunner
 
 // ChatRequest is an OpenAI-compatible chat completions request
 type ChatRequest struct {
-	Model       string        `json:"model"`
-	Messages    []ChatMessage `json:"messages"`
-	Stream      bool          `json:"stream,omitempty"`
-	Temperature *float64      `json:"temperature,omitempty"`
-	MaxTokens   *int          `json:"max_tokens,omitempty"`
-	TopP        *float64      `json:"top_p,omitempty"`
-	Tools       []Tool        `json:"tools,omitempty"`
+	Model         string         `json:"model"`
+	Messages      []ChatMessage  `json:"messages"`
+	Stream        bool           `json:"stream,omitempty"`
+	StreamOptions *StreamOptions `json:"stream_options,omitempty"`
+	Temperature   *float64       `json:"temperature,omitempty"`
+	MaxTokens     *int           `json:"max_tokens,omitempty"`
+	TopP          *float64       `json:"top_p,omitempty"`
+	Tools         []Tool         `json:"tools,omitempty"`
+}
+
+// StreamOptions represents options for streaming responses
+type StreamOptions struct {
+	IncludeUsage bool `json:"include_usage,omitempty"`
 }
 
 // Tool represents a tool the model may call (OpenAI function tool)
@@ -53,6 +59,8 @@ type ChatResponse struct {
 	Created int64    `json:"created"`
 	Model   string   `json:"model"`
 	Choices []Choice `json:"choices"`
+	Usage   *Usage   `json:"usage"`
+	Timings *Timings `json:"timings,omitempty"`
 }
 
 // Choice represents a completion choice
@@ -90,6 +98,7 @@ type StreamChunk struct {
 	Created int64               `json:"created"`
 	Model   string              `json:"model"`
 	Choices []StreamChunkChoice `json:"choices"`
+	Usage   *Usage              `json:"usage,omitempty"`
 	Timings *Timings            `json:"timings,omitempty"`
 }
 
@@ -119,6 +128,12 @@ type ToolCallChunk struct {
 type ToolCallChunkFunction struct {
 	Name      string `json:"name"`
 	Arguments string `json:"arguments"`
+}
+
+type Usage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
 }
 
 // Timings contains llama.cpp performance metrics

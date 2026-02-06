@@ -17,7 +17,10 @@ type InitClient struct {
 
 func (i *InitClient) Initialize(ctx context.Context) (context.Context, error) {
 	if i.client == nil {
-		client, err := pubsubV2.NewClient(ctx, i.ProjectID)
+		cfg := &pubsubV2.ClientConfig{
+			EnableOpenTelemetryTracing: true,
+		}
+		client, err := pubsubV2.NewClientWithConfig(ctx, i.ProjectID, cfg)
 		if err != nil {
 			return ctx, fmt.Errorf("failed to create pubsub client: %w", err)
 		}

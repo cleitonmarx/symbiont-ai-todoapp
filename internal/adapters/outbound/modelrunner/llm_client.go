@@ -8,7 +8,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/google/uuid"
 )
 
@@ -23,8 +23,8 @@ func NewLLMClientAdapter(client DRMAPIClient) LLMClient {
 }
 
 // Chat implements domain.LLMClient.Chat
-func (a LLMClient) Chat(ctx context.Context, req domain.LLMChatRequest) (string, error) {
-	spanCtx, span := tracing.Start(ctx)
+func (a LLMClient) Chat(ctx context.Context, req domain.LLMChatRequest) (domain.LLMChatResponse, error) {
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	adapterReq := toChatRequest(req)
@@ -37,22 +37,33 @@ func (a LLMClient) Chat(ctx context.Context, req domain.LLMChatRequest) (string,
 	}
 
 	resp, err := a.client.Chat(spanCtx, adapterReq)
-	if tracing.RecordErrorAndStatus(span, err) {
-		return "", err
+	if telemetry.RecordErrorAndStatus(span, err) {
+		return domain.LLMChatResponse{}, err
 	}
 
 	if len(resp.Choices) == 0 {
 		err := errors.New("no choices in response")
-		tracing.RecordErrorAndStatus(span, err)
-		return "", err
+		telemetry.RecordErrorAndStatus(span, err)
+		return domain.LLMChatResponse{}, err
 	}
 
-	return resp.Choices[0].Message.Content, nil
+	cr := domain.LLMChatResponse{
+		Content: resp.Choices[0].Message.Content,
+	}
+	if resp.Usage != nil {
+		cr.Usage = domain.LLMUsage{
+			PromptTokens:     resp.Usage.PromptTokens,
+			CompletionTokens: resp.Usage.CompletionTokens,
+			TotalTokens:      resp.Usage.TotalTokens,
+		}
+	}
+
+	return cr, nil
 }
 
 // ChatStream implements domain.LLMClient.ChatStream
 func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	adapterReq := toChatRequest(req)
@@ -70,6 +81,7 @@ func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, on
 
 	var (
 		functionCalls []*domain.LLMStreamEventFunctionCall
+		usage         domain.LLMUsage
 	)
 
 	// Stream chunks
@@ -100,7 +112,14 @@ func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, on
 
 				}
 			}
+
+			if chunk.Usage != nil {
+				usage.PromptTokens = chunk.Usage.PromptTokens
+				usage.CompletionTokens = chunk.Usage.CompletionTokens
+				usage.TotalTokens = chunk.Usage.TotalTokens
+			}
 		}
+
 		return nil
 	})
 
@@ -119,12 +138,13 @@ func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, on
 	done := domain.LLMStreamEventDone{
 		AssistantMessageID: meta.AssistantMessageID.String(),
 		CompletedAt:        time.Now().UTC().Format(time.RFC3339),
+		Usage:              usage,
 	}
 	return onEvent(domain.LLMStreamEventType_Done, done)
 }
 
-func (a LLMClient) Embed(ctx context.Context, model, input string) ([]float64, error) {
-	spanCtx, span := tracing.Start(ctx)
+func (a LLMClient) Embed(ctx context.Context, model, input string) (domain.EmbedResponse, error) {
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	req := EmbeddingsRequest{
@@ -133,17 +153,20 @@ func (a LLMClient) Embed(ctx context.Context, model, input string) ([]float64, e
 	}
 
 	resp, err := a.client.Embeddings(spanCtx, req)
-	if tracing.RecordErrorAndStatus(span, err) {
-		return nil, err
+	if telemetry.RecordErrorAndStatus(span, err) {
+		return domain.EmbedResponse{}, err
 	}
 
 	if len(resp.Data) == 0 {
 		err := errors.New("no embedding data in response")
-		tracing.RecordErrorAndStatus(span, err)
-		return nil, err
+		telemetry.RecordErrorAndStatus(span, err)
+		return domain.EmbedResponse{}, err
 	}
 
-	return resp.Data[0].Embedding, nil
+	return domain.EmbedResponse{
+		Embedding:   resp.Data[0].Embedding,
+		TotalTokens: resp.Usage.TotalTokens,
+	}, nil
 }
 
 // toChatRequest converts domain.LLMChatRequest to ChatRequest
@@ -156,6 +179,12 @@ func toChatRequest(req domain.LLMChatRequest) ChatRequest {
 		TopP:        req.TopP,
 		Messages:    make([]ChatMessage, len(req.Messages)),
 		Tools:       make([]Tool, len(req.Tools)),
+	}
+
+	if req.Stream {
+		adapterReq.StreamOptions = &StreamOptions{
+			IncludeUsage: true,
+		}
 	}
 
 	for i, msg := range req.Messages {

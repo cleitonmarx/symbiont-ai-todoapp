@@ -8,7 +8,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/tracing"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/google/uuid"
 )
 
@@ -49,7 +49,7 @@ func (ctr LLMToolManager) List() []domain.LLMToolDefinition {
 
 // Call invokes the appropriate tool based on the function call.
 func (ctr LLMToolManager) Call(ctx context.Context, call domain.LLMStreamEventFunctionCall, conversationHistory []domain.LLMChatMessage) domain.LLMChatMessage {
-	spanCtx, span := tracing.Start(ctx)
+	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 	tool, exists := ctr.tools[call.Function]
 	if !exists {
@@ -62,9 +62,10 @@ func (ctr LLMToolManager) Call(ctx context.Context, call domain.LLMStreamEventFu
 }
 
 // NewTodoFetcherTool creates a new instance of TodoFetcherTool.
-func NewTodoFetcherTool(repo domain.TodoRepository, llmCli domain.LLMClient, llmEmbeddingModel string) TodoFetcherTool {
+func NewTodoFetcherTool(repo domain.TodoRepository, llmCli domain.LLMClient, timeProvider domain.CurrentTimeProvider, llmEmbeddingModel string) TodoFetcherTool {
 	return TodoFetcherTool{
 		repo:              repo,
+		timeProvider:      timeProvider,
 		llmCli:            llmCli,
 		llmEmbeddingModel: llmEmbeddingModel,
 	}
@@ -73,6 +74,7 @@ func NewTodoFetcherTool(repo domain.TodoRepository, llmCli domain.LLMClient, llm
 // TodoFetcherTool is an LLM tool for fetching todos.
 type TodoFetcherTool struct {
 	repo              domain.TodoRepository
+	timeProvider      domain.CurrentTimeProvider
 	llmCli            domain.LLMClient
 	llmEmbeddingModel string
 }
@@ -159,14 +161,15 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventF
 	opts := []domain.ListTodoOptions{}
 
 	if params.SearchTerm != nil && *params.SearchTerm != "" {
-		embedding, err := lft.llmCli.Embed(ctx, lft.llmEmbeddingModel, *params.SearchTerm)
+		resp, err := lft.llmCli.Embed(ctx, lft.llmEmbeddingModel, *params.SearchTerm)
 		if err != nil {
 			return domain.LLMChatMessage{
 				Role:    domain.ChatRole_Tool,
 				Content: fmt.Sprintf(`{"error":"embedding_error","details":"%s"}`, err.Error()),
 			}
 		}
-		opts = append(opts, domain.WithEmbedding(embedding))
+		RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
+		opts = append(opts, domain.WithEmbedding(resp.Embedding))
 	}
 
 	if params.Status != nil {
@@ -175,15 +178,16 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventF
 	if params.SortBy != nil {
 		opts = append(opts, domain.WithSortBy(*params.SortBy))
 	}
-	if params.DueAfter != nil && *params.DueAfter != "" {
-		dueAfter, ok := domain.ExtractTimeFromText(*params.DueAfter, time.Now(), time.UTC)
+	if params.DueAfter != nil && params.DueBefore != nil {
+		now := lft.timeProvider.Now()
+		dueAfter, ok := domain.ExtractTimeFromText(*params.DueAfter, now, now.Location())
 		if !ok {
 			return domain.LLMChatMessage{
 				Role:    domain.ChatRole_Tool,
 				Content: `{"error":"invalid_due_after","details":"Could not parse due_after date."}`,
 			}
 		}
-		dueBefore, ok := domain.ExtractTimeFromText(*params.DueBefore, time.Now(), time.UTC)
+		dueBefore, ok := domain.ExtractTimeFromText(*params.DueBefore, now, now.Location())
 		if !ok {
 			return domain.LLMChatMessage{
 				Role:    domain.ChatRole_Tool,
@@ -645,6 +649,7 @@ func (i InitLLMToolRegistry) Initialize(ctx context.Context) (context.Context, e
 		NewTodoFetcherTool(
 			i.TodoRepo,
 			i.LLMClient,
+			i.TimeProvider,
 			i.EmbeddingModel,
 		),
 		NewTodoCreatorTool(

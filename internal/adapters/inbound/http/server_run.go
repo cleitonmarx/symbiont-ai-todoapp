@@ -12,6 +12,7 @@ import (
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
+	"github.com/rs/cors"
 )
 
 var _ gen.ServerInterface = (*TodoAppServer)(nil)
@@ -25,16 +26,17 @@ var _ gen.ServerInterface = (*TodoAppServer)(nil)
 //
 // Dependencies are automatically resolved and injected at initialization time.
 type TodoAppServer struct {
-	Port                      int                         `config:"HTTP_PORT" default:"8080"`
-	Logger                    *log.Logger                 `resolve:""`
-	ListTodosUseCase          usecases.ListTodos          `resolve:""`
-	CreateTodoUseCase         usecases.CreateTodo         `resolve:""`
-	UpdateTodoUseCase         usecases.UpdateTodo         `resolve:""`
-	DeleteTodoUseCase         usecases.DeleteTodo         `resolve:""`
-	GetBoardSummaryUseCase    usecases.GetBoardSummary    `resolve:""`
-	ListChatMessagesUseCase   usecases.ListChatMessages   `resolve:""`
-	DeleteConversationUseCase usecases.DeleteConversation `resolve:""`
-	StreamChatUseCase         usecases.StreamChat         `resolve:""`
+	Port                      int                             `config:"HTTP_PORT" default:"8080"`
+	Logger                    *log.Logger                     `resolve:""`
+	ListTodosUseCase          usecases.ListTodos              `resolve:""`
+	CreateTodoUseCase         usecases.CreateTodo             `resolve:""`
+	UpdateTodoUseCase         usecases.UpdateTodo             `resolve:""`
+	DeleteTodoUseCase         usecases.DeleteTodo             `resolve:""`
+	GetBoardSummaryUseCase    usecases.GetBoardSummary        `resolve:""`
+	ListChatMessagesUseCase   usecases.ListChatMessages       `resolve:""`
+	DeleteConversationUseCase usecases.DeleteConversation     `resolve:""`
+	ListAvailableLLMModels    usecases.ListAvailableLLMModels `resolve:""`
+	StreamChatUseCase         usecases.StreamChat             `resolve:""`
 }
 
 //go:embed webappdist/*
@@ -52,13 +54,19 @@ func (api TodoAppServer) Run(ctx context.Context) error {
 	}
 	mux.Handle("/", http.FileServerFS(sub))
 
-	// get an `http.Handler` that we can use
+	// Register introspection endpoint for debugging and testing purposes
+	mux.HandleFunc("/introspect", IntrospectHandler)
+
+	// Create the OpenAPI handler with telemetry middleware
 	h := gen.HandlerWithOptions(api, gen.StdHTTPServerOptions{
 		BaseRouter: mux,
 		Middlewares: []gen.MiddlewareFunc{
 			telemetry.Middleware("todoapp-api"),
 		},
 	})
+
+	// Apply CORS at the top-level so preflight requests hit it, too.
+	h = cors.AllowAll().Handler(h)
 
 	s := &http.Server{
 		Handler: h,

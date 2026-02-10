@@ -133,7 +133,7 @@ func TestLLMToolManager(t *testing.T) {
 			testFunc: func(t *testing.T, manager LLMToolManager) {
 				result := manager.Call(
 					context.Background(),
-					domain.LLMStreamEventFunctionCall{
+					domain.LLMStreamEventToolCall{
 						Function:  "fetch_todos",
 						Arguments: "{}",
 					},
@@ -150,7 +150,7 @@ func TestLLMToolManager(t *testing.T) {
 			testFunc: func(t *testing.T, manager LLMToolManager) {
 				result := manager.Call(
 					context.Background(),
-					domain.LLMStreamEventFunctionCall{
+					domain.LLMStreamEventToolCall{
 						Function: "unknown_tool",
 					},
 					[]domain.LLMChatMessage{},
@@ -186,7 +186,7 @@ func TestTodoFetcherTool(t *testing.T) {
 			*domain.MockLLMClient,
 			*domain.MockCurrentTimeProvider,
 		)
-		functionCall domain.LLMStreamEventFunctionCall
+		functionCall domain.LLMStreamEventToolCall
 		validateResp func(t *testing.T, resp domain.LLMChatMessage)
 	}{
 		"fetch-todos-success": {
@@ -201,7 +201,7 @@ func TestTodoFetcherTool(t *testing.T) {
 					Return([]domain.Todo{testTodo}, false, nil).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `{"page": 1, "page_size": 10}`,
 			},
@@ -239,7 +239,7 @@ func TestTodoFetcherTool(t *testing.T) {
 					Once()
 
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `{"page": 1, "page_size": 10, "status": "OPEN", "search_term": "urgent"}`,
 			},
@@ -269,7 +269,7 @@ func TestTodoFetcherTool(t *testing.T) {
 					}).
 					Return([]domain.Todo{}, false, nil)
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `{"page": 1, "page_size": 10, "sort_by": "duedateAsc"}`,
 			},
@@ -308,7 +308,7 @@ func TestTodoFetcherTool(t *testing.T) {
 					Return([]domain.Todo{testTodo}, false, nil).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `{"page": 1, "page_size": 10, "due_after": "2026-01-20", "due_before": "2026-01-30"}`,
 			},
@@ -327,7 +327,7 @@ func TestTodoFetcherTool(t *testing.T) {
 					Return(fixedTime).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `{"page": 1, "page_size": 10, "due_after": "invalid-date", "due_before": "2026-01-30"}`,
 			},
@@ -343,7 +343,7 @@ func TestTodoFetcherTool(t *testing.T) {
 					Return(fixedTime).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `{"page": 1, "page_size": 10, "due_after": "2026-01-20", "due_before": "invalid-date"}`,
 			},
@@ -356,7 +356,7 @@ func TestTodoFetcherTool(t *testing.T) {
 		"fetch-todos-invalid-arguments": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `invalid json`,
 			},
@@ -372,7 +372,7 @@ func TestTodoFetcherTool(t *testing.T) {
 					Return(domain.EmbedResponse{}, errors.New("embedding failed")).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `{"page": 1, "page_size": 10, "search_term": "search"}`,
 			},
@@ -393,7 +393,7 @@ func TestTodoFetcherTool(t *testing.T) {
 					Return(nil, false, errors.New("db error")).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `{"page": 1, "page_size": 10, "search_term": "search"}`,
 			},
@@ -414,7 +414,7 @@ func TestTodoFetcherTool(t *testing.T) {
 					Return([]domain.Todo{testTodo}, true, nil).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `{"page": 1, "page_size": 10, "search_term": "search"}`,
 			},
@@ -438,7 +438,7 @@ func TestTodoFetcherTool(t *testing.T) {
 					Return([]domain.Todo{}, false, nil).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
 				Arguments: `{"page": 1, "page_size": 10, "search_term": "search"}`,
 			},
@@ -473,7 +473,7 @@ func TestTodoCreatorTool(t *testing.T) {
 			*domain.MockCurrentTimeProvider,
 			*MockTodoCreator,
 		)
-		functionCall domain.LLMStreamEventFunctionCall
+		functionCall domain.LLMStreamEventToolCall
 		history      []domain.LLMChatMessage
 		validateResp func(t *testing.T, resp domain.LLMChatMessage)
 	}{
@@ -496,7 +496,7 @@ func TestTodoCreatorTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "create_todo",
 				Arguments: `{"title": "New Todo", "due_date": "2026-01-25"}`,
 			},
@@ -525,7 +525,7 @@ func TestTodoCreatorTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "create_todo",
 				Arguments: `{"title": "New Todo", "due_date": ""}`,
 			},
@@ -540,7 +540,7 @@ func TestTodoCreatorTool(t *testing.T) {
 		"create-todo-invalid-arguments": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *MockTodoCreator) {
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "create_todo",
 				Arguments: `invalid json`,
 			},
@@ -557,7 +557,7 @@ func TestTodoCreatorTool(t *testing.T) {
 					Return(fixedTime).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "create_todo",
 				Arguments: `{"title": "New Todo", "due_date": "invalid"}`,
 			},
@@ -586,7 +586,7 @@ func TestTodoCreatorTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "create_todo",
 				Arguments: `{"title": "New Todo", "due_date": "2026-01-25"}`,
 			},
@@ -608,7 +608,7 @@ func TestTodoCreatorTool(t *testing.T) {
 					Return(errors.New("uow error")).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "create_todo",
 				Arguments: `{"title": "New Todo", "due_date": "2026-01-25"}`,
 			},
@@ -640,7 +640,7 @@ func TestTodoMetaUpdaterTool(t *testing.T) {
 
 	tests := map[string]struct {
 		setupMocks   func(*domain.MockUnitOfWork, *MockTodoUpdater)
-		functionCall domain.LLMStreamEventFunctionCall
+		functionCall domain.LLMStreamEventToolCall
 		validateResp func(t *testing.T, resp domain.LLMChatMessage)
 	}{
 		"update-todo-success": {
@@ -670,7 +670,7 @@ func TestTodoMetaUpdaterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "update_todo",
 				Arguments: `{"id": "` + todoID.String() + `", "title": "Updated", "status": "DONE"}`,
 			},
@@ -682,7 +682,7 @@ func TestTodoMetaUpdaterTool(t *testing.T) {
 		"update-todo-invalid-arguments": {
 			setupMocks: func(uow *domain.MockUnitOfWork, updater *MockTodoUpdater) {
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "update_todo",
 				Arguments: `invalid json`,
 			},
@@ -694,7 +694,7 @@ func TestTodoMetaUpdaterTool(t *testing.T) {
 		"update-todo-invalid-id": {
 			setupMocks: func(uow *domain.MockUnitOfWork, updater *MockTodoUpdater) {
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "update_todo",
 				Arguments: `{"id": "invalid-uuid", "title": "Updated"}`,
 			},
@@ -723,7 +723,7 @@ func TestTodoMetaUpdaterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "update_todo",
 				Arguments: `{"id": "` + todoID.String() + `", "title": "Updated"}`,
 			},
@@ -754,7 +754,7 @@ func TestTodoDueDateUpdaterTool(t *testing.T) {
 
 	tests := map[string]struct {
 		setupMocks   func(*domain.MockUnitOfWork, *domain.MockCurrentTimeProvider, *MockTodoUpdater)
-		functionCall domain.LLMStreamEventFunctionCall
+		functionCall domain.LLMStreamEventToolCall
 		history      []domain.LLMChatMessage
 		validateResp func(t *testing.T, resp domain.LLMChatMessage)
 	}{
@@ -789,7 +789,7 @@ func TestTodoDueDateUpdaterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "update_todo_due_date",
 				Arguments: `{"id": "` + todoID.String() + `", "due_date": "2026-02-01"}`,
 			},
@@ -830,7 +830,7 @@ func TestTodoDueDateUpdaterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "update_todo_due_date",
 				Arguments: `{"id": "` + todoID.String() + `", "due_date": ""}`,
 			},
@@ -845,7 +845,7 @@ func TestTodoDueDateUpdaterTool(t *testing.T) {
 		"update-due-date-invalid-arguments": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *MockTodoUpdater) {
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "update_todo_due_date",
 				Arguments: `invalid json`,
 			},
@@ -858,7 +858,7 @@ func TestTodoDueDateUpdaterTool(t *testing.T) {
 		"update-due-date-invalid-id": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *MockTodoUpdater) {
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "update_todo_due_date",
 				Arguments: `{"id": "00000000-0000-0000-0000-000000000000", "due_date": "2026-02-01"}`,
 			},
@@ -893,7 +893,7 @@ func TestTodoDueDateUpdaterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "update_todo_due_date",
 				Arguments: `{"id": "` + todoID.String() + `", "due_date": "2026-02-01"}`,
 			},
@@ -925,7 +925,7 @@ func TestTodoDeleterTool(t *testing.T) {
 
 	tests := map[string]struct {
 		setupMocks   func(*domain.MockUnitOfWork, *MockTodoDeleter)
-		functionCall domain.LLMStreamEventFunctionCall
+		functionCall domain.LLMStreamEventToolCall
 		validateResp func(t *testing.T, resp domain.LLMChatMessage)
 	}{
 		"delete-todo-success": {
@@ -945,7 +945,7 @@ func TestTodoDeleterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "delete_todo",
 				Arguments: `{"id": "` + todoID.String() + `"}`,
 			},
@@ -957,7 +957,7 @@ func TestTodoDeleterTool(t *testing.T) {
 		"delete-todo-invalid-arguments": {
 			setupMocks: func(uow *domain.MockUnitOfWork, deleter *MockTodoDeleter) {
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "delete_todo",
 				Arguments: `invalid json`,
 			},
@@ -983,7 +983,7 @@ func TestTodoDeleterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventFunctionCall{
+			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "delete_todo",
 				Arguments: `{"id": "` + todoID.String() + `"}`,
 			},

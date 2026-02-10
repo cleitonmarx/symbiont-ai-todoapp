@@ -1,36 +1,131 @@
-import { useState, useCallback, useRef } from 'react';
-import { fetchChatMessages, clearChatMessages, streamChat } from '../services/api';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { fetchChatMessages, clearChatMessages, fetchAvailableModels, streamChat } from '../services/chatApi';
 import type { ChatMessage } from '../types';
 
 interface UseChatReturn {
   messages: ChatMessage[];
+  models: string[];
+  selectedModel: string;
+  toolStatus: string | null;
+  toolStatusCount: number;
   loading: boolean;
+  loadingModels: boolean;
   error: string | null;
   loadMessages: () => Promise<void>;
+  loadModels: () => Promise<void>;
+  setSelectedModel: (model: string) => void;
   sendMessage: (message: string) => Promise<void>;
   clearChat: () => Promise<void>;
   stopStream: () => void;
 }
 
+const CHAT_SELECTED_MODEL_STORAGE_KEY = 'todoapp.chat.selectedModel';
+
+const loadPersistedModel = (): string => {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  try {
+    return window.localStorage.getItem(CHAT_SELECTED_MODEL_STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+};
+
+const persistModel = (model: string): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (model) {
+      window.localStorage.setItem(CHAT_SELECTED_MODEL_STORAGE_KEY, model);
+    } else {
+      window.localStorage.removeItem(CHAT_SELECTED_MODEL_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage failures (e.g., private mode restrictions).
+  }
+};
+
 export const useChat = (onChatDone?: () => void): UseChatReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [models, setModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState(loadPersistedModel);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const [toolStatusCount, setToolStatusCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const readerRef = useRef<ReadableStreamReader<Uint8Array> | null>(null);
+  const toolStatusKeyRef = useRef<string | null>(null);
+  const toolStatusCountRef = useRef(0);
+
+  const clearToolStatus = useCallback(() => {
+    toolStatusKeyRef.current = null;
+    toolStatusCountRef.current = 0;
+    setToolStatus(null);
+    setToolStatusCount(0);
+  }, []);
+
+  const updateToolStatus = useCallback((text: string, fnName?: string) => {
+    const normalizedText = text.trim();
+    if (!normalizedText) {
+      return;
+    }
+
+    const normalizedFnName = typeof fnName === 'string' ? fnName.trim().toLowerCase() : '';
+    const key = normalizedFnName || normalizedText.toLowerCase();
+
+    if (toolStatusKeyRef.current === key) {
+      toolStatusCountRef.current += 1;
+    } else {
+      toolStatusKeyRef.current = key;
+      toolStatusCountRef.current = 1;
+    }
+
+    setToolStatus(normalizedText);
+    setToolStatusCount(toolStatusCountRef.current);
+  }, []);
 
   const loadMessages = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetchChatMessages(1, 200);
       setMessages(response.messages || []);
+      clearToolStatus();
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load messages');
     } finally {
       setLoading(false);
     }
+  }, [clearToolStatus]);
+
+  const loadModels = useCallback(async () => {
+    try {
+      setLoadingModels(true);
+      const availableModels = await fetchAvailableModels();
+      setModels(availableModels);
+      setSelectedModel((current) => {
+        if (current && availableModels.includes(current)) {
+          return current;
+        }
+        return availableModels[0] ?? '';
+      });
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load models');
+    } finally {
+      setLoadingModels(false);
+    }
   }, []);
+
+  useEffect(() => {
+    persistModel(selectedModel);
+  }, [selectedModel]);
 
   const stopStream = useCallback(() => {
     // Cancel the fetch request
@@ -45,15 +140,17 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
       readerRef.current = null;
     }
 
+    clearToolStatus();
     setLoading(false);
     setError('Stream stopped by user');
-  }, []);
+  }, [clearToolStatus]);
 
   const sendMessage = useCallback(async (message: string) => {
     if (!message.trim()) return;
 
     try {
       setLoading(true);
+      clearToolStatus();
       setError(null);
 
       // Create new abort controller for this request
@@ -67,7 +164,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      const response = await streamChat(message, abortControllerRef.current.signal);
+      const response = await streamChat(message, selectedModel, abortControllerRef.current.signal);
 
       if (!response.body) {
         throw new Error('No response body');
@@ -113,6 +210,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
           }
 
           if (eventType === 'delta' && data.Text) {
+            clearToolStatus();
             assistantContent += data.Text;
 
             setMessages((prev) => {
@@ -131,10 +229,20 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
             return;
           }
 
+          if (eventType === 'tool_call') {
+            const functionCallText = data.Text ?? data.text;
+            const functionCallName = data.Function ?? data.function;
+            if (typeof functionCallText === 'string' && functionCallText.trim() !== '') {
+              updateToolStatus(functionCallText, typeof functionCallName === 'string' ? functionCallName : undefined);
+            }
+            return;
+          }
+
           if (eventType === 'done') {
             if (data.AssistantMessageID) {
               assistantMessageId = data.AssistantMessageID;
             }
+            clearToolStatus();
             setLoading(false);
             readerRef.current = null;
             abortControllerRef.current = null;
@@ -148,6 +256,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
               : data.error === 'client_closed'
               ? 'Connection closed'
               : 'Failed to get response from assistant';
+            clearToolStatus();
             setError(errorMsg);
             setLoading(false);
             readerRef.current = null;
@@ -165,6 +274,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
             readerRef.current.cancel();
             readerRef.current = null;
           }
+          clearToolStatus();
           setLoading(false);
           setError('Stream stopped by user');
           abortControllerRef.current = null;
@@ -191,6 +301,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
       }
 
       setLoading(false);
+      clearToolStatus();
       readerRef.current = null;
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -198,27 +309,36 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
       } else {
         setError(err instanceof Error ? err.message : 'Failed to send message');
       }
+      clearToolStatus();
       setLoading(false);
       readerRef.current = null;
       abortControllerRef.current = null;
     }
-  }, [onChatDone]);
+  }, [clearToolStatus, onChatDone, selectedModel, updateToolStatus]);
 
   const clearChat = useCallback(async () => {
     try {
       await clearChatMessages();
       setMessages([]);
+      clearToolStatus();
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to clear chat');
     }
-  }, []);
+  }, [clearToolStatus]);
 
   return {
     messages,
+    models,
+    selectedModel,
+    toolStatus,
+    toolStatusCount,
     loading,
+    loadingModels,
     error,
     loadMessages,
+    loadModels,
+    setSelectedModel,
     sendMessage,
     clearChat,
     stopStream,

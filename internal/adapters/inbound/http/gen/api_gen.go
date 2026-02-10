@@ -104,7 +104,11 @@ type ChatMessageRole string
 
 // ChatStreamRequest defines model for ChatStreamRequest.
 type ChatStreamRequest struct {
+	// Message User message to send to the AI assistant.
 	Message string `json:"message"`
+
+	// Model AI model to use for generating the assistant response. If omitted, the system default model is used.
+	Model string `json:"model"`
 }
 
 // CreateTodoRequest Request payload for creating a todo.
@@ -163,6 +167,12 @@ type ListTodosResp struct {
 
 	// PreviousPage Opaque cursor to fetch the previous page of results. Null if there is no previous page.
 	PreviousPage *int `json:"previous_page"`
+}
+
+// ModelListResp List of available AI models.
+type ModelListResp struct {
+	// Models Available AI model identifiers.
+	Models []string `json:"models"`
 }
 
 // NextUpTodoItem defines model for NextUpTodoItem.
@@ -619,6 +629,9 @@ type ClientInterface interface {
 	// ListChatMessages request
 	ListChatMessages(ctx context.Context, params *ListChatMessagesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAvailableModels request
+	ListAvailableModels(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListTodos request
 	ListTodos(ctx context.Context, params *ListTodosParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -686,6 +699,18 @@ func (c *Client) ClearChatMessages(ctx context.Context, reqEditors ...RequestEdi
 
 func (c *Client) ListChatMessages(ctx context.Context, params *ListChatMessagesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListChatMessagesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListAvailableModels(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAvailableModelsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -909,6 +934,33 @@ func NewListChatMessagesRequest(server string, params *ListChatMessagesParams) (
 		}
 
 		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAvailableModelsRequest generates requests for ListAvailableModels
+func NewListAvailableModelsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/models")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -1218,6 +1270,9 @@ type ClientWithResponsesInterface interface {
 	// ListChatMessagesWithResponse request
 	ListChatMessagesWithResponse(ctx context.Context, params *ListChatMessagesParams, reqEditors ...RequestEditorFn) (*ListChatMessagesResponse, error)
 
+	// ListAvailableModelsWithResponse request
+	ListAvailableModelsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAvailableModelsResponse, error)
+
 	// ListTodosWithResponse request
 	ListTodosWithResponse(ctx context.Context, params *ListTodosParams, reqEditors ...RequestEditorFn) (*ListTodosResponse, error)
 
@@ -1320,6 +1375,29 @@ func (r ListChatMessagesResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListChatMessagesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListAvailableModelsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ModelListResp
+	JSON500      *ErrorResp
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAvailableModelsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAvailableModelsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1459,6 +1537,15 @@ func (c *ClientWithResponses) ListChatMessagesWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseListChatMessagesResponse(rsp)
+}
+
+// ListAvailableModelsWithResponse request returning *ListAvailableModelsResponse
+func (c *ClientWithResponses) ListAvailableModelsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAvailableModelsResponse, error) {
+	rsp, err := c.ListAvailableModels(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAvailableModelsResponse(rsp)
 }
 
 // ListTodosWithResponse request returning *ListTodosResponse
@@ -1638,6 +1725,39 @@ func ParseListChatMessagesResponse(rsp *http.Response) (*ListChatMessagesRespons
 	return response, nil
 }
 
+// ParseListAvailableModelsResponse parses an HTTP response from a ListAvailableModelsWithResponse call
+func ParseListAvailableModelsResponse(rsp *http.Response) (*ListAvailableModelsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAvailableModelsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ModelListResp
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResp
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListTodosResponse parses an HTTP response from a ListTodosWithResponse call
 func ParseListTodosResponse(rsp *http.Response) (*ListTodosResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1777,6 +1897,9 @@ type ServerInterface interface {
 	// Fetch chat history (single global chat)
 	// (GET /api/v1/chat/messages)
 	ListChatMessages(w http.ResponseWriter, r *http.Request, params ListChatMessagesParams)
+	// List available AI models
+	// (GET /api/v1/models)
+	ListAvailableModels(w http.ResponseWriter, r *http.Request)
 	// List todos
 	// (GET /api/v1/todos)
 	ListTodos(w http.ResponseWriter, r *http.Request, params ListTodosParams)
@@ -1882,6 +2005,20 @@ func (siw *ServerInterfaceWrapper) ListChatMessages(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListChatMessages(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAvailableModels operation middleware
+func (siw *ServerInterfaceWrapper) ListAvailableModels(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAvailableModels(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2160,6 +2297,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/chat", wrapper.StreamChat)
 	m.HandleFunc("DELETE "+options.BaseURL+"/api/v1/chat/messages", wrapper.ClearChatMessages)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/chat/messages", wrapper.ListChatMessages)
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/models", wrapper.ListAvailableModels)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/todos", wrapper.ListTodos)
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/todos", wrapper.CreateTodo)
 	m.HandleFunc("DELETE "+options.BaseURL+"/api/v1/todos/{todo_id}", wrapper.DeleteTodo)

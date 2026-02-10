@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -11,10 +10,10 @@ import (
 type LLMStreamEventType string
 
 const (
-	LLMStreamEventType_Meta         LLMStreamEventType = "meta"
-	LLMStreamEventType_Delta        LLMStreamEventType = "delta"
-	LLMStreamEventType_FunctionCall LLMStreamEventType = "function_call"
-	LLMStreamEventType_Done         LLMStreamEventType = "done"
+	LLMStreamEventType_Meta     LLMStreamEventType = "meta"
+	LLMStreamEventType_Delta    LLMStreamEventType = "delta"
+	LLMStreamEventType_ToolCall LLMStreamEventType = "tool_call"
+	LLMStreamEventType_Done     LLMStreamEventType = "done"
 )
 
 // LLMTool represents a tool that can be executed by the LLM
@@ -23,16 +22,16 @@ type LLMTool interface {
 	Definition() LLMToolDefinition
 	// StatusMessage returns a user-friendly status line for this tool
 	StatusMessage() string
-	// Call executes the tool with the given function call and chat messages
-	Call(context.Context, LLMStreamEventFunctionCall, []LLMChatMessage) LLMChatMessage
+	// Call executes the tool with the given tool call and chat messages
+	Call(context.Context, LLMStreamEventToolCall, []LLMChatMessage) LLMChatMessage
 }
 
 // LLMToolRegistry defines the interface for calling registered LLM tools.
 type LLMToolRegistry interface {
-	// Call executes the tool with the given function call and chat messages
-	Call(context.Context, LLMStreamEventFunctionCall, []LLMChatMessage) LLMChatMessage
+	// Call executes the tool with the given tool call and chat messages
+	Call(context.Context, LLMStreamEventToolCall, []LLMChatMessage) LLMChatMessage
 	// StatusMessage returns a friendly status message for the given tool name.
-	StatusMessage(functionName string) string
+	StatusMessage(toolName string) string
 	// List returns all registered LLM tools.
 	List() []LLMToolDefinition
 }
@@ -42,7 +41,7 @@ type LLMChatMessage struct {
 	Role       ChatRole
 	Content    string
 	ToolCallID *string
-	ToolCalls  []LLMStreamEventFunctionCall
+	ToolCalls  []LLMStreamEventToolCall
 }
 
 // LLMChatRequest represents a request to the LLM API
@@ -85,10 +84,8 @@ type LLMToolFunctionParameterDetail struct {
 
 // LLMStreamEventMeta contains metadata for a streaming chat session
 type LLMStreamEventMeta struct {
-	ConversationID     string
 	UserMessageID      uuid.UUID
 	AssistantMessageID uuid.UUID
-	StartedAt          time.Time
 }
 
 // LLMStreamEventDelta contains a text delta from the stream
@@ -96,11 +93,12 @@ type LLMStreamEventDelta struct {
 	Text string
 }
 
-type LLMStreamEventFunctionCall struct {
+// LLMStreamEventToolCall contains a function call delta from the stream
+type LLMStreamEventToolCall struct {
 	ID        string
-	Index     int
 	Function  string
 	Arguments string
+	Text      string
 }
 
 // LLMStreamEventDone contains completion metadata and token usage
@@ -110,20 +108,36 @@ type LLMStreamEventDone struct {
 	CompletedAt        string
 }
 
+// LLMUsage contains token usage information
 type LLMUsage struct {
 	PromptTokens     int
 	CompletionTokens int
 	TotalTokens      int
 }
 
+// LLMChatResponse represents the response from a chat request to the LLM API
 type LLMChatResponse struct {
 	Content string
 	Usage   LLMUsage
 }
 
+// EmbedResponse represents the response from an embedding request to the LLM API
 type EmbedResponse struct {
 	Embedding   []float64
 	TotalTokens int
+}
+
+type LLMModelType string
+
+const (
+	LLMModelType_Chat      LLMModelType = "chat"
+	LLMModelType_Embedding LLMModelType = "embedding"
+)
+
+// LLMModelInfo represents information about an available LLM model
+type LLMModelInfo struct {
+	Name string
+	Type LLMModelType
 }
 
 // LLMStreamEventCallback is called for each event in the stream
@@ -140,4 +154,7 @@ type LLMClient interface {
 
 	// Embed generates an embedding vector for the given input text
 	Embed(ctx context.Context, model, input string) (EmbedResponse, error)
+
+	// AvailableModels retrieves the list of available models
+	AvailableModels(ctx context.Context) ([]LLMModelInfo, error)
 }

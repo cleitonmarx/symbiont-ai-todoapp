@@ -73,7 +73,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 							len(req.Messages) == 2 &&
 							req.Messages[0].Role == "developer" &&
 							req.Messages[1].Role == "user" &&
-							strings.Contains(req.Messages[0].Content, "You are a helpful assistant that summarizes todo lists") &&
+							strings.Contains(req.Messages[0].Content, "You are a helpful assistant that summarizes todo progress") &&
 							strings.Contains(req.Messages[1].Content, "Open: 2\n  Done: 1")
 					}),
 				).Return(domain.LLMChatResponse{Content: "You have 2 open todos, 1 overdue todo, and 1 completed todo."}, nil)
@@ -168,4 +168,41 @@ func TestInitGenerateBoardSummary_Initialize(t *testing.T) {
 	registeredGbs, err := depend.Resolve[GenerateBoardSummary]()
 	assert.NoError(t, err)
 	assert.NotNil(t, registeredGbs)
+}
+
+func TestApplySummarySafetyGuards(t *testing.T) {
+	tests := map[string]struct {
+		content domain.BoardSummaryContent
+		summary string
+		want    string
+	}{
+		"strips-overdue-qualifiers": {
+			content: domain.BoardSummaryContent{
+				Overdue: []string{},
+			},
+			summary: "Great progress! Focus on the overdue chimney cleaning and late digital backups.",
+			want:    "Great progress! Focus on the chimney cleaning and digital backups.",
+		},
+		"keeps-overdue-wording": {
+			content: domain.BoardSummaryContent{
+				Overdue: []string{"Schedule chimney cleaning"},
+			},
+			summary: "Focus on the overdue chimney cleaning.",
+			want:    "Focus on the overdue chimney cleaning.",
+		},
+		"preserves-no-overdue-statements": {
+			content: domain.BoardSummaryContent{
+				Overdue: []string{},
+			},
+			summary: "Nice momentum, no overdue tasks right now.",
+			want:    "Nice momentum, no overdue tasks right now.",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := applySummarySafetyGuards(tt.summary, tt.content)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

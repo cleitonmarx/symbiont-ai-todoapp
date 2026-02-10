@@ -22,12 +22,8 @@ func (i *InitDockerCompose) Initialize(ctx context.Context) (context.Context, er
 	i.compose = dc
 
 	err = i.compose.
-		WaitForService("postgres", wait.NewLogStrategy(
-			"database system is ready to accept connections",
-		)).
-		WaitForService("vault", wait.NewLogStrategy(
-			"Vault server started!",
-		)).
+		WaitForService("postgres", wait.ForHealthCheck()).
+		WaitForService("vault", wait.ForHealthCheck()).
 		Up(ctx, compose.Wait(true))
 	if err != nil {
 		return ctx, err
@@ -58,13 +54,13 @@ type initEnvVars struct {
 
 func (i *initEnvVars) Initialize(ctx context.Context) (context.Context, error) {
 	for key, value := range i.envVars {
-		os.Setenv(key, value) //nolint:errcheck
+		_ = os.Setenv(key, value)
 	}
 	return ctx, nil
 }
 
 func (i *initEnvVars) Close() {
 	for key := range i.envVars {
-		os.Unsetenv(key) //nolint:errcheck
+		_ = os.Unsetenv(key)
 	}
 }

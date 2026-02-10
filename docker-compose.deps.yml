@@ -60,9 +60,12 @@ services:
 
 
 models:
-  qwen2.5:
-    model: qwen2.5:7B-Q4_0
+  qwen3:
+    model: qwen3:8B-Q4_0
     context_size: 16384
+    runtime_flags:
+      - "--batch-size"
+      - "1024"
   embeddinggemma:
     model: embeddinggemma:300M-Q8_0
     

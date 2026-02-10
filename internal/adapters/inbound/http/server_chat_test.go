@@ -223,11 +223,11 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 		expectedError  *gen.ErrorResp
 	}{
 		"success": {
-			requestBody: gen.StreamChatJSONRequestBody{Message: "Hello"},
+			requestBody: gen.StreamChatJSONRequestBody{Message: "Hello", Model: "qwen2.5:7B-Q4_0"},
 			setupUsecases: func(m *usecases.MockStreamChat) {
 				m.EXPECT().
-					Execute(mock.Anything, "Hello", mock.Anything).
-					Run(func(ctx context.Context, msg string, cb domain.LLMStreamEventCallback) {
+					Execute(mock.Anything, "Hello", "qwen2.5:7B-Q4_0", mock.Anything).
+					Run(func(ctx context.Context, msg string, model string, cb domain.LLMStreamEventCallback) {
 						_ = cb(domain.LLMStreamEventType_Meta, map[string]string{"info": "test"})
 						_ = cb(domain.LLMStreamEventType_Delta, map[string]string{"text": "Hi!"})
 					}).
@@ -248,10 +248,10 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 			},
 		},
 		"use-case-error": {
-			requestBody: gen.StreamChatJSONRequestBody{Message: "fail"},
+			requestBody: gen.StreamChatJSONRequestBody{Message: "fail", Model: "qwen2.5:7B-Q4_0"},
 			setupUsecases: func(m *usecases.MockStreamChat) {
 				m.EXPECT().
-					Execute(mock.Anything, "fail", mock.Anything).
+					Execute(mock.Anything, "fail", "qwen2.5:7B-Q4_0", mock.Anything).
 					Return(errors.New("stream error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
@@ -322,3 +322,79 @@ func newMockFlusherRecorder() *mockFlusherRecorder {
 }
 
 func (m *mockFlusherRecorder) Flush() {}
+
+func TestTodoAppServer_ListAvailableModels(t *testing.T) {
+	tests := map[string]struct {
+		setupUsecase   func(*usecases.MockListAvailableLLMModels)
+		expectedStatus int
+		expectedBody   *gen.ModelListResp
+		expectedError  *gen.ErrorResp
+	}{
+		"filters-only-chat-models": {
+			setupUsecase: func(m *usecases.MockListAvailableLLMModels) {
+				m.EXPECT().
+					Query(mock.Anything).
+					Return([]domain.LLMModelInfo{
+						{Name: "gpt-4", Type: domain.LLMModelType_Chat},
+						{Name: "text-embed", Type: domain.LLMModelType_Embedding},
+						{Name: "gpt-3.5", Type: domain.LLMModelType_Chat},
+					}, nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: &gen.ModelListResp{
+				Models: []string{"gpt-4", "gpt-3.5"},
+			},
+		},
+		"returns-error-on-usecase-failure": {
+			setupUsecase: func(m *usecases.MockListAvailableLLMModels) {
+				m.EXPECT().
+					Query(mock.Anything).
+					Return(nil, errors.New("database error"))
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.INTERNALERROR,
+					Message: "internal server error",
+				},
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			mockListAvailable := usecases.NewMockListAvailableLLMModels(t)
+			if tt.setupUsecase != nil {
+				tt.setupUsecase(mockListAvailable)
+			}
+
+			api := TodoAppServer{
+				ListAvailableLLMModels: mockListAvailable,
+				Logger:                 log.New(io.Discard, "", 0),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/models", nil)
+			rr := httptest.NewRecorder()
+
+			api.ListAvailableModels(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code)
+
+			if tt.expectedBody != nil {
+				var response gen.ModelListResp
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.ElementsMatch(t, tt.expectedBody.Models, response.Models)
+			}
+
+			if tt.expectedError != nil {
+				var response gen.ErrorResp
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Equal(t, *tt.expectedError, response)
+			}
+
+			mockListAvailable.AssertExpectations(t)
+		})
+	}
+}

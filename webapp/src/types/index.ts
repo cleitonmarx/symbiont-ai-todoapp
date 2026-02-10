@@ -52,6 +52,11 @@ export interface ChatHistoryResp {
 
 export interface ChatStreamRequest {
   message: string;
+  model: string;
+}
+
+export interface ModelListResponse {
+  models: string[];
 }
 
 export interface ChatStreamMeta {

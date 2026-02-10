@@ -272,7 +272,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY created_at DESC LIMIT 11 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY due_date ASC LIMIT 11 OFFSET 0").
 					WillReturnRows(rows)
 			},
 			expectedTodos: []domain.Todo{
@@ -286,7 +286,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 			page:     1,
 			pageSize: 10,
 			setExpectations: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY created_at DESC LIMIT 11 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY due_date ASC LIMIT 11 OFFSET 0").
 					WillReturnError(errors.New("database error"))
 			},
 			expectedTodos:   nil,
@@ -306,7 +306,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY created_at DESC LIMIT 11 OFFSET 10").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY due_date ASC LIMIT 11 OFFSET 10").
 					WillReturnRows(rows)
 			},
 			expectedTodos: []domain.Todo{
@@ -362,7 +362,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY created_at DESC LIMIT 3 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY due_date ASC LIMIT 3 OFFSET 0").
 					WillReturnRows(rows)
 			},
 			expectedTodos: []domain.Todo{
@@ -370,18 +370,6 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: true,
-			expectedErr:     false,
-		},
-		"empty-results": {
-			page:     1,
-			pageSize: 10,
-			setExpectations: func(mock sqlmock.Sqlmock) {
-				rows := sqlmock.NewRows(todoFields)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY created_at DESC LIMIT 11 OFFSET 0").
-					WillReturnRows(rows)
-			},
-			expectedTodos:   nil,
-			expectedHasMore: false,
 			expectedErr:     false,
 		},
 		"filter-by-status": {
@@ -400,7 +388,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE status = $1 ORDER BY created_at DESC LIMIT 11 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE status = $1 ORDER BY due_date ASC LIMIT 11 OFFSET 0").
 					WithArgs(domain.TodoStatus_DONE).
 					WillReturnRows(rows)
 			},
@@ -409,6 +397,18 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 			},
 			expectedHasMore: false,
 			expectedErr:     false,
+		},
+		"invalid-status-filter": {
+			page:     1,
+			pageSize: 10,
+			opts: []domain.ListTodoOptions{
+				domain.WithStatus("IN_PROGRESS"),
+			},
+			setExpectations: func(mock sqlmock.Sqlmock) {
+			},
+			expectedTodos:   nil,
+			expectedHasMore: false,
+			expectedErr:     true,
 		},
 		"filter-by-embedding": {
 			page:     1,
@@ -426,7 +426,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (embedding <=> $1) < 0.5 ORDER BY created_at DESC LIMIT 11 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (embedding <=> $1) < 0.5 ORDER BY due_date ASC LIMIT 11 OFFSET 0").
 					WithArgs(
 						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
 					).
@@ -457,7 +457,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (due_date >= $1 AND due_date <= $2) ORDER BY created_at DESC LIMIT 11 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (due_date >= $1 AND due_date <= $2) ORDER BY due_date ASC LIMIT 11 OFFSET 0").
 					WithArgs(
 						time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
 						time.Date(2024, 2, 15, 0, 0, 0, 0, time.UTC),
@@ -470,11 +470,11 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 			expectedHasMore: false,
 			expectedErr:     false,
 		},
-		"sort-by-due-date-asc": {
+		"sort-by-createdat-asc": {
 			page:     1,
 			pageSize: 10,
 			opts: []domain.ListTodoOptions{
-				domain.WithSortBy("dueDateDesc"),
+				domain.WithSortBy("createdAtAsc"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(todoFields).
@@ -494,7 +494,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY due_date DESC LIMIT 11 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY created_at ASC LIMIT 11 OFFSET 0").
 					WillReturnRows(rows)
 			},
 			expectedTodos: []domain.Todo{

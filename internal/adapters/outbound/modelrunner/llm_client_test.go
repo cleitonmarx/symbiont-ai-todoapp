@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/stretchr/testify/assert"
 )
@@ -56,7 +57,8 @@ func collectStreamEvents(adapter LLMClient, req domain.LLMChatRequest) ([]domain
 
 func TestLLMClientAdapter_ChatStream(t *testing.T) {
 	req := domain.LLMChatRequest{
-		Model: "test-model",
+		Stream: true,
+		Model:  "test-model",
 		Messages: []domain.LLMChatMessage{
 			{Role: "user", Content: "test"},
 		},
@@ -73,7 +75,7 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 			chunks: []StreamChunk{
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "Hello"}}}},
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: " "}}}},
-				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "world"}}}},
+				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "world"}}}, Usage: &Usage{PromptTokens: 5, CompletionTokens: 5, TotalTokens: 10}},
 			},
 			expectedEvents:  []domain.LLMStreamEventType{"meta", "delta", "delta", "delta", "done"},
 			expectedContent: "Hello world",
@@ -86,27 +88,24 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 			expectedEvents:  []domain.LLMStreamEventType{"meta", "done"},
 			expectedContent: "",
 		},
-		"no-usage-fallback": {
-			req: req,
-			chunks: []StreamChunk{
-				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "test"}}}},
-			},
-			expectedEvents:  []domain.LLMStreamEventType{"meta", "delta", "done"},
-			expectedContent: "test",
-		},
 		"with-tool-calls": {
 			req: domain.LLMChatRequest{
 				Model: "test-model",
 				Messages: []domain.LLMChatMessage{
 					{
-						Role: domain.ChatRole_Tool,
-						ToolCalls: []domain.LLMStreamEventFunctionCall{
+						Role: domain.ChatRole_Assistant,
+						ToolCalls: []domain.LLMStreamEventToolCall{
 							{
 								ID:        "toolcall-1",
 								Function:  "list_todos",
 								Arguments: `{"search_term":"books","page":1,"page_size":5}`,
 							},
 						},
+					},
+					{
+						Role:       domain.ChatRole_Tool,
+						ToolCallID: common.Ptr("toolcall-1"),
+						Content:    `{"todos":[{"id":1,"text":"Buy book","done":false}]}`,
 					},
 				},
 				Tools: []domain.LLMToolDefinition{
@@ -143,7 +142,7 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 				},
 			},
 
-			expectedEvents:  []domain.LLMStreamEventType{"meta", "function_call", "done"},
+			expectedEvents:  []domain.LLMStreamEventType{"meta", "tool_call", "done"},
 			expectedContent: "",
 		},
 	}
@@ -210,7 +209,7 @@ func TestLLMClientAdapter_Chat(t *testing.T) {
 		validateReq  func(*testing.T, *ChatRequest)
 	}{
 		"success": {
-			response:   `{"choices":[{"message":{"role":"assistant","content":"Hello!"}}]}`,
+			response:   `{"choices":[{"message":{"role":"assistant","content":"Hello!"}}],"usage": {"completion_tokens": 10,"prompt_tokens": 10,"total_tokens": 20}}`,
 			statusCode: http.StatusOK,
 			req: domain.LLMChatRequest{
 				Model: "test-model",
@@ -412,6 +411,71 @@ func TestLLMClientAdapter_Embed(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedVec, vec.Embedding)
+		})
+	}
+}
+
+func TestLLMClientAdapter_AvailableModels(t *testing.T) {
+	tests := map[string]struct {
+		response   string
+		statusCode int
+		expectErr  bool
+		expected   []domain.LLMModelInfo
+	}{
+		"success": {
+			statusCode: http.StatusOK,
+			response: `{
+                "object": "list",
+                "data": [
+                    { "id": "docker.io/ai/qwen3-embedding" },
+                    { "id": "docker.io/ai/llama3" }
+                ]
+            }`,
+			expected: []domain.LLMModelInfo{
+				{Name: "qwen3-embedding", Type: domain.LLMModelType_Embedding},
+				{Name: "llama3", Type: domain.LLMModelType_Chat},
+			},
+		},
+		"empty-list": {
+			statusCode: http.StatusOK,
+			response: `{
+                "object": "list",
+                "data": []
+            }`,
+			expected: []domain.LLMModelInfo{},
+		},
+		"server-error": {
+			statusCode: http.StatusInternalServerError,
+			response:   "Internal Server Error",
+			expectErr:  true,
+		},
+		"invalid-json": {
+			statusCode: http.StatusOK,
+			response:   `{invalid json}`,
+			expectErr:  true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.response)) //nolint:errcheck
+			}))
+			defer server.Close()
+
+			client := NewDRMAPIClient(server.URL, "", server.Client())
+			adapter := NewLLMClientAdapter(client)
+
+			models, err := adapter.AvailableModels(context.Background())
+
+			if tt.expectErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, models)
 		})
 	}
 }

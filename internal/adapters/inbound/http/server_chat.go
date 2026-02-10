@@ -78,7 +78,7 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, func(eventType domain.LLMStreamEventType, data any) error {
+	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(eventType domain.LLMStreamEventType, data any) error {
 		dataBytes, err := json.Marshal(data)
 		if err != nil {
 			return err
@@ -100,4 +100,22 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 		api.Logger.Printf("StreamChat: error during streaming: %v", err)
 		respondError(w, toError(err))
 	}
+}
+
+func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Request) {
+	models, err := api.ListAvailableLLMModels.Query(r.Context())
+	if err != nil {
+		respondError(w, toError(err))
+		return
+	}
+
+	rp := gen.ModelListResp{}
+	for _, m := range models {
+		if m.Type != domain.LLMModelType_Chat {
+			continue
+		}
+		rp.Models = append(rp.Models, m.Name)
+	}
+
+	respondJSON(w, http.StatusOK, rp)
 }

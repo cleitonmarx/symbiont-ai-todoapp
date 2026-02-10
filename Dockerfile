@@ -5,6 +5,12 @@ WORKDIR /webapp
 
 COPY webapp/ ./
 
+ARG VITE_API_BASE_URL=http://localhost:8080
+ARG VITE_GRAPHQL_ENDPOINT=http://localhost:8085/v1/query
+
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_GRAPHQL_ENDPOINT=$VITE_GRAPHQL_ENDPOINT
+
 RUN npm install --legacy-peer-deps
 
 RUN npm run build

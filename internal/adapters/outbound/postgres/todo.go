@@ -65,6 +65,9 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 	}
 
 	if params.Status != nil {
+		if err := params.Status.Validate(); err != nil {
+			return nil, false, err
+		}
 		qry = qry.Where(squirrel.Eq{"status": *params.Status})
 	}
 
@@ -122,7 +125,7 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 // applySort applies sorting to the given squirrel SelectBuilder based on the provided ListTodosParams.
 func applySort(qry squirrel.SelectBuilder, params *domain.ListTodosParams) (squirrel.SelectBuilder, error) {
 	if params.SortBy == nil {
-		return qry.OrderBy("created_at DESC"), nil
+		return qry.OrderBy("due_date ASC"), nil
 	}
 
 	if err := params.SortBy.Validate(); err != nil {

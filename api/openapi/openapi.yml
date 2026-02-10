@@ -347,6 +347,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResp"
 
+  /api/v1/models:
+    get:
+      operationId: listAvailableModels
+      summary: List available AI models
+      description: >
+        Lists the AI models available for generating board summaries and chat responses.
+      tags: [AI Chat]
+      responses:
+        "200":
+          description: Available models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelListResp"
+              examples:
+                example:
+                  summary: Example model list
+                  value:
+                    models:
+                      - gpt-4-todo-2026-01
+                      - gpt-3.5-todo-2026-01
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResp"
 
 components:
   responses:
@@ -378,6 +405,21 @@ components:
                   message: "todo not found"
 
   schemas:
+    ModelListResp:
+      type: object
+      additionalProperties: false
+      required: [models]
+      description: List of available AI models.
+      properties:
+        models:
+          type: array
+          description: Available AI model identifiers.
+          items:
+            type: string
+          example:
+            - gpt-4-todo-2026-01
+            - gpt-3.5-todo-2026-01
+
     CreateTodoRequest:
       type: object
       additionalProperties: false
@@ -609,12 +651,21 @@ components:
     ChatStreamRequest:
       type: object
       additionalProperties: false
-      required: [message]
+      required: [model,message]
       properties:
+        model:
+          type: string
+          description: >
+            AI model to use for generating the assistant response.
+          example: "gpt-oss:7B-Q4_0"
         message:
           type: string
           minLength: 1
           maxLength: 4000
+          description: >
+            User message to send to the AI assistant.
+          example: "Can you help me prioritize my todos?"
+        
 
     ChatHistoryResp:
       type: object

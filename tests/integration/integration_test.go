@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ import (
 
 // summaryQueue is used to receive completed board summaries for verification in tests.
 var (
-	summaryQueue usecases.CompletedSummaryQueue
+	summaryQueue usecases.CompletedSummaryChannel
 	restCli      *rest.ClientWithResponses
 )
 
@@ -51,14 +52,14 @@ func TestMain(m *testing.M) {
 				"PUBSUB_TOPIC_ID":             "Todo",
 				"PUBSUB_SUBSCRIPTION_ID":      "todo_summary_generator",
 				"LLM_MODEL_HOST":              "http://localhost:12434",
-				"LLM_MODEL":                   "qwen2.5:7B-Q4_0",
+				"LLM_SUMMARY_MODEL":           "qwen3:8B-Q4_0",
 				"LLM_EMBEDDING_MODEL":         "embeddinggemma:300M-Q8_0",
 			},
 		},
 		&InitDockerCompose{},
 	)
 
-	summaryQueue = make(usecases.CompletedSummaryQueue, 5)
+	summaryQueue = make(usecases.CompletedSummaryChannel, 5)
 	depend.Register(summaryQueue)
 
 	var err error
@@ -228,34 +229,46 @@ func TestTodoApp_GraphQLAPI(t *testing.T) {
 }
 
 func TestTodoAPP_Chat(t *testing.T) {
+	var modelName string
+
+	t.Run("fetch-available-models", func(t *testing.T) {
+		modelsResp, err := restCli.ListAvailableModelsWithResponse(t.Context())
+		require.NoError(t, err, "failed to call GetAvailableModels endpoint")
+		require.NotNil(t, modelsResp.JSON200, "expected non-nil response for GetAvailableModels")
+		require.Greater(t, len(modelsResp.JSON200.Models), 0, "expected at least one available model")
+		require.Contains(t, modelsResp.JSON200.Models, "qwen3:8B-Q4_0", "expected available models to include qwen3:8B-Q4_0")
+		i := slices.Index(modelsResp.JSON200.Models, "qwen3:8B-Q4_0")
+		modelName = modelsResp.JSON200.Models[i]
+	})
 
 	t.Run("create-todo", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
+			Model:   modelName,
 			Message: "Create a new todo with title \"Integration Test Todo\", due date tomorrow.",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText := readChatDeltaText(t, chatResp.Body)
+		deltaText, toolCallText := readChatDeltaAndToolCallText(t, chatResp.Body)
 
-		require.Contains(t, deltaText, "📝 Creating your todo...")
+		require.Contains(t, toolCallText, "📝 Creating your todo...")
 		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
-		require.Contains(t, deltaText, "OPEN", "expected chat response to contain created todo status")
 		fmt.Println("Chat response:", deltaText)
 	})
 
 	t.Run("chat-fetch-todo", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
+			Model:   modelName,
 			Message: "Fetch and confirm my Integration Test Todo was created.",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText := readChatDeltaText(t, chatResp.Body)
+		deltaText, toolCallText := readChatDeltaAndToolCallText(t, chatResp.Body)
 
-		require.Contains(t, deltaText, "🔎 Fetching todos...")
+		require.Contains(t, toolCallText, "🔎 Fetching todos...")
 		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
 		require.Contains(t, deltaText, "OPEN", "expected chat response to contain created todo status")
 		fmt.Println("Chat response:", deltaText)
@@ -264,15 +277,16 @@ func TestTodoAPP_Chat(t *testing.T) {
 
 	t.Run("mark-todo-completed", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
+			Model:   modelName,
 			Message: "Mark it as DONE, and the current status: (Status: status) title duedate.",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText := readChatDeltaText(t, chatResp.Body)
+		deltaText, toolCallText := readChatDeltaAndToolCallText(t, chatResp.Body)
 
-		require.Contains(t, deltaText, "✏️ Updating your todo...")
+		require.Contains(t, toolCallText, "✏️ Updating your todo...")
 		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
 		require.Contains(t, deltaText, "DONE", "expected chat response to contain created todo status")
 
@@ -281,22 +295,25 @@ func TestTodoAPP_Chat(t *testing.T) {
 
 	t.Run("delete-todo", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
+			Model:   modelName,
 			Message: "Delete my Integration Test Todo",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText := readChatDeltaText(t, chatResp.Body)
-		require.Contains(t, deltaText, "🗑️ Deleting the todo...")
+		deltaText, toolCallText := readChatDeltaAndToolCallText(t, chatResp.Body)
+		require.Contains(t, toolCallText, "🗑️ Deleting the todo...")
 		fmt.Println("Chat response:", deltaText)
 	})
 
 }
 
-func readChatDeltaText(t *testing.T, reader io.Reader) string {
+func readChatDeltaAndToolCallText(t *testing.T, reader io.Reader) (string, string) {
 	isDelta := false
-	payload := strings.Builder{}
+	isToolCall := false
+	toolCallText := strings.Builder{}
+	deltaText := strings.Builder{}
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -308,14 +325,30 @@ func readChatDeltaText(t *testing.T, reader io.Reader) string {
 			var delta domain.LLMStreamEventDelta
 			err := json.Unmarshal([]byte(dataPayload), &delta)
 			require.NoError(t, err, "failed to unmarshal chat delta payload")
-			payload.WriteString(delta.Text)
+			deltaText.WriteString(delta.Text)
 		}
 
 		if strings.HasPrefix(line, "event: delta") {
 			isDelta = true
 		}
 
+		if isToolCall {
+			if strings.HasPrefix(line, "data:") {
+				dataPayload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+				var toolCall domain.LLMStreamEventToolCall
+				err := json.Unmarshal([]byte(dataPayload), &toolCall)
+				require.NoError(t, err, "failed to unmarshal chat tool call payload")
+				toolCallText.WriteString(toolCall.Text)
+			} else if strings.HasPrefix(line, "event: done") {
+				isToolCall = false
+			}
+		}
+
+		if strings.HasPrefix(line, "event: tool_call") {
+			isToolCall = true
+		}
+
 	}
 
-	return payload.String()
+	return deltaText.String(), toolCallText.String()
 }

@@ -19,6 +19,14 @@ const (
 	TodoStatus_DONE TodoStatus = "DONE"
 )
 
+// Validate checks if the TodoStatus is valid.
+func (s TodoStatus) Validate() error {
+	if s != TodoStatus_OPEN && s != TodoStatus_DONE {
+		return NewValidationErr("status must be either OPEN or DONE")
+	}
+	return nil
+}
+
 // Todo represents a todo item in the system.
 type Todo struct {
 	ID        uuid.UUID

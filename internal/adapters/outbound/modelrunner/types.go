@@ -28,13 +28,13 @@ type ToolFunc struct {
 	Description string             `json:"description"`
 	Name        string             `json:"name"`
 	Parameters  ToolFuncParameters `json:"parameters"`
-	Required    []string           `json:"required,omitempty"`
 }
 
 // ToolFuncParameters represents the parameters schema for a function tool (OpenAI JSON Schema)
 type ToolFuncParameters struct {
 	Type                 string                             `json:"type"`
 	Properties           map[string]ToolFuncParameterDetail `json:"properties"`
+	Required             []string                           `json:"required,omitempty"`
 	AdditionalProperties bool                               `json:"additionalProperties"`
 }
 
@@ -167,4 +167,17 @@ type EmbeddingsResponse struct {
 	Object string          `json:"object"`
 	Usage  EmbeddingsUsage `json:"usage"`
 	Data   []EmbeddingData `json:"data"`
+}
+
+// ModelsResponse represents the response from the models endpoint.
+type ModelsResponse struct {
+	Object string      `json:"object"`
+	Data   []ModelInfo `json:"data"`
+}
+
+// ModelInfo represents information about a single model.
+type ModelInfo struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Created int64  `json:"created"`
 }

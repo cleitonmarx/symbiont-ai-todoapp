@@ -27,7 +27,7 @@ type ChatMessage struct {
 	ChatRole       ChatRole
 	Content        string
 	ToolCallID     *string
-	ToolCalls      []LLMStreamEventFunctionCall
+	ToolCalls      []LLMStreamEventToolCall
 	Model          string
 	CreatedAt      time.Time
 }

@@ -1,12 +1,14 @@
 package main
 
-import "github.com/cleitonmarx/symbiont/examples/todoapp/internal/app"
+import (
+	"log"
+
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/app"
+)
 
 func main() {
-	err := app.NewTodoApp().
-		Introspect(&app.ReportLoggerIntrospector{}).
-		Run()
+	err := app.NewTodoApp().Run()
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to run the TodoApp: %v", err)
 	}
 }

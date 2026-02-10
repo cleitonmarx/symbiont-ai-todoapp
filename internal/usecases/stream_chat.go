@@ -21,6 +21,10 @@ const (
 
 	// Maximum number of repeated tool call hits to prevent infinite loops
 	MAX_REPEATED_TOOL_CALL_HIT = 5
+
+	// Keep tool-calling deterministic to reduce malformed function arguments.
+	CHAT_TEMPERATURE = 0.2
+	CHAT_TOP_P       = 0.7
 )
 
 //go:embed prompts/chat.yml
@@ -28,7 +32,7 @@ var chatPrompt embed.FS
 
 // StreamChat defines the interface for the StreamChat use case
 type StreamChat interface {
-	Execute(ctx context.Context, userMessage string, onEvent domain.LLMStreamEventCallback) error
+	Execute(ctx context.Context, userMessage, model string, onEvent domain.LLMStreamEventCallback) error
 }
 
 // StreamChatImpl is the implementation of the StreamChat use case
@@ -37,7 +41,6 @@ type StreamChatImpl struct {
 	timeProvider      domain.CurrentTimeProvider
 	llmClient         domain.LLMClient
 	llmToolRegistry   domain.LLMToolRegistry
-	llmModel          string
 	llmEmbeddingModel string
 	maxToolCycles     int
 }
@@ -48,7 +51,6 @@ func NewStreamChatImpl(
 	timeProvider domain.CurrentTimeProvider,
 	llmClient domain.LLMClient,
 	llmToolRegistry domain.LLMToolRegistry,
-	llmModel string,
 	llmEmbeddingModel string,
 	maxToolCycles int,
 ) StreamChatImpl {
@@ -57,16 +59,23 @@ func NewStreamChatImpl(
 		timeProvider:      timeProvider,
 		llmClient:         llmClient,
 		llmToolRegistry:   llmToolRegistry,
-		llmModel:          llmModel,
 		llmEmbeddingModel: llmEmbeddingModel,
 		maxToolCycles:     maxToolCycles,
 	}
 }
 
 // Execute streams a chat response and persists the conversation
-func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEvent domain.LLMStreamEventCallback) error {
+func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string, onEvent domain.LLMStreamEventCallback) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
+
+	if strings.TrimSpace(userMessage) == "" {
+		return domain.NewValidationErr("message cannot be empty")
+	}
+
+	if model == "" {
+		return domain.NewValidationErr("model cannot be empty")
+	}
 
 	// Fetch chat history and append user message
 	messages, err := sc.fetchChatHistory(spanCtx)
@@ -79,11 +88,11 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 	})
 
 	req := domain.LLMChatRequest{
-		Model:       sc.llmModel,
+		Model:       model,
 		Messages:    messages,
 		Stream:      true,
-		Temperature: common.Ptr(1.1),
-		TopP:        common.Ptr(0.9),
+		Temperature: common.Ptr(CHAT_TEMPERATURE),
+		TopP:        common.Ptr(CHAT_TOP_P),
 		Tools:       sc.llmToolRegistry.List(),
 	}
 
@@ -91,6 +100,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 		assistantMsgContent strings.Builder
 		chatMessages        []*domain.ChatMessage
 		assistantMsgID      uuid.UUID
+		tokenUsage          domain.LLMUsage
 		tracker             = newToolCycleTracker(
 			sc.maxToolCycles,
 			MAX_REPEATED_TOOL_CALL_HIT,
@@ -102,7 +112,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 		ConversationID: domain.GlobalConversationID,
 		ChatRole:       domain.ChatRole_User,
 		Content:        userMessage,
-		Model:          req.Model,
+		Model:          model,
 		CreatedAt:      sc.timeProvider.Now().UTC(),
 	}
 	chatMessages = append(chatMessages, userMsg)
@@ -123,11 +133,11 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 					}
 				}
 
-			case domain.LLMStreamEventType_FunctionCall:
+			case domain.LLMStreamEventType_ToolCall:
 				continueChatStreaming = true
 
-				fc := data.(domain.LLMStreamEventFunctionCall)
-				if tracker.hasExceededMaxCycles() || tracker.hasExceededMaxToolCalls(fc.Function, fc.Arguments) {
+				toolCall := data.(domain.LLMStreamEventToolCall)
+				if tracker.hasExceededMaxCycles() || tracker.hasExceededMaxToolCalls(toolCall.Function, toolCall.Arguments) {
 					continueChatStreaming = false
 					return nil
 				}
@@ -137,30 +147,29 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 					ID:             uuid.New(),
 					ConversationID: domain.GlobalConversationID,
 					ChatRole:       domain.ChatRole_Assistant,
-					ToolCalls:      []domain.LLMStreamEventFunctionCall{fc},
-					Model:          req.Model,
+					ToolCalls:      []domain.LLMStreamEventToolCall{toolCall},
+					Model:          model,
 					CreatedAt:      sc.timeProvider.Now().UTC(),
 				})
 
+				toolCall.Text = sc.llmToolRegistry.StatusMessage(toolCall.Function)
 				// Process and append tool message
 				if err := onEvent(
-					domain.LLMStreamEventType_Delta,
-					domain.LLMStreamEventDelta{
-						Text: sc.llmToolRegistry.StatusMessage(fc.Function),
-					},
+					domain.LLMStreamEventType_ToolCall,
+					toolCall,
 				); err != nil {
 					return err
 				}
 
-				toolMessage := sc.llmToolRegistry.Call(spanCtx, fc, req.Messages)
+				toolMessage := sc.llmToolRegistry.Call(spanCtx, toolCall, req.Messages)
 
 				chatMessages = append(chatMessages, &domain.ChatMessage{
 					ID:             uuid.New(),
 					ConversationID: domain.GlobalConversationID,
 					ChatRole:       domain.ChatRole_Tool,
-					ToolCallID:     &fc.ID,
+					ToolCallID:     &toolCall.ID,
 					Content:        toolMessage.Content,
-					Model:          req.Model,
+					Model:          model,
 					// Increment CreatedAt to ensure ordering
 					CreatedAt: sc.timeProvider.Now().UTC().Add(3 * time.Millisecond),
 				})
@@ -168,7 +177,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 				req.Messages = append(req.Messages,
 					domain.LLMChatMessage{
 						Role:      domain.ChatRole_Assistant,
-						ToolCalls: []domain.LLMStreamEventFunctionCall{fc},
+						ToolCalls: []domain.LLMStreamEventToolCall{toolCall},
 					},
 					toolMessage,
 				)
@@ -178,7 +187,13 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 				if err := onEvent(eventType, data); err != nil {
 					return err
 				}
+			case domain.LLMStreamEventType_Done:
+				done := data.(domain.LLMStreamEventDone)
+				tokenUsage.CompletionTokens += done.Usage.CompletionTokens
+				tokenUsage.PromptTokens += done.Usage.PromptTokens
+				tokenUsage.TotalTokens += done.Usage.TotalTokens
 			}
+
 			return nil
 		})
 		if telemetry.RecordErrorAndStatus(span, err) {
@@ -191,7 +206,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 		ConversationID: domain.GlobalConversationID,
 		ChatRole:       domain.ChatRole_Assistant,
 		Content:        assistantMsgContent.String(),
-		Model:          req.Model,
+		Model:          model,
 		CreatedAt:      sc.timeProvider.Now().UTC(),
 	}
 	chatMessages = append(chatMessages, assistantMsg)
@@ -216,10 +231,13 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage string, onEven
 		return err
 	}
 
+	RecordLLMTokensUsed(spanCtx, tokenUsage.PromptTokens, tokenUsage.CompletionTokens)
+
 	// Send done event
 	if err := onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
 		AssistantMessageID: assistantMsgID.String(),
 		CompletedAt:        sc.timeProvider.Now().UTC().Format(time.RFC3339),
+		Usage:              tokenUsage,
 	}); err != nil {
 		return err
 	}
@@ -334,7 +352,6 @@ type InitStreamChat struct {
 	TimeProvider    domain.CurrentTimeProvider   `resolve:""`
 	LLMToolRegistry domain.LLMToolRegistry       `resolve:""`
 	LLMClient       domain.LLMClient             `resolve:""`
-	LLMModel        string                       `config:"LLM_MODEL"`
 	EmbeddingModel  string                       `config:"LLM_EMBEDDING_MODEL"`
 	// Maximum number of tool cycles to prevent infinite loops
 	// It restricts how many times the LLM can invoke tools in a single chat session
@@ -348,7 +365,6 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 		i.TimeProvider,
 		i.LLMClient,
 		i.LLMToolRegistry,
-		i.LLMModel,
 		i.EmbeddingModel,
 		i.MaxToolCycles,
 	))

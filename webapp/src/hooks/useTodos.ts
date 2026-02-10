@@ -1,23 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getTodos, createTodo, updateTodo, getBoardSummary, deleteTodo as deleteTodoApi } from '../services/api';
+import { getTodos, createTodo, updateTodo, deleteTodo as deleteTodoApi, type TodoSort } from '../services/todosApi';
+import { getBoardSummary, type BoardSummary } from '../services/boardApi';
 import type { Todo, CreateTodoRequest, TodoStatus } from '../types';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
-type TodoSort =
-  | 'createdAtAsc'
-  | 'createdAtDesc'
-  | 'dueDateAsc'
-  | 'dueDateDesc'
-  | 'similarityAsc'
-  | 'similarityDesc';
-
-interface UseTodosReturn {
+export interface UseTodosReturn {
   todos: Todo[];
   loading: boolean;
   error: string | null;
   createTodo: (title: string, due_date: string) => void;
   updateTodo: (id: string, status?: TodoStatus, title?: string, due_date?: string) => void;
-  boardSummary: any;
+  boardSummary: BoardSummary | null;
   statusFilter: TodoStatus | 'ALL';
   setStatusFilter: (status: TodoStatus | 'ALL') => void;
   page: number;
@@ -29,20 +22,55 @@ interface UseTodosReturn {
   setSearchQuery: (query: string) => void;
   sortBy: TodoSort;
   setSortBy: (sort: TodoSort) => void;
+  pageSize: number;
+  setPageSize: (size: number) => void;
+  dueAfter: string;
+  setDueAfter: (date: string) => void;
+  dueBefore: string;
+  setDueBefore: (date: string) => void;
+  clearDateRange: () => void;
   refetch: () => void;
 }
 
-const MAX_TODO_PAGE_SIZE = 16;
+const DEFAULT_TODO_PAGE_SIZE = 25;
 
 export const useTodos = (): UseTodosReturn => {
   const queryClient = useQueryClient();
-  const [statusFilter, setStatusFilterState] = useState<TodoStatus | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilterState] = useState<TodoStatus | 'ALL'>('OPEN');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
-  const [sortBy, setSortBy] = useState<TodoSort>('createdAtDesc');
+  const [sortBy, setSortBy] = useState<TodoSort>('dueDateAsc');
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_TODO_PAGE_SIZE);
+  const [dueAfter, setDueAfterState] = useState<string>('');
+  const [dueBefore, setDueBeforeState] = useState<string>('');
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [boardSummary, setBoardSummary] = useState<any>(null);
+  const [boardSummary, setBoardSummary] = useState<BoardSummary | null>(null);
+
+  useEffect(() => {
+    if (!searchQuery && (sortBy === 'similarityAsc' || sortBy === 'similarityDesc')) {
+      setSortBy('dueDateAsc');
+    }
+  }, [searchQuery, sortBy]);
+
+  const effectiveSortBy: TodoSort = useMemo(() => {
+    if (!debouncedSearchQuery && (sortBy === 'similarityAsc' || sortBy === 'similarityDesc')) {
+      return 'dueDateAsc';
+    }
+    return sortBy;
+  }, [debouncedSearchQuery, sortBy]);
+
+  const effectiveDateRange = useMemo(() => {
+    if (!dueAfter || !dueBefore) {
+      return undefined;
+    }
+
+    if (dueBefore < dueAfter) {
+      return undefined;
+    }
+
+    return { dueAfter, dueBefore };
+  }, [dueAfter, dueBefore]);
 
   // Debounce search query - only update after 500ms of no typing
   useEffect(() => {
@@ -53,10 +81,10 @@ export const useTodos = (): UseTodosReturn => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Reset page to 1 whenever status filter, debounced search, or sort changes
+  // Reset page to 1 whenever status filter, debounced search, sort, or page size changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, debouncedSearchQuery, sortBy]);
+  }, [statusFilter, debouncedSearchQuery, sortBy, pageSize, effectiveDateRange?.dueAfter, effectiveDateRange?.dueBefore]);
 
   const { 
     data: response, 
@@ -64,14 +92,23 @@ export const useTodos = (): UseTodosReturn => {
     error, 
     refetch 
   } = useQuery({
-    queryKey: ['todos', statusFilter, currentPage, debouncedSearchQuery, sortBy],
+    queryKey: [
+      'todos',
+      statusFilter,
+      currentPage,
+      debouncedSearchQuery,
+      effectiveSortBy,
+      pageSize,
+      effectiveDateRange?.dueAfter,
+      effectiveDateRange?.dueBefore,
+    ],
     queryFn: () => getTodos(
       statusFilter === 'ALL' ? undefined : statusFilter,
       debouncedSearchQuery || undefined,
       currentPage,
-      MAX_TODO_PAGE_SIZE,
-      undefined,
-      sortBy
+      pageSize,
+      effectiveDateRange,
+      effectiveSortBy
     ),
     retry: 1,
   });
@@ -169,6 +206,26 @@ export const useTodos = (): UseTodosReturn => {
     setCurrentPage(page);
   }, []);
 
+  const handleSetDueAfter = useCallback((date: string) => {
+    setDueAfterState(date);
+    if (date && dueBefore && dueBefore < date) {
+      setDueBeforeState(date);
+    }
+  }, [dueBefore]);
+
+  const handleSetDueBefore = useCallback((date: string) => {
+    if (date && dueAfter && date < dueAfter) {
+      setDueBeforeState(dueAfter);
+      return;
+    }
+    setDueBeforeState(date);
+  }, [dueAfter]);
+
+  const handleClearDateRange = useCallback(() => {
+    setDueAfterState('');
+    setDueBeforeState('');
+  }, []);
+
   return {
     todos,
     boardSummary,
@@ -195,5 +252,12 @@ export const useTodos = (): UseTodosReturn => {
     setSearchQuery: handleSetSearchQuery,
     sortBy,
     setSortBy: handleSetSortBy,
+    pageSize,
+    setPageSize,
+    dueAfter,
+    setDueAfter: handleSetDueAfter,
+    dueBefore,
+    setDueBefore: handleSetDueBefore,
+    clearDateRange: handleClearDateRange,
   };
 };

@@ -222,3 +222,30 @@ func TestTodoSortBy_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestTodoStatus_Validate(t *testing.T) {
+	tests := map[string]struct {
+		status  TodoStatus
+		wantErr error
+	}{
+		"valid-open": {
+			status:  TodoStatus_OPEN,
+			wantErr: nil,
+		},
+		"valid-done": {
+			status:  TodoStatus_DONE,
+			wantErr: nil,
+		},
+		"invalid-status": {
+			status:  "INVALID",
+			wantErr: NewValidationErr("status must be either OPEN or DONE"),
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			gotErr := tt.status.Validate()
+			assert.Equal(t, tt.wantErr, gotErr)
+
+		})
+	}
+}

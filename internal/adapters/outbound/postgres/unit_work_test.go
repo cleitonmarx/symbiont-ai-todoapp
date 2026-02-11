@@ -180,7 +180,7 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 			"Todo",
 			todoID,
 			"Todo",
-			"Deleted",
+			"TODO.DELETED",
 			sqlmock.AnyArg(),
 			0,
 			5,
@@ -200,10 +200,10 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 		// Publish event - both should use same transaction
 		event := domain.TodoEvent{
 			TodoID:    todoID,
-			Type:      domain.TodoEventType("Deleted"),
+			Type:      domain.EventType_TODO_DELETED,
 			CreatedAt: time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC),
 		}
-		return uow.Outbox().CreateEvent(context.Background(), event)
+		return uow.Outbox().CreateTodoEvent(context.Background(), event)
 	})
 
 	assert.NoError(t, err)

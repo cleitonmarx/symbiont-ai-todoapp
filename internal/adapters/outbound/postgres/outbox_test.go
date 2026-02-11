@@ -16,7 +16,7 @@ import (
 func TestOutboxRepository_CreateEvent(t *testing.T) {
 	event := domain.TodoEvent{
 		TodoID:    uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
-		Type:      domain.TodoEventType("Created"),
+		Type:      domain.EventType_TODO_CREATED,
 		CreatedAt: time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC),
 	}
 
@@ -73,7 +73,7 @@ func TestOutboxRepository_CreateEvent(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewOutboxRepository(db)
-			gotErr := repo.CreateEvent(context.Background(), event)
+			gotErr := repo.CreateTodoEvent(context.Background(), event)
 			if tt.err {
 				assert.Error(t, gotErr)
 			} else {
@@ -103,7 +103,7 @@ func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
 						"Todo",
 						id1,
 						"Todo",
-						"Created",
+						"TODO_CREATED",
 						[]byte(`{"id":"123"}`),
 						1,
 						5,
@@ -137,7 +137,7 @@ func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
 						"Todo",
 						id1,
 						"Todo",
-						"Created",
+						"TODO_CREATED",
 						[]byte(`{}`),
 						1,
 						5,

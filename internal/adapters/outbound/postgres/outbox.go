@@ -38,8 +38,8 @@ func NewOutboxRepository(br squirrel.BaseRunner) OutboxRepository {
 	}
 }
 
-// CreateEvent records a new event in the outbox.
-func (op OutboxRepository) CreateEvent(ctx context.Context, event domain.TodoEvent) error {
+// CreateTodoEvent records a new event in the outbox.
+func (op OutboxRepository) CreateTodoEvent(ctx context.Context, event domain.TodoEvent) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -70,6 +70,14 @@ func (op OutboxRepository) CreateEvent(ctx context.Context, event domain.TodoEve
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to insert outbox event: %w", err)
 	}
+
+	return nil
+}
+
+// CreateChatEvent records a new chat message event in the outbox.
+func (op OutboxRepository) CreateChatEvent(ctx context.Context, event domain.ChatMessageEvent) error {
+	_, span := telemetry.Start(ctx)
+	defer span.End()
 
 	return nil
 }

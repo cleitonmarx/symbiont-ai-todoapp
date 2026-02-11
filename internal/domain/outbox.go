@@ -25,7 +25,9 @@ type OutboxEvent struct {
 // OutboxRepository defines the interface for managing outbox events.
 type OutboxRepository interface {
 	// CreateEvent records a new event in the outbox.
-	CreateEvent(ctx context.Context, event TodoEvent) error
+	CreateTodoEvent(ctx context.Context, event TodoEvent) error
+	// CreateChatEvent records a new chat message event in the outbox.
+	CreateChatEvent(ctx context.Context, event ChatMessageEvent) error
 	// FetchPendingEvents retrieves a batch of pending outbox events.
 	FetchPendingEvents(ctx context.Context, limit int) ([]OutboxEvent, error)
 	// UpdateEvent updates the status, retry count, and last error of an outbox event.

@@ -66,10 +66,10 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 					todo,
 				).Return(nil)
 
-				outbox.EXPECT().CreateEvent(
+				outbox.EXPECT().CreateTodoEvent(
 					mock.Anything,
 					domain.TodoEvent{
-						Type:      domain.TodoEventType_TODO_CREATED,
+						Type:      domain.EventType_TODO_CREATED,
 						TodoID:    fixedUUID(),
 						CreatedAt: fixedTime,
 					},

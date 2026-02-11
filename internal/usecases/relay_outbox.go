@@ -17,13 +17,13 @@ type RelayOutbox interface {
 
 // RelayOutboxImpl implements domain.OutboxRelay
 type RelayOutboxImpl struct {
-	Uow       domain.UnitOfWork         `resolve:""`
-	Publisher domain.TodoEventPublisher `resolve:""` // publishes to event bus
-	Logger    *log.Logger               `resolve:""`
+	Uow       domain.UnitOfWork     `resolve:""`
+	Publisher domain.EventPublisher `resolve:""` // publishes to event bus
+	Logger    *log.Logger           `resolve:""`
 }
 
 // NewRelayOutboxImpl creates a new instance
-func NewRelayOutboxImpl(uow domain.UnitOfWork, publisher domain.TodoEventPublisher, logger *log.Logger) RelayOutboxImpl {
+func NewRelayOutboxImpl(uow domain.UnitOfWork, publisher domain.EventPublisher, logger *log.Logger) RelayOutboxImpl {
 	return RelayOutboxImpl{
 		Uow:       uow,
 		Publisher: publisher,
@@ -69,9 +69,9 @@ func (r RelayOutboxImpl) relayEvent(ctx context.Context, uow domain.UnitOfWork, 
 
 // InitRelayOutbox is used to initialize the RelayOutbox in the dependency container
 type InitRelayOutbox struct {
-	Uow       domain.UnitOfWork         `resolve:""`
-	Logger    *log.Logger               `resolve:""`
-	Publisher domain.TodoEventPublisher `resolve:""`
+	Uow       domain.UnitOfWork     `resolve:""`
+	Logger    *log.Logger           `resolve:""`
+	Publisher domain.EventPublisher `resolve:""`
 }
 
 // Initialize registers the RelayOutbox implementation in the dependency container

@@ -64,8 +64,8 @@ func (tci TodoCreatorImpl) Create(ctx context.Context, uow domain.UnitOfWork, ti
 		return domain.Todo{}, err
 	}
 
-	err = uow.Outbox().CreateEvent(ctx, domain.TodoEvent{
-		Type:      domain.TodoEventType_TODO_CREATED,
+	err = uow.Outbox().CreateTodoEvent(ctx, domain.TodoEvent{
+		Type:      domain.EventType_TODO_CREATED,
 		TodoID:    todo.ID,
 		CreatedAt: now,
 	})

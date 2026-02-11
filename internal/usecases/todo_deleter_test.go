@@ -33,8 +33,8 @@ func TestTodoDeleter_Delete(t *testing.T) {
 				todoRepo.EXPECT().DeleteTodo(mock.Anything, todoID).Return(nil)
 
 				uow.EXPECT().Outbox().Return(outboxRepo)
-				outboxRepo.EXPECT().CreateEvent(mock.Anything, mock.MatchedBy(func(event domain.TodoEvent) bool {
-					return event.Type == domain.TodoEventType_TODO_DELETED &&
+				outboxRepo.EXPECT().CreateTodoEvent(mock.Anything, mock.MatchedBy(func(event domain.TodoEvent) bool {
+					return event.Type == domain.EventType_TODO_DELETED &&
 						event.TodoID == todoID &&
 						event.CreatedAt.Equal(fixedTime)
 				})).Return(nil)
@@ -84,7 +84,7 @@ func TestTodoDeleter_Delete(t *testing.T) {
 				todoRepo.EXPECT().DeleteTodo(mock.Anything, todoID).Return(nil)
 
 				uow.EXPECT().Outbox().Return(outboxRepo)
-				outboxRepo.EXPECT().CreateEvent(mock.Anything, mock.Anything).
+				outboxRepo.EXPECT().CreateTodoEvent(mock.Anything, mock.Anything).
 					Return(assert.AnError)
 			},
 			expectErr: true,

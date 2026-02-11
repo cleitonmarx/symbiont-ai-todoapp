@@ -19,11 +19,11 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 	todoID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
 
 	tests := map[string]struct {
-		setExpectations func(uow *domain.MockUnitOfWork, publisher *domain.MockTodoEventPublisher)
+		setExpectations func(uow *domain.MockUnitOfWork, publisher *domain.MockEventPublisher)
 		expectedErr     error
 	}{
 		"success-relay-and-delete": {
-			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockTodoEventPublisher) {
+			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockEventPublisher) {
 				outbox := domain.NewMockOutboxRepository(t)
 
 				uow.EXPECT().Outbox().Return(outbox)
@@ -35,7 +35,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 
 				oe := domain.OutboxEvent{
 					ID:         eventID,
-					EventType:  string(domain.TodoEventType_TODO_CREATED),
+					EventType:  string(domain.EventType_TODO_CREATED),
 					EntityID:   todoID,
 					CreatedAt:  fixedTime,
 					RetryCount: 0,
@@ -60,7 +60,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 			expectedErr: nil,
 		},
 		"success-relay-multiple-events": {
-			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockTodoEventPublisher) {
+			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockEventPublisher) {
 				outbox := domain.NewMockOutboxRepository(t)
 
 				uow.EXPECT().Outbox().Return(outbox)
@@ -76,7 +76,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				events := []domain.OutboxEvent{
 					{
 						ID:         eventID,
-						EventType:  string(domain.TodoEventType_TODO_CREATED),
+						EventType:  string(domain.EventType_TODO_CREATED),
 						EntityID:   todoID,
 						CreatedAt:  fixedTime,
 						RetryCount: 0,
@@ -84,7 +84,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 					},
 					{
 						ID:         eventID2,
-						EventType:  string(domain.TodoEventType_TODO_UPDATED),
+						EventType:  string(domain.EventType_TODO_UPDATED),
 						EntityID:   todoID2,
 						CreatedAt:  fixedTime,
 						RetryCount: 0,
@@ -112,7 +112,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 			expectedErr: nil,
 		},
 		"publish-error-retry": {
-			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockTodoEventPublisher) {
+			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockEventPublisher) {
 				outbox := domain.NewMockOutboxRepository(t)
 
 				uow.EXPECT().Outbox().Return(outbox)
@@ -128,7 +128,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				).Return([]domain.OutboxEvent{
 					{
 						ID:         eventID,
-						EventType:  string(domain.TodoEventType_TODO_CREATED),
+						EventType:  string(domain.EventType_TODO_CREATED),
 						EntityID:   todoID,
 						CreatedAt:  fixedTime,
 						RetryCount: 0,
@@ -152,7 +152,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 			expectedErr: nil,
 		},
 		"publish-error-max-retries-exceeded": {
-			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockTodoEventPublisher) {
+			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockEventPublisher) {
 				outbox := domain.NewMockOutboxRepository(t)
 
 				uow.EXPECT().Outbox().Return(outbox)
@@ -168,7 +168,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				).Return([]domain.OutboxEvent{
 					{
 						ID:         eventID,
-						EventType:  string(domain.TodoEventType_TODO_CREATED),
+						EventType:  string(domain.EventType_TODO_CREATED),
 						EntityID:   todoID,
 						CreatedAt:  fixedTime,
 						RetryCount: 2,
@@ -192,7 +192,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 			expectedErr: nil,
 		},
 		"fetch-pending-events-error": {
-			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockTodoEventPublisher) {
+			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockEventPublisher) {
 				outbox := domain.NewMockOutboxRepository(t)
 
 				uow.EXPECT().Outbox().Return(outbox)
@@ -210,7 +210,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 			expectedErr: errors.New("database error"),
 		},
 		"empty-batch": {
-			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockTodoEventPublisher) {
+			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockEventPublisher) {
 				outbox := domain.NewMockOutboxRepository(t)
 
 				uow.EXPECT().Outbox().Return(outbox)
@@ -232,7 +232,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			uow := domain.NewMockUnitOfWork(t)
-			publisher := domain.NewMockTodoEventPublisher(t)
+			publisher := domain.NewMockEventPublisher(t)
 
 			if tt.setExpectations != nil {
 				tt.setExpectations(uow, publisher)

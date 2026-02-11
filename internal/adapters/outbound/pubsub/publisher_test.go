@@ -145,7 +145,7 @@ func TestInitPublisher_Initialize(t *testing.T) {
 	_, err := init.Initialize(context.Background())
 	assert.NoError(t, err)
 
-	res, err := depend.Resolve[domain.TodoEventPublisher]()
+	res, err := depend.Resolve[domain.EventPublisher]()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, res)
 }

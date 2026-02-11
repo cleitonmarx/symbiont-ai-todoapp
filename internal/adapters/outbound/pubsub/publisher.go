@@ -51,6 +51,6 @@ type InitPublisher struct {
 
 // Initialize registers the PubSubEventPublisher as the implementation of TodoEventPublisher
 func (i *InitPublisher) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[domain.TodoEventPublisher](NewPubSubEventPublisher(i.Client))
+	depend.Register[domain.EventPublisher](NewPubSubEventPublisher(i.Client))
 	return ctx, nil
 }

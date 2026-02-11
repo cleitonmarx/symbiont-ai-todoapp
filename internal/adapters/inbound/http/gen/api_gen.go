@@ -107,7 +107,7 @@ type ChatStreamRequest struct {
 	// Message User message to send to the AI assistant.
 	Message string `json:"message"`
 
-	// Model AI model to use for generating the assistant response. If omitted, the system default model is used.
+	// Model AI model to use for generating the assistant response.
 	Model string `json:"model"`
 }
 

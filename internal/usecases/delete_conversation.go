@@ -5,6 +5,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 )
 
 // DeleteConversation defines the interface for deleting a conversation usecase
@@ -14,28 +15,44 @@ type DeleteConversation interface {
 
 // DeleteConversationImpl implements the DeleteConversation usecase
 type DeleteConversationImpl struct {
-	chatMessageRepo domain.ChatMessageRepository
+	uow domain.UnitOfWork
 }
 
 // NewDeleteConversationImpl creates a new DeleteConversationImpl instance
-func NewDeleteConversationImpl(chatMessageRepo domain.ChatMessageRepository) *DeleteConversationImpl {
+func NewDeleteConversationImpl(uow domain.UnitOfWork) *DeleteConversationImpl {
 	return &DeleteConversationImpl{
-		chatMessageRepo: chatMessageRepo,
+		uow: uow,
 	}
 }
 
 // Execute deletes all messages in the global conversation
 func (uc *DeleteConversationImpl) Execute(ctx context.Context) error {
-	return uc.chatMessageRepo.DeleteConversation(ctx)
+	spanCtx, span := telemetry.Start(ctx)
+	defer span.End()
+
+	err := uc.uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
+		if err := uow.ChatMessage().DeleteConversation(spanCtx); err != nil {
+			return err
+		}
+		if err := uow.ConversationSummary().DeleteConversationSummary(spanCtx, domain.GlobalConversationID); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if telemetry.RecordErrorAndStatus(span, err) {
+		return err
+	}
+	return nil
 }
 
 // InitDeleteConversation is the initializer for the DeleteConversation usecase
 type InitDeleteConversation struct {
-	Repo domain.ChatMessageRepository `resolve:""`
+	Uow domain.UnitOfWork
 }
 
 // Initialize registers the DeleteConversation usecase in the dependency container
 func (i InitDeleteConversation) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[DeleteConversation](NewDeleteConversationImpl(i.Repo))
+	depend.Register[DeleteConversation](NewDeleteConversationImpl(i.Uow))
 	return ctx, nil
 }

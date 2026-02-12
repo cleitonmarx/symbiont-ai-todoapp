@@ -83,8 +83,9 @@ func (tui TodoUpdaterImpl) Update(ctx context.Context, uow domain.UnitOfWork, id
 	todo = td
 
 	if err = uow.Outbox().CreateTodoEvent(ctx, domain.TodoEvent{
-		Type:   domain.EventType_TODO_UPDATED,
-		TodoID: todo.ID,
+		Type:      domain.EventType_TODO_UPDATED,
+		TodoID:    todo.ID,
+		CreatedAt: now,
 	}); err != nil {
 		return domain.Todo{}, err
 	}

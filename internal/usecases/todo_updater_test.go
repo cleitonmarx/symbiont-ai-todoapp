@@ -69,8 +69,9 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 				outbox.EXPECT().CreateTodoEvent(
 					mock.Anything,
 					domain.TodoEvent{
-						Type:   domain.EventType_TODO_UPDATED,
-						TodoID: fixedUUID,
+						Type:      domain.EventType_TODO_UPDATED,
+						TodoID:    fixedUUID,
+						CreatedAt: fixedTime,
 					},
 				).Return(nil)
 			},

@@ -60,11 +60,11 @@ func (r RelayOutboxImpl) relayEvent(ctx context.Context, uow domain.UnitOfWork, 
 
 	if err := r.Publisher.PublishEvent(ctx, event); err != nil {
 		if event.RetryCount+1 >= event.MaxRetries {
-			return uow.Outbox().UpdateEvent(ctx, event.ID, "FAILED", event.RetryCount+1, err.Error())
+			return uow.Outbox().UpdateEvent(ctx, event.ID, domain.OutboxStatus_Failed, event.RetryCount+1, err.Error())
 		}
-		return uow.Outbox().UpdateEvent(ctx, event.ID, "PENDING", event.RetryCount+1, err.Error())
+		return uow.Outbox().UpdateEvent(ctx, event.ID, domain.OutboxStatus_Pending, event.RetryCount+1, err.Error())
 	}
-	return uow.Outbox().DeleteEvent(ctx, event.ID)
+	return uow.Outbox().UpdateEvent(ctx, event.ID, domain.OutboxStatus_Processed, event.RetryCount, "")
 }
 
 // InitRelayOutbox is used to initialize the RelayOutbox in the dependency container

@@ -22,7 +22,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 		setExpectations func(uow *domain.MockUnitOfWork, publisher *domain.MockEventPublisher)
 		expectedErr     error
 	}{
-		"success-relay-and-delete": {
+		"success-relay-and-mark-processed": {
 			setExpectations: func(uow *domain.MockUnitOfWork, publisher *domain.MockEventPublisher) {
 				outbox := domain.NewMockOutboxRepository(t)
 
@@ -35,7 +35,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 
 				oe := domain.OutboxEvent{
 					ID:         eventID,
-					EventType:  string(domain.EventType_TODO_CREATED),
+					EventType:  domain.EventType_TODO_CREATED,
 					EntityID:   todoID,
 					CreatedAt:  fixedTime,
 					RetryCount: 0,
@@ -52,9 +52,12 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 					oe,
 				).Return(nil)
 
-				outbox.EXPECT().DeleteEvent(
+				outbox.EXPECT().UpdateEvent(
 					mock.Anything,
 					eventID,
+					domain.OutboxStatus_Processed,
+					0,
+					"",
 				).Return(nil)
 			},
 			expectedErr: nil,
@@ -76,7 +79,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				events := []domain.OutboxEvent{
 					{
 						ID:         eventID,
-						EventType:  string(domain.EventType_TODO_CREATED),
+						EventType:  domain.EventType_TODO_CREATED,
 						EntityID:   todoID,
 						CreatedAt:  fixedTime,
 						RetryCount: 0,
@@ -84,7 +87,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 					},
 					{
 						ID:         eventID2,
-						EventType:  string(domain.EventType_TODO_UPDATED),
+						EventType:  domain.EventType_TODO_UPDATED,
 						EntityID:   todoID2,
 						CreatedAt:  fixedTime,
 						RetryCount: 0,
@@ -103,9 +106,12 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 						event,
 					).Return(nil)
 
-					outbox.EXPECT().DeleteEvent(
+					outbox.EXPECT().UpdateEvent(
 						mock.Anything,
 						event.ID,
+						domain.OutboxStatus_Processed,
+						event.RetryCount,
+						"",
 					).Return(nil)
 				}
 			},
@@ -128,7 +134,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				).Return([]domain.OutboxEvent{
 					{
 						ID:         eventID,
-						EventType:  string(domain.EventType_TODO_CREATED),
+						EventType:  domain.EventType_TODO_CREATED,
 						EntityID:   todoID,
 						CreatedAt:  fixedTime,
 						RetryCount: 0,
@@ -144,7 +150,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				outbox.EXPECT().UpdateEvent(
 					mock.Anything,
 					eventID,
-					"PENDING",
+					domain.OutboxStatus_Pending,
 					1,
 					"publish error",
 				).Return(nil)
@@ -168,7 +174,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				).Return([]domain.OutboxEvent{
 					{
 						ID:         eventID,
-						EventType:  string(domain.EventType_TODO_CREATED),
+						EventType:  domain.EventType_TODO_CREATED,
 						EntityID:   todoID,
 						CreatedAt:  fixedTime,
 						RetryCount: 2,
@@ -184,7 +190,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				outbox.EXPECT().UpdateEvent(
 					mock.Anything,
 					eventID,
-					"FAILED",
+					domain.OutboxStatus_Failed,
 					3,
 					"publish error",
 				).Return(nil)

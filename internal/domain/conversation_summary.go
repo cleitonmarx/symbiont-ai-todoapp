@@ -22,4 +22,6 @@ type ConversationSummaryRepository interface {
 	GetConversationSummary(ctx context.Context, conversationID string) (ConversationSummary, bool, error)
 	// StoreConversationSummary stores the summary for a conversation.
 	StoreConversationSummary(ctx context.Context, summary ConversationSummary) error
+	// DeleteConversationSummary deletes the summary for a conversation (used for testing).
+	DeleteConversationSummary(ctx context.Context, conversationID string) error
 }

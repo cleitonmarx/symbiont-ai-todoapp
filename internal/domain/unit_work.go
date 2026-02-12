@@ -8,6 +8,8 @@ type UnitOfWork interface {
 	Todo() TodoRepository
 	// ChatMessage returns the repository for managing chat messages.
 	ChatMessage() ChatMessageRepository
+	// ConversationSummary returns the repository for managing conversation summaries.
+	ConversationSummary() ConversationSummaryRepository
 	// Outbox returns the repository for managing outbox events.
 	Outbox() OutboxRepository
 	// Execute runs a function within the context of a unit of work.

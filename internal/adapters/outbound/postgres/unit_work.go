@@ -51,6 +51,11 @@ func (u *UnitOfWork) Todo() domain.TodoRepository {
 	return NewTodoRepository(u.getBaseRunner())
 }
 
+// ChatMessage returns the ChatMessageRepository for this UnitOfWork.
+func (u *UnitOfWork) ChatMessage() domain.ChatMessageRepository {
+	return NewChatMessageRepository(u.getBaseRunner())
+}
+
 // Outbox returns the OutboxRepository for this UnitOfWork.
 func (u *UnitOfWork) Outbox() domain.OutboxRepository {
 	return NewOutboxRepository(u.getBaseRunner())

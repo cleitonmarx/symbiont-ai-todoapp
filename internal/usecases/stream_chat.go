@@ -335,13 +335,6 @@ func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.
 			ChatRole:       message.ChatRole,
 			ChatMessageID:  message.ID,
 			ConversationID: message.ConversationID,
-			TurnID:         message.TurnID,
-			TurnSequence:   message.TurnSequence,
-			MessageState:   message.MessageState,
-			ErrorMessage:   message.ErrorMessage,
-			IsToolSuccess:  isToolSuccess(message),
-			CreatedAt:      message.CreatedAt,
-			UpdatedAt:      message.UpdatedAt,
 		}); err != nil {
 			return err
 		}

@@ -127,13 +127,6 @@ func expectPersistSequence(
 			assert.Equal(t, msg.ChatRole, event.ChatRole)
 			assert.Equal(t, msg.ID, event.ChatMessageID)
 			assert.Equal(t, msg.ConversationID, event.ConversationID)
-			assert.Equal(t, msg.TurnID, event.TurnID)
-			assert.Equal(t, msg.TurnSequence, event.TurnSequence)
-			assert.Equal(t, msg.MessageState, event.MessageState)
-			assert.Equal(t, msg.ErrorMessage, event.ErrorMessage)
-			assert.Equal(t, msg.CreatedAt, event.CreatedAt)
-			assert.Equal(t, msg.UpdatedAt, event.UpdatedAt)
-			assert.Equal(t, isToolSuccess(msg), event.IsToolSuccess)
 
 			return nil
 		}).

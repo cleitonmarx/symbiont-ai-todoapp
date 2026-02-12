@@ -48,7 +48,7 @@ func (uc *DeleteConversationImpl) Execute(ctx context.Context) error {
 
 // InitDeleteConversation is the initializer for the DeleteConversation usecase
 type InitDeleteConversation struct {
-	Uow domain.UnitOfWork
+	Uow domain.UnitOfWork `resolve:""`
 }
 
 // Initialize registers the DeleteConversation usecase in the dependency container

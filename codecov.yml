@@ -1,0 +1,9 @@
+ignore:
+  - "**/*_gen.go"
+
+github_checks: false
+
+coverage:
+  status:
+    project: false
+    patch: false

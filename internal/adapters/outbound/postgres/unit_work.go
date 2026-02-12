@@ -61,6 +61,10 @@ func (u *UnitOfWork) Outbox() domain.OutboxRepository {
 	return NewOutboxRepository(u.getBaseRunner())
 }
 
+func (u *UnitOfWork) ConversationSummary() domain.ConversationSummaryRepository {
+	return NewConversationSummaryRepository(u.getBaseRunner())
+}
+
 // getBaseRunner returns the appropriate BaseRunner (transaction or DB) for the UnitOfWork.
 func (u *UnitOfWork) getBaseRunner() squirrel.BaseRunner {
 	if u.tx != nil {

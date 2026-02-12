@@ -143,6 +143,18 @@ func TestUnitOfWork_ChatMessage(t *testing.T) {
 	assert.IsType(t, ChatMessageRepository{}, chatMessage)
 }
 
+func TestUnitOfWork_ConversationSummary(t *testing.T) {
+	db, _, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	uow := NewUnitOfWork(db)
+	summaryRepo := uow.ConversationSummary()
+
+	assert.NotNil(t, summaryRepo)
+	assert.IsType(t, ConversationSummaryRepository{}, summaryRepo)
+}
+
 func TestUnitOfWork_getBaseRunner(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)

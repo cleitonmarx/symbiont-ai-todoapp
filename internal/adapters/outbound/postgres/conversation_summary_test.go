@@ -143,6 +143,49 @@ func TestConversationSummaryRepository_StoreConversationSummary(t *testing.T) {
 	}
 }
 
+func TestConversationSummaryRepository_DeleteConversationSummary(t *testing.T) {
+	tests := map[string]struct {
+		expect    func(sqlmock.Sqlmock)
+		expectErr bool
+	}{
+		"success": {
+			expect: func(m sqlmock.Sqlmock) {
+				m.ExpectExec("DELETE FROM conversations_summary WHERE conversation_id = $1").
+					WithArgs("global").
+					WillReturnResult(sqlmock.NewResult(1, 1))
+			},
+			expectErr: false,
+		},
+		"database-error": {
+			expect: func(m sqlmock.Sqlmock) {
+				m.ExpectExec("DELETE FROM conversations_summary WHERE conversation_id = $1").
+					WithArgs("global").
+					WillReturnError(errors.New("db error"))
+			},
+			expectErr: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			assert.NoError(t, err)
+			defer db.Close() //nolint:errcheck
+
+			tt.expect(mock)
+
+			repo := NewConversationSummaryRepository(db)
+			gotErr := repo.DeleteConversationSummary(context.Background(), "global")
+			if tt.expectErr {
+				assert.Error(t, gotErr)
+			} else {
+				assert.NoError(t, gotErr)
+			}
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 func TestInitConversationSummaryRepository_Initialize(t *testing.T) {
 	i := &InitConversationSummaryRepository{
 		DB: &sql.DB{},

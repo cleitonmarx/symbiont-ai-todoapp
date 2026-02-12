@@ -89,6 +89,22 @@ func (r ConversationSummaryRepository) StoreConversationSummary(ctx context.Cont
 	return nil
 }
 
+// DeleteConversationSummary deletes the conversation summary for a conversation (used for testing).
+func (r ConversationSummaryRepository) DeleteConversationSummary(ctx context.Context, conversationID string) error {
+	spanCtx, span := telemetry.Start(ctx)
+	defer span.End()
+
+	_, err := r.sb.
+		Delete("conversations_summary").
+		Where(squirrel.Eq{"conversation_id": conversationID}).
+		ExecContext(spanCtx)
+	if telemetry.RecordErrorAndStatus(span, err) {
+		return err
+	}
+
+	return nil
+}
+
 // InitConversationSummaryRepository is a Symbiont initializer for ConversationSummaryRepository.
 type InitConversationSummaryRepository struct {
 	DB *sql.DB `resolve:""`

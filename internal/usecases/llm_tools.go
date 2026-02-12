@@ -119,12 +119,12 @@ func (lft TodoFetcherTool) Definition() domain.LLMToolDefinition {
 					},
 					"search_term": {
 						Type:        "string",
-						Description: "Optional search text used to find similar todos (e.g., dentist, groceries).",
-						Required:    false,
+						Description: "search text used to find similar todos (e.g., dentist, groceries).",
+						Required:    true,
 					},
 					"sort_by": {
 						Type:        "string",
-						Description: "Optional sort. Allowed: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc. Use similarity sort only with search_term.",
+						Description: "Optional sort. Allowed: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc. Use similarity sort only with search_term. similarityAsc returns most similar first.",
 						Required:    false,
 					},
 					"due_after": {
@@ -149,7 +149,7 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 		Page       int     `json:"page"`
 		PageSize   int     `json:"page_size"`
 		Status     *string `json:"status"`
-		SearchTerm *string `json:"search_term"`
+		SearchTerm string  `json:"search_term"`
 		SortBy     *string `json:"sort_by"`
 		DueAfter   *string `json:"due_after"`
 		DueBefore  *string `json:"due_before"`
@@ -170,17 +170,22 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 
 	opts := []domain.ListTodoOptions{}
 
-	if params.SearchTerm != nil && *params.SearchTerm != "" {
-		resp, err := lft.llmCli.Embed(ctx, lft.llmEmbeddingModel, *params.SearchTerm)
-		if err != nil {
-			return domain.LLMChatMessage{
-				Role:    domain.ChatRole_Tool,
-				Content: fmt.Sprintf(`{"error":"embedding_error","details":"%s"}`, err.Error()),
-			}
+	if params.SearchTerm == "" {
+		return domain.LLMChatMessage{
+			Role:    domain.ChatRole_Tool,
+			Content: fmt.Sprintf(`{"error":"missing_search_term","details":"search_term is required and cannot be empty.", "example":%s}`, exampleArgs),
 		}
-		RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
-		opts = append(opts, domain.WithEmbedding(resp.Embedding))
 	}
+
+	resp, err := lft.llmCli.Embed(ctx, lft.llmEmbeddingModel, params.SearchTerm)
+	if err != nil {
+		return domain.LLMChatMessage{
+			Role:    domain.ChatRole_Tool,
+			Content: fmt.Sprintf(`{"error":"embedding_error","details":"%s"}`, err.Error()),
+		}
+	}
+	RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
+	opts = append(opts, domain.WithEmbedding(resp.Embedding))
 
 	if params.Status != nil {
 		opts = append(opts, domain.WithStatus(domain.TodoStatus(*params.Status)))

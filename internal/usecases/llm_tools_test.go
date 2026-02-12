@@ -191,6 +191,11 @@ func TestTodoFetcherTool(t *testing.T) {
 	}{
 		"fetch-todos-success": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				llmCli.EXPECT().
+					Embed(mock.Anything, "embedding-model", "test").
+					Return(domain.EmbedResponse{Embedding: []float64{0.3, 0.4}}, nil).
+					Once()
+
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -203,7 +208,7 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
-				Arguments: `{"page": 1, "page_size": 10}`,
+				Arguments: `{"page": 1, "page_size": 10, "search_term": "test"}`,
 			},
 			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
@@ -253,6 +258,11 @@ func TestTodoFetcherTool(t *testing.T) {
 		},
 		"fetch-todos-with-sortby": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				llmCli.EXPECT().
+					Embed(mock.Anything, "embedding-model", "test").
+					Return(domain.EmbedResponse{Embedding: []float64{0.3, 0.4}}, nil).
+					Once()
+
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -271,7 +281,7 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
-				Arguments: `{"page": 1, "page_size": 10, "sort_by": "duedateAsc"}`,
+				Arguments: `{"page": 1, "page_size": 10, "search_term": "test", "sort_by": "duedateAsc"}`,
 			},
 			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
@@ -283,6 +293,11 @@ func TestTodoFetcherTool(t *testing.T) {
 		},
 		"fetch-todos-with-due-date-filters": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				llmCli.EXPECT().
+					Embed(mock.Anything, "embedding-model", "test").
+					Return(domain.EmbedResponse{Embedding: []float64{0.3, 0.4}}, nil).
+					Once()
+
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
@@ -310,7 +325,7 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
-				Arguments: `{"page": 1, "page_size": 10, "due_after": "2026-01-20", "due_before": "2026-01-30"}`,
+				Arguments: `{"page": 1, "page_size": 10, "search_term": "test", "due_after": "2026-01-20", "due_before": "2026-01-30"}`,
 			},
 			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
@@ -322,6 +337,11 @@ func TestTodoFetcherTool(t *testing.T) {
 		},
 		"fetch-todos-invalid-due-after": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				llmCli.EXPECT().
+					Embed(mock.Anything, "embedding-model", "test").
+					Return(domain.EmbedResponse{Embedding: []float64{0.3, 0.4}}, nil).
+					Once()
+
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
@@ -329,7 +349,7 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
-				Arguments: `{"page": 1, "page_size": 10, "due_after": "invalid-date", "due_before": "2026-01-30"}`,
+				Arguments: `{"page": 1, "page_size": 10, "search_term": "test", "due_after": "invalid-date", "due_before": "2026-01-30"}`,
 			},
 			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
@@ -338,6 +358,11 @@ func TestTodoFetcherTool(t *testing.T) {
 		},
 		"fetch-todos-invalid-due-before": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				llmCli.EXPECT().
+					Embed(mock.Anything, "embedding-model", "test").
+					Return(domain.EmbedResponse{Embedding: []float64{0.3, 0.4}}, nil).
+					Once()
+
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
@@ -345,7 +370,7 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
-				Arguments: `{"page": 1, "page_size": 10, "due_after": "2026-01-20", "due_before": "invalid-date"}`,
+				Arguments: `{"page": 1, "page_size": 10, "search_term": "test", "due_after": "2026-01-20", "due_before": "invalid-date"}`,
 			},
 			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)

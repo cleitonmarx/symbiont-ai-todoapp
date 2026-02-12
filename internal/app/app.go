@@ -29,6 +29,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&postgres.InitTodoRepository{},
 			&postgres.InitBoardSummaryRepository{},
 			&postgres.InitChatMessageRepository{},
+			&postgres.InitConversationSummaryRepository{},
 			&time.InitCurrentTimeProvider{},
 			&pubsub.InitClient{},
 			&pubsub.InitPublisher{},
@@ -44,6 +45,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&usecases.InitUpdateTodo{},
 			&usecases.InitDeleteTodo{},
 			&usecases.InitGenerateBoardSummary{},
+			&usecases.InitGenerateChatSummary{},
 			&usecases.InitGetBoardSummary{},
 			&usecases.InitListChatMessages{},
 			&usecases.InitDeleteConversation{},
@@ -55,6 +57,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&http.TodoAppServer{},
 			&graphql.TodoGraphQLServer{},
 			&workers.TodoEventSubscriber{},
+			&workers.ChatEventSubscriber{},
 			&workers.MessageRelay{},
 		).
 		Introspect(&MermaidGraphIntrospector{})

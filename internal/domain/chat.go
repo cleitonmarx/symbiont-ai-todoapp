@@ -20,16 +20,35 @@ const (
 	ChatRole_Tool      ChatRole = "tool"
 )
 
+// ChatMessageState represents the persistence state of a chat message.
+type ChatMessageState string
+
+const (
+	// ChatMessageState_Pending indicates the message was created but not fully streamed yet.
+	ChatMessageState_Pending ChatMessageState = "PENDING"
+	// ChatMessageState_Streaming indicates the message is currently being streamed.
+	ChatMessageState_Streaming ChatMessageState = "STREAMING"
+	// ChatMessageState_Completed indicates the message was fully generated and persisted.
+	ChatMessageState_Completed ChatMessageState = "COMPLETED"
+	// ChatMessageState_Failed indicates message generation failed.
+	ChatMessageState_Failed ChatMessageState = "FAILED"
+)
+
 // ChatMessage represents an AI chat message in a conversation
 type ChatMessage struct {
 	ID             uuid.UUID
 	ConversationID string
+	TurnID         *uuid.UUID
+	TurnSequence   *int64
 	ChatRole       ChatRole
 	Content        string
 	ToolCallID     *string
 	ToolCalls      []LLMStreamEventToolCall
 	Model          string
+	MessageState   ChatMessageState
+	ErrorMessage   *string
 	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // ChatMessageRepository defines the interface for chat message persistence

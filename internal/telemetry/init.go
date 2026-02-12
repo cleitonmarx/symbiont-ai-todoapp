@@ -19,11 +19,13 @@ import (
 
 // InitOpenTelemetry is a component that sets up OpenTelemetry tracing.
 type InitOpenTelemetry struct {
-	Logger *log.Logger `resolve:""`
-	tp     *sdktrace.TracerProvider
-	se     sdktrace.SpanExporter
-	mp     *sdkmetric.MeterProvider
-	me     sdkmetric.Exporter
+	Logger          *log.Logger `resolve:""`
+	TracesEndpoint  string      `config:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" default:"-"`
+	MetricsEndpoint string      `config:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT" default:"-"`
+	tp              *sdktrace.TracerProvider
+	se              sdktrace.SpanExporter
+	mp              *sdkmetric.MeterProvider
+	me              sdkmetric.Exporter
 }
 
 // Initialize sets up OpenTelemetry tracing and exporting.
@@ -39,27 +41,36 @@ func (o *InitOpenTelemetry) Initialize(ctx context.Context) (context.Context, er
 		return ctx, err
 	}
 
-	// Set up trace provider.
-	o.tp, o.se, err = newTracerProvider(ctx, res)
-	if err != nil {
-		return ctx, err
+	if o.TracesEndpoint != "-" {
+		// Set up trace provider.
+		o.tp, o.se, err = newTracerProvider(ctx, res)
+		if err != nil {
+			return ctx, err
+		}
+		otel.SetTracerProvider(o.tp)
 	}
-	otel.SetTracerProvider(o.tp)
 
-	// Set up meter provider.
-	o.mp, o.me, err = newMeterProvider(ctx, res)
-	if err != nil {
-		return ctx, err
+	if o.MetricsEndpoint != "-" {
+		// Set up meter provider.
+		o.mp, o.me, err = newMeterProvider(ctx, res)
+		if err != nil {
+			return ctx, err
+		}
+		otel.SetMeterProvider(o.mp)
 	}
-	otel.SetMeterProvider(o.mp)
 
 	return ctx, nil
 }
 
 // Close shuts down the OpenTelemetry tracer provider and span exporter.
 func (o *InitOpenTelemetry) Close() {
+	if o.tp == nil && o.mp == nil {
+		return
+	}
+
 	cancelCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	if err := o.tp.Shutdown(cancelCtx); err != nil {
 		o.Logger.Printf("Error shutting down tracer provider: %v", err)
 	}

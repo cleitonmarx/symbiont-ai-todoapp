@@ -72,9 +72,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime)
+				expectNowCalls(timeProvider, fixedTime, 7)
 
 				client.EXPECT().
 					ChatStream(mock.Anything, mock.Anything, mock.Anything).
@@ -82,48 +80,145 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 						toolFunctionCallback(userMsgID, assistantMsgID, fixedTime),
 					)
 
-				uow.EXPECT().
-					ChatMessage().Return(chatRepo)
-				uow.EXPECT().
-					Outbox().Return(outbox)
-
-				uow.EXPECT().
-					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-						return fn(uow)
-					}).
-					Once()
-
-				outbox.EXPECT().
-					CreateChatEvent(mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, event domain.ChatMessageEvent) {
-						assert.Equal(t, domain.EventType_CHAT_MESSAGE_SENT, event.Type)
-					}).
-					Return(nil).
-					Times(4)
-
-				chatRepo.EXPECT().
-					CreateChatMessages(mock.Anything, mock.MatchedBy(func(msgs []domain.ChatMessage) bool {
-						return assert.Equal(t, 4, len(msgs))
-					})).
-					Run(func(ctx context.Context, msgs []domain.ChatMessage) {
-						assert.Equal(t, domain.ChatRole_User, msgs[0].ChatRole)
-						assert.Equal(t, "Call a tool", msgs[0].Content)
-
-						assert.Equal(t, domain.ChatRole_Assistant, msgs[1].ChatRole)
-						assert.Len(t, msgs[1].ToolCalls, 1)
-
-						assert.Equal(t, domain.ChatRole_Tool, msgs[2].ChatRole)
-						assert.Equal(t, "func-123", *msgs[2].ToolCallID)
-
-						assert.Equal(t, domain.ChatRole_Assistant, msgs[3].ChatRole)
-						assert.Equal(t, "Tool called successfully.", msgs[3].Content)
-					}).
-					Return(nil).
-					Once()
+				expectPersistSequence(t, chatRepo, uow, outbox, fixedTime, []persistCallExpectation{
+					{
+						Role:          domain.ChatRole_User,
+						Content:       "Call a tool",
+						ID:            &userMsgID,
+						ToolCallsLen:  0,
+						HasToolCallID: false,
+					},
+					{
+						Role:          domain.ChatRole_Assistant,
+						Content:       "",
+						ToolCallsLen:  1,
+						HasToolCallID: false,
+					},
+					{
+						Role:          domain.ChatRole_Tool,
+						Content:       "",
+						ToolCallsLen:  0,
+						HasToolCallID: true,
+					},
+					{
+						Role:          domain.ChatRole_Assistant,
+						Content:       "Tool called successfully.",
+						ID:            &assistantMsgID,
+						ToolCallsLen:  0,
+						HasToolCallID: false,
+					},
+				})
 			},
 			expectErr:       false,
 			expectedContent: "",
+		},
+		"tool-message-marked-as-failed-when-content-has-error": {
+			userMessage: "Call failing tool",
+			model:       "test-model",
+			setExpectations: func(
+				chatRepo *domain.MockChatMessageRepository,
+				timeProvider *domain.MockCurrentTimeProvider,
+				client *domain.MockLLMClient,
+				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
+			) {
+				toolRegistry.EXPECT().
+					List().
+					Return([]domain.LLMToolDefinition{})
+
+				toolRegistry.EXPECT().
+					StatusMessage("failing_tool").
+					Return("calling failing_tool...\n")
+
+				toolRegistry.EXPECT().
+					Call(
+						mock.Anything,
+						domain.LLMStreamEventToolCall{
+							ID:        "func-error",
+							Function:  "failing_tool",
+							Arguments: "{\"input\":\"x\"}",
+							Text:      "calling failing_tool...\n",
+						},
+						mock.MatchedBy(func(msgs []domain.LLMChatMessage) bool {
+							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Call failing tool"
+						}),
+					).
+					Return(domain.LLMChatMessage{
+						Role:    domain.ChatRole_Tool,
+						Content: "error: failing_tool unavailable",
+					})
+
+				chatRepo.EXPECT().
+					ListChatMessages(mock.Anything, MAX_CHAT_HISTORY_MESSAGES).
+					Return([]domain.ChatMessage{}, false, nil).
+					Once()
+
+				expectNowCalls(timeProvider, fixedTime, 7)
+
+				callCount := 0
+				client.EXPECT().
+					ChatStream(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
+						if callCount == 0 {
+							callCount++
+							if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+								UserMessageID:      userMsgID,
+								AssistantMessageID: assistantMsgID,
+							}); err != nil {
+								return err
+							}
+							return onEvent(domain.LLMStreamEventType_ToolCall, domain.LLMStreamEventToolCall{
+								ID:        "func-error",
+								Function:  "failing_tool",
+								Arguments: "{\"input\":\"x\"}",
+							})
+						}
+
+						if err := onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "I could not complete that tool call."}); err != nil {
+							return err
+						}
+						return onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
+							AssistantMessageID: assistantMsgID.String(),
+							CompletedAt:        fixedTime.Format(time.RFC3339),
+						})
+					}).
+					Times(2)
+
+				toolErr := "error: failing_tool unavailable"
+				expectPersistSequence(t, chatRepo, uow, outbox, fixedTime, []persistCallExpectation{
+					{
+						Role:          domain.ChatRole_User,
+						Content:       "Call failing tool",
+						ID:            &userMsgID,
+						ToolCallsLen:  0,
+						HasToolCallID: false,
+					},
+					{
+						Role:          domain.ChatRole_Assistant,
+						Content:       "",
+						ToolCallsLen:  1,
+						HasToolCallID: false,
+					},
+					{
+						Role:          domain.ChatRole_Tool,
+						Content:       "error: failing_tool unavailable",
+						MessageState:  domain.ChatMessageState_Failed,
+						ErrorMessage:  &toolErr,
+						ToolCallsLen:  0,
+						HasToolCallID: true,
+					},
+					{
+						Role:          domain.ChatRole_Assistant,
+						Content:       "I could not complete that tool call.",
+						ID:            &assistantMsgID,
+						ToolCallsLen:  0,
+						HasToolCallID: false,
+					},
+				})
+			},
+			expectErr:       false,
+			expectedContent: "calling failing_tool...\nI could not complete that tool call.",
 		},
 		"onEvent-function-call-error": {
 			userMessage: "Call tool",
@@ -144,9 +239,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					StatusMessage("fetch_todos").
 					Return("calling fetch_todos...\n")
 
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime)
+				expectNowCalls(timeProvider, fixedTime, 5)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, MAX_CHAT_HISTORY_MESSAGES).
@@ -168,6 +261,32 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 							Arguments: `{"page": 1}`,
 						})
 					})
+
+				onEventErr := "onEvent error"
+				expectPersistSequence(t, chatRepo, uow, outbox, fixedTime, []persistCallExpectation{
+					{
+						Role:          domain.ChatRole_User,
+						Content:       "Call tool",
+						ID:            &userMsgID,
+						ToolCallsLen:  0,
+						HasToolCallID: false,
+					},
+					{
+						Role:          domain.ChatRole_Assistant,
+						Content:       "",
+						ToolCallsLen:  1,
+						HasToolCallID: false,
+					},
+					{
+						Role:          domain.ChatRole_Assistant,
+						Content:       "",
+						ID:            &assistantMsgID,
+						MessageState:  domain.ChatMessageState_Failed,
+						ErrorMessage:  &onEventErr,
+						ToolCallsLen:  0,
+						HasToolCallID: false,
+					},
+				})
 			},
 			expectErr:      true,
 			onEventErrType: domain.LLMStreamEventType_ToolCall,
@@ -187,9 +306,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					List().
 					Return([]domain.LLMToolDefinition{})
 
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime)
+				expectNowCalls(timeProvider, fixedTime, 19)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, MAX_CHAT_HISTORY_MESSAGES).
@@ -228,34 +345,39 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					}).
 					Times(8)
 
-				uow.EXPECT().
-					ChatMessage().Return(chatRepo)
-				uow.EXPECT().
-					Outbox().Return(outbox)
-
-				uow.EXPECT().
-					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-						return fn(uow)
-					}).
-					Once()
-
-				outbox.EXPECT().
-					CreateChatEvent(mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, event domain.ChatMessageEvent) {
-						assert.Equal(t, domain.EventType_CHAT_MESSAGE_SENT, event.Type)
-					}).
-					Return(nil).
-					Times(16)
-
-				chatRepo.EXPECT().
-					CreateChatMessages(mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, msgs []domain.ChatMessage) {
-						assert.Len(t, msgs, 16)
-						assert.Equal(t, domain.ChatRole_User, msgs[0].ChatRole)
-					}).
-					Return(nil).
-					Once()
+				expectations := []persistCallExpectation{
+					{
+						Role:          domain.ChatRole_User,
+						Content:       "Keep calling tools",
+						ID:            &userMsgID,
+						ToolCallsLen:  0,
+						HasToolCallID: false,
+					},
+				}
+				for i := 0; i < 7; i++ {
+					expectations = append(expectations,
+						persistCallExpectation{
+							Role:          domain.ChatRole_Assistant,
+							Content:       "",
+							ToolCallsLen:  1,
+							HasToolCallID: false,
+						},
+						persistCallExpectation{
+							Role:          domain.ChatRole_Tool,
+							Content:       "tool result",
+							ToolCallsLen:  0,
+							HasToolCallID: true,
+						},
+					)
+				}
+				expectations = append(expectations, persistCallExpectation{
+					Role:          domain.ChatRole_Assistant,
+					Content:       "Sorry, I could not process your request. Please try again.",
+					ID:            &assistantMsgID,
+					ToolCallsLen:  0,
+					HasToolCallID: false,
+				})
+				expectPersistSequence(t, chatRepo, uow, outbox, fixedTime, expectations)
 			},
 			expectErr:       false,
 			expectedContent: "calling tool...\ncalling tool...\ncalling tool...\ncalling tool...\ncalling tool...\ncalling tool...\ncalling tool...\nSorry, I could not process your request. Please try again.\n",
@@ -275,9 +397,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					List().
 					Return([]domain.LLMToolDefinition{})
 
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime)
+				expectNowCalls(timeProvider, fixedTime, 15)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, MAX_CHAT_HISTORY_MESSAGES).
@@ -316,34 +436,39 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					}).
 					Times(6)
 
-				uow.EXPECT().
-					ChatMessage().Return(chatRepo)
-				uow.EXPECT().
-					Outbox().Return(outbox)
-
-				uow.EXPECT().
-					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-						return fn(uow)
-					}).
-					Once()
-
-				outbox.EXPECT().
-					CreateChatEvent(mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, event domain.ChatMessageEvent) {
-						assert.Equal(t, domain.EventType_CHAT_MESSAGE_SENT, event.Type)
-					}).
-					Return(nil).
-					Times(12)
-
-				chatRepo.EXPECT().
-					CreateChatMessages(mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, msgs []domain.ChatMessage) {
-						assert.Len(t, msgs, 12)
-						assert.Equal(t, domain.ChatRole_User, msgs[0].ChatRole)
-					}).
-					Return(nil).
-					Once()
+				expectations := []persistCallExpectation{
+					{
+						Role:          domain.ChatRole_User,
+						Content:       "Call the same tool repeatedly",
+						ID:            &userMsgID,
+						ToolCallsLen:  0,
+						HasToolCallID: false,
+					},
+				}
+				for range 5 {
+					expectations = append(expectations,
+						persistCallExpectation{
+							Role:          domain.ChatRole_Assistant,
+							Content:       "",
+							ToolCallsLen:  1,
+							HasToolCallID: false,
+						},
+						persistCallExpectation{
+							Role:          domain.ChatRole_Tool,
+							Content:       "same result",
+							ToolCallsLen:  0,
+							HasToolCallID: true,
+						},
+					)
+				}
+				expectations = append(expectations, persistCallExpectation{
+					Role:          domain.ChatRole_Assistant,
+					Content:       "Sorry, I could not process your request. Please try again.",
+					ID:            &assistantMsgID,
+					ToolCallsLen:  0,
+					HasToolCallID: false,
+				})
+				expectPersistSequence(t, chatRepo, uow, outbox, fixedTime, expectations)
 			},
 			expectErr:       false,
 			expectedContent: "calling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\nSorry, I could not process your request. Please try again.\n",

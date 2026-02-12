@@ -6,6 +6,8 @@ import "context"
 type UnitOfWork interface {
 	// Todo returns the repository for managing todos.
 	Todo() TodoRepository
+	// ChatMessage returns the repository for managing chat messages.
+	ChatMessage() ChatMessageRepository
 	// Outbox returns the repository for managing outbox events.
 	Outbox() OutboxRepository
 	// Execute runs a function within the context of a unit of work.

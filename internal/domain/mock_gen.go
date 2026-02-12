@@ -1974,6 +1974,52 @@ func (_m *MockUnitOfWork) EXPECT() *MockUnitOfWork_Expecter {
 	return &MockUnitOfWork_Expecter{mock: &_m.Mock}
 }
 
+// ChatMessage provides a mock function for the type MockUnitOfWork
+func (_mock *MockUnitOfWork) ChatMessage() ChatMessageRepository {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ChatMessage")
+	}
+
+	var r0 ChatMessageRepository
+	if returnFunc, ok := ret.Get(0).(func() ChatMessageRepository); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ChatMessageRepository)
+		}
+	}
+	return r0
+}
+
+// MockUnitOfWork_ChatMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ChatMessage'
+type MockUnitOfWork_ChatMessage_Call struct {
+	*mock.Call
+}
+
+// ChatMessage is a helper method to define mock.On call
+func (_e *MockUnitOfWork_Expecter) ChatMessage() *MockUnitOfWork_ChatMessage_Call {
+	return &MockUnitOfWork_ChatMessage_Call{Call: _e.mock.On("ChatMessage")}
+}
+
+func (_c *MockUnitOfWork_ChatMessage_Call) Run(run func()) *MockUnitOfWork_ChatMessage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockUnitOfWork_ChatMessage_Call) Return(chatMessageRepository ChatMessageRepository) *MockUnitOfWork_ChatMessage_Call {
+	_c.Call.Return(chatMessageRepository)
+	return _c
+}
+
+func (_c *MockUnitOfWork_ChatMessage_Call) RunAndReturn(run func() ChatMessageRepository) *MockUnitOfWork_ChatMessage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Execute provides a mock function for the type MockUnitOfWork
 func (_mock *MockUnitOfWork) Execute(ctx context.Context, fn func(uow UnitOfWork) error) error {
 	ret := _mock.Called(ctx, fn)

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"embed"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -112,11 +113,18 @@ func (di *InitDB) runMigrations() error {
 		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("failed to apply migrations: %w", err)
+	if err := m.Up(); err != nil {
+		switch {
+		case errors.Is(err, migrate.ErrNoChange):
+			di.Logger.Println("InitDB: no new migrations to apply")
+			return nil
+		default:
+			return fmt.Errorf("failed to apply migrations: %w", err)
+		}
+	} else {
+		di.Logger.Println("InitDB: migrations applied successfully")
 	}
 
-	di.Logger.Println("InitDB: migrations applied successfully")
 	return nil
 }
 

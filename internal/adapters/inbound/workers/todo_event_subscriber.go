@@ -16,7 +16,7 @@ type TodoEventSubscriber struct {
 	Client               *pubsub.Client                `resolve:""`
 	Interval             time.Duration                 `config:"SUMMARY_BATCH_INTERVAL" default:"3s"`
 	BatchSize            int                           `config:"SUMMARY_BATCH_SIZE" default:"20"`
-	SubscriptionID       string                        `config:"PUBSUB_SUBSCRIPTION_ID"`
+	SubscriptionID       string                        `config:"TODO_EVENTS_SUBSCRIPTION_ID"`
 	GenerateBoardSummary usecases.GenerateBoardSummary `resolve:""`
 	workerExecutionChan  chan struct{}
 }

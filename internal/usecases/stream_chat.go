@@ -38,6 +38,7 @@ type StreamChat interface {
 // StreamChatImpl is the implementation of the StreamChat use case
 type StreamChatImpl struct {
 	chatMessageRepo   domain.ChatMessageRepository
+	uow               domain.UnitOfWork
 	timeProvider      domain.CurrentTimeProvider
 	llmClient         domain.LLMClient
 	llmToolRegistry   domain.LLMToolRegistry
@@ -51,11 +52,13 @@ func NewStreamChatImpl(
 	timeProvider domain.CurrentTimeProvider,
 	llmClient domain.LLMClient,
 	llmToolRegistry domain.LLMToolRegistry,
+	uow domain.UnitOfWork,
 	llmEmbeddingModel string,
 	maxToolCycles int,
 ) StreamChatImpl {
 	return StreamChatImpl{
 		chatMessageRepo:   chatMessageRepo,
+		uow:               uow,
 		timeProvider:      timeProvider,
 		llmClient:         llmClient,
 		llmToolRegistry:   llmToolRegistry,
@@ -227,7 +230,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	for i, m := range chatMessages {
 		msgs[i] = *m
 	}
-	if err := sc.chatMessageRepo.CreateChatMessages(spanCtx, msgs); telemetry.RecordErrorAndStatus(span, err) {
+	if err := sc.persistChatMessages(spanCtx, msgs); telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 
@@ -242,6 +245,39 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return err
 	}
 	return nil
+}
+
+func (sc StreamChatImpl) persistChatMessages(ctx context.Context, messages []domain.ChatMessage) error {
+	return sc.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
+		if err := uow.ChatMessage().CreateChatMessages(ctx, messages); err != nil {
+			return err
+		}
+
+		for _, message := range messages {
+			if err := uow.Outbox().CreateChatEvent(ctx, domain.ChatMessageEvent{
+				Type:           domain.EventType_CHAT_MESSAGE_SENT,
+				ChatRole:       message.ChatRole,
+				ChatMessageID:  message.ID,
+				ConversationID: message.ConversationID,
+				IsToolSuccess:  isToolSuccess(message),
+				CreatedAt:      message.CreatedAt,
+			}); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// isToolSuccess determines if a tool message indicates a successful tool call based on its content
+func isToolSuccess(message domain.ChatMessage) bool {
+	if message.ChatRole != domain.ChatRole_Tool {
+		return false
+	}
+
+	content := strings.ToLower(message.Content)
+	return !strings.Contains(content, "error")
 }
 
 // buildSystemPrompt creates a system prompt with current todos context
@@ -349,6 +385,7 @@ func (t *toolCycleTracker) hasExceededMaxToolCalls(functionName, arguments strin
 // InitStreamChat is the initializer for the StreamChat use case
 type InitStreamChat struct {
 	ChatMessageRepo domain.ChatMessageRepository `resolve:""`
+	Uow             domain.UnitOfWork            `resolve:""`
 	TimeProvider    domain.CurrentTimeProvider   `resolve:""`
 	LLMToolRegistry domain.LLMToolRegistry       `resolve:""`
 	LLMClient       domain.LLMClient             `resolve:""`
@@ -365,6 +402,7 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 		i.TimeProvider,
 		i.LLMClient,
 		i.LLMToolRegistry,
+		i.Uow,
 		i.EmbeddingModel,
 		i.MaxToolCycles,
 	))

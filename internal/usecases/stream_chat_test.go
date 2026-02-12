@@ -27,6 +27,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			*domain.MockCurrentTimeProvider,
 			*domain.MockLLMClient,
 			*domain.MockLLMToolRegistry,
+			*domain.MockUnitOfWork,
+			*domain.MockOutboxRepository,
 		)
 		expectErr       bool
 		expectedContent string
@@ -40,6 +42,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 
 				toolRegistry.EXPECT().
@@ -81,7 +85,27 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}).
 					Return(nil)
 
-				// user and assistant saves...
+				uow.EXPECT().
+					ChatMessage().Return(chatRepo)
+				uow.EXPECT().
+					Outbox().Return(outbox)
+
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
+						return fn(uow)
+					}).
+					Once()
+
+				outbox.EXPECT().
+					CreateChatEvent(mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, event domain.ChatMessageEvent) {
+						assert.Equal(t, domain.EventType_CHAT_MESSAGE_SENT, event.Type)
+						assert.Equal(t, false, event.IsToolSuccess)
+					}).
+					Return(nil).
+					Twice()
+
 				chatRepo.EXPECT().
 					CreateChatMessages(mock.Anything, mock.MatchedBy(func(msgs []domain.ChatMessage) bool {
 						return len(msgs) == 2
@@ -94,6 +118,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}).
 					Return(nil).
 					Once()
+
 			},
 			expectErr:       false,
 			expectedContent: "I'm doing great!",
@@ -106,6 +131,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 				toolRegistry.EXPECT().
 					List().
@@ -145,6 +172,26 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						toolFunctionCallback(userMsgID, assistantMsgID, fixedTime),
 					)
 
+				uow.EXPECT().
+					ChatMessage().Return(chatRepo)
+				uow.EXPECT().
+					Outbox().Return(outbox)
+
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
+						return fn(uow)
+					}).
+					Once()
+
+				outbox.EXPECT().
+					CreateChatEvent(mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, event domain.ChatMessageEvent) {
+						assert.Equal(t, domain.EventType_CHAT_MESSAGE_SENT, event.Type)
+					}).
+					Return(nil).
+					Times(4)
+
 				// user and assistant saves...
 				chatRepo.EXPECT().
 					CreateChatMessages(mock.Anything, mock.MatchedBy(func(msgs []domain.ChatMessage) bool {
@@ -178,6 +225,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 				toolRegistry.EXPECT().
 					List().
@@ -205,6 +254,26 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						})
 					}).
 					Return(nil)
+
+				uow.EXPECT().
+					ChatMessage().Return(chatRepo)
+				uow.EXPECT().
+					Outbox().Return(outbox)
+
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
+						return fn(uow)
+					}).
+					Once()
+
+				outbox.EXPECT().
+					CreateChatEvent(mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, event domain.ChatMessageEvent) {
+						assert.Equal(t, domain.EventType_CHAT_MESSAGE_SENT, event.Type)
+					}).
+					Return(nil).
+					Times(2)
 
 				chatRepo.EXPECT().
 					CreateChatMessages(mock.Anything, mock.MatchedBy(func(msgs []domain.ChatMessage) bool {
@@ -239,6 +308,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 				timeProvider.EXPECT().
 					Now().
@@ -259,6 +330,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 				toolRegistry.EXPECT().
 					List().
@@ -293,6 +366,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 				toolRegistry.EXPECT().
 					List().
@@ -330,6 +405,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 				toolRegistry.EXPECT().
 					List().
@@ -375,6 +452,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 
 				toolRegistry.EXPECT().
@@ -404,6 +483,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 
 				toolRegistry.EXPECT().
@@ -433,6 +514,16 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						})
 					}).
 					Return(nil)
+
+				uow.EXPECT().
+					ChatMessage().Return(chatRepo)
+
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
+						return fn(uow)
+					}).
+					Once()
 
 				chatRepo.EXPECT().
 					CreateChatMessages(mock.Anything, mock.MatchedBy(func(msgs []domain.ChatMessage) bool {
@@ -451,6 +542,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 
 				toolRegistry.EXPECT().
@@ -480,6 +573,16 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						})
 					}).
 					Return(nil)
+
+				uow.EXPECT().
+					ChatMessage().Return(chatRepo)
+
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
+						return fn(uow)
+					}).
+					Once()
 
 				chatRepo.EXPECT().
 					CreateChatMessages(mock.Anything, mock.Anything).
@@ -500,7 +603,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
+
 				toolRegistry.EXPECT().
 					List().
 					Return([]domain.LLMToolDefinition{})
@@ -548,6 +654,26 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}).
 					Times(8)
 
+				uow.EXPECT().
+					ChatMessage().Return(chatRepo)
+				uow.EXPECT().
+					Outbox().Return(outbox)
+
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
+						return fn(uow)
+					}).
+					Once()
+
+				outbox.EXPECT().
+					CreateChatEvent(mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, event domain.ChatMessageEvent) {
+						assert.Equal(t, domain.EventType_CHAT_MESSAGE_SENT, event.Type)
+					}).
+					Return(nil).
+					Times(16)
+
 				// Final assistant message - contains the warning only
 				chatRepo.EXPECT().
 					CreateChatMessages(mock.Anything, mock.Anything).
@@ -570,6 +696,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
 			) {
 				toolRegistry.EXPECT().
 					List().
@@ -616,6 +744,26 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}).
 					Times(6)
 
+				uow.EXPECT().
+					ChatMessage().Return(chatRepo)
+				uow.EXPECT().
+					Outbox().Return(outbox)
+
+				uow.EXPECT().
+					Execute(mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
+						return fn(uow)
+					}).
+					Once()
+
+				outbox.EXPECT().
+					CreateChatEvent(mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, event domain.ChatMessageEvent) {
+						assert.Equal(t, domain.EventType_CHAT_MESSAGE_SENT, event.Type)
+					}).
+					Return(nil).
+					Times(12)
+
 				chatRepo.EXPECT().
 					CreateChatMessages(mock.Anything, mock.Anything).
 					Run(func(ctx context.Context, msgs []domain.ChatMessage) {
@@ -637,12 +785,13 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			timeProvider := domain.NewMockCurrentTimeProvider(t)
 			llmClient := domain.NewMockLLMClient(t)
 			lltToolRegistry := domain.NewMockLLMToolRegistry(t)
-
+			uow := domain.NewMockUnitOfWork(t)
+			outbox := domain.NewMockOutboxRepository(t)
 			if tt.setExpectations != nil {
-				tt.setExpectations(chatRepo, timeProvider, llmClient, lltToolRegistry)
+				tt.setExpectations(chatRepo, timeProvider, llmClient, lltToolRegistry, uow, outbox)
 			}
 
-			useCase := NewStreamChatImpl(chatRepo, timeProvider, llmClient, lltToolRegistry, "test-embedding-model", 7)
+			useCase := NewStreamChatImpl(chatRepo, timeProvider, llmClient, lltToolRegistry, uow, "test-embedding-model", 7)
 
 			var capturedContent string
 			err := useCase.Execute(context.Background(), tt.userMessage, tt.model, func(eventType domain.LLMStreamEventType, data any) error {

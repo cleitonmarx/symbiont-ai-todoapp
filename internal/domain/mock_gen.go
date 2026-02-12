@@ -1227,7 +1227,7 @@ func (_c *MockOutboxRepository_FetchPendingEvents_Call) RunAndReturn(run func(ct
 }
 
 // UpdateEvent provides a mock function for the type MockOutboxRepository
-func (_mock *MockOutboxRepository) UpdateEvent(ctx context.Context, eventID uuid.UUID, status string, retryCount int, lastError string) error {
+func (_mock *MockOutboxRepository) UpdateEvent(ctx context.Context, eventID uuid.UUID, status OutboxStatus, retryCount int, lastError string) error {
 	ret := _mock.Called(ctx, eventID, status, retryCount, lastError)
 
 	if len(ret) == 0 {
@@ -1235,7 +1235,7 @@ func (_mock *MockOutboxRepository) UpdateEvent(ctx context.Context, eventID uuid
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, int, string) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, OutboxStatus, int, string) error); ok {
 		r0 = returnFunc(ctx, eventID, status, retryCount, lastError)
 	} else {
 		r0 = ret.Error(0)
@@ -1251,14 +1251,14 @@ type MockOutboxRepository_UpdateEvent_Call struct {
 // UpdateEvent is a helper method to define mock.On call
 //   - ctx context.Context
 //   - eventID uuid.UUID
-//   - status string
+//   - status OutboxStatus
 //   - retryCount int
 //   - lastError string
 func (_e *MockOutboxRepository_Expecter) UpdateEvent(ctx interface{}, eventID interface{}, status interface{}, retryCount interface{}, lastError interface{}) *MockOutboxRepository_UpdateEvent_Call {
 	return &MockOutboxRepository_UpdateEvent_Call{Call: _e.mock.On("UpdateEvent", ctx, eventID, status, retryCount, lastError)}
 }
 
-func (_c *MockOutboxRepository_UpdateEvent_Call) Run(run func(ctx context.Context, eventID uuid.UUID, status string, retryCount int, lastError string)) *MockOutboxRepository_UpdateEvent_Call {
+func (_c *MockOutboxRepository_UpdateEvent_Call) Run(run func(ctx context.Context, eventID uuid.UUID, status OutboxStatus, retryCount int, lastError string)) *MockOutboxRepository_UpdateEvent_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1268,9 +1268,9 @@ func (_c *MockOutboxRepository_UpdateEvent_Call) Run(run func(ctx context.Contex
 		if args[1] != nil {
 			arg1 = args[1].(uuid.UUID)
 		}
-		var arg2 string
+		var arg2 OutboxStatus
 		if args[2] != nil {
-			arg2 = args[2].(string)
+			arg2 = args[2].(OutboxStatus)
 		}
 		var arg3 int
 		if args[3] != nil {
@@ -1296,7 +1296,7 @@ func (_c *MockOutboxRepository_UpdateEvent_Call) Return(err error) *MockOutboxRe
 	return _c
 }
 
-func (_c *MockOutboxRepository_UpdateEvent_Call) RunAndReturn(run func(ctx context.Context, eventID uuid.UUID, status string, retryCount int, lastError string) error) *MockOutboxRepository_UpdateEvent_Call {
+func (_c *MockOutboxRepository_UpdateEvent_Call) RunAndReturn(run func(ctx context.Context, eventID uuid.UUID, status OutboxStatus, retryCount int, lastError string) error) *MockOutboxRepository_UpdateEvent_Call {
 	_c.Call.Return(run)
 	return _c
 }

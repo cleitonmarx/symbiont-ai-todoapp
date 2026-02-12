@@ -34,6 +34,7 @@ type ChatMessageEvent struct {
 	ChatMessageID  uuid.UUID
 	ConversationID string
 	IsToolSuccess  bool
+	CreatedAt      time.Time
 }
 
 // EventPublisher defines the interface for publishing events.

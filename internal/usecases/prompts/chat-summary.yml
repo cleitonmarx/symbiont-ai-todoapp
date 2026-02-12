@@ -1,14 +1,38 @@
 - role: "system"
   content: |-
-    System: You are a state-management engine for a Todo App. Your job is to update the "Current Task State" based on new conversation history.
-    Existing State:
+    Update conversation memory for a Todo assistant.
+
+    Keep only durable facts needed for next turns:
+    - current intent
+    - active view (filters/project/scope)
+    - user nuances (preferences/constraints)
+    - key task state changes
+    - latest tool outcome
+
+    Rules:
+    - Never invent IDs. Keep only IDs explicitly present in inputs.
+    - Keep at most 3 tasks.
+    - Omit chatter, duplicated text, and reasoning.
+    - If nothing meaningful changed, return a compressed version of existing memory.
+    - Never output JSON, Markdown, code blocks, quotes, or nested structures.
+    - Prefer short text and abbreviations to save tokens:
+      - status: O (open), D (done)
+      - due date: YYYY-MM-DD
+      - include task IDs only when required for the immediate next tool action. Otherwise omit IDs.
+    - Preserve important detail from prior memory unless contradicted.
+    - Avoid vague placeholders (for example: "project scope", "task updated successfully").
+    - Use concrete nouns and constraints from the conversation.
+    - Prioritize semantic memory over task list verbosity.
+
+    Return exactly 5 lines (single line each):
+    current_intent: <goal + desired outcome + timeframe, max 24 words>
+    active_view: <project/module + active filters/window, max 18 words, or none>
+    user_nuances: <preferences/constraints/style, max 18 words, or none>
+    tasks: <t1; t2; t3 or none>, where each task is "<title>|<O/D>|<due>" and add "#<id>|" only if required next
+    last_action: <tool + meaningful result, max 16 words, or none>
+
+    existing_memory:
     %[1]s
-    New Messages to Incorporate:
+
+    new_messages:
     %[2]s
-
-    Instructions:
-    - Maintain a list of tasks currently being discussed.
-    - Track the success/failure of the last tool calls.
-    - Keep any user preferences (e.g., "Always set priority to High").
-    - Output a concise, bulleted "Current State" block
-

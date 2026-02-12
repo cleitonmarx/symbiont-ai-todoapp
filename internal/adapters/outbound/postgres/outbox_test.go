@@ -100,8 +100,6 @@ func TestOutboxRepository_CreateChatEvent(t *testing.T) {
 		ChatRole:       domain.ChatRole_Assistant,
 		ChatMessageID:  uuid.MustParse("223e4567-e89b-12d3-a456-426614174000"),
 		ConversationID: "global",
-		IsToolSuccess:  true,
-		CreatedAt:      time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC),
 	}
 
 	tests := map[string]struct {
@@ -123,9 +121,9 @@ func TestOutboxRepository_CreateChatEvent(t *testing.T) {
 						5,
 						nil,
 						"chat:CHAT_MESSAGE.SENT:223e4567-e89b-12d3-a456-426614174000",
-						event.CreatedAt,
+						sqlmock.AnyArg(),
 						nil,
-						event.CreatedAt,
+						sqlmock.AnyArg(),
 					).
 					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
@@ -146,9 +144,9 @@ func TestOutboxRepository_CreateChatEvent(t *testing.T) {
 						5,
 						nil,
 						"chat:CHAT_MESSAGE.SENT:223e4567-e89b-12d3-a456-426614174000",
-						event.CreatedAt,
+						sqlmock.AnyArg(),
 						nil,
-						event.CreatedAt,
+						sqlmock.AnyArg(),
 					).
 					WillReturnError(errors.New("db error"))
 			},

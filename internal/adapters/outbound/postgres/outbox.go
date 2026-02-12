@@ -102,10 +102,7 @@ func (op OutboxRepository) CreateChatEvent(ctx context.Context, event domain.Cha
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	createdAt := event.CreatedAt.UTC()
-	if createdAt.IsZero() {
-		createdAt = time.Now().UTC()
-	}
+	createdAt := time.Now().UTC()
 
 	contentJSON, err := json.Marshal(event)
 	if telemetry.RecordErrorAndStatus(span, err) {

@@ -68,7 +68,7 @@ func TestBoardSummaryRepository_StoreSummary(t *testing.T) {
 			},
 			shouldError: false,
 		},
-		"success-upsert": {
+		"success-store": {
 			summary: summary,
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(`INSERT INTO board_summary (id,summary,model,generated_at,source_version) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO UPDATE SET summary = EXCLUDED.summary, model = EXCLUDED.model, generated_at = EXCLUDED.generated_at, source_version = EXCLUDED.source_version`).

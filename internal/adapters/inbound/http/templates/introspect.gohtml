@@ -1,0 +1,530 @@
+`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+	<script src="https://unpkg.com/@panzoom/panzoom@4.6.1/dist/panzoom.min.js"></script>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        import elkLayouts from 'https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0/dist/mermaid-layout-elk.esm.min.mjs';
+
+        // Register the ELK layout engine with Mermaid and initialize it. 
+        // This allows Mermaid to use ELK for graph layout when specified in the graph definition.
+        // renderGraph will be called once the DOM content is loaded to render the graph.
+        mermaid.registerLayoutLoaders(elkLayouts);
+        mermaid.initialize({ startOnLoad: false });
+        window.addEventListener('DOMContentLoaded', renderGraph);
+
+        // Mermaid's built-in viewBox handling doesn't account for all the various ways nodes and edges can be rendered, 
+        // which can result in some content being cut off when fitting to the viewport. 
+        // This function computes a more accurate bounding box by examining the actual positions of all relevant elements in the graph.
+        function resolveGraphBBox(svgElement) {
+            const candidates = svgElement.querySelectorAll(
+                '.nodes .node, .subgraphs > *, .clusters > *, .edgeLabels > *, .edges .flowchart-link, .edges path.path, .edges path[data-edge="true"], .edgePath path'
+            );
+            if (!candidates.length) {
+                return svgElement.getBBox();
+            }
+
+            let minX = Number.POSITIVE_INFINITY;
+            let minY = Number.POSITIVE_INFINITY;
+            let maxX = Number.NEGATIVE_INFINITY;
+            let maxY = Number.NEGATIVE_INFINITY;
+
+            candidates.forEach((candidate) => {
+                if (candidate.dataset?.fitIgnore === 'true' || candidate.closest('[data-fit-ignore="true"]')) {
+                    return;
+                }
+
+                const box = candidate.getBBox();
+                if (!isFinite(box.x) || !isFinite(box.y) || !isFinite(box.width) || !isFinite(box.height)) {
+                    return;
+                }
+                if (box.width === 0 && box.height === 0) {
+                    return;
+                }
+
+                minX = Math.min(minX, box.x);
+                minY = Math.min(minY, box.y);
+                maxX = Math.max(maxX, box.x + box.width);
+                maxY = Math.max(maxY, box.y + box.height);
+            });
+
+            if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+                return svgElement.getBBox();
+            }
+
+            return {
+                x: minX,
+                y: minY,
+                width: maxX - minX,
+                height: maxY - minY,
+            };
+        }
+
+        // This function calculates the appropriate zoom level and pan offset to fit the entire graph within the viewport of the container, 
+        // while also centering it.
+        function fitGraphToViewport(svgElement, container, panzoom) {
+            const viewBox = svgElement.viewBox && svgElement.viewBox.baseVal
+                ? svgElement.viewBox.baseVal
+                : null;
+            const bbox = (viewBox && viewBox.width > 0 && viewBox.height > 0)
+                ? {
+                    x: viewBox.x,
+                    y: viewBox.y,
+                    width: viewBox.width,
+                    height: viewBox.height,
+                }
+                : resolveGraphBBox(svgElement);
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            if (!bbox.width || !bbox.height || !containerWidth || !containerHeight) {
+                return;
+            }
+
+            const baseX = viewBox ? viewBox.x : 0;
+            const baseY = viewBox ? viewBox.y : 0;
+            const baseWidth = viewBox && viewBox.width > 0 ? viewBox.width : bbox.width;
+            const baseHeight = viewBox && viewBox.height > 0 ? viewBox.height : bbox.height;
+
+            if (!baseWidth || !baseHeight) {
+                return;
+            }
+
+            const unitToPxX = containerWidth / baseWidth;
+            const unitToPxY = containerHeight / baseHeight;
+
+            const padding = 4;
+            const contentWidthPx = bbox.width * unitToPxX;
+            const contentHeightPx = bbox.height * unitToPxY;
+            const scaleX = (containerWidth - (padding * 2)) / contentWidthPx;
+            const scaleY = (containerHeight - (padding * 2)) / contentHeightPx;
+            panzoom.pan(0, 0, { animate: false, force: true });
+            panzoom.zoom(1, { animate: false, force: true });
+
+            const fitScale = Math.min(scaleX, scaleY);
+            const nextScale = Math.max(0.05, fitScale * 0.995);
+            panzoom.zoom(nextScale, { animate: false });
+
+            const leftPx = (bbox.x - baseX) * unitToPxX * nextScale;
+            const topPx = (bbox.y - baseY) * unitToPxY * nextScale;
+            const widthPx = contentWidthPx * nextScale;
+            const heightPx = contentHeightPx * nextScale;
+            const panX = ((containerWidth - widthPx) / 2) - leftPx;
+            const panY = ((containerHeight - heightPx) / 2) - topPx;
+            panzoom.pan(panX, panY, { animate: false });
+        }
+
+        // This function adds interactive hover effects to the edges in the graph. 
+        // It creates invisible hitboxes over the edges to capture pointer events, 
+        // and separate glow paths that become visible on hover or when an edge is selected. 
+        // It also manages selection state and ensures that interactions don't interfere with panning and zooming.
+        function bindHoverEffects(container) {
+            const edgePaths = container.querySelectorAll('.edgePath path, .flowchart-link, path.path, path[data-edge="true"]');
+            let selectedEdge = null;
+            let pointerDownInsideGraph = false;
+            let pointerMovedSinceDown = false;
+            let pointerDownX = 0;
+            let pointerDownY = 0;
+
+            const clearSelectedEdge = () => {
+                if (!selectedEdge) {
+                    return;
+                }
+                selectedEdge.path.classList.remove('edge-selected');
+                selectedEdge.glowPath.style.opacity = '0';
+                selectedEdge = null;
+            };
+
+            const selectEdge = (path, glowPath) => {
+                if (selectedEdge && selectedEdge.path === path) {
+                    return;
+                }
+                clearSelectedEdge();
+                selectedEdge = { path, glowPath };
+                path.classList.add('edge-selected');
+                glowPath.style.opacity = '0.35';
+            };
+
+            edgePaths.forEach((path) => {
+                // Ignore marker definitions and already-generated helper paths.
+                if (path.closest('defs') || path.dataset.fitIgnore === 'true') {
+                    return;
+                }
+
+                const glowPath = path.cloneNode();
+                glowPath.removeAttribute('id');
+                glowPath.removeAttribute('class');
+                glowPath.removeAttribute('marker-start');
+                glowPath.removeAttribute('marker-end');
+                glowPath.dataset.fitIgnore = 'true';
+                glowPath.classList.add('edge-hover-glow');
+                glowPath.style.fill = 'none';
+                glowPath.style.stroke = '#0042eb';
+                glowPath.style.strokeWidth = '2px';
+                glowPath.style.strokeLinecap = 'round';
+                glowPath.style.strokeLinejoin = 'round';
+                glowPath.style.opacity = '0';
+                glowPath.style.filter = 'drop-shadow(0px 0px 2px #0042eb)';
+                glowPath.style.pointerEvents = 'none';
+                glowPath.style.vectorEffect = 'non-scaling-stroke';
+                glowPath.style.transition = 'opacity 0.12s ease';
+                path.parentNode.insertBefore(glowPath, path);
+
+                const hitbox = path.cloneNode();
+                hitbox.removeAttribute('id');
+                hitbox.removeAttribute('class');
+                hitbox.removeAttribute('marker-start');
+                hitbox.removeAttribute('marker-end');
+                hitbox.dataset.fitIgnore = 'true';
+                hitbox.classList.add('edge-hover-hitbox');
+                hitbox.style.fill = 'none';
+                hitbox.style.stroke = 'transparent';
+                const baseStrokeWidth = parseFloat(window.getComputedStyle(path).strokeWidth) || 2;
+                const preciseHitboxWidth = Math.max(6, Math.min(8, baseStrokeWidth + 2));
+                hitbox.style.strokeWidth = preciseHitboxWidth + 'px';
+                hitbox.style.strokeLinecap = 'round';
+                hitbox.style.strokeLinejoin = 'round';
+                hitbox.style.pointerEvents = 'stroke';
+                hitbox.style.vectorEffect = 'non-scaling-stroke';
+                hitbox.style.cursor = 'pointer';
+
+                hitbox.addEventListener('pointerenter', () => {
+                    glowPath.style.opacity = selectedEdge && selectedEdge.path === path ? '0.35' : '0.5';
+                });
+                hitbox.addEventListener('pointerleave', () => {
+                    glowPath.style.opacity = selectedEdge && selectedEdge.path === path ? '0.35' : '0';
+                });
+                hitbox.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    selectEdge(path, glowPath);
+                });
+
+                // Preserve Mermaid's original visuals; hover interaction uses only hitbox.
+                path.style.pointerEvents = 'none';
+                path.parentNode.appendChild(hitbox);
+            });
+
+            document.addEventListener('pointerdown', (event) => {
+                const graphRoot = container.querySelector('svg');
+                pointerDownInsideGraph = Boolean(graphRoot && event.target && event.target.closest && event.target.closest('svg') === graphRoot);
+                pointerMovedSinceDown = false;
+                pointerDownX = event.clientX || 0;
+                pointerDownY = event.clientY || 0;
+            }, true);
+
+            document.addEventListener('pointermove', (event) => {
+                if (!pointerDownInsideGraph) {
+                    return;
+                }
+                const dx = (event.clientX || 0) - pointerDownX;
+                const dy = (event.clientY || 0) - pointerDownY;
+                if ((dx * dx) + (dy * dy) > 16) {
+                    pointerMovedSinceDown = true;
+                }
+            }, true);
+
+            document.addEventListener('click', (event) => {
+                if (event.target && event.target.closest('.edge-hover-hitbox')) {
+                    return;
+                }
+                if (event.target && event.target.closest('.graph-controls')) {
+                    return;
+                }
+                if (pointerDownInsideGraph && pointerMovedSinceDown) {
+                    return;
+                }
+                clearSelectedEdge();
+            }, true);
+        }
+
+        // This function creates on-screen controls for panning and zooming the graph. 
+        // It adds buttons for panning in four directions, zooming in and out, and recentering the graph. 
+        // The controls are designed to be intuitive and accessible, with appropriate icons and hover effects.
+        function createViewportControls(container, panzoom, recenterFn) {
+            const controls = document.createElement('div');
+            controls.className = 'graph-controls';
+            controls.innerHTML =
+                '<div class="graph-controls-grid">' +
+                    '<button type="button" data-action="pan-up" title="Pan up" class="icon-button icon-arrow">' +
+                        '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="6,14 12,8 18,14"></polyline></svg>' +
+                    '</button>' +
+                    '<button type="button" data-action="zoom-in" title="Zoom in" class="icon-button icon-zoom">' +
+                        '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"></circle><line x1="10" y1="7" x2="10" y2="13"></line><line x1="7" y1="10" x2="13" y2="10"></line><line x1="14.5" y1="14.5" x2="20" y2="20"></line></svg>' +
+                    '</button>' +
+                    '<button type="button" data-action="pan-left" title="Pan left" class="icon-button icon-arrow">' +
+                        '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="14,6 8,12 14,18"></polyline></svg>' +
+                    '</button>' +
+                    '<button type="button" data-action="recenter" title="Recenter" class="icon-button icon-recenter">' +
+                        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"></path><polyline points="20,4 20,10 14,10"></polyline></svg>' +
+                    '</button>' +
+                    '<button type="button" data-action="pan-right" title="Pan right" class="icon-button icon-arrow">' +
+                        '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="10,6 16,12 10,18"></polyline></svg>' +
+                    '</button>' +
+                    '<button type="button" data-action="pan-down" title="Pan down" class="icon-button icon-arrow">' +
+                        '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="6,10 12,16 18,10"></polyline></svg>' +
+                    '</button>' +
+                    '<button type="button" data-action="zoom-out" title="Zoom out" class="icon-button icon-zoom">' +
+                        '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"></circle><line x1="7" y1="10" x2="13" y2="10"></line><line x1="14.5" y1="14.5" x2="20" y2="20"></line></svg>' +
+                    '</button>' +
+                '</div>';
+
+            const panAmount = 120;
+            const zoomStep = 0.2;
+
+            // This function handles the logic for each control action, including calculating the new pan 
+            // and zoom values based on the current state of the graph.
+            const onControlAction = (action) => {
+                const currentScale = panzoom.getScale ? panzoom.getScale() : 1;
+                const currentPan = panzoom.getPan ? panzoom.getPan() : { x: 0, y: 0 };
+
+                if (action === 'zoom-in') {
+                    panzoom.zoom(currentScale + zoomStep);
+                    return;
+                }
+                if (action === 'zoom-out') {
+                    panzoom.zoom(Math.max(0.1, currentScale - zoomStep));
+                    return;
+                }
+                if (action === 'recenter') {
+                    recenterFn();
+                    return;
+                }
+                if (action === 'pan-up') {
+                    panzoom.pan(currentPan.x, currentPan.y + panAmount);
+                    return;
+                }
+                if (action === 'pan-down') {
+                    panzoom.pan(currentPan.x, currentPan.y - panAmount);
+                    return;
+                }
+                if (action === 'pan-left') {
+                    panzoom.pan(currentPan.x + panAmount, currentPan.y);
+                    return;
+                }
+                if (action === 'pan-right') {
+                    panzoom.pan(currentPan.x - panAmount, currentPan.y);
+                }
+            };
+
+            controls.querySelectorAll('button').forEach((button) => {
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onControlAction(button.dataset.action);
+                });
+            });
+
+            controls.addEventListener('wheel', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+            }, { passive: false });
+
+            controls.addEventListener('pointerdown', (event) => event.stopPropagation());
+            controls.addEventListener('mousedown', (event) => event.stopPropagation());
+            controls.addEventListener('touchstart', (event) => event.stopPropagation(), { passive: true });
+
+            container.appendChild(controls);
+        }
+
+        // This is the main function that renders the Mermaid graph, initializes pan and zoom functionality, 
+        // fits the graph to the viewport, and sets up interactive controls and hover effects.
+        async function renderGraph() {
+            const container = document.getElementById('mermaid-container');    
+            const { svg } = await mermaid.render('mermaid-svg-id', "{{ .Graph }}");
+            container.innerHTML = svg;
+
+            const svgElement = container.querySelector('svg');
+            if (!svgElement) {
+                return;
+            }
+
+			const panzoom = Panzoom(svgElement, {
+				maxScale: 10,
+				minScale: 0.1,
+				step: 0.12,
+			});
+
+            fitGraphToViewport(svgElement, container, panzoom);
+            bindHoverEffects(container);
+            createViewportControls(container, panzoom, () => fitGraphToViewport(svgElement, container, panzoom));
+
+			container.addEventListener("wheel", (event) => {
+                event.preventDefault();
+				panzoom.zoomWithWheel(event);
+			}, { passive: false });
+
+            window.addEventListener('resize', () => {
+                fitGraphToViewport(svgElement, container, panzoom);
+            });
+        }
+
+        
+    </script>
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+
+        body {
+            padding: 0;
+        }
+
+        .container {
+            width: 100%;
+            height: 100vh;
+            box-sizing: border-box;
+            background: #ffffff;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            line-height: 1.2;
+            color: #1f2937;
+        }
+
+        #mermaid-container {
+            flex: 1 1 auto;
+            min-height: 0;
+			width: 100%;
+			overflow: hidden;
+			border: 1px solid #d1d5db;
+			border-radius: 10px;
+			position: relative;
+            background: #ffffff;
+        }
+
+        #mermaid-container svg {
+			cursor: grab;
+            width: 100%;
+            height: 100%;
+            display: block;
+		}
+
+        #mermaid-container svg:active {
+            cursor: grabbing;
+        }
+
+        #mermaid-svg-id .node rect,
+        #mermaid-svg-id .node circle,
+        #mermaid-svg-id .node polygon {
+            transition: stroke 0.2s ease, fill 0.2s ease;
+        }
+
+        #mermaid-svg-id .node:hover rect,
+        #mermaid-svg-id .node:hover circle,
+        #mermaid-svg-id .node:hover polygon {
+            stroke: #0f62fe !important;
+            stroke-width: 2px !important;
+            fill: #eef4ff !important;
+        }
+
+        #mermaid-svg-id path.edge-selected {
+            stroke: #0042eb !important;
+            opacity: 1 !important;
+        }
+
+        .graph-controls {
+            position: absolute;
+            right: 14px;
+            bottom: 14px;
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        .graph-controls-grid {
+            display: grid;
+            gap: 7px;
+            grid-template-columns: repeat(3, 46px);
+            grid-template-areas:
+                ". up zoom-in"
+                "left recenter right"
+                ". down zoom-out";
+        }
+
+        .graph-controls-grid button[data-action='pan-up'] { grid-area: up; }
+        .graph-controls-grid button[data-action='pan-left'] { grid-area: left; }
+        .graph-controls-grid button[data-action='recenter'] { grid-area: recenter; }
+        .graph-controls-grid button[data-action='pan-right'] { grid-area: right; }
+        .graph-controls-grid button[data-action='pan-down'] { grid-area: down; }
+        .graph-controls-grid button[data-action='zoom-in'] { grid-area: zoom-in; }
+        .graph-controls-grid button[data-action='zoom-out'] { grid-area: zoom-out; }
+
+        .graph-controls button {
+            width: 46px;
+            height: 46px;
+            border: 2px solid #c7d1dc;
+            border-radius: 12px;
+            background: #f7f9fc;
+            color: #111827;
+            line-height: 1;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .graph-controls button:hover {
+            background: #ffffff;
+            border-color: #aebac8;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+        }
+
+        .graph-controls button:active {
+            background: #eef2f8;
+        }
+
+        .graph-controls .icon-button svg {
+            width: 21px;
+            height: 21px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        @media (max-width: 720px) {
+            .graph-controls {
+                right: 10px;
+                bottom: 10px;
+            }
+
+            .graph-controls-grid {
+                gap: 6px;
+                grid-template-columns: repeat(3, 40px);
+            }
+
+            .graph-controls button {
+                width: 40px;
+                height: 40px;
+            }
+
+            .graph-controls .icon-button svg {
+                width: 18px;
+                height: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ .Title }}</h1>
+        <div id="mermaid-container"></div>
+    </div>
+</body>
+</html>

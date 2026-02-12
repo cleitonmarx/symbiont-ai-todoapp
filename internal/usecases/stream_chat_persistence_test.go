@@ -13,14 +13,17 @@ import (
 
 // persistCallExpectation describes one expected CreateChatMessages call.
 type persistCallExpectation struct {
-	Role          domain.ChatRole
-	Content       string
-	ID            *uuid.UUID
-	MessageState  domain.ChatMessageState
-	ErrorMessage  *string
-	ToolCallsLen  int
-	HasToolCallID bool
-	CreateErr     error
+	Role             domain.ChatRole
+	Content          string
+	ID               *uuid.UUID
+	MessageState     domain.ChatMessageState
+	ErrorMessage     *string
+	PromptTokens     *int
+	CompletionTokens *int
+	TotalTokens      *int
+	ToolCallsLen     int
+	HasToolCallID    bool
+	CreateErr        error
 }
 
 // expectNowCalls enforces an exact number of current-time reads.
@@ -93,6 +96,15 @@ func expectPersistSequence(
 			assert.Equal(t, int64(createIdx-1), msg.TurnSequence)
 			assert.Equal(t, fixedTime, msg.CreatedAt)
 			assert.Equal(t, fixedTime, msg.UpdatedAt)
+			if exp.PromptTokens != nil {
+				assert.Equal(t, *exp.PromptTokens, msg.PromptTokens)
+			}
+			if exp.CompletionTokens != nil {
+				assert.Equal(t, *exp.CompletionTokens, msg.CompletionTokens)
+			}
+			if exp.TotalTokens != nil {
+				assert.Equal(t, *exp.TotalTokens, msg.TotalTokens)
+			}
 
 			if exp.ID != nil {
 				assert.Equal(t, *exp.ID, msg.ID)

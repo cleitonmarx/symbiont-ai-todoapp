@@ -26,6 +26,9 @@ var chatFields = []string{
 	"model",
 	"message_state",
 	"error_message",
+	"prompt_tokens",
+	"completion_tokens",
+	"total_tokens",
 	"created_at",
 	"updated_at",
 }
@@ -69,6 +72,9 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 			message.Model,
 			message.MessageState,
 			message.ErrorMessage,
+			message.PromptTokens,
+			message.CompletionTokens,
+			message.TotalTokens,
 			message.CreatedAt,
 			message.UpdatedAt,
 		)
@@ -174,6 +180,9 @@ func (r ChatMessageRepository) ListChatMessages(
 			&m.Model,
 			&m.MessageState,
 			&m.ErrorMessage,
+			&m.PromptTokens,
+			&m.CompletionTokens,
+			&m.TotalTokens,
 			&m.CreatedAt,
 			&m.UpdatedAt,
 		); telemetry.RecordErrorAndStatus(span, err) {

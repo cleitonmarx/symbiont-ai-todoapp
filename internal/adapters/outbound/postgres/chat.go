@@ -17,12 +17,17 @@ import (
 var chatFields = []string{
 	"id",
 	"conversation_id",
+	"turn_id",
+	"turn_sequence",
 	"chat_role",
 	"content",
 	"tool_call_id",
 	"tool_calls",
 	"model",
+	"message_state",
+	"error_message",
 	"created_at",
+	"updated_at",
 }
 
 // ChatMessageRepository persists chat messages in Postgres.
@@ -51,15 +56,21 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 		if telemetry.RecordErrorAndStatus(span, err) {
 			return err
 		}
+
 		insertQry = insertQry.Values(
 			message.ID,
 			message.ConversationID,
+			message.TurnID,
+			message.TurnSequence,
 			message.ChatRole,
 			message.Content,
 			message.ToolCallID,
 			toolCallsJSON,
 			message.Model,
+			message.MessageState,
+			message.ErrorMessage,
 			message.CreatedAt,
+			message.UpdatedAt,
 		)
 	}
 
@@ -82,7 +93,7 @@ func (r ChatMessageRepository) ListChatMessages(ctx context.Context, limit int) 
 		Select(chatFields...).
 		From("ai_chat_messages").
 		Where(squirrel.Eq{"conversation_id": domain.GlobalConversationID}).
-		OrderBy("created_at DESC")
+		OrderBy("created_at DESC", "id DESC")
 
 	if limit > 0 {
 		qry = qry.Limit(uint64(limit + 1)) // fetch one extra to detect more
@@ -104,15 +115,21 @@ func (r ChatMessageRepository) ListChatMessages(ctx context.Context, limit int) 
 		if err := rows.Scan(
 			&m.ID,
 			&m.ConversationID,
+			&m.TurnID,
+			&m.TurnSequence,
 			&m.ChatRole,
 			&m.Content,
 			&m.ToolCallID,
 			&tcJSON,
 			&m.Model,
+			&m.MessageState,
+			&m.ErrorMessage,
 			&m.CreatedAt,
+			&m.UpdatedAt,
 		); telemetry.RecordErrorAndStatus(span, err) {
 			return nil, false, err
 		}
+
 		if len(tcJSON) > 0 {
 			if err := json.Unmarshal(tcJSON, &m.ToolCalls); telemetry.RecordErrorAndStatus(span, err) {
 				return nil, false, err

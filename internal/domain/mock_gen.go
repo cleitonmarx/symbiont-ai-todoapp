@@ -148,8 +148,14 @@ func (_c *MockChatMessageRepository_DeleteConversation_Call) RunAndReturn(run fu
 }
 
 // ListChatMessages provides a mock function for the type MockChatMessageRepository
-func (_mock *MockChatMessageRepository) ListChatMessages(ctx context.Context, limit int) ([]ChatMessage, bool, error) {
-	ret := _mock.Called(ctx, limit)
+func (_mock *MockChatMessageRepository) ListChatMessages(ctx context.Context, limit int, options ...ListChatMessagesOption) ([]ChatMessage, bool, error) {
+	var tmpRet mock.Arguments
+	if len(options) > 0 {
+		tmpRet = _mock.Called(ctx, limit, options)
+	} else {
+		tmpRet = _mock.Called(ctx, limit)
+	}
+	ret := tmpRet
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListChatMessages")
@@ -158,23 +164,23 @@ func (_mock *MockChatMessageRepository) ListChatMessages(ctx context.Context, li
 	var r0 []ChatMessage
 	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int) ([]ChatMessage, bool, error)); ok {
-		return returnFunc(ctx, limit)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, ...ListChatMessagesOption) ([]ChatMessage, bool, error)); ok {
+		return returnFunc(ctx, limit, options...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int) []ChatMessage); ok {
-		r0 = returnFunc(ctx, limit)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, ...ListChatMessagesOption) []ChatMessage); ok {
+		r0 = returnFunc(ctx, limit, options...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]ChatMessage)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, int) bool); ok {
-		r1 = returnFunc(ctx, limit)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int, ...ListChatMessagesOption) bool); ok {
+		r1 = returnFunc(ctx, limit, options...)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, int) error); ok {
-		r2 = returnFunc(ctx, limit)
+	if returnFunc, ok := ret.Get(2).(func(context.Context, int, ...ListChatMessagesOption) error); ok {
+		r2 = returnFunc(ctx, limit, options...)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -189,11 +195,13 @@ type MockChatMessageRepository_ListChatMessages_Call struct {
 // ListChatMessages is a helper method to define mock.On call
 //   - ctx context.Context
 //   - limit int
-func (_e *MockChatMessageRepository_Expecter) ListChatMessages(ctx interface{}, limit interface{}) *MockChatMessageRepository_ListChatMessages_Call {
-	return &MockChatMessageRepository_ListChatMessages_Call{Call: _e.mock.On("ListChatMessages", ctx, limit)}
+//   - options ...ListChatMessagesOption
+func (_e *MockChatMessageRepository_Expecter) ListChatMessages(ctx interface{}, limit interface{}, options ...interface{}) *MockChatMessageRepository_ListChatMessages_Call {
+	return &MockChatMessageRepository_ListChatMessages_Call{Call: _e.mock.On("ListChatMessages",
+		append([]interface{}{ctx, limit}, options...)...)}
 }
 
-func (_c *MockChatMessageRepository_ListChatMessages_Call) Run(run func(ctx context.Context, limit int)) *MockChatMessageRepository_ListChatMessages_Call {
+func (_c *MockChatMessageRepository_ListChatMessages_Call) Run(run func(ctx context.Context, limit int, options ...ListChatMessagesOption)) *MockChatMessageRepository_ListChatMessages_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -203,9 +211,16 @@ func (_c *MockChatMessageRepository_ListChatMessages_Call) Run(run func(ctx cont
 		if args[1] != nil {
 			arg1 = args[1].(int)
 		}
+		var arg2 []ListChatMessagesOption
+		var variadicArgs []ListChatMessagesOption
+		if len(args) > 2 {
+			variadicArgs = args[2].([]ListChatMessagesOption)
+		}
+		arg2 = variadicArgs
 		run(
 			arg0,
 			arg1,
+			arg2...,
 		)
 	})
 	return _c
@@ -216,7 +231,7 @@ func (_c *MockChatMessageRepository_ListChatMessages_Call) Return(chatMessages [
 	return _c
 }
 
-func (_c *MockChatMessageRepository_ListChatMessages_Call) RunAndReturn(run func(ctx context.Context, limit int) ([]ChatMessage, bool, error)) *MockChatMessageRepository_ListChatMessages_Call {
+func (_c *MockChatMessageRepository_ListChatMessages_Call) RunAndReturn(run func(ctx context.Context, limit int, options ...ListChatMessagesOption) ([]ChatMessage, bool, error)) *MockChatMessageRepository_ListChatMessages_Call {
 	_c.Call.Return(run)
 	return _c
 }

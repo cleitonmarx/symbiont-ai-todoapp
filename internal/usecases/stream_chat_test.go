@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,10 +23,12 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 	totalTokens := 18
 
 	tests := map[string]struct {
-		userMessage     string
-		model           string
-		setExpectations func(
+		userMessage              string
+		model                    string
+		customSummaryExpectation bool
+		setExpectations          func(
 			*domain.MockChatMessageRepository,
+			*domain.MockConversationSummaryRepository,
 			*domain.MockCurrentTimeProvider,
 			*domain.MockLLMClient,
 			*domain.MockLLMToolRegistry,
@@ -37,16 +40,26 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		onEventErrType  domain.LLMStreamEventType
 	}{
 		"success": {
-			userMessage: "Hello, how are you?",
-			model:       "test-model",
+			userMessage:              "Hello, how are you?",
+			model:                    "test-model",
+			customSummaryExpectation: true,
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				summaryRepo.EXPECT().
+					GetConversationSummary(mock.Anything, domain.GlobalConversationID).
+					Return(domain.ConversationSummary{
+						ID:                  uuid.MustParse("323e4567-e89b-12d3-a456-426614174002"),
+						ConversationID:      domain.GlobalConversationID,
+						CurrentStateSummary: "Current intent: organize todos",
+					}, true, nil).
+					Once()
 
 				toolRegistry.EXPECT().
 					List().
@@ -70,6 +83,15 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				client.EXPECT().
 					ChatStream(mock.Anything, mock.Anything, mock.Anything).
 					Run(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) {
+						foundSummaryContext := false
+						for _, msg := range req.Messages {
+							if msg.Role == domain.ChatRole_Developer && strings.Contains(msg.Content, "Current intent: organize todos") {
+								foundSummaryContext = true
+								break
+							}
+						}
+						assert.True(t, foundSummaryContext)
+
 						// Simulate events
 						_ = onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
 							UserMessageID:      userMsgID,
@@ -118,6 +140,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			model:       "test-model",
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
@@ -184,6 +207,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			model:       "test-model",
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
@@ -204,6 +228,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			model:       "test-model",
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
@@ -258,6 +283,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			model:       "test-model",
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
@@ -315,6 +341,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			model:       "test-model",
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
@@ -362,6 +389,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			model:       "test-model",
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
@@ -414,6 +442,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			model:       "test-model",
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
@@ -479,6 +508,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			model:       "test-model",
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
@@ -542,16 +572,25 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			chatRepo := domain.NewMockChatMessageRepository(t)
+			summaryRepo := domain.NewMockConversationSummaryRepository(t)
 			timeProvider := domain.NewMockCurrentTimeProvider(t)
 			llmClient := domain.NewMockLLMClient(t)
 			lltToolRegistry := domain.NewMockLLMToolRegistry(t)
 			uow := domain.NewMockUnitOfWork(t)
 			outbox := domain.NewMockOutboxRepository(t)
-			if tt.setExpectations != nil {
-				tt.setExpectations(chatRepo, timeProvider, llmClient, lltToolRegistry, uow, outbox)
+
+			if strings.TrimSpace(tt.userMessage) != "" && tt.model != "" && !tt.customSummaryExpectation {
+				summaryRepo.EXPECT().
+					GetConversationSummary(mock.Anything, domain.GlobalConversationID).
+					Return(domain.ConversationSummary{}, false, nil).
+					Once()
 			}
 
-			useCase := NewStreamChatImpl(chatRepo, timeProvider, llmClient, lltToolRegistry, uow, "test-embedding-model", 7)
+			if tt.setExpectations != nil {
+				tt.setExpectations(chatRepo, summaryRepo, timeProvider, llmClient, lltToolRegistry, uow, outbox)
+			}
+
+			useCase := NewStreamChatImpl(chatRepo, summaryRepo, timeProvider, llmClient, lltToolRegistry, uow, "test-embedding-model", 7)
 
 			var capturedContent string
 			err := useCase.Execute(context.Background(), tt.userMessage, tt.model, func(eventType domain.LLMStreamEventType, data any) error {

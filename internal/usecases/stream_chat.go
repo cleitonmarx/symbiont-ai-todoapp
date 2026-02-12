@@ -17,7 +17,7 @@ import (
 
 const (
 	// Maximum number of chat history messages to include in the context
-	MAX_CHAT_HISTORY_MESSAGES = 10
+	MAX_CHAT_HISTORY_MESSAGES = 5
 
 	// Maximum number of repeated tool call hits to prevent infinite loops
 	MAX_REPEATED_TOOL_CALL_HIT = 5
@@ -37,18 +37,20 @@ type StreamChat interface {
 
 // StreamChatImpl is the implementation of the StreamChat use case
 type StreamChatImpl struct {
-	chatMessageRepo   domain.ChatMessageRepository
-	uow               domain.UnitOfWork
-	timeProvider      domain.CurrentTimeProvider
-	llmClient         domain.LLMClient
-	llmToolRegistry   domain.LLMToolRegistry
-	llmEmbeddingModel string
-	maxToolCycles     int
+	chatMessageRepo         domain.ChatMessageRepository
+	conversationSummaryRepo domain.ConversationSummaryRepository
+	uow                     domain.UnitOfWork
+	timeProvider            domain.CurrentTimeProvider
+	llmClient               domain.LLMClient
+	llmToolRegistry         domain.LLMToolRegistry
+	llmEmbeddingModel       string
+	maxToolCycles           int
 }
 
 // NewStreamChatImpl creates a new instance of StreamChatImpl
 func NewStreamChatImpl(
 	chatMessageRepo domain.ChatMessageRepository,
+	conversationSummaryRepo domain.ConversationSummaryRepository,
 	timeProvider domain.CurrentTimeProvider,
 	llmClient domain.LLMClient,
 	llmToolRegistry domain.LLMToolRegistry,
@@ -57,13 +59,14 @@ func NewStreamChatImpl(
 	maxToolCycles int,
 ) StreamChatImpl {
 	return StreamChatImpl{
-		chatMessageRepo:   chatMessageRepo,
-		uow:               uow,
-		timeProvider:      timeProvider,
-		llmClient:         llmClient,
-		llmToolRegistry:   llmToolRegistry,
-		llmEmbeddingModel: llmEmbeddingModel,
-		maxToolCycles:     maxToolCycles,
+		chatMessageRepo:         chatMessageRepo,
+		conversationSummaryRepo: conversationSummaryRepo,
+		uow:                     uow,
+		timeProvider:            timeProvider,
+		llmClient:               llmClient,
+		llmToolRegistry:         llmToolRegistry,
+		llmEmbeddingModel:       llmEmbeddingModel,
+		maxToolCycles:           maxToolCycles,
 	}
 }
 
@@ -428,8 +431,8 @@ func isToolSuccess(message domain.ChatMessage) bool {
 	return !strings.Contains(content, "error")
 }
 
-// buildSystemPrompt creates a system prompt with current todos context
-func (sc StreamChatImpl) buildSystemPrompt() ([]domain.LLMChatMessage, error) {
+// buildSystemPrompt creates the base chat prompt and injects the latest conversation summary context.
+func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context) ([]domain.LLMChatMessage, error) {
 	file, err := chatPrompt.Open("prompts/chat.yml")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open chat prompt: %w", err)
@@ -450,7 +453,23 @@ func (sc StreamChatImpl) buildSystemPrompt() ([]domain.LLMChatMessage, error) {
 			)
 		}
 	}
-	// Fetch current todos for context
+
+	latestSummary, found, err := sc.conversationSummaryRepo.GetConversationSummary(ctx, domain.GlobalConversationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load conversation summary: %w", err)
+	}
+
+	summaryText := "No conversation summary available."
+	if found && strings.TrimSpace(latestSummary.CurrentStateSummary) != "" {
+		summaryText = strings.TrimSpace(latestSummary.CurrentStateSummary)
+	}
+	messages = append(messages, domain.LLMChatMessage{
+		Role: domain.ChatRole_Developer,
+		Content: fmt.Sprintf(
+			"Conversation summary context:\n%s\n\nUse this as compact memory, but prioritize explicit user instructions in this turn.",
+			summaryText,
+		),
+	})
 
 	return messages, nil
 }
@@ -458,7 +477,7 @@ func (sc StreamChatImpl) buildSystemPrompt() ([]domain.LLMChatMessage, error) {
 // fetchChatHistory retrieves the chat history excluding old system messages
 func (sc StreamChatImpl) fetchChatHistory(ctx context.Context) ([]domain.LLMChatMessage, error) {
 	// Build system prompt with todo context
-	systemPrompt, err := sc.buildSystemPrompt()
+	systemPrompt, err := sc.buildSystemPrompt(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -532,12 +551,13 @@ func (t *toolCycleTracker) hasExceededMaxToolCalls(functionName, arguments strin
 
 // InitStreamChat is the initializer for the StreamChat use case
 type InitStreamChat struct {
-	ChatMessageRepo domain.ChatMessageRepository `resolve:""`
-	Uow             domain.UnitOfWork            `resolve:""`
-	TimeProvider    domain.CurrentTimeProvider   `resolve:""`
-	LLMToolRegistry domain.LLMToolRegistry       `resolve:""`
-	LLMClient       domain.LLMClient             `resolve:""`
-	EmbeddingModel  string                       `config:"LLM_EMBEDDING_MODEL"`
+	ChatMessageRepo         domain.ChatMessageRepository         `resolve:""`
+	ConversationSummaryRepo domain.ConversationSummaryRepository `resolve:""`
+	Uow                     domain.UnitOfWork                    `resolve:""`
+	TimeProvider            domain.CurrentTimeProvider           `resolve:""`
+	LLMToolRegistry         domain.LLMToolRegistry               `resolve:""`
+	LLMClient               domain.LLMClient                     `resolve:""`
+	EmbeddingModel          string                               `config:"LLM_EMBEDDING_MODEL"`
 	// Maximum number of tool cycles to prevent infinite loops
 	// It restricts how many times the LLM can invoke tools in a single chat session
 	MaxToolCycles int `config:"LLM_MAX_TOOL_CYCLES" default:"50"`
@@ -547,6 +567,7 @@ type InitStreamChat struct {
 func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error) {
 	depend.Register[StreamChat](NewStreamChatImpl(
 		i.ChatMessageRepo,
+		i.ConversationSummaryRepo,
 		i.TimeProvider,
 		i.LLMClient,
 		i.LLMToolRegistry,

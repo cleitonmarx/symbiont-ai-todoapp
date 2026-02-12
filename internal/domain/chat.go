@@ -32,19 +32,22 @@ const (
 
 // ChatMessage represents an AI chat message in a conversation
 type ChatMessage struct {
-	ID             uuid.UUID
-	ConversationID string
-	TurnID         uuid.UUID
-	TurnSequence   int64
-	ChatRole       ChatRole
-	Content        string
-	ToolCallID     *string
-	ToolCalls      []LLMStreamEventToolCall
-	Model          string
-	MessageState   ChatMessageState
-	ErrorMessage   *string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID               uuid.UUID
+	ConversationID   string
+	TurnID           uuid.UUID
+	TurnSequence     int64
+	ChatRole         ChatRole
+	Content          string
+	ToolCallID       *string
+	ToolCalls        []LLMStreamEventToolCall
+	Model            string
+	MessageState     ChatMessageState
+	ErrorMessage     *string
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // ListChatMessagesOptions defines optional filters for listing chat messages.

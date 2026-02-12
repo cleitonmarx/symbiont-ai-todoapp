@@ -81,7 +81,7 @@ func TestPubSubEventPublisher_PublishEvent(t *testing.T) {
 			defer server.Close() //nolint:errcheck
 
 			projectID := "test-project"
-			subID := tt.event.Topic + "-sub"
+			subID := string(tt.event.Topic) + "-sub"
 
 			conn, err := grpc.NewClient(server.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			assert.NoError(t, err)
@@ -101,7 +101,7 @@ func TestPubSubEventPublisher_PublishEvent(t *testing.T) {
 			// Only create topic and subscription for success cases
 			if !tt.expectErr {
 				// Create topic
-				topicName := "projects/" + projectID + "/topics/" + tt.event.Topic
+				topicName := "projects/" + projectID + "/topics/" + string(tt.event.Topic)
 				topic, err := client.TopicAdminClient.CreateTopic(
 					ctx,
 					&pubsubpb.Topic{Name: topicName},

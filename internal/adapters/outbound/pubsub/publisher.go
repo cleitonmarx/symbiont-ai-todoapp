@@ -26,16 +26,16 @@ func (p PubSubEventPublisher) PublishEvent(ctx context.Context, event domain.Out
 	spanCtx, span := telemetry.Start(ctx,
 		trace.WithAttributes(
 			attribute.String("event_id", event.ID.String()),
-			attribute.String("event_type", event.EventType),
-			attribute.String("topic", event.Topic),
+			attribute.String("event_type", string(event.EventType)),
+			attribute.String("topic", string(event.Topic)),
 		),
 	)
 	defer span.End()
 
-	result := p.Client.Publisher(event.Topic).Publish(spanCtx, &pubsubV2.Message{
+	result := p.Client.Publisher(string(event.Topic)).Publish(spanCtx, &pubsubV2.Message{
 		Data: event.Payload,
 		Attributes: map[string]string{
-			"event_type": event.EventType,
+			"event_type": string(event.EventType),
 			"entity_id":  event.EntityID.String(),
 		},
 	})

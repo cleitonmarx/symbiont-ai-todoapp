@@ -24,8 +24,8 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 	msg := domain.ChatMessage{
 		ID:             fixedID,
 		ConversationID: domain.GlobalConversationID,
-		TurnID:         &turnID,
-		TurnSequence:   &turnSequence,
+		TurnID:         turnID,
+		TurnSequence:   turnSequence,
 		ChatRole:       domain.ChatRole("user"),
 		Content:        "hello",
 		Model:          "ai/gpt-oss",
@@ -51,8 +51,8 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 					WithArgs(
 						msg.ID,
 						msg.ConversationID,
-						*msg.TurnID,
-						*msg.TurnSequence,
+						msg.TurnID,
+						msg.TurnSequence,
 						msg.ChatRole,
 						msg.Content,
 						msg.ToolCallID,
@@ -73,8 +73,8 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 					WithArgs(
 						msg.ID,
 						msg.ConversationID,
-						*msg.TurnID,
-						*msg.TurnSequence,
+						msg.TurnID,
+						msg.TurnSequence,
 						msg.ChatRole,
 						msg.Content,
 						msg.ToolCallID,
@@ -114,13 +114,16 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 	t1 := time.Date(2026, 1, 24, 10, 0, 0, 0, time.UTC)
 	t2 := time.Date(2026, 1, 24, 11, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 1, 24, 12, 0, 0, 0, time.UTC)
+	turnID1 := uuid.MustParse("423e4567-e89b-12d3-a456-426614174003")
+	turnID2 := uuid.MustParse("523e4567-e89b-12d3-a456-426614174004")
+	turnID3 := uuid.MustParse("623e4567-e89b-12d3-a456-426614174005")
 
-	row := func(id uuid.UUID, ts time.Time) []driver.Value {
+	row := func(id uuid.UUID, turnID uuid.UUID, turnSequence int64, ts time.Time) []driver.Value {
 		return []driver.Value{
 			id.String(), // UUID as string for driver.Value
 			domain.GlobalConversationID,
-			nil,
-			nil,
+			turnID.String(),
+			turnSequence,
 			domain.ChatRole("user"),
 			"content",
 			nil,
@@ -144,17 +147,17 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			limit: 0,
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(chatFields).
-					AddRow(row(fixedID3, t3)...).
-					AddRow(row(fixedID2, t2)...).
-					AddRow(row(fixedID1, t1)...)
+					AddRow(row(fixedID3, turnID3, 2, t3)...).
+					AddRow(row(fixedID2, turnID2, 1, t2)...).
+					AddRow(row(fixedID1, turnID1, 0, t1)...)
 				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, tool_call_id, tool_calls, model, message_state, error_message, created_at, updated_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC").
 					WithArgs(domain.GlobalConversationID).
 					WillReturnRows(rows)
 			},
 			expectedMsgs: []domain.ChatMessage{
-				{ID: fixedID1, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t1, UpdatedAt: t1},
-				{ID: fixedID2, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t2, UpdatedAt: t2},
-				{ID: fixedID3, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t3, UpdatedAt: t3},
+				{ID: fixedID1, ConversationID: domain.GlobalConversationID, TurnID: turnID1, TurnSequence: 0, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t1, UpdatedAt: t1},
+				{ID: fixedID2, ConversationID: domain.GlobalConversationID, TurnID: turnID2, TurnSequence: 1, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t2, UpdatedAt: t2},
+				{ID: fixedID3, ConversationID: domain.GlobalConversationID, TurnID: turnID3, TurnSequence: 2, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t3, UpdatedAt: t3},
 			},
 			expectedHasMore: false,
 			expectErr:       false,
@@ -163,17 +166,17 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			limit: 2,
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(chatFields).
-					AddRow(row(fixedID3, t3)...).
-					AddRow(row(fixedID2, t2)...).
-					AddRow(row(fixedID1, t1)...)
+					AddRow(row(fixedID3, turnID3, 2, t3)...).
+					AddRow(row(fixedID2, turnID2, 1, t2)...).
+					AddRow(row(fixedID1, turnID1, 0, t1)...)
 
 				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, tool_call_id, tool_calls, model, message_state, error_message, created_at, updated_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3").
 					WithArgs(domain.GlobalConversationID).
 					WillReturnRows(rows)
 			},
 			expectedMsgs: []domain.ChatMessage{
-				{ID: fixedID2, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t2, UpdatedAt: t2},
-				{ID: fixedID3, ConversationID: domain.GlobalConversationID, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t3, UpdatedAt: t3},
+				{ID: fixedID2, ConversationID: domain.GlobalConversationID, TurnID: turnID2, TurnSequence: 1, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t2, UpdatedAt: t2},
+				{ID: fixedID3, ConversationID: domain.GlobalConversationID, TurnID: turnID3, TurnSequence: 2, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t3, UpdatedAt: t3},
 			},
 			expectedHasMore: true,
 			expectErr:       false,

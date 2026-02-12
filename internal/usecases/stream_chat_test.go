@@ -17,6 +17,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 	userMsgID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	assistantMsgID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
+	promptTokens := 11
+	completionTokens := 7
+	totalTokens := 18
 
 	tests := map[string]struct {
 		userMessage     string
@@ -78,6 +81,11 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						_ = onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
 							AssistantMessageID: assistantMsgID.String(),
 							CompletedAt:        fixedTime.Format(time.RFC3339),
+							Usage: domain.LLMUsage{
+								PromptTokens:     promptTokens,
+								CompletionTokens: completionTokens,
+								TotalTokens:      totalTokens,
+							},
 						})
 					}).
 					Return(nil)
@@ -91,11 +99,14 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						HasToolCallID: false,
 					},
 					{
-						Role:          domain.ChatRole_Assistant,
-						Content:       "I'm doing great!",
-						ID:            &assistantMsgID,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:             domain.ChatRole_Assistant,
+						Content:          "I'm doing great!",
+						ID:               &assistantMsgID,
+						PromptTokens:     &promptTokens,
+						CompletionTokens: &completionTokens,
+						TotalTokens:      &totalTokens,
+						ToolCallsLen:     0,
+						HasToolCallID:    false,
 					},
 				})
 			},

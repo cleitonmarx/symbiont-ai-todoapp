@@ -99,30 +99,18 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		Tools:       sc.llmToolRegistry.List(),
 	}
 
-	var (
-		assistantMsgContent strings.Builder
-		assistantMsgID      uuid.UUID
-		tokenUsage          domain.LLMUsage
-		turnID              = uuid.New()
-		turnSequence        int64
-		userMsgPersisted    bool
-		userMsgPersistTried bool
-		tracker             = newToolCycleTracker(
+	state := streamChatExecutionState{
+		turnID: uuid.New(),
+		tracker: newToolCycleTracker(
 			sc.maxToolCycles,
 			MAX_REPEATED_TOOL_CALL_HIT,
-		)
-	)
-
-	nextTurnSequence := func() int64 {
-		current := turnSequence
-		turnSequence++
-		return current
+		),
 	}
 
-	userMsg := domain.ChatMessage{
+	state.userMsg = domain.ChatMessage{
 		ConversationID: domain.GlobalConversationID,
-		TurnID:         turnID,
-		TurnSequence:   nextTurnSequence(),
+		TurnID:         state.turnID,
+		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_User,
 		Content:        userMessage,
 		Model:          model,
@@ -133,165 +121,41 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		continueChatStreaming = false
 
 		err = sc.llmClient.ChatStream(spanCtx, req, func(eventType domain.LLMStreamEventType, data any) error {
-			switch eventType {
-			case domain.LLMStreamEventType_Meta:
-				// Capture message IDs from meta event
-				if assistantMsgID == uuid.Nil {
-					meta := data.(domain.LLMStreamEventMeta)
-					assistantMsgID = meta.AssistantMessageID
-					userMsg.ID = meta.UserMessageID
-					userMsg.CreatedAt = sc.timeProvider.Now().UTC()
-					userMsg.UpdatedAt = userMsg.CreatedAt
-					userMsgPersistTried = true
-					if err := sc.persistChatMessage(spanCtx, userMsg); err != nil {
-						return err
-					}
-					userMsgPersisted = true
-					if err := onEvent(eventType, data); err != nil {
-						return err
-					}
-				}
-
-			case domain.LLMStreamEventType_ToolCall:
+			shouldContinue, eventErr := sc.handleStreamEvent(spanCtx, eventType, data, model, &req, &state, onEvent)
+			if shouldContinue {
 				continueChatStreaming = true
-
-				toolCall := data.(domain.LLMStreamEventToolCall)
-				if tracker.hasExceededMaxCycles() || tracker.hasExceededMaxToolCalls(toolCall.Function, toolCall.Arguments) {
-					continueChatStreaming = false
-					return nil
-				}
-
-				assistantToolCallMsg := domain.ChatMessage{
-					ID:             uuid.New(),
-					ConversationID: domain.GlobalConversationID,
-					TurnID:         turnID,
-					TurnSequence:   nextTurnSequence(),
-					ChatRole:       domain.ChatRole_Assistant,
-					ToolCalls:      []domain.LLMStreamEventToolCall{toolCall},
-					Model:          model,
-					MessageState:   domain.ChatMessageState_Completed,
-					CreatedAt:      sc.timeProvider.Now().UTC(),
-				}
-				assistantToolCallMsg.UpdatedAt = assistantToolCallMsg.CreatedAt
-				if err := sc.persistChatMessage(spanCtx, assistantToolCallMsg); err != nil {
-					return err
-				}
-
-				toolCall.Text = sc.llmToolRegistry.StatusMessage(toolCall.Function)
-				// Process and append tool message
-				if err := onEvent(
-					domain.LLMStreamEventType_ToolCall,
-					toolCall,
-				); err != nil {
-					return err
-				}
-
-				toolMessage := sc.llmToolRegistry.Call(spanCtx, toolCall, req.Messages)
-
-				toolMsg := domain.ChatMessage{
-					ID:             uuid.New(),
-					ConversationID: domain.GlobalConversationID,
-					TurnID:         turnID,
-					TurnSequence:   nextTurnSequence(),
-					ChatRole:       domain.ChatRole_Tool,
-					ToolCallID:     &toolCall.ID,
-					Content:        toolMessage.Content,
-					Model:          model,
-					MessageState:   domain.ChatMessageState_Completed,
-					CreatedAt:      sc.timeProvider.Now().UTC(),
-				}
-				if !isToolSuccess(toolMsg) {
-					toolMsg.MessageState = domain.ChatMessageState_Failed
-					toolMsg.ErrorMessage = common.Ptr(toolMsg.Content)
-				}
-				toolMsg.UpdatedAt = toolMsg.CreatedAt
-				if err := sc.persistChatMessage(spanCtx, toolMsg); err != nil {
-					return err
-				}
-
-				req.Messages = append(req.Messages,
-					domain.LLMChatMessage{
-						Role:      domain.ChatRole_Assistant,
-						ToolCalls: []domain.LLMStreamEventToolCall{toolCall},
-					},
-					toolMessage,
-				)
-			case domain.LLMStreamEventType_Delta:
-				delta := data.(domain.LLMStreamEventDelta)
-				assistantMsgContent.WriteString(delta.Text)
-				if err := onEvent(eventType, data); err != nil {
-					return err
-				}
-			case domain.LLMStreamEventType_Done:
-				done := data.(domain.LLMStreamEventDone)
-				tokenUsage.CompletionTokens += done.Usage.CompletionTokens
-				tokenUsage.PromptTokens += done.Usage.PromptTokens
-				tokenUsage.TotalTokens += done.Usage.TotalTokens
 			}
-
-			return nil
+			return eventErr
 		})
 		if telemetry.RecordErrorAndStatus(span, err) {
-			if !userMsgPersisted && !userMsgPersistTried {
-				userMsg.ID = uuid.New()
-				userMsg.CreatedAt = sc.timeProvider.Now().UTC()
-				userMsg.UpdatedAt = userMsg.CreatedAt
-				userMsgPersistTried = true
-				if persistErr := sc.persistChatMessage(spanCtx, userMsg); persistErr != nil {
-					return persistErr
-				}
-				userMsgPersisted = true
-			}
-
-			if assistantMsgID == uuid.Nil {
-				assistantMsgID = uuid.New()
-			}
-			failedAt := sc.timeProvider.Now().UTC()
-			errorMessage := err.Error()
-			failedAssistantMsg := domain.ChatMessage{
-				ID:             assistantMsgID,
-				ConversationID: domain.GlobalConversationID,
-				TurnID:         turnID,
-				TurnSequence:   nextTurnSequence(),
-				ChatRole:       domain.ChatRole_Assistant,
-				Content:        "",
-				Model:          model,
-				MessageState:   domain.ChatMessageState_Failed,
-				ErrorMessage:   &errorMessage,
-				CreatedAt:      failedAt,
-				UpdatedAt:      failedAt,
-			}
-			if persistErr := sc.persistChatMessage(spanCtx, failedAssistantMsg); persistErr != nil {
+			if persistErr := sc.persistFailureMessages(spanCtx, err, model, &state); persistErr != nil {
 				return persistErr
 			}
 			return err
 		}
 	}
 
-	if !userMsgPersisted && !userMsgPersistTried {
-		userMsg.ID = uuid.New()
-		userMsg.CreatedAt = sc.timeProvider.Now().UTC()
-		userMsg.UpdatedAt = userMsg.CreatedAt
-		userMsgPersistTried = true
-		if err := sc.persistChatMessage(spanCtx, userMsg); telemetry.RecordErrorAndStatus(span, err) {
-			return err
-		}
+	if err := sc.persistUserMessageIfNeeded(spanCtx, &state); telemetry.RecordErrorAndStatus(span, err) {
+		return err
 	}
 
-	if assistantMsgID == uuid.Nil {
-		assistantMsgID = uuid.New()
+	if state.assistantMsgID == uuid.Nil {
+		state.assistantMsgID = uuid.New()
 	}
 
 	assistantMsg := domain.ChatMessage{
-		ID:             assistantMsgID,
-		ConversationID: domain.GlobalConversationID,
-		TurnID:         turnID,
-		TurnSequence:   nextTurnSequence(),
-		ChatRole:       domain.ChatRole_Assistant,
-		Content:        assistantMsgContent.String(),
-		Model:          model,
-		MessageState:   domain.ChatMessageState_Completed,
-		CreatedAt:      sc.timeProvider.Now().UTC(),
+		ID:               state.assistantMsgID,
+		ConversationID:   domain.GlobalConversationID,
+		TurnID:           state.turnID,
+		TurnSequence:     state.nextTurnSequence(),
+		ChatRole:         domain.ChatRole_Assistant,
+		Content:          state.assistantMsgContent.String(),
+		Model:            model,
+		MessageState:     domain.ChatMessageState_Completed,
+		PromptTokens:     state.tokenUsage.PromptTokens,
+		CompletionTokens: state.tokenUsage.CompletionTokens,
+		TotalTokens:      state.tokenUsage.TotalTokens,
+		CreatedAt:        sc.timeProvider.Now().UTC(),
 	}
 	assistantMsg.UpdatedAt = assistantMsg.CreatedAt
 
@@ -311,19 +175,230 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return err
 	}
 
-	RecordLLMTokensUsed(spanCtx, tokenUsage.PromptTokens, tokenUsage.CompletionTokens)
+	RecordLLMTokensUsed(spanCtx, state.tokenUsage.PromptTokens, state.tokenUsage.CompletionTokens)
 
 	// Send done event
 	if err := onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
 		AssistantMessageID: assistantMsg.ID.String(),
 		CompletedAt:        sc.timeProvider.Now().UTC().Format(time.RFC3339),
-		Usage:              tokenUsage,
+		Usage:              state.tokenUsage,
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
+// streamChatExecutionState holds mutable state during a stream-chat execution.
+type streamChatExecutionState struct {
+	assistantMsgContent strings.Builder
+	assistantMsgID      uuid.UUID
+	tokenUsage          domain.LLMUsage
+	turnID              uuid.UUID
+	turnSequence        int64
+	userMsg             domain.ChatMessage
+	userMsgPersisted    bool
+	userMsgPersistTried bool
+	tracker             *toolCycleTracker
+}
+
+// nextTurnSequence returns the current sequence value and advances the counter.
+func (s *streamChatExecutionState) nextTurnSequence() int64 {
+	current := s.turnSequence
+	s.turnSequence++
+	return current
+}
+
+// handleStreamEvent routes one stream event to the corresponding specialized handler.
+func (sc StreamChatImpl) handleStreamEvent(
+	ctx context.Context,
+	eventType domain.LLMStreamEventType,
+	data any,
+	model string,
+	req *domain.LLMChatRequest,
+	state *streamChatExecutionState,
+	onEvent domain.LLMStreamEventCallback,
+) (bool, error) {
+	switch eventType {
+	case domain.LLMStreamEventType_Meta:
+		return false, sc.handleMetaEvent(ctx, data, state, onEvent)
+	case domain.LLMStreamEventType_ToolCall:
+		return sc.handleToolCallEvent(ctx, data, model, req, state, onEvent)
+	case domain.LLMStreamEventType_Delta:
+		return false, sc.handleDeltaEvent(data, state, onEvent)
+	case domain.LLMStreamEventType_Done:
+		sc.handleDoneEvent(data, state)
+		return false, nil
+	default:
+		return false, nil
+	}
+}
+
+// handleMetaEvent persists the user message as soon as stream IDs are available.
+func (sc StreamChatImpl) handleMetaEvent(
+	ctx context.Context,
+	data any,
+	state *streamChatExecutionState,
+	onEvent domain.LLMStreamEventCallback,
+) error {
+	// Capture IDs from the first meta event and persist the user message immediately.
+	if state.assistantMsgID != uuid.Nil {
+		return nil
+	}
+
+	meta := data.(domain.LLMStreamEventMeta)
+	state.assistantMsgID = meta.AssistantMessageID
+	state.userMsg.ID = meta.UserMessageID
+	state.userMsg.CreatedAt = sc.timeProvider.Now().UTC()
+	state.userMsg.UpdatedAt = state.userMsg.CreatedAt
+	state.userMsgPersistTried = true
+	if err := sc.persistChatMessage(ctx, state.userMsg); err != nil {
+		return err
+	}
+	state.userMsgPersisted = true
+	return onEvent(domain.LLMStreamEventType_Meta, data)
+}
+
+// handleToolCallEvent persists assistant tool-call and tool-result messages, then updates request context.
+func (sc StreamChatImpl) handleToolCallEvent(
+	ctx context.Context,
+	data any,
+	model string,
+	req *domain.LLMChatRequest,
+	state *streamChatExecutionState,
+	onEvent domain.LLMStreamEventCallback,
+) (bool, error) {
+	toolCall := data.(domain.LLMStreamEventToolCall)
+	if state.tracker.hasExceededMaxCycles() || state.tracker.hasExceededMaxToolCalls(toolCall.Function, toolCall.Arguments) {
+		return false, nil
+	}
+
+	assistantToolCallMsg := domain.ChatMessage{
+		ID:             uuid.New(),
+		ConversationID: domain.GlobalConversationID,
+		TurnID:         state.turnID,
+		TurnSequence:   state.nextTurnSequence(),
+		ChatRole:       domain.ChatRole_Assistant,
+		ToolCalls:      []domain.LLMStreamEventToolCall{toolCall},
+		Model:          model,
+		MessageState:   domain.ChatMessageState_Completed,
+		CreatedAt:      sc.timeProvider.Now().UTC(),
+	}
+	assistantToolCallMsg.UpdatedAt = assistantToolCallMsg.CreatedAt
+	if err := sc.persistChatMessage(ctx, assistantToolCallMsg); err != nil {
+		return false, err
+	}
+
+	toolCall.Text = sc.llmToolRegistry.StatusMessage(toolCall.Function)
+	if err := onEvent(domain.LLMStreamEventType_ToolCall, toolCall); err != nil {
+		return false, err
+	}
+
+	toolMessage := sc.llmToolRegistry.Call(ctx, toolCall, req.Messages)
+	toolMsg := domain.ChatMessage{
+		ID:             uuid.New(),
+		ConversationID: domain.GlobalConversationID,
+		TurnID:         state.turnID,
+		TurnSequence:   state.nextTurnSequence(),
+		ChatRole:       domain.ChatRole_Tool,
+		ToolCallID:     &toolCall.ID,
+		Content:        toolMessage.Content,
+		Model:          model,
+		MessageState:   domain.ChatMessageState_Completed,
+		CreatedAt:      sc.timeProvider.Now().UTC(),
+	}
+	if !isToolSuccess(toolMsg) {
+		toolMsg.MessageState = domain.ChatMessageState_Failed
+		toolMsg.ErrorMessage = &toolMsg.Content
+	}
+	toolMsg.UpdatedAt = toolMsg.CreatedAt
+	if err := sc.persistChatMessage(ctx, toolMsg); err != nil {
+		return false, err
+	}
+
+	req.Messages = append(req.Messages,
+		domain.LLMChatMessage{
+			Role:      domain.ChatRole_Assistant,
+			ToolCalls: []domain.LLMStreamEventToolCall{toolCall},
+		},
+		toolMessage,
+	)
+
+	return true, nil
+}
+
+// handleDeltaEvent appends assistant delta text and forwards the delta to the caller callback.
+func (sc StreamChatImpl) handleDeltaEvent(
+	data any,
+	state *streamChatExecutionState,
+	onEvent domain.LLMStreamEventCallback,
+) error {
+	delta := data.(domain.LLMStreamEventDelta)
+	state.assistantMsgContent.WriteString(delta.Text)
+	return onEvent(domain.LLMStreamEventType_Delta, data)
+}
+
+// handleDoneEvent accumulates usage from one stream completion event.
+func (sc StreamChatImpl) handleDoneEvent(data any, state *streamChatExecutionState) {
+	done := data.(domain.LLMStreamEventDone)
+	state.tokenUsage.CompletionTokens += done.Usage.CompletionTokens
+	state.tokenUsage.PromptTokens += done.Usage.PromptTokens
+	state.tokenUsage.TotalTokens += done.Usage.TotalTokens
+}
+
+// persistUserMessageIfNeeded ensures the user message is persisted exactly once when no meta event was received.
+func (sc StreamChatImpl) persistUserMessageIfNeeded(ctx context.Context, state *streamChatExecutionState) error {
+	if state.userMsgPersisted || state.userMsgPersistTried {
+		return nil
+	}
+
+	state.userMsg.ID = uuid.New()
+	state.userMsg.CreatedAt = sc.timeProvider.Now().UTC()
+	state.userMsg.UpdatedAt = state.userMsg.CreatedAt
+	state.userMsgPersistTried = true
+	if err := sc.persistChatMessage(ctx, state.userMsg); err != nil {
+		return err
+	}
+	state.userMsgPersisted = true
+	return nil
+}
+
+// persistFailureMessages persists fallback user and assistant failure messages when streaming fails.
+func (sc StreamChatImpl) persistFailureMessages(
+	ctx context.Context,
+	streamErr error,
+	model string,
+	state *streamChatExecutionState,
+) error {
+	if err := sc.persistUserMessageIfNeeded(ctx, state); err != nil {
+		return err
+	}
+
+	if state.assistantMsgID == uuid.Nil {
+		state.assistantMsgID = uuid.New()
+	}
+
+	failedAt := sc.timeProvider.Now().UTC()
+	errorMessage := streamErr.Error()
+	failedAssistantMsg := domain.ChatMessage{
+		ID:               state.assistantMsgID,
+		ConversationID:   domain.GlobalConversationID,
+		TurnID:           state.turnID,
+		TurnSequence:     state.nextTurnSequence(),
+		ChatRole:         domain.ChatRole_Assistant,
+		Content:          "",
+		Model:            model,
+		MessageState:     domain.ChatMessageState_Failed,
+		ErrorMessage:     &errorMessage,
+		PromptTokens:     state.tokenUsage.PromptTokens,
+		CompletionTokens: state.tokenUsage.CompletionTokens,
+		TotalTokens:      state.tokenUsage.TotalTokens,
+		CreatedAt:        failedAt,
+		UpdatedAt:        failedAt,
+	}
+	return sc.persistChatMessage(ctx, failedAssistantMsg)
+}
+
+// persistChatMessage persists a chat message and emits a corresponding domain event for outbox processing.
 func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.ChatMessage) error {
 	return sc.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
 		if err := uow.ChatMessage().CreateChatMessages(ctx, []domain.ChatMessage{message}); err != nil {

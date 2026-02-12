@@ -89,10 +89,8 @@ func expectPersistSequence(
 			assert.Equal(t, expectedState, msg.MessageState)
 			assert.Equal(t, exp.HasToolCallID, msg.ToolCallID != nil)
 			assert.Len(t, msg.ToolCalls, exp.ToolCallsLen)
-			assert.NotNil(t, msg.TurnID)
-			if assert.NotNil(t, msg.TurnSequence) {
-				assert.Equal(t, int64(createIdx-1), *msg.TurnSequence)
-			}
+			assert.NotEqual(t, uuid.Nil, msg.TurnID)
+			assert.Equal(t, int64(createIdx-1), msg.TurnSequence)
 			assert.Equal(t, fixedTime, msg.CreatedAt)
 			assert.Equal(t, fixedTime, msg.UpdatedAt)
 

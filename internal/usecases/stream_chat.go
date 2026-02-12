@@ -113,15 +113,15 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		)
 	)
 
-	nextTurnSequence := func() *int64 {
+	nextTurnSequence := func() int64 {
 		current := turnSequence
 		turnSequence++
-		return &current
+		return current
 	}
 
 	userMsg := domain.ChatMessage{
 		ConversationID: domain.GlobalConversationID,
-		TurnID:         &turnID,
+		TurnID:         turnID,
 		TurnSequence:   nextTurnSequence(),
 		ChatRole:       domain.ChatRole_User,
 		Content:        userMessage,
@@ -164,7 +164,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 				assistantToolCallMsg := domain.ChatMessage{
 					ID:             uuid.New(),
 					ConversationID: domain.GlobalConversationID,
-					TurnID:         &turnID,
+					TurnID:         turnID,
 					TurnSequence:   nextTurnSequence(),
 					ChatRole:       domain.ChatRole_Assistant,
 					ToolCalls:      []domain.LLMStreamEventToolCall{toolCall},
@@ -191,7 +191,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 				toolMsg := domain.ChatMessage{
 					ID:             uuid.New(),
 					ConversationID: domain.GlobalConversationID,
-					TurnID:         &turnID,
+					TurnID:         turnID,
 					TurnSequence:   nextTurnSequence(),
 					ChatRole:       domain.ChatRole_Tool,
 					ToolCallID:     &toolCall.ID,
@@ -251,7 +251,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 			failedAssistantMsg := domain.ChatMessage{
 				ID:             assistantMsgID,
 				ConversationID: domain.GlobalConversationID,
-				TurnID:         &turnID,
+				TurnID:         turnID,
 				TurnSequence:   nextTurnSequence(),
 				ChatRole:       domain.ChatRole_Assistant,
 				Content:        "",
@@ -285,7 +285,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	assistantMsg := domain.ChatMessage{
 		ID:             assistantMsgID,
 		ConversationID: domain.GlobalConversationID,
-		TurnID:         &turnID,
+		TurnID:         turnID,
 		TurnSequence:   nextTurnSequence(),
 		ChatRole:       domain.ChatRole_Assistant,
 		Content:        assistantMsgContent.String(),

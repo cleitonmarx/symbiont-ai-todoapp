@@ -10,6 +10,9 @@ CREATE TABLE ai_chat_messages (
     model TEXT,
     message_state TEXT NOT NULL,
     error_message TEXT,
+    prompt_tokens INTEGER NOT NULL,
+    completion_tokens INTEGER NOT NULL,
+    total_tokens INTEGER NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL
 );

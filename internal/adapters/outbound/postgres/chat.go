@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"sort"
 
-	"github.com/Masterminds/squirrel"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
@@ -32,13 +32,13 @@ var chatFields = []string{
 
 // ChatMessageRepository persists chat messages in Postgres.
 type ChatMessageRepository struct {
-	sb squirrel.StatementBuilderType
+	sb sq.StatementBuilderType
 }
 
 // NewChatMessageRepository creates a new ChatMessageRepository.
-func NewChatMessageRepository(br squirrel.BaseRunner) ChatMessageRepository {
+func NewChatMessageRepository(br sq.BaseRunner) ChatMessageRepository {
 	return ChatMessageRepository{
-		sb: squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar).RunWith(br),
+		sb: sq.StatementBuilder.PlaceholderFormat(sq.Dollar).RunWith(br),
 	}
 }
 
@@ -81,19 +81,69 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 	return nil
 }
 
-// ListChatMessages retrieves messages for the global conversation ordered by creation time.
-// If limit > 0, returns up to the latest N messages; hasMore indicates if there are older messages.
-func (r ChatMessageRepository) ListChatMessages(ctx context.Context, limit int) ([]domain.ChatMessage, bool, error) {
+// ListChatMessages retrieves messages ordered by creation time using optional filters.
+// If limit > 0, returns up to N messages and indicates whether more messages exist.
+func (r ChatMessageRepository) ListChatMessages(
+	ctx context.Context,
+	limit int,
+	options ...domain.ListChatMessagesOption,
+) ([]domain.ChatMessage, bool, error) {
 	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
 		attribute.Int("limit", limit),
 	))
 	defer span.End()
 
+	queryOptions := domain.ListChatMessagesOptions{
+		ConversationID: domain.GlobalConversationID,
+	}
+	for _, option := range options {
+		if option != nil {
+			option(&queryOptions)
+		}
+	}
+	span.SetAttributes(
+		attribute.String("conversation_id", queryOptions.ConversationID),
+	)
+
 	qry := r.sb.
 		Select(chatFields...).
 		From("ai_chat_messages").
-		Where(squirrel.Eq{"conversation_id": domain.GlobalConversationID}).
-		OrderBy("created_at DESC", "id DESC")
+		Where(sq.Eq{"conversation_id": queryOptions.ConversationID})
+
+	if queryOptions.AfterMessageID != nil {
+		span.SetAttributes(
+			attribute.String("after_message_id", queryOptions.AfterMessageID.String()),
+		)
+
+		qry = qry.JoinClause(
+			r.sb.
+				Select(
+					"created_at AS checkpoint_created_at",
+					"id AS checkpoint_id",
+				).
+				From("ai_chat_messages").
+				Where(sq.Eq{
+					"conversation_id": queryOptions.ConversationID,
+					"id":              *queryOptions.AfterMessageID,
+				}).
+				Limit(1).
+				Prefix("LEFT JOIN (").
+				Suffix(") checkpoint ON TRUE"),
+		).Where(
+			sq.Or{
+				sq.Eq{"checkpoint.checkpoint_id": nil},
+				sq.Expr("ai_chat_messages.created_at > checkpoint.checkpoint_created_at"),
+				sq.And{
+					sq.Expr("ai_chat_messages.created_at = checkpoint.checkpoint_created_at"),
+					sq.Expr("ai_chat_messages.id > checkpoint.checkpoint_id"),
+				},
+			},
+		)
+
+		qry = qry.OrderBy("created_at ASC", "id ASC")
+	} else {
+		qry = qry.OrderBy("created_at DESC", "id DESC")
+	}
 
 	if limit > 0 {
 		qry = qry.Limit(uint64(limit + 1)) // fetch one extra to detect more
@@ -147,10 +197,13 @@ func (r ChatMessageRepository) ListChatMessages(ctx context.Context, limit int) 
 		msgs = msgs[:limit]
 	}
 
-	// Currently ordered DESC; reverse to ASC for chronological order
-	sort.SliceStable(msgs, func(i, j int) bool {
-		return msgs[i].CreatedAt.Before(msgs[j].CreatedAt)
-	})
+	// Keep chronological order for callers.
+	if queryOptions.AfterMessageID == nil {
+		// Query path without checkpoint orders DESC for efficient latest reads.
+		sort.SliceStable(msgs, func(i, j int) bool {
+			return msgs[i].CreatedAt.Before(msgs[j].CreatedAt)
+		})
+	}
 
 	return msgs, hasMore, nil
 }
@@ -162,7 +215,7 @@ func (r ChatMessageRepository) DeleteConversation(ctx context.Context) error {
 
 	_, err := r.sb.
 		Delete("ai_chat_messages").
-		Where(squirrel.Eq{"conversation_id": domain.GlobalConversationID}).
+		Where(sq.Eq{"conversation_id": domain.GlobalConversationID}).
 		ExecContext(spanCtx)
 
 	if telemetry.RecordErrorAndStatus(span, err) {

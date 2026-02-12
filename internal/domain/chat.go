@@ -38,8 +38,8 @@ const (
 type ChatMessage struct {
 	ID             uuid.UUID
 	ConversationID string
-	TurnID         *uuid.UUID
-	TurnSequence   *int64
+	TurnID         uuid.UUID
+	TurnSequence   int64
 	ChatRole       ChatRole
 	Content        string
 	ToolCallID     *string

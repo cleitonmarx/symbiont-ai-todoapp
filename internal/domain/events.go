@@ -33,8 +33,8 @@ type ChatMessageEvent struct {
 	ChatRole       ChatRole
 	ChatMessageID  uuid.UUID
 	ConversationID string
-	TurnID         *uuid.UUID
-	TurnSequence   *int64
+	TurnID         uuid.UUID
+	TurnSequence   int64
 	MessageState   ChatMessageState
 	ErrorMessage   *string
 	IsToolSuccess  bool

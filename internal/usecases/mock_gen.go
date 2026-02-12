@@ -8,7 +8,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
 )

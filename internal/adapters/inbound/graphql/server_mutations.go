@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/gen"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/types"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/gen"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/types"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/google/uuid"
 )
 

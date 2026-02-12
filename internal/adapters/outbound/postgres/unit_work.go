@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/depend"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 )
 
 // UnitOfWork implements the domain.UnitOfWork interface for Postgres.

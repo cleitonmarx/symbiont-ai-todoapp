@@ -15,16 +15,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql"
+	gqlmodels "github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/gen"
+	rest "github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/depend"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql"
-	gqlmodels "github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/gen"
-	rest "github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/google/uuid"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/app"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/app"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 	"github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/require"
 )

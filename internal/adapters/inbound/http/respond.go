@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 )
 
 func respondJSON(w http.ResponseWriter, statusCode int, payload any) {

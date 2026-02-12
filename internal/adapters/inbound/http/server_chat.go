@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 )
 
 func (api TodoAppServer) ClearChatMessages(w http.ResponseWriter, r *http.Request) {

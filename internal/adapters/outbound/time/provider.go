@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/depend"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 )
 
 // CurrentTimeProvider is an implementation of domain.CurrentTimeProvider using the standard time package.

@@ -7,10 +7,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/depend"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
 	"github.com/google/uuid"
 	"github.com/toon-format/toon-go"
 	"go.yaml.in/yaml/v3"

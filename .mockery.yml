@@ -11,9 +11,9 @@ require-template-schema-exists: true
 template: testify
 template-schema: '{{.Template}}.schema.json'
 packages:
-  github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain:
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain:
     config:
       all: true
-  github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases:
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases:
     config:
       all: true

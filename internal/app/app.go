@@ -2,17 +2,17 @@ package app
 
 import (
 	"github.com/cleitonmarx/symbiont"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/workers"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/outbound/config"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/outbound/log"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/outbound/modelrunner"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/outbound/postgres"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/outbound/pubsub"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/outbound/time"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/workers"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/config"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/log"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/modelrunner"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/postgres"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/pubsub"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/time"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 )
 
 // NewTodoApp creates and returns a new instance of the TodoApp application.

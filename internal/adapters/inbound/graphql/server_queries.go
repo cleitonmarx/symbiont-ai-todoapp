@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/gen"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/types"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/gen"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/types"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 )
 
 // ListTodos is the resolver for the listTodos field.

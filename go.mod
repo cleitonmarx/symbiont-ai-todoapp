@@ -1,4 +1,4 @@
-module github.com/cleitonmarx/symbiont/examples/todoapp
+module github.com/cleitonmarx/symbiont-ai-todoapp
 
 go 1.24.9
 

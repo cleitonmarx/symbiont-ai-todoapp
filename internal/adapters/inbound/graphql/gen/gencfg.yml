@@ -20,6 +20,6 @@ models:
       - github.com/99designs/gqlgen/graphql.UUID
   Date:
     model:
-      - github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/types.Date
+      - github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/types.Date
 
 

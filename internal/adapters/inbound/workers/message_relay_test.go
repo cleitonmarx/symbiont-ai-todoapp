@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

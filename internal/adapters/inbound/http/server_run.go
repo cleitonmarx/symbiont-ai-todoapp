@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 	"github.com/rs/cors"
 )
 

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/types"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/types"
 	"github.com/google/uuid"
 )
 

@@ -6,7 +6,7 @@ import (
 
 	"strings"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )

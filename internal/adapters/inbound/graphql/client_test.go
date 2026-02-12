@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/gen"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/graphql/types"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/gen"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/types"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )

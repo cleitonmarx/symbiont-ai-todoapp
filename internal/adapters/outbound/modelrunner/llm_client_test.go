@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/depend"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/stretchr/testify/assert"
 )
 

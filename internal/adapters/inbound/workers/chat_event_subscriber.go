@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub/v2"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 )
 
 // ChatEventSubscriber consumes chat-message events from Pub/Sub

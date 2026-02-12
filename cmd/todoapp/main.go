@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/app"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/app"
 )
 
 func main() {

@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 )
 
 // MessageRelay is a runnable that processes outbox events and publishes them to Pub/Sub.

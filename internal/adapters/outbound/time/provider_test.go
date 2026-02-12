@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/depend"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
 	"github.com/stretchr/testify/assert"
 )
 

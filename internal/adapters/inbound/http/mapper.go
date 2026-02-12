@@ -1,8 +1,8 @@
 package http
 
 import (
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/adapters/inbound/http/gen"
-	"github.com/cleitonmarx/symbiont/examples/todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 

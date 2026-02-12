@@ -24,10 +24,6 @@ const (
 type ChatMessageState string
 
 const (
-	// ChatMessageState_Pending indicates the message was created but not fully streamed yet.
-	ChatMessageState_Pending ChatMessageState = "PENDING"
-	// ChatMessageState_Streaming indicates the message is currently being streamed.
-	ChatMessageState_Streaming ChatMessageState = "STREAMING"
 	// ChatMessageState_Completed indicates the message was fully generated and persisted.
 	ChatMessageState_Completed ChatMessageState = "COMPLETED"
 	// ChatMessageState_Failed indicates message generation failed.

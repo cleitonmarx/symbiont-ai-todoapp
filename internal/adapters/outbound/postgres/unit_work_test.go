@@ -174,16 +174,20 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 	mock.ExpectExec("DELETE FROM todos WHERE id = $1").
 		WithArgs(todoID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec("INSERT INTO outbox_events (id,entity_type,entity_id,topic,event_type,payload,retry_count,max_retries,last_error,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)").
+	mock.ExpectExec("INSERT INTO outbox_events (id,entity_type,entity_id,topic,event_type,payload,status,retry_count,max_retries,last_error,dedupe_key,available_at,processed_at,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING").
 		WithArgs(
 			sqlmock.AnyArg(),
-			"Todo",
+			string(domain.OutboxEntityType_Todo),
 			todoID,
-			"Todo",
+			string(domain.OutboxTopic_Todo),
 			"TODO.DELETED",
 			sqlmock.AnyArg(),
+			string(domain.OutboxStatus_Pending),
 			0,
 			5,
+			nil,
+			sqlmock.AnyArg(),
+			sqlmock.AnyArg(),
 			nil,
 			sqlmock.AnyArg(),
 		).

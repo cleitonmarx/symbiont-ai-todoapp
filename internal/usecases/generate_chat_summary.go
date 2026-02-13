@@ -29,6 +29,10 @@ const (
 	CHAT_SUMMARY_TOP_P       = 0.7
 )
 
+// CompletedConversationSummaryChannel is a channel type for sending processed domain.ConversationSummary items.
+// It is used in integration tests to verify summary generation.
+type CompletedConversationSummaryChannel chan domain.ConversationSummary
+
 // Default list of tool function names that imply task state changes.
 var stateChangingTools = map[string]struct{}{
 	"create_todo":          {},
@@ -48,11 +52,12 @@ type GenerateChatSummary interface {
 
 // GenerateChatSummaryImpl is the implementation of the GenerateChatSummary use case.
 type GenerateChatSummaryImpl struct {
-	ChatMessageRepo         domain.ChatMessageRepository
-	ConversationSummaryRepo domain.ConversationSummaryRepository
-	TimeProvider            domain.CurrentTimeProvider
-	LLMClient               domain.LLMClient
-	Model                   string
+	chatMessageRepo         domain.ChatMessageRepository
+	conversationSummaryRepo domain.ConversationSummaryRepository
+	timeProvider            domain.CurrentTimeProvider
+	llmClient               domain.LLMClient
+	model                   string
+	completedSummaryCh      CompletedConversationSummaryChannel
 }
 
 // NewGenerateChatSummaryImpl creates a new instance of GenerateChatSummaryImpl.
@@ -62,14 +67,16 @@ func NewGenerateChatSummaryImpl(
 	timeProvider domain.CurrentTimeProvider,
 	llmClient domain.LLMClient,
 	model string,
+	q CompletedConversationSummaryChannel,
 ) GenerateChatSummaryImpl {
 
 	return GenerateChatSummaryImpl{
-		ChatMessageRepo:         chatMessageRepo,
-		ConversationSummaryRepo: conversationSummaryRepo,
-		TimeProvider:            timeProvider,
-		LLMClient:               llmClient,
-		Model:                   model,
+		chatMessageRepo:         chatMessageRepo,
+		conversationSummaryRepo: conversationSummaryRepo,
+		timeProvider:            timeProvider,
+		llmClient:               llmClient,
+		model:                   model,
+		completedSummaryCh:      q,
 	}
 }
 
@@ -87,7 +94,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	}
 
 	currentSummary := "No current state."
-	previous, found, err := gcs.ConversationSummaryRepo.GetConversationSummary(spanCtx, event.ConversationID)
+	previous, found, err := gcs.conversationSummaryRepo.GetConversationSummary(spanCtx, event.ConversationID)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
@@ -103,7 +110,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 		messageOptions = append(messageOptions, domain.WithChatMessagesAfterMessageID(*previous.LastSummarizedMessageID))
 	}
 
-	unsummarizedMessages, hasMore, err := gcs.ChatMessageRepo.ListChatMessages(spanCtx, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, messageOptions...)
+	unsummarizedMessages, hasMore, err := gcs.chatMessageRepo.ListChatMessages(spanCtx, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, messageOptions...)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
@@ -121,8 +128,8 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 		return err
 	}
 
-	resp, err := gcs.LLMClient.Chat(spanCtx, domain.LLMChatRequest{
-		Model:       gcs.Model,
+	resp, err := gcs.llmClient.Chat(spanCtx, domain.LLMChatRequest{
+		Model:       gcs.model,
 		Messages:    promptMessages,
 		Stream:      false,
 		Temperature: common.Ptr(CHAT_SUMMARY_TEMPERATURE),
@@ -141,15 +148,25 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 
 	lastMessage := unsummarizedMessages[len(unsummarizedMessages)-1]
 	messageID := lastMessage.ID
-	err = gcs.ConversationSummaryRepo.StoreConversationSummary(spanCtx, domain.ConversationSummary{
+	err = gcs.conversationSummaryRepo.StoreConversationSummary(spanCtx, domain.ConversationSummary{
 		ID:                      summaryID,
 		ConversationID:          event.ConversationID,
 		CurrentStateSummary:     strings.TrimSpace(resp.Content),
 		LastSummarizedMessageID: &messageID,
-		UpdatedAt:               gcs.TimeProvider.Now().UTC(),
+		UpdatedAt:               gcs.timeProvider.Now().UTC(),
 	})
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
+	}
+
+	if gcs.completedSummaryCh != nil {
+		gcs.completedSummaryCh <- domain.ConversationSummary{
+			ID:                      summaryID,
+			ConversationID:          event.ConversationID,
+			CurrentStateSummary:     strings.TrimSpace(resp.Content),
+			LastSummarizedMessageID: &messageID,
+			UpdatedAt:               gcs.timeProvider.Now().UTC(),
+		}
 	}
 
 	return nil
@@ -276,12 +293,14 @@ type InitGenerateChatSummary struct {
 
 // Initialize registers the GenerateChatSummary use case implementation.
 func (i InitGenerateChatSummary) Initialize(ctx context.Context) (context.Context, error) {
+	queue, _ := depend.Resolve[CompletedConversationSummaryChannel]()
 	depend.Register[GenerateChatSummary](NewGenerateChatSummaryImpl(
 		i.ChatMessageRepo,
 		i.ConversationSummaryRepo,
 		i.TimeProvider,
 		i.LLMClient,
 		i.Model,
+		queue,
 	))
 	return ctx, nil
 }

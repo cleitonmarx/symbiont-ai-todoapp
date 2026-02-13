@@ -27,13 +27,13 @@ func (op MessageRelay) Run(ctx context.Context) error {
 		case <-ticker.C:
 			err := op.MessageDispatcher.Execute(ctx)
 			if err != nil {
-				op.Logger.Printf("error processing batch: %v", err)
+				op.Logger.Printf("MessageRelay: error processing batch: %v", err)
 			}
 			if op.workerExecutionChan != nil {
 				op.workerExecutionChan <- struct{}{}
 			}
 		case <-ctx.Done():
-			op.Logger.Println("MessageRelay: stopping...")
+			op.Logger.Println("MessageRelay: stopped")
 			return nil
 		}
 	}

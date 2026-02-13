@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -48,15 +49,6 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 			},
 			expectedErr: domain.NewValidationErr("conversation id cannot be empty"),
 		},
-		"empty-model": {
-			model: "",
-			event: domain.ChatMessageEvent{
-				Type:           domain.EventType_CHAT_MESSAGE_SENT,
-				ConversationID: conversationID,
-				ChatMessageID:  chatMessageID,
-			},
-			expectedErr: domain.NewValidationErr("model cannot be empty"),
-		},
 		"get-summary-error": {
 			model: "summary-model",
 			event: domain.ChatMessageEvent{
@@ -76,7 +68,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Return(domain.ConversationSummary{}, false, errors.New("summary db error")).
 					Once()
 			},
-			expectedErr: errors.New("summary db error"),
+			expectedErr: fmt.Errorf("failed to get conversation summary: %w", errors.New("summary db error")),
 		},
 		"list-chat-messages-error": {
 			model: "summary-model",
@@ -111,7 +103,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					}).
 					Once()
 			},
-			expectedErr: errors.New("chat db error"),
+			expectedErr: fmt.Errorf("failed to list chat messages: %w", errors.New("chat db error")),
 		},
 		"no-unsummarized-messages-noop": {
 			model: "summary-model",
@@ -394,7 +386,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Return(domain.LLMChatResponse{}, errors.New("llm error")).
 					Once()
 			},
-			expectedErr: errors.New("llm error"),
+			expectedErr: fmt.Errorf("failed to generate chat summary: %w", errors.New("llm error")),
 		},
 		"store-error": {
 			model: "summary-model",
@@ -436,7 +428,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Return(errors.New("store error")).
 					Once()
 			},
-			expectedErr: errors.New("store error"),
+			expectedErr: fmt.Errorf("failed to store conversation summary: %w", errors.New("store error")),
 		},
 	}
 
@@ -457,6 +449,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				timeProvider,
 				llmClient,
 				tt.model,
+				nil,
 			)
 
 			gotErr := uc.Execute(context.Background(), tt.event)

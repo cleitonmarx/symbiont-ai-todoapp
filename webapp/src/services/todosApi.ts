@@ -9,9 +9,12 @@ export type TodoSort =
   | 'similarityAsc'
   | 'similarityDesc';
 
+export type TodoSearchType = 'TITLE' | 'SIMILARITY';
+
 export const getTodos = async (
   status?: TodoStatus,
-  query?: string,
+  search?: string,
+  searchType: TodoSearchType = 'TITLE',
   page = 1,
   pageSize = 50,
   dateRange?: { dueAfter?: string; dueBefore?: string },
@@ -23,8 +26,9 @@ export const getTodos = async (
     params.status = status;
   }
 
-  if (query) {
-    params.query = query;
+  if (search) {
+    params.search = search;
+    params.searchType = searchType;
   }
 
   if (dateRange?.dueAfter) {

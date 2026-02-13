@@ -47,6 +47,61 @@ type UpdateTodoParams struct {
 	DueDate *types.Date `json:"due_date,omitempty"`
 }
 
+type SearchType string
+
+const (
+	SearchTypeTitle      SearchType = "TITLE"
+	SearchTypeSimilarity SearchType = "SIMILARITY"
+)
+
+var AllSearchType = []SearchType{
+	SearchTypeTitle,
+	SearchTypeSimilarity,
+}
+
+func (e SearchType) IsValid() bool {
+	switch e {
+	case SearchTypeTitle, SearchTypeSimilarity:
+		return true
+	}
+	return false
+}
+
+func (e SearchType) String() string {
+	return string(e)
+}
+
+func (e *SearchType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SearchType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SearchType", str)
+	}
+	return nil
+}
+
+func (e SearchType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *SearchType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e SearchType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
 type TodoSortBy string
 
 const (

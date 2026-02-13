@@ -22,8 +22,11 @@ func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, param
 	if params.Status != nil {
 		queryParams = append(queryParams, usecases.WithStatus(domain.TodoStatus(*params.Status)))
 	}
-	if params.Query != nil {
-		queryParams = append(queryParams, usecases.WithSearchQuery(*params.Query))
+	if params.Search != nil {
+		queryParams = append(queryParams, usecases.WithSearchQuery(*params.Search))
+	}
+	if params.SearchType != nil {
+		queryParams = append(queryParams, usecases.WithSearchType(usecases.SearchType(*params.SearchType)))
 	}
 	if params.DateRange.DueAfter != nil && params.DateRange.DueBefore != nil {
 		queryParams = append(queryParams, usecases.WithDueDateRange(params.DateRange.DueAfter.Time, params.DateRange.DueBefore.Time))

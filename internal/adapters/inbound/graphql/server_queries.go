@@ -12,13 +12,16 @@ import (
 )
 
 // ListTodos is the resolver for the listTodos field.
-func (s *TodoGraphQLServer) ListTodos(ctx context.Context, page int, pageSize int, status *gen.TodoStatus, query *string, dateRange *gen.DateRange, sortBy *gen.TodoSortBy) (*gen.TodoPage, error) {
+func (s *TodoGraphQLServer) ListTodos(ctx context.Context, page int, pageSize int, status *gen.TodoStatus, search *string, searchType *gen.SearchType, dateRange *gen.DateRange, sortBy *gen.TodoSortBy) (*gen.TodoPage, error) {
 	var options []usecases.ListTodoOptions
 	if status != nil {
 		options = append(options, usecases.WithStatus(domain.TodoStatus(*status)))
 	}
-	if query != nil {
-		options = append(options, usecases.WithSearchQuery(*query))
+	if search != nil {
+		options = append(options, usecases.WithSearchQuery(*search))
+	}
+	if searchType != nil {
+		options = append(options, usecases.WithSearchType(usecases.SearchType(*searchType)))
 	}
 	if dateRange != nil {
 		options = append(options, usecases.WithDueDateRange(time.Time(dateRange.DueAfter), time.Time(dateRange.DueBefore)))

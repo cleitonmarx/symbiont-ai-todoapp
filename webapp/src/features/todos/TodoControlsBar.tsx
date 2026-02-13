@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { TodoStatus } from '../../types';
-import type { TodoSort } from '../../services/todosApi';
+import type { TodoSearchType, TodoSort } from '../../services/todosApi';
 import { DateRangePicker } from '../../components/ui/DateRangePicker';
 
 interface TodoControlsBarProps {
@@ -12,6 +12,8 @@ interface TodoControlsBarProps {
   onPageSizeChange: (size: number) => void;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
+  searchType: TodoSearchType;
+  onSearchTypeChange: (searchType: TodoSearchType) => void;
   dueAfter: string;
   onDueAfterChange: (date: string) => void;
   dueBefore: string;
@@ -28,6 +30,8 @@ export const TodoControlsBar = ({
   onPageSizeChange,
   searchQuery,
   onSearchQueryChange,
+  searchType,
+  onSearchTypeChange,
   dueAfter,
   onDueAfterChange,
   dueBefore,
@@ -79,7 +83,7 @@ export const TodoControlsBar = ({
           <option value="createdAtDesc">Created At Desc</option>
           <option value="dueDateAsc">Due Date Asc</option>
           <option value="dueDateDesc">Due Date Desc</option>
-          {searchQuery ? (
+          {searchQuery && searchType === 'SIMILARITY' ? (
             <>
               <option value="similarityAsc">Similarity Asc</option>
               <option value="similarityDesc">Similarity Desc</option>
@@ -116,6 +120,21 @@ export const TodoControlsBar = ({
           placeholder="Search todos"
           onChange={(event) => onSearchQueryChange(event.target.value)}
         />
+      </div>
+
+      <div className="ui-controls-group ui-controls-search-type">
+        <label className="ui-controls-label" htmlFor="todo-search-type-select">
+          Search Type
+        </label>
+        <select
+          id="todo-search-type-select"
+          className="ui-select"
+          value={searchType}
+          onChange={(event) => onSearchTypeChange(event.target.value as TodoSearchType)}
+        >
+          <option value="TITLE">Title</option>
+          <option value="SIMILARITY">Similarity</option>
+        </select>
       </div>
 
       <div className="ui-controls-group ui-controls-advanced-toggle-group">

@@ -4,6 +4,7 @@ export {
   updateTodo,
   deleteTodo,
   type TodoSort,
+  type TodoSearchType,
 } from './todosApi';
 export { getBoardSummary, type BoardSummary } from './boardApi';
 export { streamChat, fetchChatMessages, clearChatMessages, fetchAvailableModels } from './chatApi';

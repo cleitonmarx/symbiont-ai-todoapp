@@ -54,7 +54,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		ListTodos func(childComplexity int, page int, pageSize int, status *TodoStatus, query *string, dateRange *DateRange, sortBy *TodoSortBy) int
+		ListTodos func(childComplexity int, page int, pageSize int, status *TodoStatus, search *string, searchType *SearchType, dateRange *DateRange, sortBy *TodoSortBy) int
 	}
 
 	Todo struct {
@@ -79,7 +79,7 @@ type MutationResolver interface {
 	DeleteTodo(ctx context.Context, id uuid.UUID) (bool, error)
 }
 type QueryResolver interface {
-	ListTodos(ctx context.Context, page int, pageSize int, status *TodoStatus, query *string, dateRange *DateRange, sortBy *TodoSortBy) (*TodoPage, error)
+	ListTodos(ctx context.Context, page int, pageSize int, status *TodoStatus, search *string, searchType *SearchType, dateRange *DateRange, sortBy *TodoSortBy) (*TodoPage, error)
 }
 
 type executableSchema struct {
@@ -134,7 +134,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.ListTodos(childComplexity, args["page"].(int), args["pageSize"].(int), args["status"].(*TodoStatus), args["query"].(*string), args["dateRange"].(*DateRange), args["sortBy"].(*TodoSortBy)), true
+		return e.complexity.Query.ListTodos(childComplexity, args["page"].(int), args["pageSize"].(int), args["status"].(*TodoStatus), args["search"].(*string), args["searchType"].(*SearchType), args["dateRange"].(*DateRange), args["sortBy"].(*TodoSortBy)), true
 
 	case "Todo.created_at":
 		if e.complexity.Todo.CreatedAt == nil {
@@ -348,8 +348,13 @@ input DateRange {
   DueBefore: Date!
 }
 
+enum SearchType {
+  TITLE
+  SIMILARITY
+}
+
 type Query {
-  listTodos(page: Int! = 1, pageSize: Int! = 50, status: TodoStatus, query: String, dateRange: DateRange, sortBy: TodoSortBy): TodoPage!
+  listTodos(page: Int! = 1, pageSize: Int! = 50, status: TodoStatus, search: String, searchType: SearchType, dateRange: DateRange, sortBy: TodoSortBy): TodoPage!
 }
 
 type Mutation {
@@ -381,7 +386,7 @@ func (ec *executionContext) field_Mutation_deleteTodo_args(ctx context.Context, 
 func (ec *executionContext) field_Mutation_updateTodo_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "params", ec.unmarshalNupdateTodoParams2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐUpdateTodoParams)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "params", ec.unmarshalNupdateTodoParams2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐUpdateTodoParams)
 	if err != nil {
 		return nil, err
 	}
@@ -413,26 +418,31 @@ func (ec *executionContext) field_Query_listTodos_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["pageSize"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "status", ec.unmarshalOTodoStatus2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus)
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "status", ec.unmarshalOTodoStatus2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus)
 	if err != nil {
 		return nil, err
 	}
 	args["status"] = arg2
-	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "query", ec.unmarshalOString2ᚖstring)
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "search", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["query"] = arg3
-	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "dateRange", ec.unmarshalODateRange2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐDateRange)
+	args["search"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "searchType", ec.unmarshalOSearchType2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐSearchType)
 	if err != nil {
 		return nil, err
 	}
-	args["dateRange"] = arg4
-	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "sortBy", ec.unmarshalOTodoSortBy2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoSortBy)
+	args["searchType"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "dateRange", ec.unmarshalODateRange2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐDateRange)
 	if err != nil {
 		return nil, err
 	}
-	args["sortBy"] = arg5
+	args["dateRange"] = arg5
+	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "sortBy", ec.unmarshalOTodoSortBy2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoSortBy)
+	if err != nil {
+		return nil, err
+	}
+	args["sortBy"] = arg6
 	return args, nil
 }
 
@@ -499,7 +509,7 @@ func (ec *executionContext) _Mutation_updateTodo(ctx context.Context, field grap
 			return ec.resolvers.Mutation().UpdateTodo(ctx, fc.Args["params"].(UpdateTodoParams))
 		},
 		nil,
-		ec.marshalNTodo2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodo,
+		ec.marshalNTodo2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodo,
 		true,
 		true,
 	)
@@ -592,10 +602,10 @@ func (ec *executionContext) _Query_listTodos(ctx context.Context, field graphql.
 		ec.fieldContext_Query_listTodos,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().ListTodos(ctx, fc.Args["page"].(int), fc.Args["pageSize"].(int), fc.Args["status"].(*TodoStatus), fc.Args["query"].(*string), fc.Args["dateRange"].(*DateRange), fc.Args["sortBy"].(*TodoSortBy))
+			return ec.resolvers.Query().ListTodos(ctx, fc.Args["page"].(int), fc.Args["pageSize"].(int), fc.Args["status"].(*TodoStatus), fc.Args["search"].(*string), fc.Args["searchType"].(*SearchType), fc.Args["dateRange"].(*DateRange), fc.Args["sortBy"].(*TodoSortBy))
 		},
 		nil,
-		ec.marshalNTodoPage2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoPage,
+		ec.marshalNTodoPage2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoPage,
 		true,
 		true,
 	)
@@ -811,7 +821,7 @@ func (ec *executionContext) _Todo_status(ctx context.Context, field graphql.Coll
 			return obj.Status, nil
 		},
 		nil,
-		ec.marshalNTodoStatus2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus,
+		ec.marshalNTodoStatus2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus,
 		true,
 		true,
 	)
@@ -840,7 +850,7 @@ func (ec *executionContext) _Todo_due_date(ctx context.Context, field graphql.Co
 			return obj.DueDate, nil
 		},
 		nil,
-		ec.marshalNDate2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate,
+		ec.marshalNDate2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate,
 		true,
 		true,
 	)
@@ -927,7 +937,7 @@ func (ec *executionContext) _TodoPage_items(ctx context.Context, field graphql.C
 			return obj.Items, nil
 		},
 		nil,
-		ec.marshalNTodo2ᚕᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoᚄ,
+		ec.marshalNTodo2ᚕᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoᚄ,
 		true,
 		true,
 	)
@@ -2509,14 +2519,14 @@ func (ec *executionContext) unmarshalInputDateRange(ctx context.Context, obj any
 		switch k {
 		case "DueAfter":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("DueAfter"))
-			data, err := ec.unmarshalNDate2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx, v)
+			data, err := ec.unmarshalNDate2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.DueAfter = data
 		case "DueBefore":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("DueBefore"))
-			data, err := ec.unmarshalNDate2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx, v)
+			data, err := ec.unmarshalNDate2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -2557,14 +2567,14 @@ func (ec *executionContext) unmarshalInputupdateTodoParams(ctx context.Context, 
 			it.Title = data
 		case "status":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
-			data, err := ec.unmarshalOTodoStatus2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus(ctx, v)
+			data, err := ec.unmarshalOTodoStatus2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.Status = data
 		case "due_date":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("due_date"))
-			data, err := ec.unmarshalODate2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx, v)
+			data, err := ec.unmarshalODate2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -3174,13 +3184,13 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) unmarshalNDate2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx context.Context, v any) (types.Date, error) {
+func (ec *executionContext) unmarshalNDate2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx context.Context, v any) (types.Date, error) {
 	var res types.Date
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNDate2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx context.Context, sel ast.SelectionSet, v types.Date) graphql.Marshaler {
+func (ec *executionContext) marshalNDate2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx context.Context, sel ast.SelectionSet, v types.Date) graphql.Marshaler {
 	return v
 }
 
@@ -3232,11 +3242,11 @@ func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel as
 	return res
 }
 
-func (ec *executionContext) marshalNTodo2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodo(ctx context.Context, sel ast.SelectionSet, v Todo) graphql.Marshaler {
+func (ec *executionContext) marshalNTodo2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodo(ctx context.Context, sel ast.SelectionSet, v Todo) graphql.Marshaler {
 	return ec._Todo(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNTodo2ᚕᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoᚄ(ctx context.Context, sel ast.SelectionSet, v []*Todo) graphql.Marshaler {
+func (ec *executionContext) marshalNTodo2ᚕᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoᚄ(ctx context.Context, sel ast.SelectionSet, v []*Todo) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -3260,7 +3270,7 @@ func (ec *executionContext) marshalNTodo2ᚕᚖgithubᚗcomᚋcleitonmarxᚋsymb
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNTodo2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodo(ctx, sel, v[i])
+			ret[i] = ec.marshalNTodo2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodo(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -3280,7 +3290,7 @@ func (ec *executionContext) marshalNTodo2ᚕᚖgithubᚗcomᚋcleitonmarxᚋsymb
 	return ret
 }
 
-func (ec *executionContext) marshalNTodo2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodo(ctx context.Context, sel ast.SelectionSet, v *Todo) graphql.Marshaler {
+func (ec *executionContext) marshalNTodo2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodo(ctx context.Context, sel ast.SelectionSet, v *Todo) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -3290,11 +3300,11 @@ func (ec *executionContext) marshalNTodo2ᚖgithubᚗcomᚋcleitonmarxᚋsymbion
 	return ec._Todo(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNTodoPage2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoPage(ctx context.Context, sel ast.SelectionSet, v TodoPage) graphql.Marshaler {
+func (ec *executionContext) marshalNTodoPage2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoPage(ctx context.Context, sel ast.SelectionSet, v TodoPage) graphql.Marshaler {
 	return ec._TodoPage(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNTodoPage2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoPage(ctx context.Context, sel ast.SelectionSet, v *TodoPage) graphql.Marshaler {
+func (ec *executionContext) marshalNTodoPage2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoPage(ctx context.Context, sel ast.SelectionSet, v *TodoPage) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -3304,13 +3314,13 @@ func (ec *executionContext) marshalNTodoPage2ᚖgithubᚗcomᚋcleitonmarxᚋsym
 	return ec._TodoPage(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNTodoStatus2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus(ctx context.Context, v any) (TodoStatus, error) {
+func (ec *executionContext) unmarshalNTodoStatus2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus(ctx context.Context, v any) (TodoStatus, error) {
 	var res TodoStatus
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNTodoStatus2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus(ctx context.Context, sel ast.SelectionSet, v TodoStatus) graphql.Marshaler {
+func (ec *executionContext) marshalNTodoStatus2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus(ctx context.Context, sel ast.SelectionSet, v TodoStatus) graphql.Marshaler {
 	return v
 }
 
@@ -3583,7 +3593,7 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
-func (ec *executionContext) unmarshalNupdateTodoParams2githubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐUpdateTodoParams(ctx context.Context, v any) (UpdateTodoParams, error) {
+func (ec *executionContext) unmarshalNupdateTodoParams2githubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐUpdateTodoParams(ctx context.Context, v any) (UpdateTodoParams, error) {
 	res, err := ec.unmarshalInputupdateTodoParams(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
@@ -3618,7 +3628,7 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
-func (ec *executionContext) unmarshalODate2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx context.Context, v any) (*types.Date, error) {
+func (ec *executionContext) unmarshalODate2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx context.Context, v any) (*types.Date, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -3627,14 +3637,14 @@ func (ec *executionContext) unmarshalODate2ᚖgithubᚗcomᚋcleitonmarxᚋsymbi
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalODate2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx context.Context, sel ast.SelectionSet, v *types.Date) graphql.Marshaler {
+func (ec *executionContext) marshalODate2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋtypesᚐDate(ctx context.Context, sel ast.SelectionSet, v *types.Date) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return v
 }
 
-func (ec *executionContext) unmarshalODateRange2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐDateRange(ctx context.Context, v any) (*DateRange, error) {
+func (ec *executionContext) unmarshalODateRange2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐDateRange(ctx context.Context, v any) (*DateRange, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -3660,6 +3670,22 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	return res
 }
 
+func (ec *executionContext) unmarshalOSearchType2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐSearchType(ctx context.Context, v any) (*SearchType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(SearchType)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOSearchType2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐSearchType(ctx context.Context, sel ast.SelectionSet, v *SearchType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {
 	if v == nil {
 		return nil, nil
@@ -3678,7 +3704,7 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	return res
 }
 
-func (ec *executionContext) unmarshalOTodoSortBy2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoSortBy(ctx context.Context, v any) (*TodoSortBy, error) {
+func (ec *executionContext) unmarshalOTodoSortBy2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoSortBy(ctx context.Context, v any) (*TodoSortBy, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -3687,14 +3713,14 @@ func (ec *executionContext) unmarshalOTodoSortBy2ᚖgithubᚗcomᚋcleitonmarx�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOTodoSortBy2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoSortBy(ctx context.Context, sel ast.SelectionSet, v *TodoSortBy) graphql.Marshaler {
+func (ec *executionContext) marshalOTodoSortBy2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoSortBy(ctx context.Context, sel ast.SelectionSet, v *TodoSortBy) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return v
 }
 
-func (ec *executionContext) unmarshalOTodoStatus2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus(ctx context.Context, v any) (*TodoStatus, error) {
+func (ec *executionContext) unmarshalOTodoStatus2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus(ctx context.Context, v any) (*TodoStatus, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -3703,7 +3729,7 @@ func (ec *executionContext) unmarshalOTodoStatus2ᚖgithubᚗcomᚋcleitonmarx�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOTodoStatus2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚋexamplesᚋtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus(ctx context.Context, sel ast.SelectionSet, v *TodoStatus) graphql.Marshaler {
+func (ec *executionContext) marshalOTodoStatus2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoStatus(ctx context.Context, sel ast.SelectionSet, v *TodoStatus) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

@@ -64,11 +64,12 @@ func TestListTodosImpl_Query(t *testing.T) {
 			expectedHasMore: false,
 			expectedErr:     nil,
 		},
-		"success-without-query-filters": {
+		"success-search-similarity-filters": {
 			page:     2,
 			pageSize: 5,
 			queryParams: []ListTodoOptions{
 				WithSearchQuery("meeting"),
+				WithSearchType(SearchType_SIMILARITY),
 			},
 			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
 				llmClient.EXPECT().
@@ -81,7 +82,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 						for _, opt := range opts {
 							opt(&params)
 						}
-						assert.Equal(t, []float64{0.1, 0.2, 0.3}, params.Embedding) // This line seems incorrect; should check SearchQuery instead --- IGNORE ---
+						assert.Equal(t, []float64{0.1, 0.2, 0.3}, params.Embedding)
 					}).
 					Return([]domain.Todo{}, false, nil)
 			},
@@ -89,6 +90,29 @@ func TestListTodosImpl_Query(t *testing.T) {
 			expectedHasMore: false,
 			expectedErr:     nil,
 		},
+		"success-search-title-filter": {
+			page:     1,
+			pageSize: 5,
+			queryParams: []ListTodoOptions{
+				WithSearchQuery("report"),
+				WithSearchType(SearchType_TITLE),
+			},
+			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+				repo.EXPECT().ListTodos(mock.Anything, 1, 5, mock.Anything).
+					Run(func(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOptions) {
+						var params domain.ListTodosParams
+						for _, opt := range opts {
+							opt(&params)
+						}
+						assert.Equal(t, "report", *params.TitleContains)
+					}).
+					Return([]domain.Todo{}, false, nil)
+			},
+			expectedTodos:   []domain.Todo{},
+			expectedHasMore: false,
+			expectedErr:     nil,
+		},
+
 		"success-with-due-date-range-filter": {
 			page:     1,
 			pageSize: 10,
@@ -135,6 +159,18 @@ func TestListTodosImpl_Query(t *testing.T) {
 			expectedTodos:   []domain.Todo{},
 			expectedHasMore: false,
 			expectedErr:     nil,
+		},
+		"error-when-search-type-is-not-provided": {
+			page:     1,
+			pageSize: 5,
+			queryParams: []ListTodoOptions{
+				WithSearchQuery("meeting"),
+			},
+			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+			},
+			expectedTodos:   []domain.Todo(nil),
+			expectedHasMore: false,
+			expectedErr:     domain.NewValidationErr("invalid search type"),
 		},
 		"repository-error": {
 			page:     1,

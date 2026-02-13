@@ -45,6 +45,12 @@ const (
 	OPEN TodoStatus = "OPEN"
 )
 
+// Defines values for ListTodosParamsSearchType.
+const (
+	SIMILARITY ListTodosParamsSearchType = "SIMILARITY"
+	TITLE      ListTodosParamsSearchType = "TITLE"
+)
+
 // Defines values for ListTodosParamsSort.
 const (
 	CreatedAtAsc   ListTodosParamsSort = "createdAtAsc"
@@ -262,13 +268,19 @@ type ListTodosParams struct {
 	// Status Filter todos by status.
 	Status *TodoStatus `form:"status,omitempty" json:"status,omitempty"`
 
-	// Query Full-text or semantic search query to retrieve todos most relevant to the provided keywords or context using vector similarity.
-	Query     *string    `form:"query,omitempty" json:"query,omitempty"`
-	DateRange *DateRange `json:"dateRange,omitempty"`
+	// Search Full-text or semantic search query to retrieve todos most relevant to the provided keywords or context using vector similarity.
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// SearchType The type of search to perform when the 'search' parameter is provided. 'title' performs a case-insensitive substring match on todo titles. 'similarity' uses vector similarity search based on the todo embeddings.
+	SearchType *ListTodosParamsSearchType `form:"searchType,omitempty" json:"searchType,omitempty"`
+	DateRange  *DateRange                 `json:"dateRange,omitempty"`
 
 	// Sort Sorting criteria.
 	Sort *ListTodosParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 }
+
+// ListTodosParamsSearchType defines parameters for ListTodos.
+type ListTodosParamsSearchType string
 
 // ListTodosParamsSort defines parameters for ListTodos.
 type ListTodosParamsSort string
@@ -1033,9 +1045,25 @@ func NewListTodosRequest(server string, params *ListTodosParams) (*http.Request,
 
 		}
 
-		if params.Query != nil {
+		if params.Search != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "query", runtime.ParamLocationQuery, *params.Query); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SearchType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "searchType", runtime.ParamLocationQuery, *params.SearchType); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -2074,11 +2102,19 @@ func (siw *ServerInterfaceWrapper) ListTodos(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// ------------- Optional query parameter "query" -------------
+	// ------------- Optional query parameter "search" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "query", r.URL.Query(), &params.Query)
+	err = runtime.BindQueryParameter("form", true, false, "search", r.URL.Query(), &params.Search)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "searchType" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "searchType", r.URL.Query(), &params.SearchType)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "searchType", Err: err})
 		return
 	}
 

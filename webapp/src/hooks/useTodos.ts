@@ -1,5 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getTodos, createTodo, updateTodo, deleteTodo as deleteTodoApi, type TodoSort } from '../services/todosApi';
+import {
+  getTodos,
+  createTodo,
+  updateTodo,
+  deleteTodo as deleteTodoApi,
+  type TodoSort,
+  type TodoSearchType,
+} from '../services/todosApi';
 import { getBoardSummary, type BoardSummary } from '../services/boardApi';
 import type { Todo, CreateTodoRequest, TodoStatus } from '../types';
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -20,6 +27,8 @@ export interface UseTodosReturn {
   deleteTodo: (id: string) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  searchType: TodoSearchType;
+  setSearchType: (searchType: TodoSearchType) => void;
   sortBy: TodoSort;
   setSortBy: (sort: TodoSort) => void;
   pageSize: number;
@@ -40,6 +49,7 @@ export const useTodos = (): UseTodosReturn => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
+  const [searchType, setSearchType] = useState<TodoSearchType>('TITLE');
   const [sortBy, setSortBy] = useState<TodoSort>('dueDateAsc');
   const [pageSize, setPageSize] = useState<number>(DEFAULT_TODO_PAGE_SIZE);
   const [dueAfter, setDueAfterState] = useState<string>('');
@@ -48,17 +58,23 @@ export const useTodos = (): UseTodosReturn => {
   const [boardSummary, setBoardSummary] = useState<BoardSummary | null>(null);
 
   useEffect(() => {
-    if (!searchQuery && (sortBy === 'similarityAsc' || sortBy === 'similarityDesc')) {
+    if (
+      (!searchQuery || searchType !== 'SIMILARITY') &&
+      (sortBy === 'similarityAsc' || sortBy === 'similarityDesc')
+    ) {
       setSortBy('dueDateAsc');
     }
-  }, [searchQuery, sortBy]);
+  }, [searchQuery, searchType, sortBy]);
 
   const effectiveSortBy: TodoSort = useMemo(() => {
-    if (!debouncedSearchQuery && (sortBy === 'similarityAsc' || sortBy === 'similarityDesc')) {
+    if (
+      (!debouncedSearchQuery || searchType !== 'SIMILARITY') &&
+      (sortBy === 'similarityAsc' || sortBy === 'similarityDesc')
+    ) {
       return 'dueDateAsc';
     }
     return sortBy;
-  }, [debouncedSearchQuery, sortBy]);
+  }, [debouncedSearchQuery, searchType, sortBy]);
 
   const effectiveDateRange = useMemo(() => {
     if (!dueAfter || !dueBefore) {
@@ -84,7 +100,7 @@ export const useTodos = (): UseTodosReturn => {
   // Reset page to 1 whenever status filter, debounced search, sort, or page size changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, debouncedSearchQuery, sortBy, pageSize, effectiveDateRange?.dueAfter, effectiveDateRange?.dueBefore]);
+  }, [statusFilter, debouncedSearchQuery, searchType, sortBy, pageSize, effectiveDateRange?.dueAfter, effectiveDateRange?.dueBefore]);
 
   const { 
     data: response, 
@@ -97,6 +113,7 @@ export const useTodos = (): UseTodosReturn => {
       statusFilter,
       currentPage,
       debouncedSearchQuery,
+      searchType,
       effectiveSortBy,
       pageSize,
       effectiveDateRange?.dueAfter,
@@ -105,6 +122,7 @@ export const useTodos = (): UseTodosReturn => {
     queryFn: () => getTodos(
       statusFilter === 'ALL' ? undefined : statusFilter,
       debouncedSearchQuery || undefined,
+      searchType,
       currentPage,
       pageSize,
       effectiveDateRange,
@@ -194,6 +212,10 @@ export const useTodos = (): UseTodosReturn => {
     setSearchQuery(query);
   }, []);
 
+  const handleSetSearchType = useCallback((nextSearchType: TodoSearchType) => {
+    setSearchType(nextSearchType);
+  }, []);
+
   const handleSetStatusFilter = useCallback((status: TodoStatus | 'ALL') => {
     setStatusFilterState(status);
   }, []);
@@ -250,6 +272,8 @@ export const useTodos = (): UseTodosReturn => {
     refetch,
     searchQuery,
     setSearchQuery: handleSetSearchQuery,
+    searchType,
+    setSearchType: handleSetSearchType,
     sortBy,
     setSortBy: handleSetSortBy,
     pageSize,

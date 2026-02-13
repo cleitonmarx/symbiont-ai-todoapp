@@ -77,12 +77,18 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 			pgvector.NewVector(toFloat32Truncated(params.Embedding)),
 		))
 	}
+
+	if params.TitleContains != nil {
+		qry = qry.Where(squirrel.ILike{"title": "%" + *params.TitleContains + "%"})
+	}
+
 	if params.DueAfter != nil && params.DueBefore != nil {
 		qry = qry.Where(squirrel.And{
 			squirrel.GtOrEq{"due_date": *params.DueAfter},
 			squirrel.LtOrEq{"due_date": *params.DueBefore},
 		})
 	}
+
 	qry, err := applySort(qry, params)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err

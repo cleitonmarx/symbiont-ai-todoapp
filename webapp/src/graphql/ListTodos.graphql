@@ -1,5 +1,5 @@
-query ListTodos($status: TodoStatus, $query: String, $page: Int!, $pageSize: Int!, $dateRange: DateRange, $sortBy: TodoSortBy) {
-  listTodos(status: $status, query: $query, page: $page, pageSize: $pageSize, dateRange: $dateRange, sortBy: $sortBy) {
+query ListTodos($status: TodoStatus, $search: String, $searchType: SearchType, $page: Int!, $pageSize: Int!, $dateRange: DateRange, $sortBy: TodoSortBy) {
+  listTodos(status: $status, search: $search, searchType: $searchType, page: $page, pageSize: $pageSize, dateRange: $dateRange, sortBy: $sortBy) {
     items {
       id
       title

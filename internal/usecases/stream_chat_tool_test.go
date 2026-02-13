@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -68,7 +69,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Call a tool"
 						}),
 					).
-					Return(domain.LLMChatMessage{Role: domain.ChatRole_Tool})
+					Return(domain.LLMChatMessage{Role: domain.ChatRole_Tool, ToolCallID: common.Ptr("func-123")})
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, MAX_CHAT_HISTORY_MESSAGES).
@@ -149,8 +150,9 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 						}),
 					).
 					Return(domain.LLMChatMessage{
-						Role:    domain.ChatRole_Tool,
-						Content: "error: failing_tool unavailable",
+						Role:       domain.ChatRole_Tool,
+						ToolCallID: common.Ptr("func-error"),
+						Content:    "error: failing_tool unavailable",
 					})
 
 				chatRepo.EXPECT().
@@ -206,7 +208,6 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					},
 					{
 						Role:          domain.ChatRole_Tool,
-						Content:       "error: failing_tool unavailable",
 						MessageState:  domain.ChatMessageState_Failed,
 						ErrorMessage:  &toolErr,
 						ToolCallsLen:  0,
@@ -326,7 +327,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 
 				toolRegistry.EXPECT().
 					Call(mock.Anything, mock.Anything, mock.Anything).
-					Return(domain.LLMChatMessage{Role: domain.ChatRole_Tool, Content: "tool result"}).
+					Return(domain.LLMChatMessage{Role: domain.ChatRole_Tool, Content: "tool result", ToolCallID: common.Ptr("func-123")}).
 					Times(7)
 
 				callCount := 0
@@ -418,7 +419,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 
 				toolRegistry.EXPECT().
 					Call(mock.Anything, mock.Anything, mock.Anything).
-					Return(domain.LLMChatMessage{Role: domain.ChatRole_Tool, Content: "same result"}).
+					Return(domain.LLMChatMessage{Role: domain.ChatRole_Tool, Content: "same result", ToolCallID: common.Ptr("func-123")}).
 					Times(5)
 
 				callCount := 0

@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 
@@ -53,7 +54,7 @@ func (s TodoEventSubscriber) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			s.Logger.Println("TodoEventSubscriber: stopping...")
+			s.Logger.Println("TodoEventSubscriber: stopped")
 			return nil
 
 		case err := <-subscriberInitErrCh:
@@ -84,7 +85,9 @@ func (s TodoEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 
 	// Generate board-level summary once per batch
 	if err := s.GenerateBoardSummary.Execute(ctx); err != nil {
-		s.Logger.Printf("AI summary generation failed: %v", err)
+		if !errors.Is(err, context.Canceled) {
+			s.Logger.Printf("TodoEventSubscriber: %v", err)
+		}
 		return
 	}
 

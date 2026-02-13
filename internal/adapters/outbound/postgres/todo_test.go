@@ -438,6 +438,30 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 			expectedHasMore: false,
 			expectedErr:     false,
 		},
+		"filter-by-title-contains": {
+			page:     1,
+			pageSize: 10,
+			opts: []domain.ListTodoOptions{
+				domain.WithTitleContains("report"),
+			},
+			setExpectations: func(mock sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows(todoFields).
+					AddRow(
+						fixedUUID1,
+						"Finish report",
+						domain.TodoStatus_OPEN,
+						fixedDueDate,
+						fixedTime,
+						fixedTime,
+					)
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE title ILIKE $1 ORDER BY due_date ASC LIMIT 11 OFFSET 0").
+					WithArgs("%report%").
+					WillReturnRows(rows)
+			},
+			expectedTodos: []domain.Todo{
+				{ID: fixedUUID1, Title: "Finish report", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			},
+		},
 		"filter-by-due-date-range": {
 			page:     1,
 			pageSize: 10,

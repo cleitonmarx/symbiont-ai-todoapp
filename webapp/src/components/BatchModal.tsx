@@ -30,6 +30,7 @@ const BatchModal: React.FC<BatchModalProps> = ({
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'OPEN' | 'DONE'>('OPEN');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState<'TITLE' | 'SIMILARITY'>('TITLE');
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [dueAfter, setDueAfter] = useState('');
   const [dueBefore, setDueBefore] = useState('');
@@ -57,6 +58,7 @@ const BatchModal: React.FC<BatchModalProps> = ({
       setDueAfter('');
       setDueBefore('');
       setSortBy('dueDateAsc');
+      setSearchType('TITLE');
     } else {
       setShow(false);
     }
@@ -66,7 +68,8 @@ const BatchModal: React.FC<BatchModalProps> = ({
     setLoading(true);
     try {
       const effectiveSortBy =
-        !searchQuery && (sortBy === 'similarityAsc' || sortBy === 'similarityDesc')
+        (!searchQuery || searchType !== 'SIMILARITY') &&
+        (sortBy === 'similarityAsc' || sortBy === 'similarityDesc')
           ? 'dueDateAsc'
           : sortBy;
 
@@ -74,7 +77,8 @@ const BatchModal: React.FC<BatchModalProps> = ({
         status: statusFilter,
         page: pageToFetch,
         pageSize,
-        query: searchQuery || undefined,
+        search: searchQuery || undefined,
+        searchType: searchQuery ? searchType : undefined,
         dateRange: dueAfter && dueBefore ? { DueAfter: dueAfter, DueBefore: dueBefore } : undefined,
         sortBy: effectiveSortBy || undefined,
       });
@@ -96,7 +100,7 @@ const BatchModal: React.FC<BatchModalProps> = ({
       fetchTodos(1);
     }
     // eslint-disable-next-line
-  }, [show, statusFilter, searchQuery, dueAfter, dueBefore, sortBy, pageSize]);
+  }, [show, statusFilter, searchQuery, searchType, dueAfter, dueBefore, sortBy, pageSize]);
 
   useEffect(() => {
     setBatchPage(1);
@@ -109,10 +113,13 @@ const BatchModal: React.FC<BatchModalProps> = ({
   }, [batchPage, show]);
 
   useEffect(() => {
-    if (!searchQuery && (sortBy === 'similarityAsc' || sortBy === 'similarityDesc')) {
+    if (
+      (!searchQuery || searchType !== 'SIMILARITY') &&
+      (sortBy === 'similarityAsc' || sortBy === 'similarityDesc')
+    ) {
       setSortBy('dueDateAsc' as TodoSortBy);
     }
-  }, [searchQuery, sortBy]);
+  }, [searchQuery, searchType, sortBy]);
 
   useEffect(() => {
     if (dueAfter && dueBefore && dueBefore < dueAfter) {
@@ -318,7 +325,7 @@ const BatchModal: React.FC<BatchModalProps> = ({
                   <option value="createdAtDesc">Created At Desc</option>
                   <option value="dueDateAsc">Due Date Asc</option>
                   <option value="dueDateDesc">Due Date Desc</option>
-                  {searchQuery ? (
+                  {searchQuery && searchType === 'SIMILARITY' ? (
                     <>
                       <option value="similarityAsc">Similarity Asc</option>
                       <option value="similarityDesc">Similarity Desc</option>
@@ -327,7 +334,7 @@ const BatchModal: React.FC<BatchModalProps> = ({
                 </select>
               </div>
 
-              <div className="filter-group">
+              <div className="filter-group ui-batch-page-size-group">
                 <label htmlFor="batch-page-size-select">Page Size:</label>
                 <select
                   id="batch-page-size-select"
@@ -352,6 +359,19 @@ const BatchModal: React.FC<BatchModalProps> = ({
                   className="search-input"
                   style={isModernLayout ? undefined : { flex: 1 }}
                 />
+              </div>
+
+              <div className="filter-group ui-batch-search-type-group">
+                <label htmlFor="batch-search-type-select">Search Type:</label>
+                <select
+                  id="batch-search-type-select"
+                  value={searchType}
+                  onChange={(event) => setSearchType(event.target.value as 'TITLE' | 'SIMILARITY')}
+                  className="sort-select"
+                >
+                  <option value="TITLE">Title</option>
+                  <option value="SIMILARITY">Similarity</option>
+                </select>
               </div>
             </div>
 

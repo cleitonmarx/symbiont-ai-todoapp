@@ -50,6 +50,13 @@ type ChatMessage struct {
 	UpdatedAt        time.Time
 }
 
+// IsToolCall returns true if the chat message is a tool call, based on its role.
+func (m ChatMessage) IsToolCallSuccess() bool {
+	return m.ChatRole == ChatRole_Tool &&
+		m.ToolCallID != nil &&
+		m.MessageState == ChatMessageState_Completed
+}
+
 // ListChatMessagesOptions defines optional filters for listing chat messages.
 type ListChatMessagesOptions struct {
 	ConversationID string
@@ -59,15 +66,15 @@ type ListChatMessagesOptions struct {
 // ListChatMessagesOption configures optional filters for listing chat messages.
 type ListChatMessagesOption func(*ListChatMessagesOptions)
 
-// ListChatMessagesByConversationID filters the query by conversation ID.
-func ListChatMessagesByConversationID(conversationID string) ListChatMessagesOption {
+// WithChatMessagesByConversationID filters the query by conversation ID.
+func WithChatMessagesByConversationID(conversationID string) ListChatMessagesOption {
 	return func(options *ListChatMessagesOptions) {
 		options.ConversationID = conversationID
 	}
 }
 
-// ListChatMessagesAfterMessageID filters the query to return messages after a checkpoint message ID.
-func ListChatMessagesAfterMessageID(messageID uuid.UUID) ListChatMessagesOption {
+// WithChatMessagesAfterMessageID filters the query to return messages after a checkpoint message ID.
+func WithChatMessagesAfterMessageID(messageID uuid.UUID) ListChatMessagesOption {
 	return func(options *ListChatMessagesOptions) {
 		options.AfterMessageID = &messageID
 	}

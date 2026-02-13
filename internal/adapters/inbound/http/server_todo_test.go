@@ -158,7 +158,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 		page            int
 		pageSize        int
 		todoStatus      *gen.TodoStatus
-		query           *string
+		search          *string
+		searchType      *gen.ListTodosParamsSearchType
 		dateRange       *gen.DateRange
 		sortBy          *string
 		setExpectations func(*usecases.MockListTodos)
@@ -235,10 +236,11 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 				Page:  1,
 			},
 		},
-		"success-with-query": {
-			page:     1,
-			pageSize: 10,
-			query:    common.Ptr("groceries"),
+		"success-with-search-similarity": {
+			page:       1,
+			pageSize:   10,
+			search:     common.Ptr("groceries"),
+			searchType: common.Ptr(gen.SIMILARITY),
 			setExpectations: func(m *usecases.MockListTodos) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
@@ -247,7 +249,32 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 						for _, opt := range opts {
 							opt(&p)
 						}
-						assert.Equal(t, "groceries", *p.Query)
+						assert.Equal(t, "groceries", *p.Search)
+						assert.Equal(t, usecases.SearchType_SIMILARITY, *p.SearchType)
+					}).
+					Return([]domain.Todo{domainTodo}, false, nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: &gen.ListTodosResp{
+				Items: []gen.Todo{restTodo},
+				Page:  1,
+			},
+		},
+		"success-with-search-title": {
+			page:       1,
+			pageSize:   10,
+			search:     common.Ptr("groceries"),
+			searchType: common.Ptr(gen.TITLE),
+			setExpectations: func(m *usecases.MockListTodos) {
+				m.EXPECT().
+					Query(mock.Anything, 1, 10, mock.Anything).
+					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
+						p := usecases.ListTodoParams{}
+						for _, opt := range opts {
+							opt(&p)
+						}
+						assert.Equal(t, "groceries", *p.Search)
+						assert.Equal(t, usecases.SearchType_TITLE, *p.SearchType)
 					}).
 					Return([]domain.Todo{domainTodo}, false, nil)
 			},
@@ -333,8 +360,11 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 			if tt.todoStatus != nil {
 				q.Set("status", string(*tt.todoStatus))
 			}
-			if tt.query != nil {
-				q.Set("query", *tt.query)
+			if tt.search != nil {
+				q.Set("search", *tt.search)
+			}
+			if tt.searchType != nil {
+				q.Set("searchType", string(*tt.searchType))
 			}
 			if tt.dateRange != nil {
 				q.Set("dateRange[dueAfter]", tt.dateRange.DueAfter.String())

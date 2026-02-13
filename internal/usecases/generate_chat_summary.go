@@ -96,7 +96,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	currentSummary := "No current state."
 	previous, found, err := gcs.conversationSummaryRepo.GetConversationSummary(spanCtx, event.ConversationID)
 	if telemetry.RecordErrorAndStatus(span, err) {
-		return err
+		return fmt.Errorf("failed to get conversation summary: %w", err)
 	}
 
 	if found && strings.TrimSpace(previous.CurrentStateSummary) != "" {
@@ -112,7 +112,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 
 	unsummarizedMessages, hasMore, err := gcs.chatMessageRepo.ListChatMessages(spanCtx, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, messageOptions...)
 	if telemetry.RecordErrorAndStatus(span, err) {
-		return err
+		return fmt.Errorf("failed to list chat messages: %w", err)
 	}
 
 	if len(unsummarizedMessages) == 0 {
@@ -125,7 +125,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 
 	promptMessages, err := gcs.buildPromptMessages(currentSummary, formatMessagesForSummary(unsummarizedMessages))
 	if telemetry.RecordErrorAndStatus(span, err) {
-		return err
+		return fmt.Errorf("failed to build prompt messages: %w", err)
 	}
 
 	resp, err := gcs.llmClient.Chat(spanCtx, domain.LLMChatRequest{
@@ -136,7 +136,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 		TopP:        common.Ptr(CHAT_SUMMARY_TOP_P),
 	})
 	if telemetry.RecordErrorAndStatus(span, err) {
-		return err
+		return fmt.Errorf("failed to generate chat summary: %w", err)
 	}
 
 	RecordLLMTokensUsed(spanCtx, resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
@@ -147,26 +147,22 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	}
 
 	lastMessage := unsummarizedMessages[len(unsummarizedMessages)-1]
-	messageID := lastMessage.ID
-	err = gcs.conversationSummaryRepo.StoreConversationSummary(spanCtx, domain.ConversationSummary{
+
+	newSummary := domain.ConversationSummary{
 		ID:                      summaryID,
 		ConversationID:          event.ConversationID,
 		CurrentStateSummary:     strings.TrimSpace(resp.Content),
-		LastSummarizedMessageID: &messageID,
+		LastSummarizedMessageID: &lastMessage.ID,
 		UpdatedAt:               gcs.timeProvider.Now().UTC(),
-	})
+	}
+
+	err = gcs.conversationSummaryRepo.StoreConversationSummary(spanCtx, newSummary)
 	if telemetry.RecordErrorAndStatus(span, err) {
-		return err
+		return fmt.Errorf("failed to store conversation summary: %w", err)
 	}
 
 	if gcs.completedSummaryCh != nil {
-		gcs.completedSummaryCh <- domain.ConversationSummary{
-			ID:                      summaryID,
-			ConversationID:          event.ConversationID,
-			CurrentStateSummary:     strings.TrimSpace(resp.Content),
-			LastSummarizedMessageID: &messageID,
-			UpdatedAt:               gcs.timeProvider.Now().UTC(),
-		}
+		gcs.completedSummaryCh <- newSummary
 	}
 
 	return nil
@@ -177,14 +173,14 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 func (gcs GenerateChatSummaryImpl) buildPromptMessages(currentState, newMessages string) ([]domain.LLMChatMessage, error) {
 	file, err := chatSummaryPrompt.Open("prompts/chat-summary.yml")
 	if err != nil {
-		return nil, fmt.Errorf("failed to open chat summary prompt: %w", err)
+		return nil, err
 	}
 	defer file.Close() //nolint:errcheck
 
 	messages := []domain.LLMChatMessage{}
 	err = yaml.NewDecoder(file).Decode(&messages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode chat summary prompt: %w", err)
+		return nil, err
 	}
 
 	for i, msg := range messages {
@@ -216,7 +212,7 @@ func formatMessageForSummary(message domain.ChatMessage) string {
 	}
 
 	if message.ChatRole == domain.ChatRole_Tool {
-		parts = append(parts, fmt.Sprintf("  tool_success: %t", isToolMessageSuccess(message)))
+		parts = append(parts, fmt.Sprintf("  tool_success: %t", message.IsToolCallSuccess()))
 	}
 
 	if message.ErrorMessage != nil && strings.TrimSpace(*message.ErrorMessage) != "" {
@@ -224,12 +220,6 @@ func formatMessageForSummary(message domain.ChatMessage) string {
 	}
 
 	return strings.Join(parts, "\n")
-}
-
-// isToolMessageSuccess determines if a tool message indicates a successful tool execution
-// based on its message state.
-func isToolMessageSuccess(message domain.ChatMessage) bool {
-	return message.MessageState != domain.ChatMessageState_Failed
 }
 
 func (gcs GenerateChatSummaryImpl) shouldGenerateSummary(messages []domain.ChatMessage, hasMore bool) bool {
@@ -258,7 +248,7 @@ func (gcs GenerateChatSummaryImpl) hasStateChangingToolSuccess(messages []domain
 	}
 
 	for _, message := range messages {
-		if message.ChatRole != domain.ChatRole_Tool || !isToolMessageSuccess(message) || message.ToolCallID == nil {
+		if !message.IsToolCallSuccess() {
 			continue
 		}
 		toolFunction, found := toolCallFunctionsByID[*message.ToolCallID]

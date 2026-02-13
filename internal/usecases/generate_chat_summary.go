@@ -86,10 +86,6 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 		return domain.NewValidationErr("conversation id cannot be empty")
 	}
 
-	if gcs.Model == "" {
-		return domain.NewValidationErr("model cannot be empty")
-	}
-
 	currentSummary := "No current state."
 	previous, found, err := gcs.ConversationSummaryRepo.GetConversationSummary(spanCtx, event.ConversationID)
 	if telemetry.RecordErrorAndStatus(span, err) {
@@ -101,10 +97,10 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	}
 
 	messageOptions := []domain.ListChatMessagesOption{
-		domain.ListChatMessagesByConversationID(event.ConversationID),
+		domain.WithChatMessagesByConversationID(event.ConversationID),
 	}
 	if found && previous.LastSummarizedMessageID != nil {
-		messageOptions = append(messageOptions, domain.ListChatMessagesAfterMessageID(*previous.LastSummarizedMessageID))
+		messageOptions = append(messageOptions, domain.WithChatMessagesAfterMessageID(*previous.LastSummarizedMessageID))
 	}
 
 	unsummarizedMessages, hasMore, err := gcs.ChatMessageRepo.ListChatMessages(spanCtx, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, messageOptions...)

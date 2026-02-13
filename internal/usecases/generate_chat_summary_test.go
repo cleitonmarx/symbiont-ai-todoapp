@@ -48,15 +48,6 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 			},
 			expectedErr: domain.NewValidationErr("conversation id cannot be empty"),
 		},
-		"empty-model": {
-			model: "",
-			event: domain.ChatMessageEvent{
-				Type:           domain.EventType_CHAT_MESSAGE_SENT,
-				ConversationID: conversationID,
-				ChatMessageID:  chatMessageID,
-			},
-			expectedErr: domain.NewValidationErr("model cannot be empty"),
-		},
 		"get-summary-error": {
 			model: "summary-model",
 			event: domain.ChatMessageEvent{

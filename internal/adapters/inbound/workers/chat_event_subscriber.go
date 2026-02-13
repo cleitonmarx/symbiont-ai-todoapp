@@ -41,10 +41,10 @@ func (s ChatEventSubscriber) Run(ctx context.Context) error {
 	go func() {
 		err := s.Client.Subscriber(s.SubscriptionID).Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 			select {
-			case eventCh <- msg:
-				// Ack later, after batching.
 			case <-ctx.Done():
 				msg.Nack()
+			case eventCh <- msg:
+				// Ack later, after batching.
 			}
 		})
 
@@ -62,7 +62,7 @@ func (s ChatEventSubscriber) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			s.Logger.Println("ChatEventSubscriber: stopping...")
+			s.Logger.Println("ChatEventSubscriber: stopped")
 			return nil
 
 		case err := <-subscriberInitErrCh:
@@ -127,7 +127,7 @@ func (s ChatEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 	for _, conversationBatch := range conversations {
 		err := s.GenerateChatSummary.Execute(ctx, conversationBatch.LatestEvent)
 		if err != nil {
-			s.Logger.Printf("ChatEventSubscriber: summary generation failed: %v", err)
+			s.Logger.Printf("ChatEventSubscriber: %v", err)
 			for _, message := range conversationBatch.Messages {
 				message.Nack()
 			}

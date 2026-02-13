@@ -2,8 +2,6 @@
 
 AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx/symbiont), Go, React, PostgreSQL, and Pub/Sub.
 
-This repository is the standalone extraction of the former `examples/todoapp` project from the Symbiont monorepo, preserved with history.
-
 ## Features
 
 - 📝 **Todo Management**: Create, update, delete, filter, and sort todos with pagination
@@ -54,7 +52,7 @@ Tunable settings:
 
 Prerequisites:
 
-- Docker + Docker Compose
+- Docker + Docker Compose + Docker Model Runner
 - LLM endpoint compatible with this project (the provided compose file uses Docker Model Runner settings)
 
 Run everything:

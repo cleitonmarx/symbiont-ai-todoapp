@@ -20,7 +20,8 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 		page          int
 		pageSize      int
 		status        *gen.TodoStatus
-		query         *string
+		search        *string
+		searchType    *gen.SearchType
 		dateRange     *gen.DateRange
 		sortBy        *gen.TodoSortBy
 		setupUsecases func(*usecases.MockListTodos)
@@ -44,11 +45,12 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			},
 			expectError: false,
 		},
-		"success-with-query": {
-			status:   nil,
-			page:     1,
-			pageSize: 2,
-			query:    common.Ptr("groceries"),
+		"success-with-search-similarity": {
+			status:     nil,
+			page:       1,
+			pageSize:   2,
+			search:     common.Ptr("groceries"),
+			searchType: common.Ptr(gen.SearchTypeSimilarity),
 			setupUsecases: func(m *usecases.MockListTodos) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 2, mock.Anything).
@@ -57,8 +59,37 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 						for _, opt := range opts {
 							opt(&p)
 						}
-						assert.NotNil(t, p.Query)
-						assert.Equal(t, "groceries", *p.Query)
+						assert.NotNil(t, p.Search)
+						assert.Equal(t, "groceries", *p.Search)
+						assert.NotNil(t, p.SearchType)
+						assert.Equal(t, usecases.SearchType_SIMILARITY, *p.SearchType)
+					}).
+					Return([]domain.Todo{testTodo}, false, nil)
+			},
+			expected: &gen.TodoPage{
+				Items: []*gen.Todo{&testGenTodo},
+				Page:  1,
+			},
+			expectError: false,
+		},
+		"success-with-search-title": {
+			status:     nil,
+			page:       1,
+			pageSize:   2,
+			search:     common.Ptr("meeting"),
+			searchType: common.Ptr(gen.SearchTypeTitle),
+			setupUsecases: func(m *usecases.MockListTodos) {
+				m.EXPECT().
+					Query(mock.Anything, 1, 2, mock.Anything).
+					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
+						p := usecases.ListTodoParams{}
+						for _, opt := range opts {
+							opt(&p)
+						}
+						assert.NotNil(t, p.Search)
+						assert.Equal(t, "meeting", *p.Search)
+						assert.NotNil(t, p.SearchType)
+						assert.Equal(t, usecases.SearchType_TITLE, *p.SearchType)
 					}).
 					Return([]domain.Todo{testTodo}, false, nil)
 			},
@@ -141,7 +172,7 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			tt.setupUsecases(mockUC)
 			server := &TodoGraphQLServer{ListTodosUsecase: mockUC}
 
-			got, err := server.ListTodos(context.Background(), tt.page, tt.pageSize, tt.status, tt.query, tt.dateRange, tt.sortBy)
+			got, err := server.ListTodos(context.Background(), tt.page, tt.pageSize, tt.status, tt.search, tt.searchType, tt.dateRange, tt.sortBy)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {

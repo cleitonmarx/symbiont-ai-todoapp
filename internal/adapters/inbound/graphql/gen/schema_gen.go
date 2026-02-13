@@ -54,7 +54,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		ListTodos func(childComplexity int, page int, pageSize int, status *TodoStatus, query *string, dateRange *DateRange, sortBy *TodoSortBy) int
+		ListTodos func(childComplexity int, page int, pageSize int, status *TodoStatus, search *string, searchType *SearchType, dateRange *DateRange, sortBy *TodoSortBy) int
 	}
 
 	Todo struct {
@@ -79,7 +79,7 @@ type MutationResolver interface {
 	DeleteTodo(ctx context.Context, id uuid.UUID) (bool, error)
 }
 type QueryResolver interface {
-	ListTodos(ctx context.Context, page int, pageSize int, status *TodoStatus, query *string, dateRange *DateRange, sortBy *TodoSortBy) (*TodoPage, error)
+	ListTodos(ctx context.Context, page int, pageSize int, status *TodoStatus, search *string, searchType *SearchType, dateRange *DateRange, sortBy *TodoSortBy) (*TodoPage, error)
 }
 
 type executableSchema struct {
@@ -134,7 +134,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.ListTodos(childComplexity, args["page"].(int), args["pageSize"].(int), args["status"].(*TodoStatus), args["query"].(*string), args["dateRange"].(*DateRange), args["sortBy"].(*TodoSortBy)), true
+		return e.complexity.Query.ListTodos(childComplexity, args["page"].(int), args["pageSize"].(int), args["status"].(*TodoStatus), args["search"].(*string), args["searchType"].(*SearchType), args["dateRange"].(*DateRange), args["sortBy"].(*TodoSortBy)), true
 
 	case "Todo.created_at":
 		if e.complexity.Todo.CreatedAt == nil {
@@ -348,8 +348,13 @@ input DateRange {
   DueBefore: Date!
 }
 
+enum SearchType {
+  TITLE
+  SIMILARITY
+}
+
 type Query {
-  listTodos(page: Int! = 1, pageSize: Int! = 50, status: TodoStatus, query: String, dateRange: DateRange, sortBy: TodoSortBy): TodoPage!
+  listTodos(page: Int! = 1, pageSize: Int! = 50, status: TodoStatus, search: String, searchType: SearchType, dateRange: DateRange, sortBy: TodoSortBy): TodoPage!
 }
 
 type Mutation {
@@ -418,21 +423,26 @@ func (ec *executionContext) field_Query_listTodos_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["status"] = arg2
-	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "query", ec.unmarshalOString2ᚖstring)
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "search", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["query"] = arg3
-	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "dateRange", ec.unmarshalODateRange2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐDateRange)
+	args["search"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "searchType", ec.unmarshalOSearchType2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐSearchType)
 	if err != nil {
 		return nil, err
 	}
-	args["dateRange"] = arg4
-	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "sortBy", ec.unmarshalOTodoSortBy2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoSortBy)
+	args["searchType"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "dateRange", ec.unmarshalODateRange2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐDateRange)
 	if err != nil {
 		return nil, err
 	}
-	args["sortBy"] = arg5
+	args["dateRange"] = arg5
+	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "sortBy", ec.unmarshalOTodoSortBy2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoSortBy)
+	if err != nil {
+		return nil, err
+	}
+	args["sortBy"] = arg6
 	return args, nil
 }
 
@@ -592,7 +602,7 @@ func (ec *executionContext) _Query_listTodos(ctx context.Context, field graphql.
 		ec.fieldContext_Query_listTodos,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().ListTodos(ctx, fc.Args["page"].(int), fc.Args["pageSize"].(int), fc.Args["status"].(*TodoStatus), fc.Args["query"].(*string), fc.Args["dateRange"].(*DateRange), fc.Args["sortBy"].(*TodoSortBy))
+			return ec.resolvers.Query().ListTodos(ctx, fc.Args["page"].(int), fc.Args["pageSize"].(int), fc.Args["status"].(*TodoStatus), fc.Args["search"].(*string), fc.Args["searchType"].(*SearchType), fc.Args["dateRange"].(*DateRange), fc.Args["sortBy"].(*TodoSortBy))
 		},
 		nil,
 		ec.marshalNTodoPage2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐTodoPage,
@@ -3658,6 +3668,22 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	_ = ctx
 	res := graphql.MarshalInt(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOSearchType2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐSearchType(ctx context.Context, v any) (*SearchType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(SearchType)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOSearchType2ᚖgithubᚗcomᚋcleitonmarxᚋsymbiontᚑaiᚑtodoappᚋinternalᚋadaptersᚋinboundᚋgraphqlᚋgenᚐSearchType(ctx context.Context, sel ast.SelectionSet, v *SearchType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {

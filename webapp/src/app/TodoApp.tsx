@@ -36,6 +36,8 @@ const TodoApp = () => {
     refetch,
     searchQuery,
     setSearchQuery,
+    searchType,
+    setSearchType,
     sortBy,
     setSortBy,
     pageSize,
@@ -117,6 +119,8 @@ const TodoApp = () => {
             onPageSizeChange={setPageSize}
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
+            searchType={searchType}
+            onSearchTypeChange={setSearchType}
             dueAfter={dueAfter}
             onDueAfterChange={setDueAfter}
             dueBefore={dueBefore}

@@ -1,19 +1,61 @@
 import axios from 'axios';
-import { print } from 'graphql';
 import {
-  ListTodosDocument,
   ListTodosQuery,
-  ListTodosQueryVariables,
+  TodoSortBy,
   TodoStatus,
 } from '../types/graphql';
 
 const GRAPHQL_ENDPOINT = import.meta.env.VITE_GRAPHQL_ENDPOINT || 'http://localhost:8085/v1/query';
 
-export async function gqlListTodos(variables: ListTodosQueryVariables) {
+const LIST_TODOS_QUERY = `
+  query ListTodos(
+    $status: TodoStatus
+    $search: String
+    $searchType: SearchType
+    $page: Int!
+    $pageSize: Int!
+    $dateRange: DateRange
+    $sortBy: TodoSortBy
+  ) {
+    listTodos(
+      status: $status
+      search: $search
+      searchType: $searchType
+      page: $page
+      pageSize: $pageSize
+      dateRange: $dateRange
+      sortBy: $sortBy
+    ) {
+      items {
+        id
+        title
+        status
+        due_date
+        created_at
+        updated_at
+      }
+      page
+      nextPage
+      previousPage
+    }
+  }
+`;
+
+export interface GqlListTodosVariables {
+  status?: TodoStatus;
+  search?: string;
+  searchType?: 'TITLE' | 'SIMILARITY';
+  page: number;
+  pageSize: number;
+  dateRange?: { DueAfter: string; DueBefore: string };
+  sortBy?: TodoSortBy;
+}
+
+export async function gqlListTodos(variables: GqlListTodosVariables) {
   const response = await axios.post<{ data: ListTodosQuery }>(
     GRAPHQL_ENDPOINT,
     {
-      query: print(ListTodosDocument),
+      query: LIST_TODOS_QUERY,
       variables,
     }
   );

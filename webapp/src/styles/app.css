@@ -310,7 +310,7 @@
 .ui-controls {
   --ui-control-height: 2.5rem;
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 210px) minmax(0, 112px) minmax(300px, 1fr) minmax(108px, 128px);
+  grid-template-columns: minmax(180px, 220px) minmax(180px, 220px) minmax(76px, 88px) minmax(220px, 1fr) minmax(112px, 122px) minmax(108px, 128px);
   gap: 0.85rem;
   align-items: end;
   padding: 0.85rem;
@@ -325,6 +325,7 @@
 
 .ui-controls-size {
   min-width: 0;
+  max-width: 88px;
 }
 
 .ui-controls-group {
@@ -335,6 +336,11 @@
 
 .ui-controls-search {
   min-width: 0;
+}
+
+.ui-controls-search-type {
+  min-width: 0;
+  max-width: 122px;
 }
 
 .ui-controls-advanced-toggle-group {
@@ -374,6 +380,8 @@
 
 .ui-controls .ui-segmented {
   display: inline-flex;
+  width: fit-content;
+  justify-self: start;
 }
 
 .ui-controls .ui-segmented-item {
@@ -1428,6 +1436,18 @@
   min-width: 220px;
 }
 
+.ui-app .ui-batch-filter-bar .ui-batch-search-type-group {
+  flex: 0 1 122px;
+  min-width: 110px;
+  max-width: 122px;
+}
+
+.ui-app .ui-batch-filter-bar .ui-batch-page-size-group {
+  flex: 0 1 70px;
+  min-width: 70px;
+  max-width: 70px;
+}
+
 .ui-app .ui-batch-content {
   padding: 0.75rem 1rem !important;
   flex: 1 1 auto;
@@ -1929,6 +1949,12 @@
   .ui-app .ui-batch-filter-bar .filter-group {
     min-width: 0;
     flex: 1 1 140px;
+  }
+
+  .ui-app .ui-batch-filter-bar .ui-batch-page-size-group {
+    flex: 0 1 70px;
+    min-width: 70px;
+    max-width: 70px;
   }
 
   .ui-app .ui-batch-content .batch-modal-grid table {

@@ -16,9 +16,9 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// CompletedSummaryChannel is a channel type for sending processed domain.BoardSummary items.
+// CompletedBoardSummaryChannel is a channel type for sending processed domain.BoardSummary items.
 // It is used in integration tests to verify summary generation.
-type CompletedSummaryChannel chan domain.BoardSummary
+type CompletedBoardSummaryChannel chan domain.BoardSummary
 
 // GenerateBoardSummary is the use case interface for generating a summary of the todo board.
 type GenerateBoardSummary interface {
@@ -31,7 +31,7 @@ type GenerateBoardSummaryImpl struct {
 	timeProvider       domain.CurrentTimeProvider
 	llmClient          domain.LLMClient
 	model              string
-	completedSummaryCh CompletedSummaryChannel
+	completedSummaryCh CompletedBoardSummaryChannel
 }
 
 // NewGenerateBoardSummaryImpl creates a new instance of GenerateBoardSummaryImpl.
@@ -40,7 +40,7 @@ func NewGenerateBoardSummaryImpl(
 	tp domain.CurrentTimeProvider,
 	c domain.LLMClient,
 	m string,
-	q CompletedSummaryChannel,
+	q CompletedBoardSummaryChannel,
 
 ) GenerateBoardSummaryImpl {
 	return GenerateBoardSummaryImpl{
@@ -255,7 +255,7 @@ type InitGenerateBoardSummary struct {
 
 // Initialize registers the GenerateBoardSummary use case implementation.
 func (igbs InitGenerateBoardSummary) Initialize(ctx context.Context) (context.Context, error) {
-	queue, _ := depend.Resolve[CompletedSummaryChannel]()
+	queue, _ := depend.Resolve[CompletedBoardSummaryChannel]()
 	depend.Register[GenerateBoardSummary](NewGenerateBoardSummaryImpl(
 		igbs.SummaryRepo, igbs.TimeProvider, igbs.LLMClient, igbs.Model, queue,
 	))

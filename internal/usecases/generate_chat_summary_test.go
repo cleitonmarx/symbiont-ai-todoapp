@@ -448,6 +448,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				timeProvider,
 				llmClient,
 				tt.model,
+				nil,
 			)
 
 			gotErr := uc.Execute(context.Background(), tt.event)

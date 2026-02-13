@@ -59,10 +59,11 @@ type LLMChatRequest struct {
 	Messages []LLMChatMessage
 	Stream   bool
 	// Optional parameters
-	Temperature *float64
-	TopP        *float64
-	MaxTokens   *int
-	Tools       []LLMToolDefinition
+	Temperature      *float64
+	TopP             *float64
+	MaxTokens        *int
+	FrequencyPenalty *float64
+	Tools            []LLMToolDefinition
 }
 
 // LLMToolDefinition represents a tool that can be used by the LLM

@@ -24,9 +24,15 @@ const (
 	// Minimum persisted tokens from unsummarized messages that triggers summary generation.
 	CHAT_SUMMARY_TRIGGER_TOKENS = 2000
 
+	// Maximum output tokens for the summary model response.
+	CHAT_SUMMARY_MAX_TOKENS = 1024
+
 	// Keep chat summary generation stable and focused on state updates.
 	CHAT_SUMMARY_TEMPERATURE = 0.2
 	CHAT_SUMMARY_TOP_P       = 0.7
+
+	// Frequency penalty to reduce repetition in summaries, especially for longer conversations.
+	CHAT_SUMMARY_FREQUENCY_PENALTY = 0.7
 )
 
 // CompletedConversationSummaryChannel is a channel type for sending processed domain.ConversationSummary items.
@@ -129,17 +135,23 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	}
 
 	resp, err := gcs.llmClient.Chat(spanCtx, domain.LLMChatRequest{
-		Model:       gcs.model,
-		Messages:    promptMessages,
-		Stream:      false,
-		Temperature: common.Ptr(CHAT_SUMMARY_TEMPERATURE),
-		TopP:        common.Ptr(CHAT_SUMMARY_TOP_P),
+		Model:            gcs.model,
+		Messages:         promptMessages,
+		Stream:           false,
+		MaxTokens:        common.Ptr(CHAT_SUMMARY_MAX_TOKENS),
+		Temperature:      common.Ptr(CHAT_SUMMARY_TEMPERATURE),
+		TopP:             common.Ptr(CHAT_SUMMARY_TOP_P),
+		FrequencyPenalty: common.Ptr(CHAT_SUMMARY_FREQUENCY_PENALTY),
 	})
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to generate chat summary: %w", err)
 	}
 
 	RecordLLMTokensUsed(spanCtx, resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
+	summaryContent := strings.TrimSpace(resp.Content)
+	if summaryContent == "" {
+		return nil
+	}
 
 	summaryID := uuid.New()
 	if found {
@@ -151,7 +163,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	newSummary := domain.ConversationSummary{
 		ID:                      summaryID,
 		ConversationID:          event.ConversationID,
-		CurrentStateSummary:     strings.TrimSpace(resp.Content),
+		CurrentStateSummary:     summaryContent,
 		LastSummarizedMessageID: &lastMessage.ID,
 		UpdatedAt:               gcs.timeProvider.Now().UTC(),
 	}

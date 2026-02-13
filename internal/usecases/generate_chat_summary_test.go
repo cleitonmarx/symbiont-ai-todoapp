@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/google/uuid"
@@ -190,7 +191,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 
 				messages := make([]domain.ChatMessage, 0, CHAT_SUMMARY_TRIGGER_MESSAGES)
 				lastMessageID := uuid.Nil
-				for idx := 0; idx < CHAT_SUMMARY_TRIGGER_MESSAGES; idx++ {
+				for idx := range CHAT_SUMMARY_TRIGGER_MESSAGES {
 					lastMessageID = uuid.New()
 					role := domain.ChatRole_User
 					if idx%2 == 1 {
@@ -221,7 +222,9 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 
 				llmClient.EXPECT().
 					Chat(mock.Anything, mock.MatchedBy(func(req domain.LLMChatRequest) bool {
-						return req.Model == "summary-model" && len(req.Messages) > 0 && !req.Stream
+						return assert.Equal(t, "summary-model", req.Model) &&
+							assert.Equal(t, common.Ptr(CHAT_SUMMARY_MAX_TOKENS), req.MaxTokens) &&
+							assert.Equal(t, common.Ptr(CHAT_SUMMARY_FREQUENCY_PENALTY), req.FrequencyPenalty)
 					})).
 					Return(domain.LLMChatResponse{
 						Content: "Current State:\n- User asked to organize tasks.",
@@ -347,6 +350,49 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				summaryRepo.EXPECT().
 					StoreConversationSummary(mock.Anything, mock.Anything).
 					Return(nil).
+					Once()
+			},
+			expectedErr: nil,
+		},
+		"empty-llm-content-noop": {
+			model: "summary-model",
+			event: domain.ChatMessageEvent{
+				Type:           domain.EventType_CHAT_MESSAGE_SENT,
+				ConversationID: conversationID,
+				ChatMessageID:  chatMessageID,
+			},
+			setExpectations: func(
+				t *testing.T,
+				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
+				timeProvider *domain.MockCurrentTimeProvider,
+				llmClient *domain.MockLLMClient,
+			) {
+				summaryRepo.EXPECT().
+					GetConversationSummary(mock.Anything, conversationID).
+					Return(domain.ConversationSummary{}, false, nil).
+					Once()
+				chatRepo.EXPECT().
+					ListChatMessages(mock.Anything, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
+					Return([]domain.ChatMessage{
+						{
+							ID:             chatMessageID,
+							ConversationID: conversationID,
+							ChatRole:       domain.ChatRole_Assistant,
+							Content:        "hello",
+							MessageState:   domain.ChatMessageState_Completed,
+						},
+					}, true, nil).
+					Once()
+				llmClient.EXPECT().
+					Chat(mock.Anything, mock.Anything).
+					Return(domain.LLMChatResponse{
+						Content: "",
+						Usage: domain.LLMUsage{
+							PromptTokens:     120,
+							CompletionTokens: 512,
+						},
+					}, nil).
 					Once()
 			},
 			expectedErr: nil,

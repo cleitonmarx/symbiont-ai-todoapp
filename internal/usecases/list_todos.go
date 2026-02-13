@@ -9,13 +9,24 @@ import (
 	"github.com/cleitonmarx/symbiont/depend"
 )
 
+// SearchType defines the type of search to perform when listing todos.
+type SearchType string
+
+const (
+	// SearchType_TITLE performs a case-insensitive substring match on todo titles.
+	SearchType_TITLE SearchType = "TITLE"
+	// SearchType_SIMILARITY uses vector similarity search based on the todo embeddings.
+	SearchType_SIMILARITY SearchType = "SIMILARITY"
+)
+
 // ListTodoParams holds the parameters for listing todos.
 type ListTodoParams struct {
-	Status    *domain.TodoStatus
-	Query     *string
-	DueAfter  *time.Time
-	DueBefore *time.Time
-	SortBy    *string
+	Status     *domain.TodoStatus
+	Search     *string
+	SearchType *SearchType
+	DueAfter   *time.Time
+	DueBefore  *time.Time
+	SortBy     *string
 }
 
 // ListTodoOptions defines a function type for specifying options when listing todos.
@@ -31,7 +42,14 @@ func WithStatus(status domain.TodoStatus) ListTodoOptions {
 // WithSearchQuery creates a ListTodoOptions to filter todos by a search query.
 func WithSearchQuery(query string) ListTodoOptions {
 	return func(params *ListTodoParams) {
-		params.Query = &query
+		params.Search = &query
+	}
+}
+
+// WithSearchType creates a ListTodoOptions to specify the type of search (e.g., title, similarity).
+func WithSearchType(searchType SearchType) ListTodoOptions {
+	return func(params *ListTodoParams) {
+		params.SearchType = &searchType
 	}
 }
 
@@ -85,19 +103,29 @@ func (lti ListTodosImpl) Query(ctx context.Context, page int, pageSize int, opts
 	if params.Status != nil {
 		queryOpts = append(queryOpts, domain.WithStatus(*params.Status))
 	}
-	if params.Query != nil {
-		resp, err := lti.llmClient.Embed(spanCtx, lti.llmEmbeddingModel, *params.Query)
-		if telemetry.RecordErrorAndStatus(span, err) {
-			return nil, false, err
+
+	if params.Search != nil {
+		switch {
+		case params.SearchType != nil && *params.SearchType == SearchType_SIMILARITY:
+			// Perform embedding-based similarity search
+			resp, err := lti.llmClient.Embed(spanCtx, lti.llmEmbeddingModel, *params.Search)
+			if telemetry.RecordErrorAndStatus(span, err) {
+				return nil, false, err
+			}
+			RecordLLMTokensEmbedding(spanCtx, resp.TotalTokens)
+
+			queryOpts = append(queryOpts, domain.WithEmbedding(resp.Embedding))
+		case params.SearchType != nil && *params.SearchType == SearchType_TITLE:
+			queryOpts = append(queryOpts, domain.WithTitleContains(*params.Search))
+		default:
+			return nil, false, domain.NewValidationErr("invalid search type")
 		}
-
-		RecordLLMTokensEmbedding(spanCtx, resp.TotalTokens)
-
-		queryOpts = append(queryOpts, domain.WithEmbedding(resp.Embedding))
 	}
+
 	if params.DueAfter != nil && params.DueBefore != nil {
 		queryOpts = append(queryOpts, domain.WithDueDateRange(*params.DueAfter, *params.DueBefore))
 	}
+
 	if params.SortBy != nil {
 		queryOpts = append(queryOpts, domain.WithSortBy(*params.SortBy))
 	}

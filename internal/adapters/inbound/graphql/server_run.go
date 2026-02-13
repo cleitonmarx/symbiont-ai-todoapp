@@ -17,6 +17,7 @@ import (
 	"github.com/rs/cors"
 )
 
+// TodoGraphQLServer is the GraphQL Server for the TodoApp application.
 type TodoGraphQLServer struct {
 	Logger            *log.Logger         `resolve:""`
 	ListTodosUsecase  usecases.ListTodos  `resolve:""`
@@ -25,6 +26,7 @@ type TodoGraphQLServer struct {
 	Port              int                 `config:"GRAPHQL_SERVER_PORT" default:"8085"`
 }
 
+// Run starts the GraphQL server for the TodoApp application.
 func (s *TodoGraphQLServer) Run(ctx context.Context) error {
 	mux := http.NewServeMux()
 
@@ -56,10 +58,15 @@ func (s *TodoGraphQLServer) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		s.Logger.Print("TodoGraphQLServer: Shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		return svr.Shutdown(shutdownCtx)
+		err := svr.Shutdown(shutdownCtx)
+		if err != nil {
+			s.Logger.Printf("TodoGraphQLServer: error during shutdown: %v", err)
+		} else {
+			s.Logger.Println("TodoGraphQLServer: stopped")
+		}
+		return err
 	case err := <-errCh:
 		return err
 	}

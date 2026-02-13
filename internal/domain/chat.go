@@ -50,6 +50,13 @@ type ChatMessage struct {
 	UpdatedAt        time.Time
 }
 
+// IsToolCall returns true if the chat message is a tool call, based on its role.
+func (m ChatMessage) IsToolCallSuccess() bool {
+	return m.ChatRole == ChatRole_Tool &&
+		m.ToolCallID != nil &&
+		m.MessageState == ChatMessageState_Completed
+}
+
 // ListChatMessagesOptions defines optional filters for listing chat messages.
 type ListChatMessagesOptions struct {
 	ConversationID string

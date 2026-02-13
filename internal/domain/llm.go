@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -42,6 +43,14 @@ type LLMChatMessage struct {
 	Content    string
 	ToolCallID *string
 	ToolCalls  []LLMStreamEventToolCall
+}
+
+// IsToolCallSuccess returns true if the chat message is a tool call
+// and indicates success based on its content.
+func (m LLMChatMessage) IsToolCallSuccess() bool {
+	return m.Role == ChatRole_Tool &&
+		m.ToolCallID != nil &&
+		!strings.Contains(m.Content, "error")
 }
 
 // LLMChatRequest represents a request to the LLM API

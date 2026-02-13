@@ -98,7 +98,7 @@ func (lft TodoFetcherTool) Definition() domain.LLMToolDefinition {
 		Type: "function",
 		Function: domain.LLMToolFunction{
 			Name:        "fetch_todos",
-			Description: "List existing todos with explicit pagination. Always pass page and page_size, start with page=1, and use returned next_page to keep fetching when full coverage is needed. Send a strict JSON object using only: page, page_size, status, search_term, sort_by, due_after, due_before. page and page_size must be positive integers. status must be OPEN or DONE. sort_by must be one of: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc (use similarity sort only with search_term). due_after and due_before must be provided together in YYYY-MM-DD format. Avoid repeated identical calls. Valid: {\"page\":1,\"page_size\":10,\"status\":\"OPEN\"}. Invalid: {\"page\":\"1\",\"note\":\"x\"}.",
+			Description: "List existing todos with explicit pagination. Always pass page and page_size, start with page=1, and use returned next_page to keep fetching when full coverage is needed. Send a strict JSON object using only: page, page_size, status, search_term, sort_by, due_after, due_before. page and page_size must be positive integers. status must be OPEN or DONE. search_term is optional and should be used for semantic search. sort_by must be one of: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc (use similarity sort only with search_term). due_after and due_before must be provided together in YYYY-MM-DD format. Avoid repeated identical calls. Valid: {\"page\":1,\"page_size\":10}. Invalid: {\"page\":\"1\",\"note\":\"x\"}.",
 			Parameters: domain.LLMToolFunctionParameters{
 				Type: "object",
 				Properties: map[string]domain.LLMToolFunctionParameterDetail{
@@ -119,8 +119,8 @@ func (lft TodoFetcherTool) Definition() domain.LLMToolDefinition {
 					},
 					"search_term": {
 						Type:        "string",
-						Description: "search text used to find similar todos (e.g., dentist, groceries).",
-						Required:    true,
+						Description: "Optional semantic search text used to find similar todos (e.g., dentist, groceries).",
+						Required:    false,
 					},
 					"sort_by": {
 						Type:        "string",
@@ -149,7 +149,7 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 		Page       int     `json:"page"`
 		PageSize   int     `json:"page_size"`
 		Status     *string `json:"status"`
-		SearchTerm string  `json:"search_term"`
+		SearchTerm *string `json:"search_term"`
 		SortBy     *string `json:"sort_by"`
 		DueAfter   *string `json:"due_after"`
 		DueBefore  *string `json:"due_before"`
@@ -158,7 +158,7 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 		PageSize: 10, // default page size
 	}
 
-	exampleArgs := `{"page":1,"page_size":50,"status":"OPEN", "search_term":"dentist appointments", "sort_by":"dueDateAsc", "due_after":"2026-04-01", "due_before":"2026-04-30"}`
+	exampleArgs := `{"page":1,"page_size":50,"status":"OPEN","sort_by":"dueDateAsc"}`
 
 	err := unmarshalToolArguments(call.Arguments, &params)
 	if err != nil {
@@ -170,22 +170,36 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 
 	opts := []domain.ListTodoOptions{}
 
-	if params.SearchTerm == "" {
+	if (params.DueAfter == nil) != (params.DueBefore == nil) {
 		return domain.LLMChatMessage{
 			Role:    domain.ChatRole_Tool,
-			Content: fmt.Sprintf(`{"error":"missing_search_term","details":"search_term is required and cannot be empty.", "example":%s}`, exampleArgs),
+			Content: `{"error":"invalid_due_range","details":"due_after and due_before must be provided together."}`,
 		}
 	}
 
-	resp, err := lft.llmCli.Embed(ctx, lft.llmEmbeddingModel, params.SearchTerm)
-	if err != nil {
+	searchTerm := ""
+	if params.SearchTerm != nil {
+		searchTerm = strings.TrimSpace(*params.SearchTerm)
+	}
+
+	if params.SortBy != nil && strings.HasPrefix(strings.ToLower(*params.SortBy), "similarity") && searchTerm == "" {
 		return domain.LLMChatMessage{
 			Role:    domain.ChatRole_Tool,
-			Content: fmt.Sprintf(`{"error":"embedding_error","details":"%s"}`, err.Error()),
+			Content: `{"error":"missing_search_term_for_similarity_sort","details":"search_term is required when using similarity sorting."}`,
 		}
 	}
-	RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
-	opts = append(opts, domain.WithEmbedding(resp.Embedding))
+
+	if searchTerm != "" {
+		resp, err := lft.llmCli.Embed(ctx, lft.llmEmbeddingModel, searchTerm)
+		if err != nil {
+			return domain.LLMChatMessage{
+				Role:    domain.ChatRole_Tool,
+				Content: fmt.Sprintf(`{"error":"embedding_error","details":"%s"}`, err.Error()),
+			}
+		}
+		RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
+		opts = append(opts, domain.WithEmbedding(resp.Embedding))
+	}
 
 	if params.Status != nil {
 		opts = append(opts, domain.WithStatus(domain.TodoStatus(*params.Status)))
@@ -193,7 +207,7 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 	if params.SortBy != nil {
 		opts = append(opts, domain.WithSortBy(*params.SortBy))
 	}
-	if params.DueAfter != nil && params.DueBefore != nil {
+	if params.DueAfter != nil {
 		now := lft.timeProvider.Now()
 		dueAfter, ok := domain.ExtractTimeFromText(*params.DueAfter, now, now.Location())
 		if !ok {
@@ -222,10 +236,7 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 	}
 
 	if len(todos) == 0 {
-		return domain.LLMChatMessage{
-			Role:    domain.ChatRole_Tool,
-			Content: `{"error":"no_todos_found","details":"No todos matched your search."}`,
-		}
+		todos = []domain.Todo{}
 	}
 
 	type result struct {
@@ -296,7 +307,7 @@ func (tct TodoCreatorTool) Definition() domain.LLMToolDefinition {
 		Type: "function",
 		Function: domain.LLMToolFunction{
 			Name:        "create_todo",
-			Description: "Create exactly one todo. Required keys: title (string) and due_date (YYYY-MM-DD). No extra keys. Valid: {\"title\":\"Pay rent\",\"due_date\":\"2026-04-30\"}. Invalid: {\"title\":\"Pay rent\",\"due\":\"tomorrow\",\"priority\":\"high\"}.",
+			Description: "Create exactly one todo. Required keys: title (string) and due_date (YYYY-MM-DD). No extra keys. For batch creation requests, call this tool once per task until all tasks are saved. Valid: {\"title\":\"Pay rent\",\"due_date\":\"2026-04-30\"}. Invalid: {\"title\":\"Pay rent\",\"due\":\"tomorrow\",\"priority\":\"high\"}.",
 			Parameters: domain.LLMToolFunctionParameters{
 				Type: "object",
 				Properties: map[string]domain.LLMToolFunctionParameterDetail{

@@ -218,6 +218,30 @@ func TestTodoFetcherTool(t *testing.T) {
 				assert.NotNil(t, output["todos"])
 			},
 		},
+		"fetch-todos-success-without-search-term": {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				todoRepo.EXPECT().
+					ListTodos(
+						mock.Anything,
+						1,
+						10,
+						mock.Anything,
+					).
+					Return([]domain.Todo{testTodo}, false, nil).
+					Once()
+			},
+			functionCall: domain.LLMStreamEventToolCall{
+				Function:  "fetch_todos",
+				Arguments: `{"page": 1, "page_size": 10}`,
+			},
+			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				var output map[string]any
+				err := json.Unmarshal([]byte(resp.Content), &output)
+				require.NoError(t, err)
+				assert.NotNil(t, output["todos"])
+			},
+		},
 		"fetch-todos-with-status-and-search": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				llmCli.EXPECT().
@@ -288,7 +312,9 @@ func TestTodoFetcherTool(t *testing.T) {
 				var output map[string]any
 				err := json.Unmarshal([]byte(resp.Content), &output)
 				require.NoError(t, err)
-				assert.Nil(t, output["todos"])
+				todos, ok := output["todos"].([]any)
+				require.True(t, ok)
+				assert.Len(t, todos, 0)
 			},
 		},
 		"fetch-todos-with-due-date-filters": {
@@ -390,6 +416,30 @@ func TestTodoFetcherTool(t *testing.T) {
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
+		"fetch-todos-invalid-partial-due-range": {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+			},
+			functionCall: domain.LLMStreamEventToolCall{
+				Function:  "fetch_todos",
+				Arguments: `{"page": 1, "page_size": 10, "due_after": "2026-01-20"}`,
+			},
+			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Contains(t, resp.Content, "invalid_due_range")
+			},
+		},
+		"fetch-todos-similarity-sort-without-search-term": {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+			},
+			functionCall: domain.LLMStreamEventToolCall{
+				Function:  "fetch_todos",
+				Arguments: `{"page": 1, "page_size": 10, "sort_by": "similarityAsc"}`,
+			},
+			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Contains(t, resp.Content, "missing_search_term_for_similarity_sort")
+			},
+		},
 		"fetch-todos-embedding-error": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				llmCli.EXPECT().
@@ -469,7 +519,12 @@ func TestTodoFetcherTool(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "no_todos_found")
+				var output map[string]any
+				err := json.Unmarshal([]byte(resp.Content), &output)
+				require.NoError(t, err)
+				todos, ok := output["todos"].([]any)
+				require.True(t, ok)
+				assert.Len(t, todos, 0)
 			},
 		},
 	}

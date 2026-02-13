@@ -17,14 +17,7 @@ import (
 
 var _ gen.ServerInterface = (*TodoAppServer)(nil)
 
-// TodoAppServer is the HTTP server adapter for the TodoApp application.
-//
-// It implements the OpenAPI-generated ServerInterface and serves both the REST API
-// endpoints and the embedded web application static files. The server is instrumented
-// with OpenTelemetry for distributed tracing and configured via environment variables
-// or configuration providers through the symbiont framework.
-//
-// Dependencies are automatically resolved and injected at initialization time.
+// TodoAppServer is the REST API and UI HTTP server for the TodoApp application.
 type TodoAppServer struct {
 	Port                      int                             `config:"HTTP_PORT" default:"8080"`
 	Logger                    *log.Logger                     `resolve:""`

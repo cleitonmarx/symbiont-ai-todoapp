@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 
@@ -32,10 +33,10 @@ func (s TodoEventSubscriber) Run(ctx context.Context) error {
 	go func() {
 		err := s.Client.Subscriber(s.SubscriptionID).Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 			select {
-			case <-ctx.Done():
-				msg.Nack()
 			case eventCh <- msg:
 				// Ack later, after batching
+			case <-ctx.Done():
+				msg.Nack()
 			}
 		})
 
@@ -84,7 +85,9 @@ func (s TodoEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 
 	// Generate board-level summary once per batch
 	if err := s.GenerateBoardSummary.Execute(ctx); err != nil {
-		s.Logger.Printf("TodoEventSubscriber: %v", err)
+		if !errors.Is(err, context.Canceled) {
+			s.Logger.Printf("TodoEventSubscriber: %v", err)
+		}
 		return
 	}
 

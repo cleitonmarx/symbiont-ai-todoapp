@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"time"
 
@@ -41,10 +42,10 @@ func (s ChatEventSubscriber) Run(ctx context.Context) error {
 	go func() {
 		err := s.Client.Subscriber(s.SubscriptionID).Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 			select {
-			case <-ctx.Done():
-				msg.Nack()
 			case eventCh <- msg:
 				// Ack later, after batching.
+			case <-ctx.Done():
+				msg.Nack()
 			}
 		})
 
@@ -127,9 +128,11 @@ func (s ChatEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 	for _, conversationBatch := range conversations {
 		err := s.GenerateChatSummary.Execute(ctx, conversationBatch.LatestEvent)
 		if err != nil {
-			s.Logger.Printf("ChatEventSubscriber: %v", err)
 			for _, message := range conversationBatch.Messages {
 				message.Nack()
+			}
+			if !errors.Is(err, context.Canceled) {
+				s.Logger.Printf("ChatEventSubscriber: %v", err)
 			}
 			continue
 		}

@@ -32,10 +32,10 @@ func (s TodoEventSubscriber) Run(ctx context.Context) error {
 	go func() {
 		err := s.Client.Subscriber(s.SubscriptionID).Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 			select {
-			case eventCh <- msg:
-				// Ack later, after batching
 			case <-ctx.Done():
 				msg.Nack()
+			case eventCh <- msg:
+				// Ack later, after batching
 			}
 		})
 
@@ -53,7 +53,7 @@ func (s TodoEventSubscriber) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			s.Logger.Println("TodoEventSubscriber: stopping...")
+			s.Logger.Println("TodoEventSubscriber: stopped")
 			return nil
 
 		case err := <-subscriberInitErrCh:
@@ -84,7 +84,7 @@ func (s TodoEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 
 	// Generate board-level summary once per batch
 	if err := s.GenerateBoardSummary.Execute(ctx); err != nil {
-		s.Logger.Printf("AI summary generation failed: %v", err)
+		s.Logger.Printf("TodoEventSubscriber: %v", err)
 		return
 	}
 

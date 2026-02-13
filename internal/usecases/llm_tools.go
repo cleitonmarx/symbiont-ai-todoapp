@@ -99,7 +99,7 @@ func (lft TodoFetcherTool) Definition() domain.LLMToolDefinition {
 		Type: "function",
 		Function: domain.LLMToolFunction{
 			Name:        "fetch_todos",
-			Description: "List existing todos with explicit pagination. Always pass page and page_size, start with page=1, and use returned next_page to keep fetching when full coverage is needed. Send a strict JSON object using only: page, page_size, status, search_term, sort_by, due_after, due_before. page and page_size must be positive integers. status must be OPEN or DONE. search_term is optional and should be used for semantic search. sort_by must be one of: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc (use similarity sort only with search_term). due_after and due_before must be provided together in YYYY-MM-DD format. Avoid repeated identical calls. Valid: {\"page\":1,\"page_size\":10}. Invalid: {\"page\":\"1\",\"note\":\"x\"}.",
+			Description: "List existing todos with explicit pagination. Always pass page and page_size, start with page=1, and use returned next_page to keep fetching when full coverage is needed. Send a strict JSON object using only: page, page_size, status, search_by_similarity, search_by_title, sort_by, due_after, due_before. page and page_size must be positive integers. status must be OPEN or DONE. search_by_similarity is optional and should be used for semantic search. sort_by must be one of: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc (use similarity sort only with search_by_similarity). due_after and due_before must be provided together in YYYY-MM-DD format. Avoid repeated identical calls. Valid: {\"page\":1,\"page_size\":10}. Invalid: {\"page\":\"1\",\"note\":\"x\"}.",
 			Parameters: domain.LLMToolFunctionParameters{
 				Type: "object",
 				Properties: map[string]domain.LLMToolFunctionParameterDetail{
@@ -118,14 +118,19 @@ func (lft TodoFetcherTool) Definition() domain.LLMToolDefinition {
 						Description: "Optional status filter. Allowed values: OPEN or DONE.",
 						Required:    false,
 					},
-					"search_term": {
+					"search_by_similarity": {
 						Type:        "string",
-						Description: "Optional semantic search text used to find similar todos (e.g., dentist, groceries).",
+						Description: "Optional semantic search text used to find similar todos (e.g., dentist, groceries). Generally should be used together with similarityAsc.",
+						Required:    false,
+					},
+					"search_by_title": {
+						Type:        "string",
+						Description: "Optional text filter to find todos whose title contains the specified substring (case-insensitive).",
 						Required:    false,
 					},
 					"sort_by": {
 						Type:        "string",
-						Description: "Optional sort. Allowed: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc. Use similarity sort only with search_term. similarityAsc returns most similar first.",
+						Description: "Optional sort. Allowed: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc. Use similarity sort only with search_by_similarity. similarityAsc returns most similar first.",
 						Required:    false,
 					},
 					"due_after": {
@@ -147,13 +152,14 @@ func (lft TodoFetcherTool) Definition() domain.LLMToolDefinition {
 // Call executes the TodoFetcherTool with the provided function call.
 func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventToolCall, _ []domain.LLMChatMessage) domain.LLMChatMessage {
 	params := struct {
-		Page       int     `json:"page"`
-		PageSize   int     `json:"page_size"`
-		Status     *string `json:"status"`
-		SearchTerm *string `json:"search_term"`
-		SortBy     *string `json:"sort_by"`
-		DueAfter   *string `json:"due_after"`
-		DueBefore  *string `json:"due_before"`
+		Page               int     `json:"page"`
+		PageSize           int     `json:"page_size"`
+		Status             *string `json:"status"`
+		SearchBySimilarity *string `json:"search_by_similarity"`
+		SearchByTitle      *string `json:"search_by_title"`
+		SortBy             *string `json:"sort_by"`
+		DueAfter           *string `json:"due_after"`
+		DueBefore          *string `json:"due_before"`
 	}{
 		Page:     1,  // default page
 		PageSize: 10, // default page size
@@ -180,21 +186,21 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 		}
 	}
 
-	searchTerm := ""
-	if params.SearchTerm != nil {
-		searchTerm = strings.TrimSpace(*params.SearchTerm)
+	searchBySimilarity := ""
+	if params.SearchBySimilarity != nil {
+		searchBySimilarity = strings.TrimSpace(*params.SearchBySimilarity)
 	}
 
-	if params.SortBy != nil && strings.HasPrefix(strings.ToLower(*params.SortBy), "similarity") && searchTerm == "" {
+	if params.SortBy != nil && strings.HasPrefix(strings.ToLower(*params.SortBy), "similarity") && searchBySimilarity == "" {
 		return domain.LLMChatMessage{
 			Role:       domain.ChatRole_Tool,
 			ToolCallID: &call.ID,
-			Content:    `{"error":"missing_search_term_for_similarity_sort","details":"search_term is required when using similarity sorting."}`,
+			Content:    `{"error":"missing_search_by_similarity_for_similarity_sort","details":"search_by_similarity is required when using similarity sorting."}`,
 		}
 	}
 
-	if searchTerm != "" {
-		resp, err := lft.llmCli.Embed(ctx, lft.llmEmbeddingModel, searchTerm)
+	if searchBySimilarity != "" {
+		resp, err := lft.llmCli.Embed(ctx, lft.llmEmbeddingModel, searchBySimilarity)
 		if err != nil {
 			return domain.LLMChatMessage{
 				Role:       domain.ChatRole_Tool,
@@ -204,6 +210,10 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 		}
 		RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
 		opts = append(opts, domain.WithEmbedding(resp.Embedding))
+	}
+
+	if params.SearchByTitle != nil {
+		opts = append(opts, domain.WithTitleContains(*params.SearchByTitle))
 	}
 
 	if params.Status != nil {

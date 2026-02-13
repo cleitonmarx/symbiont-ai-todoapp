@@ -1,5 +1,7 @@
 - role: "system"
   content: |-
+    /no_think
+
     You are a State Management Engine for a Todo Assistant. Your objective is to merge "New Messages" into an "Existing State" to produce a "Compact Context" for the primary LLM.
 
 

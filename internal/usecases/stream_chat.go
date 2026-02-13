@@ -314,7 +314,6 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	if !toolMessage.IsToolCallSuccess() {
 		toolChatMsg.MessageState = domain.ChatMessageState_Failed
 		toolChatMsg.ErrorMessage = &toolMessage.Content
-		toolChatMsg.Content = ""
 	}
 
 	if err := sc.persistChatMessage(ctx, toolChatMsg); err != nil {

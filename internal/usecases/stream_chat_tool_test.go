@@ -210,6 +210,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 						Role:          domain.ChatRole_Tool,
 						MessageState:  domain.ChatMessageState_Failed,
 						ErrorMessage:  &toolErr,
+						Content:       toolErr,
 						ToolCallsLen:  0,
 						HasToolCallID: true,
 					},

@@ -41,8 +41,13 @@ input DateRange {
   DueBefore: Date!
 }
 
+enum SearchType {
+  TITLE
+  SIMILARITY
+}
+
 type Query {
-  listTodos(page: Int! = 1, pageSize: Int! = 50, status: TodoStatus, query: String, dateRange: DateRange, sortBy: TodoSortBy): TodoPage!
+  listTodos(page: Int! = 1, pageSize: Int! = 50, status: TodoStatus, search: String, searchType: SearchType, dateRange: DateRange, sortBy: TodoSortBy): TodoPage!
 }
 
 type Mutation {

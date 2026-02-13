@@ -112,6 +112,10 @@ func TestListTodoOptions_WithOptions(t *testing.T) {
 			opts: []ListTodoOptions{WithEmbedding([]float64{0.1, 0.2, 0.3})},
 			want: ListTodosParams{Embedding: []float64{0.1, 0.2, 0.3}},
 		},
+		"with-title-contains-only": {
+			opts: []ListTodoOptions{WithTitleContains("report")},
+			want: ListTodosParams{TitleContains: common.Ptr("report")},
+		},
 		"with-due-date-range-only": {
 			opts: []ListTodoOptions{
 				WithDueDateRange(

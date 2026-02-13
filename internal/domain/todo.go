@@ -90,11 +90,12 @@ func (s *TodoSortBy) Validate() error {
 
 // ListTodosParams represents the parameters for listing todo items.
 type ListTodosParams struct {
-	Status    *TodoStatus
-	Embedding []float64
-	DueAfter  *time.Time
-	DueBefore *time.Time
-	SortBy    *TodoSortBy
+	Status        *TodoStatus
+	Embedding     []float64
+	TitleContains *string
+	DueAfter      *time.Time
+	DueBefore     *time.Time
+	SortBy        *TodoSortBy
 }
 
 // ListTodoOptions defines a function type for modifying ListTodosParams.
@@ -111,6 +112,13 @@ func WithStatus(status TodoStatus) ListTodoOptions {
 func WithEmbedding(embedding []float64) ListTodoOptions {
 	return func(params *ListTodosParams) {
 		params.Embedding = embedding
+	}
+}
+
+// WithTitleContains is a ListTodoOptions that filters todos whose title contains the specified substring (case-insensitive).
+func WithTitleContains(substring string) ListTodoOptions {
+	return func(params *ListTodosParams) {
+		params.TitleContains = &substring
 	}
 }
 

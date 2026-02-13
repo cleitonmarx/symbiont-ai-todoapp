@@ -297,7 +297,8 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	}
 
 	toolMessage := sc.llmToolRegistry.Call(ctx, toolCall, req.Messages)
-	toolMsg := domain.ChatMessage{
+	now := sc.timeProvider.Now().UTC()
+	toolChatMsg := domain.ChatMessage{
 		ID:             uuid.New(),
 		ConversationID: domain.GlobalConversationID,
 		TurnID:         state.turnID,
@@ -307,14 +308,16 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		Content:        toolMessage.Content,
 		Model:          model,
 		MessageState:   domain.ChatMessageState_Completed,
-		CreatedAt:      sc.timeProvider.Now().UTC(),
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
-	if !isToolSuccess(toolMsg) {
-		toolMsg.MessageState = domain.ChatMessageState_Failed
-		toolMsg.ErrorMessage = &toolMsg.Content
+	if !toolMessage.IsToolCallSuccess() {
+		toolChatMsg.MessageState = domain.ChatMessageState_Failed
+		toolChatMsg.ErrorMessage = &toolMessage.Content
+		toolChatMsg.Content = ""
 	}
-	toolMsg.UpdatedAt = toolMsg.CreatedAt
-	if err := sc.persistChatMessage(ctx, toolMsg); err != nil {
+
+	if err := sc.persistChatMessage(ctx, toolChatMsg); err != nil {
 		return false, err
 	}
 
@@ -419,16 +422,6 @@ func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.
 
 		return nil
 	})
-}
-
-// isToolSuccess determines if a tool message indicates a successful tool call based on its content
-func isToolSuccess(message domain.ChatMessage) bool {
-	if message.ChatRole != domain.ChatRole_Tool {
-		return false
-	}
-
-	content := strings.ToLower(message.Content)
-	return !strings.Contains(content, "error")
 }
 
 // buildSystemPrompt creates the base chat prompt and injects the latest conversation summary context.

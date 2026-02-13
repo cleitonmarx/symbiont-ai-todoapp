@@ -283,7 +283,7 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 	}{
 		"success-with-conversation-option": {
 			options: []domain.ListChatMessagesOption{
-				domain.ListChatMessagesByConversationID(conversationID),
+				domain.WithChatMessagesByConversationID(conversationID),
 			},
 			limit: 0,
 			expect: func(m sqlmock.Sqlmock) {
@@ -303,8 +303,8 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 		},
 		"success-with-after-message-option": {
 			options: []domain.ListChatMessagesOption{
-				domain.ListChatMessagesByConversationID(conversationID),
-				domain.ListChatMessagesAfterMessageID(fixedID1),
+				domain.WithChatMessagesByConversationID(conversationID),
+				domain.WithChatMessagesAfterMessageID(fixedID1),
 			},
 			limit: 2,
 			expect: func(m sqlmock.Sqlmock) {
@@ -325,8 +325,8 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 		},
 		"after-message-query-error": {
 			options: []domain.ListChatMessagesOption{
-				domain.ListChatMessagesByConversationID(conversationID),
-				domain.ListChatMessagesAfterMessageID(fixedID1),
+				domain.WithChatMessagesByConversationID(conversationID),
+				domain.WithChatMessagesAfterMessageID(fixedID1),
 			},
 			limit: 0,
 			expect: func(m sqlmock.Sqlmock) {

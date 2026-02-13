@@ -62,10 +62,10 @@ func TestMain(m *testing.M) {
 		&InitDockerCompose{},
 	)
 
-	boardSummaryQueue = make(usecases.CompletedBoardSummaryChannel, 5)
+	boardSummaryQueue = make(usecases.CompletedBoardSummaryChannel)
 	depend.Register(boardSummaryQueue)
 
-	conversationSummaryQueue = make(usecases.CompletedConversationSummaryChannel, 5)
+	conversationSummaryQueue = make(usecases.CompletedConversationSummaryChannel)
 	depend.Register(conversationSummaryQueue)
 
 	var err error

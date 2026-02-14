@@ -2,14 +2,15 @@ package modelrunner
 
 // ChatRequest is an OpenAI-compatible chat completions request
 type ChatRequest struct {
-	Model         string         `json:"model"`
-	Messages      []ChatMessage  `json:"messages"`
-	Stream        bool           `json:"stream,omitempty"`
-	StreamOptions *StreamOptions `json:"stream_options,omitempty"`
-	Temperature   *float64       `json:"temperature,omitempty"`
-	MaxTokens     *int           `json:"max_tokens,omitempty"`
-	TopP          *float64       `json:"top_p,omitempty"`
-	Tools         []Tool         `json:"tools,omitempty"`
+	Model            string         `json:"model"`
+	Messages         []ChatMessage  `json:"messages"`
+	Stream           bool           `json:"stream,omitempty"`
+	StreamOptions    *StreamOptions `json:"stream_options,omitempty"`
+	Temperature      *float64       `json:"temperature,omitempty"`
+	MaxTokens        *int           `json:"max_tokens,omitempty"`
+	TopP             *float64       `json:"top_p,omitempty"`
+	FrequencyPenalty *float64       `json:"frequency_penalty,omitempty"`
+	Tools            []Tool         `json:"tools,omitempty"`
 }
 
 // StreamOptions represents options for streaming responses

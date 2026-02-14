@@ -194,13 +194,14 @@ func (a LLMClient) AvailableModels(ctx context.Context) ([]domain.LLMModelInfo, 
 // toChatRequest converts domain.LLMChatRequest to ChatRequest
 func toChatRequest(req domain.LLMChatRequest) ChatRequest {
 	adapterReq := ChatRequest{
-		Model:       req.Model,
-		Temperature: req.Temperature,
-		Stream:      req.Stream,
-		MaxTokens:   req.MaxTokens,
-		TopP:        req.TopP,
-		Messages:    make([]ChatMessage, len(req.Messages)),
-		Tools:       make([]Tool, len(req.Tools)),
+		Model:            req.Model,
+		Temperature:      req.Temperature,
+		Stream:           req.Stream,
+		MaxTokens:        req.MaxTokens,
+		TopP:             req.TopP,
+		FrequencyPenalty: req.FrequencyPenalty,
+		Messages:         make([]ChatMessage, len(req.Messages)),
+		Tools:            make([]Tool, len(req.Tools)),
 	}
 
 	if req.Stream {

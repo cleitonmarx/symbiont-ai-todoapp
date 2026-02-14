@@ -74,10 +74,15 @@ func (api TodoAppServer) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		api.Logger.Print("TodoAppServer: Shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		return s.Shutdown(shutdownCtx)
+		err := s.Shutdown(shutdownCtx)
+		if err != nil {
+			api.Logger.Printf("TodoAppServer: error during shutdown: %v", err)
+		} else {
+			api.Logger.Println("TodoAppServer: stopped")
+		}
+		return err
 	case err := <-errCh:
 		return err
 	}

@@ -1,12 +1,16 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func (api TodoAppServer) ClearChatMessages(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +100,8 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 		return nil
 	})
-	if err != nil {
+	if telemetry.RecordErrorAndStatus(trace.SpanFromContext(r.Context()), err) &&
+		!errors.Is(err, context.Canceled) {
 		api.Logger.Printf("StreamChat: error during streaming: %v", err)
 		respondError(w, toError(err))
 	}

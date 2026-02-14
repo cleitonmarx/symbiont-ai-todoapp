@@ -11,6 +11,8 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -120,12 +122,15 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to list chat messages: %w", err)
 	}
+	span.SetAttributes(
+		attribute.Int("unsummarized_messages_count", len(unsummarizedMessages)),
+	)
 
 	if len(unsummarizedMessages) == 0 {
 		return nil
 	}
 
-	if !gcs.shouldGenerateSummary(unsummarizedMessages, hasMore) {
+	if !gcs.shouldGenerateSummary(span, unsummarizedMessages, hasMore) {
 		return nil
 	}
 
@@ -234,16 +239,23 @@ func formatMessageForSummary(message domain.ChatMessage) string {
 	return strings.Join(parts, "\n")
 }
 
-func (gcs GenerateChatSummaryImpl) shouldGenerateSummary(messages []domain.ChatMessage, hasMore bool) bool {
+func (gcs GenerateChatSummaryImpl) shouldGenerateSummary(span trace.Span, messages []domain.ChatMessage, hasMore bool) bool {
 	if gcs.hasStateChangingToolSuccess(messages) {
+		span.AddEvent("Triggering summary generation due to successful state-changing tool call")
 		return true
 	}
 
 	if hasMore || len(messages) >= CHAT_SUMMARY_TRIGGER_MESSAGES {
+		span.AddEvent(fmt.Sprintf("Triggering summary generation due to message count threshold: %d messages", len(messages)))
 		return true
 	}
 
-	return sumMessagesTotalTokens(messages) >= CHAT_SUMMARY_TRIGGER_TOKENS
+	if sumMessagesTotalTokens(messages) >= CHAT_SUMMARY_TRIGGER_TOKENS {
+		span.AddEvent(fmt.Sprintf("Triggering summary generation due to token count threshold: %d tokens", sumMessagesTotalTokens(messages)))
+		return true
+	}
+
+	return false
 }
 
 // hasStateChangingToolSuccess checks if any of the chat messages indicate a

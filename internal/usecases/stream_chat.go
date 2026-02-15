@@ -107,7 +107,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	}
 
 	var (
-		conversationID      uuid.UUID
+		conversation        domain.Conversation
 		conversationCreated bool
 	)
 
@@ -118,21 +118,21 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		if telemetry.RecordErrorAndStatus(span, err) {
 			return err
 		}
-		conversationID = newConversation.ID
+		conversation = newConversation
 		conversationCreated = true
 	} else {
-		_, found, err := sc.conversationRepo.GetConversation(spanCtx, *params.ConversationID)
+		c, found, err := sc.conversationRepo.GetConversation(spanCtx, *params.ConversationID)
 		if telemetry.RecordErrorAndStatus(span, err) {
 			return err
 		}
 		if !found {
 			return domain.NewValidationErr("conversation not found")
 		}
-		conversationID = *params.ConversationID
+		conversation = c
 	}
 
 	// Fetch chat history and append user message
-	messages, err := sc.fetchChatHistory(spanCtx, conversationID)
+	messages, err := sc.fetchChatHistory(spanCtx, conversation.ID)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
@@ -151,7 +151,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	}
 
 	state := streamChatExecutionState{
-		conversationID:      conversationID,
+		conversation:        conversation,
 		conversationCreated: conversationCreated,
 		turnID:              uuid.New(),
 		tracker: newToolCycleTracker(
@@ -161,7 +161,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	}
 
 	state.userMsg = domain.ChatMessage{
-		ConversationID: conversationID,
+		ConversationID: conversation.ID,
 		TurnID:         state.turnID,
 		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_User,
@@ -198,7 +198,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 
 	assistantMsg := domain.ChatMessage{
 		ID:               state.assistantMsgID,
-		ConversationID:   conversationID,
+		ConversationID:   state.conversation.ID,
 		TurnID:           state.turnID,
 		TurnSequence:     state.nextTurnSequence(),
 		ChatRole:         domain.ChatRole_Assistant,
@@ -224,7 +224,8 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		}
 	}
 
-	if err := sc.persistChatMessage(spanCtx, assistantMsg); telemetry.RecordErrorAndStatus(span, err) {
+	err = sc.persistChatMessage(spanCtx, assistantMsg, state.conversation)
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 
@@ -243,7 +244,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 
 // streamChatExecutionState holds mutable state during a stream-chat execution.
 type streamChatExecutionState struct {
-	conversationID      uuid.UUID
+	conversation        domain.Conversation
 	conversationCreated bool
 	assistantMsgContent strings.Builder
 	assistantMsgID      uuid.UUID
@@ -301,14 +302,14 @@ func (sc StreamChatImpl) handleMetaEvent(
 	}
 
 	meta := data.(domain.LLMStreamEventMeta)
-	meta.ConversationID = state.conversationID
+	meta.ConversationID = state.conversation.ID
 	meta.ConversationCreated = state.conversationCreated
 	state.assistantMsgID = meta.AssistantMessageID
 	state.userMsg.ID = meta.UserMessageID
 	state.userMsg.CreatedAt = sc.timeProvider.Now().UTC()
 	state.userMsg.UpdatedAt = state.userMsg.CreatedAt
 	state.userMsgPersistTried = true
-	if err := sc.persistChatMessage(ctx, state.userMsg); err != nil {
+	if err := sc.persistChatMessage(ctx, state.userMsg, state.conversation); err != nil {
 		return err
 	}
 	state.userMsgPersisted = true
@@ -331,7 +332,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 
 	assistantToolCallMsg := domain.ChatMessage{
 		ID:             uuid.New(),
-		ConversationID: state.userMsg.ConversationID,
+		ConversationID: state.conversation.ID,
 		TurnID:         state.turnID,
 		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_Assistant,
@@ -341,7 +342,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		CreatedAt:      sc.timeProvider.Now().UTC(),
 	}
 	assistantToolCallMsg.UpdatedAt = assistantToolCallMsg.CreatedAt
-	if err := sc.persistChatMessage(ctx, assistantToolCallMsg); err != nil {
+	if err := sc.persistChatMessage(ctx, assistantToolCallMsg, state.conversation); err != nil {
 		return false, err
 	}
 
@@ -354,7 +355,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	now := sc.timeProvider.Now().UTC()
 	toolChatMsg := domain.ChatMessage{
 		ID:             uuid.New(),
-		ConversationID: state.userMsg.ConversationID,
+		ConversationID: state.conversation.ID,
 		TurnID:         state.turnID,
 		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_Tool,
@@ -370,7 +371,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		toolChatMsg.ErrorMessage = &toolMessage.Content
 	}
 
-	if err := sc.persistChatMessage(ctx, toolChatMsg); err != nil {
+	if err := sc.persistChatMessage(ctx, toolChatMsg, state.conversation); err != nil {
 		return false, err
 	}
 
@@ -411,10 +412,11 @@ func (sc StreamChatImpl) persistUserMessageIfNeeded(ctx context.Context, state *
 	}
 
 	state.userMsg.ID = uuid.New()
+	state.userMsg.ConversationID = state.conversation.ID
 	state.userMsg.CreatedAt = sc.timeProvider.Now().UTC()
 	state.userMsg.UpdatedAt = state.userMsg.CreatedAt
 	state.userMsgPersistTried = true
-	if err := sc.persistChatMessage(ctx, state.userMsg); err != nil {
+	if err := sc.persistChatMessage(ctx, state.userMsg, state.conversation); err != nil {
 		return err
 	}
 	state.userMsgPersisted = true
@@ -440,7 +442,7 @@ func (sc StreamChatImpl) persistFailureMessages(
 	errorMessage := streamErr.Error()
 	failedAssistantMsg := domain.ChatMessage{
 		ID:               state.assistantMsgID,
-		ConversationID:   state.userMsg.ConversationID,
+		ConversationID:   state.conversation.ID,
 		TurnID:           state.turnID,
 		TurnSequence:     state.nextTurnSequence(),
 		ChatRole:         domain.ChatRole_Assistant,
@@ -454,11 +456,11 @@ func (sc StreamChatImpl) persistFailureMessages(
 		CreatedAt:        failedAt,
 		UpdatedAt:        failedAt,
 	}
-	return sc.persistChatMessage(ctx, failedAssistantMsg)
+	return sc.persistChatMessage(ctx, failedAssistantMsg, state.conversation)
 }
 
 // persistChatMessage persists a chat message and emits a corresponding domain event for outbox processing.
-func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.ChatMessage) error {
+func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.ChatMessage, conversation domain.Conversation) error {
 	return sc.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
 		if err := uow.ChatMessage().CreateChatMessages(ctx, []domain.ChatMessage{message}); err != nil {
 			return err
@@ -472,14 +474,6 @@ func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.
 			CreatedAt:      message.CreatedAt,
 		}); err != nil {
 			return err
-		}
-
-		conversation, found, err := uow.Conversation().GetConversation(ctx, message.ConversationID)
-		if err != nil {
-			return err
-		}
-		if !found {
-			return domain.NewNotFoundErr(fmt.Sprintf("conversation with ID %s not found", message.ConversationID))
 		}
 
 		lastMessageAt := message.CreatedAt

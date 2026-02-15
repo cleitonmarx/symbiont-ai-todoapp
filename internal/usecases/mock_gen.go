@@ -140,16 +140,16 @@ func (_m *MockDeleteConversation) EXPECT() *MockDeleteConversation_Expecter {
 }
 
 // Execute provides a mock function for the type MockDeleteConversation
-func (_mock *MockDeleteConversation) Execute(ctx context.Context) error {
-	ret := _mock.Called(ctx)
+func (_mock *MockDeleteConversation) Execute(ctx context.Context, conversationID uuid.UUID) error {
+	ret := _mock.Called(ctx, conversationID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Execute")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
+		r0 = returnFunc(ctx, conversationID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -163,18 +163,24 @@ type MockDeleteConversation_Execute_Call struct {
 
 // Execute is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockDeleteConversation_Expecter) Execute(ctx interface{}) *MockDeleteConversation_Execute_Call {
-	return &MockDeleteConversation_Execute_Call{Call: _e.mock.On("Execute", ctx)}
+//   - conversationID uuid.UUID
+func (_e *MockDeleteConversation_Expecter) Execute(ctx interface{}, conversationID interface{}) *MockDeleteConversation_Execute_Call {
+	return &MockDeleteConversation_Execute_Call{Call: _e.mock.On("Execute", ctx, conversationID)}
 }
 
-func (_c *MockDeleteConversation_Execute_Call) Run(run func(ctx context.Context)) *MockDeleteConversation_Execute_Call {
+func (_c *MockDeleteConversation_Execute_Call) Run(run func(ctx context.Context, conversationID uuid.UUID)) *MockDeleteConversation_Execute_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -185,7 +191,7 @@ func (_c *MockDeleteConversation_Execute_Call) Return(err error) *MockDeleteConv
 	return _c
 }
 
-func (_c *MockDeleteConversation_Execute_Call) RunAndReturn(run func(ctx context.Context) error) *MockDeleteConversation_Execute_Call {
+func (_c *MockDeleteConversation_Execute_Call) RunAndReturn(run func(ctx context.Context, conversationID uuid.UUID) error) *MockDeleteConversation_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -640,8 +646,8 @@ func (_m *MockListChatMessages) EXPECT() *MockListChatMessages_Expecter {
 }
 
 // Query provides a mock function for the type MockListChatMessages
-func (_mock *MockListChatMessages) Query(ctx context.Context, page int, pageSize int) ([]domain.ChatMessage, bool, error) {
-	ret := _mock.Called(ctx, page, pageSize)
+func (_mock *MockListChatMessages) Query(ctx context.Context, conversationID uuid.UUID, page int, pageSize int) ([]domain.ChatMessage, bool, error) {
+	ret := _mock.Called(ctx, conversationID, page, pageSize)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Query")
@@ -650,14 +656,127 @@ func (_mock *MockListChatMessages) Query(ctx context.Context, page int, pageSize
 	var r0 []domain.ChatMessage
 	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int) ([]domain.ChatMessage, bool, error)); ok {
-		return returnFunc(ctx, page, pageSize)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, int, int) ([]domain.ChatMessage, bool, error)); ok {
+		return returnFunc(ctx, conversationID, page, pageSize)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int) []domain.ChatMessage); ok {
-		r0 = returnFunc(ctx, page, pageSize)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, int, int) []domain.ChatMessage); ok {
+		r0 = returnFunc(ctx, conversationID, page, pageSize)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]domain.ChatMessage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID, int, int) bool); ok {
+		r1 = returnFunc(ctx, conversationID, page, pageSize)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context, uuid.UUID, int, int) error); ok {
+		r2 = returnFunc(ctx, conversationID, page, pageSize)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// MockListChatMessages_Query_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Query'
+type MockListChatMessages_Query_Call struct {
+	*mock.Call
+}
+
+// Query is a helper method to define mock.On call
+//   - ctx context.Context
+//   - conversationID uuid.UUID
+//   - page int
+//   - pageSize int
+func (_e *MockListChatMessages_Expecter) Query(ctx interface{}, conversationID interface{}, page interface{}, pageSize interface{}) *MockListChatMessages_Query_Call {
+	return &MockListChatMessages_Query_Call{Call: _e.mock.On("Query", ctx, conversationID, page, pageSize)}
+}
+
+func (_c *MockListChatMessages_Query_Call) Run(run func(ctx context.Context, conversationID uuid.UUID, page int, pageSize int)) *MockListChatMessages_Query_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 int
+		if args[3] != nil {
+			arg3 = args[3].(int)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockListChatMessages_Query_Call) Return(chatMessages []domain.ChatMessage, b bool, err error) *MockListChatMessages_Query_Call {
+	_c.Call.Return(chatMessages, b, err)
+	return _c
+}
+
+func (_c *MockListChatMessages_Query_Call) RunAndReturn(run func(ctx context.Context, conversationID uuid.UUID, page int, pageSize int) ([]domain.ChatMessage, bool, error)) *MockListChatMessages_Query_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockListConversations creates a new instance of MockListConversations. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockListConversations(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockListConversations {
+	mock := &MockListConversations{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockListConversations is an autogenerated mock type for the ListConversations type
+type MockListConversations struct {
+	mock.Mock
+}
+
+type MockListConversations_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockListConversations) EXPECT() *MockListConversations_Expecter {
+	return &MockListConversations_Expecter{mock: &_m.Mock}
+}
+
+// Query provides a mock function for the type MockListConversations
+func (_mock *MockListConversations) Query(ctx context.Context, page int, pageSize int) ([]domain.Conversation, bool, error) {
+	ret := _mock.Called(ctx, page, pageSize)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Query")
+	}
+
+	var r0 []domain.Conversation
+	var r1 bool
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int) ([]domain.Conversation, bool, error)); ok {
+		return returnFunc(ctx, page, pageSize)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int) []domain.Conversation); ok {
+		r0 = returnFunc(ctx, page, pageSize)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]domain.Conversation)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, int, int) bool); ok {
@@ -673,8 +792,8 @@ func (_mock *MockListChatMessages) Query(ctx context.Context, page int, pageSize
 	return r0, r1, r2
 }
 
-// MockListChatMessages_Query_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Query'
-type MockListChatMessages_Query_Call struct {
+// MockListConversations_Query_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Query'
+type MockListConversations_Query_Call struct {
 	*mock.Call
 }
 
@@ -682,11 +801,11 @@ type MockListChatMessages_Query_Call struct {
 //   - ctx context.Context
 //   - page int
 //   - pageSize int
-func (_e *MockListChatMessages_Expecter) Query(ctx interface{}, page interface{}, pageSize interface{}) *MockListChatMessages_Query_Call {
-	return &MockListChatMessages_Query_Call{Call: _e.mock.On("Query", ctx, page, pageSize)}
+func (_e *MockListConversations_Expecter) Query(ctx interface{}, page interface{}, pageSize interface{}) *MockListConversations_Query_Call {
+	return &MockListConversations_Query_Call{Call: _e.mock.On("Query", ctx, page, pageSize)}
 }
 
-func (_c *MockListChatMessages_Query_Call) Run(run func(ctx context.Context, page int, pageSize int)) *MockListChatMessages_Query_Call {
+func (_c *MockListConversations_Query_Call) Run(run func(ctx context.Context, page int, pageSize int)) *MockListConversations_Query_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -709,12 +828,12 @@ func (_c *MockListChatMessages_Query_Call) Run(run func(ctx context.Context, pag
 	return _c
 }
 
-func (_c *MockListChatMessages_Query_Call) Return(chatMessages []domain.ChatMessage, b bool, err error) *MockListChatMessages_Query_Call {
-	_c.Call.Return(chatMessages, b, err)
+func (_c *MockListConversations_Query_Call) Return(conversations []domain.Conversation, b bool, err error) *MockListConversations_Query_Call {
+	_c.Call.Return(conversations, b, err)
 	return _c
 }
 
-func (_c *MockListChatMessages_Query_Call) RunAndReturn(run func(ctx context.Context, page int, pageSize int) ([]domain.ChatMessage, bool, error)) *MockListChatMessages_Query_Call {
+func (_c *MockListConversations_Query_Call) RunAndReturn(run func(ctx context.Context, page int, pageSize int) ([]domain.Conversation, bool, error)) *MockListConversations_Query_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -947,16 +1066,22 @@ func (_m *MockStreamChat) EXPECT() *MockStreamChat_Expecter {
 }
 
 // Execute provides a mock function for the type MockStreamChat
-func (_mock *MockStreamChat) Execute(ctx context.Context, userMessage string, model string, onEvent domain.LLMStreamEventCallback) error {
-	ret := _mock.Called(ctx, userMessage, model, onEvent)
+func (_mock *MockStreamChat) Execute(ctx context.Context, userMessage string, model string, onEvent domain.LLMStreamEventCallback, opts ...StreamChatOption) error {
+	var tmpRet mock.Arguments
+	if len(opts) > 0 {
+		tmpRet = _mock.Called(ctx, userMessage, model, onEvent, opts)
+	} else {
+		tmpRet = _mock.Called(ctx, userMessage, model, onEvent)
+	}
+	ret := tmpRet
 
 	if len(ret) == 0 {
 		panic("no return value specified for Execute")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, domain.LLMStreamEventCallback) error); ok {
-		r0 = returnFunc(ctx, userMessage, model, onEvent)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, domain.LLMStreamEventCallback, ...StreamChatOption) error); ok {
+		r0 = returnFunc(ctx, userMessage, model, onEvent, opts...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -973,11 +1098,13 @@ type MockStreamChat_Execute_Call struct {
 //   - userMessage string
 //   - model string
 //   - onEvent domain.LLMStreamEventCallback
-func (_e *MockStreamChat_Expecter) Execute(ctx interface{}, userMessage interface{}, model interface{}, onEvent interface{}) *MockStreamChat_Execute_Call {
-	return &MockStreamChat_Execute_Call{Call: _e.mock.On("Execute", ctx, userMessage, model, onEvent)}
+//   - opts ...StreamChatOption
+func (_e *MockStreamChat_Expecter) Execute(ctx interface{}, userMessage interface{}, model interface{}, onEvent interface{}, opts ...interface{}) *MockStreamChat_Execute_Call {
+	return &MockStreamChat_Execute_Call{Call: _e.mock.On("Execute",
+		append([]interface{}{ctx, userMessage, model, onEvent}, opts...)...)}
 }
 
-func (_c *MockStreamChat_Execute_Call) Run(run func(ctx context.Context, userMessage string, model string, onEvent domain.LLMStreamEventCallback)) *MockStreamChat_Execute_Call {
+func (_c *MockStreamChat_Execute_Call) Run(run func(ctx context.Context, userMessage string, model string, onEvent domain.LLMStreamEventCallback, opts ...StreamChatOption)) *MockStreamChat_Execute_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -995,11 +1122,18 @@ func (_c *MockStreamChat_Execute_Call) Run(run func(ctx context.Context, userMes
 		if args[3] != nil {
 			arg3 = args[3].(domain.LLMStreamEventCallback)
 		}
+		var arg4 []StreamChatOption
+		var variadicArgs []StreamChatOption
+		if len(args) > 4 {
+			variadicArgs = args[4].([]StreamChatOption)
+		}
+		arg4 = variadicArgs
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4...,
 		)
 	})
 	return _c
@@ -1010,7 +1144,7 @@ func (_c *MockStreamChat_Execute_Call) Return(err error) *MockStreamChat_Execute
 	return _c
 }
 
-func (_c *MockStreamChat_Execute_Call) RunAndReturn(run func(ctx context.Context, userMessage string, model string, onEvent domain.LLMStreamEventCallback) error) *MockStreamChat_Execute_Call {
+func (_c *MockStreamChat_Execute_Call) RunAndReturn(run func(ctx context.Context, userMessage string, model string, onEvent domain.LLMStreamEventCallback, opts ...StreamChatOption) error) *MockStreamChat_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1323,6 +1457,105 @@ func (_c *MockTodoUpdater_Update_Call) Return(todo domain.Todo, err error) *Mock
 }
 
 func (_c *MockTodoUpdater_Update_Call) RunAndReturn(run func(ctx context.Context, uow domain.UnitOfWork, id uuid.UUID, title *string, status *domain.TodoStatus, dueDate *time.Time) (domain.Todo, error)) *MockTodoUpdater_Update_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockUpdateConversation creates a new instance of MockUpdateConversation. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockUpdateConversation(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockUpdateConversation {
+	mock := &MockUpdateConversation{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockUpdateConversation is an autogenerated mock type for the UpdateConversation type
+type MockUpdateConversation struct {
+	mock.Mock
+}
+
+type MockUpdateConversation_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockUpdateConversation) EXPECT() *MockUpdateConversation_Expecter {
+	return &MockUpdateConversation_Expecter{mock: &_m.Mock}
+}
+
+// Execute provides a mock function for the type MockUpdateConversation
+func (_mock *MockUpdateConversation) Execute(ctx context.Context, conversationID uuid.UUID, title string) (domain.Conversation, error) {
+	ret := _mock.Called(ctx, conversationID, title)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Execute")
+	}
+
+	var r0 domain.Conversation
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string) (domain.Conversation, error)); ok {
+		return returnFunc(ctx, conversationID, title)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string) domain.Conversation); ok {
+		r0 = returnFunc(ctx, conversationID, title)
+	} else {
+		r0 = ret.Get(0).(domain.Conversation)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID, string) error); ok {
+		r1 = returnFunc(ctx, conversationID, title)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockUpdateConversation_Execute_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Execute'
+type MockUpdateConversation_Execute_Call struct {
+	*mock.Call
+}
+
+// Execute is a helper method to define mock.On call
+//   - ctx context.Context
+//   - conversationID uuid.UUID
+//   - title string
+func (_e *MockUpdateConversation_Expecter) Execute(ctx interface{}, conversationID interface{}, title interface{}) *MockUpdateConversation_Execute_Call {
+	return &MockUpdateConversation_Execute_Call{Call: _e.mock.On("Execute", ctx, conversationID, title)}
+}
+
+func (_c *MockUpdateConversation_Execute_Call) Run(run func(ctx context.Context, conversationID uuid.UUID, title string)) *MockUpdateConversation_Execute_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockUpdateConversation_Execute_Call) Return(conversation domain.Conversation, err error) *MockUpdateConversation_Execute_Call {
+	_c.Call.Return(conversation, err)
+	return _c
+}
+
+func (_c *MockUpdateConversation_Execute_Call) RunAndReturn(run func(ctx context.Context, conversationID uuid.UUID, title string) (domain.Conversation, error)) *MockUpdateConversation_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }

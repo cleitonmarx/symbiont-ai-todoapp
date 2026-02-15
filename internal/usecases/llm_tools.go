@@ -176,7 +176,7 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 		}
 	}
 
-	opts := []domain.ListTodoOptions{}
+	opts := []domain.ListTodoOption{}
 
 	if (params.DueAfter == nil) != (params.DueBefore == nil) {
 		return domain.LLMChatMessage{

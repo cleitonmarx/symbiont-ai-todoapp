@@ -2,52 +2,46 @@ package usecases
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userMsgID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	assistantMsgID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
 
-	tests := map[string]struct {
-		userMessage     string
-		model           string
-		setExpectations func(
-			*domain.MockChatMessageRepository,
-			*domain.MockConversationSummaryRepository,
-			*domain.MockCurrentTimeProvider,
-			*domain.MockLLMClient,
-			*domain.MockLLMToolRegistry,
-			*domain.MockUnitOfWork,
-			*domain.MockOutboxRepository,
-		)
-		expectErr       bool
-		expectedContent string
-		onEventErrType  domain.LLMStreamEventType
-	}{
+	tests := map[string]streamChatTestTableEntry{
 		"success-with-function-call": {
 			userMessage: "Call a tool",
 			model:       "test-model",
+			options: []StreamChatOption{
+				WithConversationID(conversationID),
+			},
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
+				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				conversationRepo.EXPECT().
+					GetConversation(mock.Anything, conversationID).
+					Return(domain.Conversation{
+						ID: conversationID,
+					}, true, nil).
+					Once()
+
 				toolRegistry.EXPECT().
 					List().
 					Return([]domain.LLMToolDefinition{})
@@ -72,7 +66,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					Return(domain.LLMChatMessage{Role: domain.ChatRole_Tool, ToolCallID: common.Ptr("func-123")})
 
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_HISTORY_MESSAGES).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
@@ -84,7 +78,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 						toolFunctionCallback(userMsgID, assistantMsgID, fixedTime),
 					)
 
-				expectPersistSequence(t, chatRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
 						Role:          domain.ChatRole_User,
 						Content:       "Call a tool",
@@ -119,15 +113,26 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 		"tool-message-marked-as-failed-when-content-has-error": {
 			userMessage: "Call failing tool",
 			model:       "test-model",
+			options: []StreamChatOption{
+				WithConversationID(conversationID),
+			},
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
+				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				conversationRepo.EXPECT().
+					GetConversation(mock.Anything, conversationID).
+					Return(domain.Conversation{
+						ID: conversationID,
+					}, true, nil).
+					Once()
+
 				toolRegistry.EXPECT().
 					List().
 					Return([]domain.LLMToolDefinition{})
@@ -156,7 +161,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					})
 
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_HISTORY_MESSAGES).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
@@ -192,7 +197,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					Times(2)
 
 				toolErr := "error: failing_tool unavailable"
-				expectPersistSequence(t, chatRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
 						Role:          domain.ChatRole_User,
 						Content:       "Call failing tool",
@@ -229,15 +234,26 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 		"onEvent-function-call-error": {
 			userMessage: "Call tool",
 			model:       "test-model",
+			options: []StreamChatOption{
+				WithConversationID(conversationID),
+			},
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
+				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				conversationRepo.EXPECT().
+					GetConversation(mock.Anything, conversationID).
+					Return(domain.Conversation{
+						ID: conversationID,
+					}, true, nil).
+					Once()
+
 				toolRegistry.EXPECT().
 					List().
 					Return([]domain.LLMToolDefinition{})
@@ -249,7 +265,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				expectNowCalls(timeProvider, fixedTime, 5)
 
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_HISTORY_MESSAGES).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
@@ -270,7 +286,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					})
 
 				onEventErr := "onEvent error"
-				expectPersistSequence(t, chatRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
 						Role:          domain.ChatRole_User,
 						Content:       "Call tool",
@@ -301,15 +317,26 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 		"max-tool-cycles-exceeded": {
 			userMessage: "Keep calling tools",
 			model:       "test-model",
+			options: []StreamChatOption{
+				WithConversationID(conversationID),
+			},
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
+				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				conversationRepo.EXPECT().
+					GetConversation(mock.Anything, conversationID).
+					Return(domain.Conversation{
+						ID: conversationID,
+					}, true, nil).
+					Once()
+
 				toolRegistry.EXPECT().
 					List().
 					Return([]domain.LLMToolDefinition{})
@@ -317,7 +344,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				expectNowCalls(timeProvider, fixedTime, 19)
 
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_HISTORY_MESSAGES).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
@@ -385,7 +412,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					ToolCallsLen:  0,
 					HasToolCallID: false,
 				})
-				expectPersistSequence(t, chatRepo, uow, outbox, fixedTime, expectations)
+				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, expectations)
 			},
 			expectErr:       false,
 			expectedContent: "calling tool...\ncalling tool...\ncalling tool...\ncalling tool...\ncalling tool...\ncalling tool...\ncalling tool...\nSorry, I could not process your request. Please try again.\n",
@@ -393,15 +420,26 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 		"repeated-tool-call-loop": {
 			userMessage: "Call the same tool repeatedly",
 			model:       "test-model",
+			options: []StreamChatOption{
+				WithConversationID(conversationID),
+			},
 			setExpectations: func(
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
+				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
 				client *domain.MockLLMClient,
 				toolRegistry *domain.MockLLMToolRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				conversationRepo.EXPECT().
+					GetConversation(mock.Anything, conversationID).
+					Return(domain.Conversation{
+						ID: conversationID,
+					}, true, nil).
+					Once()
+
 				toolRegistry.EXPECT().
 					List().
 					Return([]domain.LLMToolDefinition{})
@@ -409,7 +447,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				expectNowCalls(timeProvider, fixedTime, 15)
 
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_HISTORY_MESSAGES).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
@@ -477,7 +515,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					ToolCallsLen:  0,
 					HasToolCallID: false,
 				})
-				expectPersistSequence(t, chatRepo, uow, outbox, fixedTime, expectations)
+				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, expectations)
 			},
 			expectErr:       false,
 			expectedContent: "calling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\nSorry, I could not process your request. Please try again.\n",
@@ -486,86 +524,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			chatRepo := domain.NewMockChatMessageRepository(t)
-			summaryRepo := domain.NewMockConversationSummaryRepository(t)
-			timeProvider := domain.NewMockCurrentTimeProvider(t)
-			llmClient := domain.NewMockLLMClient(t)
-			lltToolRegistry := domain.NewMockLLMToolRegistry(t)
-			uow := domain.NewMockUnitOfWork(t)
-			outbox := domain.NewMockOutboxRepository(t)
-
-			if strings.TrimSpace(tt.userMessage) != "" && tt.model != "" {
-				summaryRepo.EXPECT().
-					GetConversationSummary(mock.Anything, domain.GlobalConversationID).
-					Return(domain.ConversationSummary{}, false, nil).
-					Once()
-			}
-
-			if tt.setExpectations != nil {
-				tt.setExpectations(chatRepo, summaryRepo, timeProvider, llmClient, lltToolRegistry, uow, outbox)
-			}
-
-			useCase := NewStreamChatImpl(chatRepo, summaryRepo, timeProvider, llmClient, lltToolRegistry, uow, "test-embedding-model", 7)
-
-			var capturedContent string
-			err := useCase.Execute(context.Background(), tt.userMessage, tt.model, func(eventType domain.LLMStreamEventType, data any) error {
-				if tt.onEventErrType != "" && eventType == tt.onEventErrType {
-					return errors.New("onEvent error")
-				}
-				if eventType == domain.LLMStreamEventType_Delta {
-					delta := data.(domain.LLMStreamEventDelta)
-					capturedContent += delta.Text
-				}
-				if eventType == domain.LLMStreamEventType_ToolCall {
-					fc := data.(domain.LLMStreamEventToolCall)
-					capturedContent += fc.Text
-				}
-				return nil
-			})
-
-			if tt.expectErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				if tt.expectedContent != "" {
-					assert.Equal(t, tt.expectedContent, capturedContent)
-				}
-			}
+			testStreamChatImpl(t, tt)
 		})
-	}
-}
-
-func toolFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Time) func(_ context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-	return func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-		if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
-			UserMessageID:      userMsgID,
-			AssistantMessageID: assistantMsgID,
-		}); err != nil {
-			return err
-		}
-
-		lastMsg := req.Messages[len(req.Messages)-1]
-		if lastMsg.Content == "Call a tool" {
-			err := onEvent(domain.LLMStreamEventType_ToolCall, domain.LLMStreamEventToolCall{
-				ID:        "func-123",
-				Function:  "list_todos",
-				Arguments: `{"page": 1, "page_size": 5, "search_term": "searchTerm"}`,
-			})
-			return err
-		}
-
-		if lastMsg.Role == domain.ChatRole_Tool {
-			if err := onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "Tool called successfully."}); err != nil {
-				return err
-			}
-		}
-
-		if err := onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
-			AssistantMessageID: assistantMsgID.String(),
-			CompletedAt:        fixedTime.Format(time.RFC3339),
-		}); err != nil {
-			return err
-		}
-		return nil
 	}
 }

@@ -1,6 +1,6 @@
 CREATE TABLE conversations_summary (
     id UUID PRIMARY KEY,
-    conversation_id TEXT NOT NULL,
+    conversation_id UUID NOT NULL,
     current_state_summary TEXT,
     last_summarized_message_id UUID,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

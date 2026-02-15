@@ -261,6 +261,95 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResp"
 
+  /api/conversations:
+    get:
+      summary: List conversations
+      description: >
+        Lists all conversations.
+      operationId: listConversations
+      tags:
+        - AI Chat
+      parameters:
+        - in: query
+          name: pageSize
+          required: true
+          description: Maximum number of messages to return (server may cap).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 200
+        - in: query
+          name: page
+          required: true
+          description: >
+            Opaque cursor from a prior ListChatMessagesResp to fetch the next page.
+            Omit or set to null to fetch the first page.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationListResp"
+
+  /api/conversations/{conversation_id}:
+    patch:
+      summary: Update conversation
+      description: >
+        Partially updates a conversation, such as the title.
+      operationId: updateConversation
+      parameters:
+        - in: path
+          name: conversation_id
+          required: true
+          description: Conversation identifier (UUID).
+          schema:
+            type: string
+            format: uuid
+      tags:
+        - AI Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConversationRequest"
+      responses:
+        "200":
+          description: Conversation updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete a conversation
+      description: >
+        Deletes a conversation and all its messages.
+      operationId: deleteConversation
+      parameters:
+        - in: path
+          name: conversation_id
+          required: true
+          description: Conversation identifier (UUID).
+          schema:
+            type: string
+            format: uuid
+      tags:
+        - AI Chat
+      responses:
+        "204":
+          description: Conversation deleted successfully. No content.
+        "404":
+          $ref: '#/components/responses/NotFound'
+    
   /api/v1/chat:
     post:
       operationId: streamChat
@@ -286,7 +375,7 @@ paths:
                   summary: Example SSE events
                   value: |
                     event: meta
-                    data: {"conversation_id":"global","user_message_id":"2b81d8d2-2a90-4b4f-83e5-9b7a1e4e0b9c","assistant_message_id":"0f7d6ef6-1f2a-4e0c-9f6d-7d7c7c2e1a11","started_at":"2026-01-23T22:10:00Z"}
+                    data: {"conversation_id":"4b825f1e-8c3a-4d2b-9f1e-7c9a0b5e6d8f","user_message_id":"1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d","assistant_message_id":"0f7d6ef6-1f2a-4e0c-9f6d-7d7c7c2e1a11","started_at":"2026-01-23T22:10:00Z"}
 
                     event: delta
                     data: {"text":"You have 2 overdue todos:"}
@@ -313,7 +402,15 @@ paths:
       tags: [AI Chat]
       parameters:
         - in: query
-          name: pagesize
+          name: conversation_id
+          required: true
+          description: >
+            Identifier for the conversation.
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: pageSize
           required: true
           description: Maximum number of messages to return (server may cap).
           schema:
@@ -336,20 +433,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatHistoryResp"
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResp"
-
-    delete:
-      operationId: clearChatMessages
-      summary: Clear chat history (single global chat)
-      tags: [AI Chat]
-      responses:
-        "204":
-          description: Cleared
         "500":
           description: Server error
           content:
@@ -658,6 +741,77 @@ components:
 
     ### AI Chat Schemas
 
+    Conversation:
+      type: object
+      additionalProperties: false
+      required: [id, title, created_at, updated_at]
+      description: >
+        A conversation between the user and the AI assistant.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the conversation.
+          example: "00000000-0000-0000-0000-000000000001"
+        title:
+          type: string
+          description: User-defined title for the conversation.
+          example: "General Chat"
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the conversation was created.
+          example: "2026-01-19T19:20:30Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp when the conversation was last updated.
+          example: "2026-01-20T10:15:00Z"
+
+    ConversationListResp:
+      type: object
+      additionalProperties: false
+      required: [conversations, page]
+      description: List of conversations.
+      properties:
+        conversations:
+          type: array
+          description: List of conversations.
+          items:
+            $ref: '#/components/schemas/Conversation' 
+        page:
+          type: integer
+          description: >
+            Opaque cursor to fetch the current page of results.
+            Omit or set to null when fetching the first page.
+          example: "2"
+        previous_page:
+          type: integer
+          nullable: true
+          description: >  
+            Opaque cursor to fetch the previous page of results.
+            Null if there is no previous page.
+          example: "1"
+        next_page:
+          type: integer
+          nullable: true
+          description: >
+            Opaque cursor to fetch the next page of results.
+            Null if there are no more pages.
+          example: "3"
+
+    UpdateConversationRequest:
+      type: object
+      additionalProperties: false
+      required: [title]
+      description: Payload to update conversation.
+      properties:
+        title:
+          type: string  
+          description: New title for the conversation. Must be non-empty.
+          example: "Project Discussion"
+
+
     ChatStreamRequest:
       type: object
       additionalProperties: false
@@ -668,6 +822,12 @@ components:
           description: >
             AI model to use for generating the assistant response.
           example: "gpt-oss:7B-Q4_0"
+        conversation_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Identifier for the conversation. For this API, it should always be "global".
         message:
           type: string
           minLength: 1
@@ -684,7 +844,7 @@ components:
       properties:
         conversation_id:
           type: string
-          enum: [global]
+          format: uuid
         messages:
           type: array
           items:
@@ -755,7 +915,7 @@ components:
       properties:
         conversation_id:
           type: string
-          enum: [global]
+          format: uuid
         user_message_id:
           type: string
           format: uuid

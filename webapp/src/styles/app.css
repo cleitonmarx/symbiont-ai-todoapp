@@ -380,11 +380,14 @@
 
 .ui-controls .ui-segmented {
   display: inline-flex;
-  width: fit-content;
-  justify-self: start;
+  width: 100%;
+  max-width: 100%;
+  justify-self: stretch;
 }
 
 .ui-controls .ui-segmented-item {
+  flex: 1 1 0;
+  min-width: 0;
   height: 100%;
   display: inline-flex;
   align-items: center;
@@ -544,6 +547,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
+}
+
+.ui-date-range-calendars.single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .ui-date-range-calendar-pane {
@@ -799,6 +806,12 @@
   gap: 0.45rem;
 }
 
+.ui-pagination .pagination-info {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ui-text);
+}
+
 .ui-btn {
   border: 1px solid transparent;
   border-radius: 10px;
@@ -869,13 +882,14 @@
 
 .ui-chat {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: min(74vh, 780px);
   max-height: calc(100vh - 6.2rem);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   box-shadow: var(--ui-shadow-1);
+  overflow: hidden;
 }
 
 .ui-chat.sheet {
@@ -885,11 +899,226 @@
   border: 0;
 }
 
-.ui-chat-header {
+.ui-chat-topbar {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  padding: 0.75rem;
+  padding: 0.52rem 0.7rem;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-alt);
+}
+
+.ui-chat-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.ui-chat-tab {
+  border: 0;
+  background: transparent;
+  color: var(--ui-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0.25rem 0.15rem;
+}
+
+.ui-chat-tab.active {
+  color: var(--ui-text);
+  border-bottom-color: var(--ui-primary);
+}
+
+.ui-chat-topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ui-chat-shell {
+  display: grid;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+}
+
+.ui-chat-shell.desktop {
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+
+.ui-chat-shell.compact {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ui-chat-shell.compact .ui-chat-conversations {
+  border-right: 0;
+}
+
+.ui-chat-conversations {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0.35rem;
+  border-right: 1px solid var(--ui-border);
+  border-bottom: 0;
+  background: var(--ui-surface-alt);
+  min-width: 0;
+  min-height: 0;
+}
+
+.ui-chat-conversations-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.3rem;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.ui-chat-conversations-header h3 {
+  margin: 0;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-muted);
+}
+
+.ui-chat-conversation-list {
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  padding: 0.2rem 0.5rem 0.6rem;
+}
+
+.ui-chat-conversation-item-wrap {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ui-chat-conversation-item {
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0.5rem 0.55rem;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.45rem;
+}
+
+.ui-chat-conversation-item.active {
+  border-color: #98b8ec;
+  background: #eef5ff;
+}
+
+.ui-chat-conversation-item-with-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.ui-chat-conversation-main {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1;
+  font: inherit;
+  color: inherit;
+}
+
+.ui-chat-conversation-main:disabled {
+  cursor: default;
+}
+
+.ui-chat-session-dot {
+  color: #7a8ca9;
+  font-size: 0.86rem;
+  line-height: 1.2;
+  padding-top: 0.05rem;
+}
+
+.ui-chat-conversation-body {
+  min-width: 0;
+  display: grid;
+  gap: 0.12rem;
+}
+
+.ui-chat-conversation-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-chat-conversation-date {
+  font-size: 0.76rem;
+  color: var(--ui-muted);
+}
+
+.ui-chat-conversation-actions {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.ui-icon-btn.danger {
+  border-color: #efc2ba;
+  color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+}
+
+.ui-chat-rename-box {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ui-chat-rename-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+
+.ui-chat-conversation-meta {
+  margin: 0;
+  padding: 0 0.65rem 0.6rem;
+  color: var(--ui-muted);
+  font-size: 0.76rem;
+}
+
+.ui-chat-conversation-error {
+  margin: 0;
+  padding: 0 0.65rem 0.6rem;
+  color: var(--ui-danger);
+  font-size: 0.76rem;
+}
+
+.ui-chat-thread {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.ui-chat-header {
+  display: flex;
+  justify-content: flex-start;
+  gap: 0.6rem;
+  padding: 0.65rem 0.75rem;
   border-bottom: 1px solid var(--ui-border);
 }
 
@@ -902,12 +1131,6 @@
   margin: 0.2rem 0 0;
   color: var(--ui-muted);
   font-size: 0.76rem;
-}
-
-.ui-chat-header-actions {
-  display: flex;
-  gap: 0.35rem;
-  align-items: center;
 }
 
 .ui-chat-model-select {
@@ -939,6 +1162,7 @@
 .ui-icon-btn {
   width: 2rem;
   height: 2rem;
+  padding: 0;
   border: 1px solid var(--ui-border);
   border-radius: 999px;
   background: var(--ui-surface-alt);
@@ -1021,6 +1245,17 @@
 .ui-chat-message time {
   font-size: 0.68rem;
   color: var(--ui-muted);
+}
+
+.ui-chat-empty-state {
+  border: 1px dashed var(--ui-border);
+  background: var(--ui-surface-alt);
+  color: var(--ui-muted);
+  border-radius: 10px;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.8rem;
 }
 
 .ui-chat-error {
@@ -1253,20 +1488,20 @@
   --radius-md: 10px;
   --radius-lg: var(--ui-radius-lg);
   --shadow-lg: var(--ui-shadow-2);
-  width: min(1120px, 96vw);
-  max-width: min(1120px, 96vw) !important;
+  width: min(1240px, 96vw);
+  max-width: min(1240px, 96vw) !important;
   height: min(90vh, 920px);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
   border-radius: var(--ui-radius-lg);
   border: 1px solid var(--ui-border);
-  background: var(--ui-surface);
+  background: var(--ui-bg);
   color: var(--ui-text);
   box-shadow: var(--ui-shadow-2);
   font-family: inherit;
   font-size: 0.9rem;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .ui-app .ui-batch-dialog button,
@@ -1275,57 +1510,11 @@
   font-family: inherit;
 }
 
-.ui-app .ui-batch-dialog .btn-primary,
-.ui-app .ui-batch-dialog .btn-secondary,
-.ui-app .ui-batch-dialog .btn-danger {
-  border-radius: 10px;
-  border: 1px solid transparent;
-  font-size: 0.85rem;
-  font-weight: 600;
-  line-height: 1.15;
-  transition: background 0.2s, border-color 0.2s, color 0.2s;
-  transform: none;
-}
-
-.ui-app .ui-batch-dialog .btn-primary {
-  background: var(--ui-primary);
-  border-color: var(--ui-primary);
-  color: #ffffff;
-}
-
-.ui-app .ui-batch-dialog .btn-primary:hover:not(:disabled) {
-  background: var(--ui-primary-strong);
-  border-color: var(--ui-primary-strong);
-  transform: none;
-  box-shadow: none;
-}
-
-.ui-app .ui-batch-dialog .btn-secondary {
-  background: var(--ui-surface-alt);
-  border-color: var(--ui-border);
-  color: var(--ui-text);
-}
-
-.ui-app .ui-batch-dialog .btn-secondary:hover:not(:disabled) {
-  border-color: #b8c4d6;
-  background: #ffffff;
-  transform: none;
-  box-shadow: none;
-}
-
-.ui-app .ui-batch-dialog .btn-danger {
-  background: var(--ui-danger-bg);
-  border-color: #efc2ba;
-  color: var(--ui-danger);
-}
-
-.ui-app .ui-batch-dialog .btn-danger:hover:not(:disabled) {
-  background: #fde7e3;
-  transform: none;
-  box-shadow: none;
-}
-
 .ui-app .ui-batch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   background: var(--ui-surface);
   color: var(--ui-text);
   border-bottom: 1px solid var(--ui-border);
@@ -1337,115 +1526,20 @@
   font-size: 1rem !important;
 }
 
-.ui-app .ui-batch-filter-bar {
-  --ui-batch-control-height: 2.5rem;
+.ui-app .ui-batch-filter-shell {
   margin: 0.75rem 1rem;
-  padding: 0.85rem;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-1);
-  align-items: end;
-  flex-wrap: wrap;
-  gap: 0.6rem;
 }
 
-.ui-app .ui-batch-filter-bar .filter-group {
-  display: grid;
-  gap: 0.32rem;
-  min-width: 140px;
-  align-items: start;
-  align-content: end;
+.ui-app .ui-batch-filter-shell .ui-controls {
+  position: static;
+  top: auto;
+  z-index: auto;
+  margin: 0;
 }
 
-.ui-app .ui-batch-filter-bar .filter-group label {
-  color: var(--ui-muted);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.ui-app .ui-batch-filter-bar .filter-buttons {
-  display: inline-flex;
-  align-items: stretch;
-  width: fit-content;
-  min-height: var(--ui-batch-control-height);
-  height: var(--ui-batch-control-height);
-  border: 1px solid var(--ui-border);
-  border-radius: 9px;
-  overflow: hidden;
-  gap: 0;
-}
-
-.ui-app .ui-batch-filter-bar .filter-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100%;
-  height: 100%;
-  border-radius: 0;
-  border: 0;
-  background: #ffffff;
-  color: var(--ui-muted);
-  padding: 0 0.72rem;
-  font-size: 0.84rem;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.ui-app .ui-batch-filter-bar .filter-button.active {
-  background: #dbe9ff;
-  color: #0b4aa4;
-}
-
-.ui-app .ui-batch-filter-bar .date-input,
-.ui-app .ui-batch-filter-bar .sort-select,
-.ui-app .ui-batch-filter-bar .search-input,
-.ui-app .ui-batch-filter-bar .ui-date-range-trigger {
-  min-height: var(--ui-batch-control-height);
-  height: var(--ui-batch-control-height);
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  background: #ffffff;
-  box-shadow: none;
-  max-width: none;
-  width: 100%;
-  padding-top: 0;
-  padding-bottom: 0;
-  font-size: 0.85rem;
-  color: var(--ui-text);
-}
-
-.ui-app .ui-batch-filter-bar .ui-batch-date-range-group {
-  min-width: 210px;
-  flex: 1 1 240px;
-}
-
-.ui-app .ui-batch-filter-bar .ui-batch-date-range-group .ui-date-range {
-  width: 100%;
-}
-
-.ui-app .ui-batch-filter-bar .ui-batch-date-range-group .ui-date-range-popover {
+.ui-app .ui-batch-filter-shell .ui-date-range-popover {
   width: min(44rem, calc(100vw - 2rem));
   max-width: calc(100vw - 2rem);
-}
-
-.ui-app .ui-batch-filter-bar .ui-batch-search-group {
-  flex: 1 1 240px;
-  min-width: 220px;
-}
-
-.ui-app .ui-batch-filter-bar .ui-batch-search-type-group {
-  flex: 0 1 122px;
-  min-width: 110px;
-  max-width: 122px;
-}
-
-.ui-app .ui-batch-filter-bar .ui-batch-page-size-group {
-  flex: 0 1 70px;
-  min-width: 70px;
-  max-width: 70px;
 }
 
 .ui-app .ui-batch-content {
@@ -1462,8 +1556,7 @@
 .ui-app .ui-batch-pagination-shell {
   flex: 0 0 auto;
   padding: 0 1rem 0.6rem;
-  background: var(--ui-surface);
-  border-top: 1px solid var(--ui-border);
+  background: var(--ui-bg);
 }
 
 .ui-app .ui-batch-content .batch-modal-error {
@@ -1479,6 +1572,7 @@
   box-shadow: none;
   border: 1px solid var(--ui-border);
   border-radius: 12px;
+  background: var(--ui-surface);
   flex: 1 1 auto;
   min-height: 220px;
   max-height: none;
@@ -1487,17 +1581,44 @@
 }
 
 .ui-app .ui-batch-content .batch-modal-grid table {
+  width: 100%;
   min-width: 560px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--ui-surface);
   font-size: 0.86rem;
 }
 
+.ui-app .ui-batch-content .batch-modal-grid .ui-batch-col-select {
+  width: 3rem;
+}
+
+.ui-app .ui-batch-content .batch-modal-grid .ui-batch-col-title {
+  width: auto;
+}
+
+.ui-app .ui-batch-content .batch-modal-grid .ui-batch-col-due {
+  width: 10.5rem;
+}
+
+.ui-app .ui-batch-content .batch-modal-grid .ui-batch-col-status {
+  width: 7.5rem;
+}
+
 .ui-app .ui-batch-content .batch-modal-grid th {
-  background: var(--ui-surface-alt);
+  background: var(--ui-surface);
   color: var(--ui-muted);
   font-size: 0.75rem;
   font-weight: 700;
+  text-align: left;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  border-bottom: 1px solid var(--ui-border);
+  box-shadow: 0 1px 0 rgba(16, 24, 40, 0.05);
 }
 
 .ui-app .ui-batch-content .batch-modal-grid td,
@@ -1505,7 +1626,39 @@
   padding: 0.58rem 0.7rem;
 }
 
+.ui-app .ui-batch-content .batch-modal-grid td {
+  background: var(--ui-surface);
+  border-bottom: 1px solid #e6ebf2;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.ui-app .ui-batch-content .batch-modal-grid th:first-child,
+.ui-app .ui-batch-content .batch-modal-grid td:first-child {
+  text-align: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ui-app .ui-batch-content .batch-modal-grid th:first-child input,
+.ui-app .ui-batch-content .batch-modal-grid td:first-child input {
+  margin: 0;
+}
+
+.ui-app .ui-batch-content .batch-modal-grid tbody tr:nth-child(even) td {
+  background: #fafcff;
+}
+
+.ui-app .ui-batch-content .batch-modal-grid tbody tr:hover td {
+  background: #f2f7ff;
+}
+
 .ui-app .ui-batch-content .batch-modal-grid tr.selected td {
+  background: #eaf2ff;
+}
+
+.ui-app .ui-batch-content .batch-modal-grid tbody tr.selected:nth-child(even) td,
+.ui-app .ui-batch-content .batch-modal-grid tbody tr.selected:hover td {
   background: #eaf2ff;
 }
 
@@ -1542,7 +1695,7 @@
   gap: 0.35rem;
 }
 
-.ui-app .ui-batch-pagination .pagination-buttons .btn-secondary {
+.ui-app .ui-batch-pagination .pagination-buttons .ui-btn {
   border: 1px solid var(--ui-border);
   border-radius: 10px;
   background: var(--ui-surface-alt);
@@ -1550,26 +1703,12 @@
   padding: 0.5rem 0.72rem;
   font-size: 0.85rem;
   font-weight: 600;
-}
-
-.ui-app .ui-batch-pagination .pagination-buttons .btn-secondary:hover:not(:disabled) {
-  border-color: #b8c4d6;
-  background: #ffffff;
-}
-
-.ui-app .ui-batch-pagination .pagination-buttons .btn-primary {
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  background: #ffffff;
-  color: var(--ui-text);
-  min-width: 2.1rem;
-  min-height: 2.1rem;
   box-shadow: none;
 }
 
-.ui-app .ui-batch-pagination .pagination-buttons .btn-primary:hover:not(:disabled) {
+.ui-app .ui-batch-pagination .pagination-buttons .ui-btn:hover:not(:disabled) {
   border-color: #b8c4d6;
-  background: var(--ui-surface-alt);
+  background: #ffffff;
 }
 
 .ui-app .ui-batch-selection-summary {
@@ -1581,49 +1720,29 @@
 .ui-app .ui-batch-command-shell {
   flex: 0 0 auto;
   padding: 0 1rem 0.6rem;
-  background: var(--ui-surface);
-  border-top: 1px solid var(--ui-border);
+  background: var(--ui-bg);
+  border-top: 0;
 }
 
 .ui-app .ui-batch-command-shell .batch-modal-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   margin: 0;
-  padding: 0.35rem 0 !important;
-  gap: 0.45rem;
+  padding: 0.25rem 0 !important;
+  gap: 0.35rem;
 }
 
-.ui-app .ui-batch-command-shell .batch-modal-actions .batch-action-btn {
-  width: 100%;
+.ui-app .ui-batch-command-shell .batch-modal-actions .ui-batch-action-btn {
+  width: auto;
   min-width: 0;
+  flex: 0 0 auto;
   padding: 0.5rem 0.72rem;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
+  line-height: 1.15;
 }
 
-.ui-app .ui-batch-command-shell .batch-modal-actions .batch-action-btn.btn-primary {
-  border: 1px solid var(--ui-primary);
-  border-radius: 10px;
-  background: var(--ui-primary);
-  color: #ffffff;
-}
-
-.ui-app .ui-batch-command-shell .batch-modal-actions .batch-action-btn.btn-primary:hover:not(:disabled) {
-  background: var(--ui-primary-strong);
-  border-color: var(--ui-primary-strong);
-}
-
-.ui-app .ui-batch-command-shell .batch-modal-actions .batch-action-btn.btn-danger {
-  border: 1px solid #efc2ba;
-  border-radius: 10px;
-  background: var(--ui-danger-bg);
-  color: var(--ui-danger);
-}
-
-.ui-app .ui-batch-command-shell .batch-modal-actions .batch-action-btn.btn-danger:hover:not(:disabled) {
-  background: #fde7e3;
-}
-
-.ui-app .ui-batch-command-shell .batch-modal-actions .batch-action-btn:disabled {
+.ui-app .ui-batch-command-shell .batch-modal-actions .ui-batch-action-btn:disabled {
   background: #eef2f7 !important;
   border-color: #d5deeb !important;
   color: #8d9ab0 !important;
@@ -1644,17 +1763,30 @@
   align-items: center;
 }
 
-.ui-app .ui-batch-command-shell .batch-date-input {
-  min-width: 170px;
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
+.ui-app .ui-batch-command-shell .ui-batch-due-picker {
+  min-width: 0;
+  width: min(240px, 100%);
+}
+
+.ui-app .ui-batch-command-shell .ui-batch-due-picker .ui-date-range-trigger {
+  min-height: 2.5rem;
+  height: 2.5rem;
+}
+
+.ui-app .ui-batch-command-shell .ui-batch-due-picker .ui-date-range-popover {
+  top: auto;
+  bottom: calc(100% + 0.45rem);
+  left: 0;
+  right: auto;
+  width: min(26rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
 }
 
 .ui-app .ui-batch-command-shell .batch-modal-confirm {
   margin-bottom: 0;
   padding: 0.55rem !important;
-  border-radius: 12px;
   border: 1px solid var(--ui-border);
+  border-radius: 12px;
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-1);
 }
@@ -1686,56 +1818,21 @@
   justify-content: end;
 }
 
-.ui-app .ui-batch-command-shell .btn-secondary,
-.ui-app .ui-batch-command-shell .btn-primary,
-.ui-app .ui-batch-command-shell .btn-danger {
+.ui-app .ui-batch-command-shell .ui-btn {
   border-radius: 10px;
-  border: 1px solid var(--ui-border);
   font-weight: 600;
   font-size: 0.83rem;
   padding: 0.5rem 0.72rem;
 }
 
-.ui-app .ui-batch-command-shell .btn-secondary {
-  background: var(--ui-surface-alt);
-  color: var(--ui-text);
-}
-
-.ui-app .ui-batch-command-shell .btn-primary {
-  background: var(--ui-primary);
-  border-color: var(--ui-primary);
-  color: #ffffff;
-}
-
-.ui-app .ui-batch-command-shell .btn-primary:hover:not(:disabled) {
-  background: var(--ui-primary-strong);
-  border-color: var(--ui-primary-strong);
-}
-
-.ui-app .ui-batch-command-shell .btn-danger {
-  background: var(--ui-danger-bg);
-  border-color: #efc2ba;
-  color: var(--ui-danger);
-}
-
-.ui-app .ui-batch-footer {
-  padding: 0.75rem 1rem !important;
-  background: var(--ui-surface) !important;
-  border-top: 1px solid var(--ui-border) !important;
-  display: flex;
-  justify-content: flex-end;
-  box-shadow: 0 -1px 0 rgba(16, 24, 40, 0.04);
-}
-
-.ui-app .ui-batch-footer .btn-secondary {
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  background: #ffffff;
-  color: var(--ui-text);
-}
-
 .ui-batch-label-short {
   display: none;
+}
+
+@media (max-width: 1460px) {
+  .ui-layout.chat-open .ui-controls {
+    grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(76px, 88px) minmax(200px, 1fr);
+  }
 }
 
 @media (max-width: 1279px) {
@@ -1778,10 +1875,6 @@
     font-size: 0.84rem;
   }
 
-  .ui-app .ui-batch-filter-bar .ui-batch-date-range-group .ui-date-range-popover {
-    width: min(31rem, calc(100vw - 2rem));
-    max-width: calc(100vw - 2rem);
-  }
 }
 
 @media (max-width: 1100px) {
@@ -1849,6 +1942,10 @@
   .ui-chat-column.tablet .ui-chat {
     height: 100%;
     max-height: none;
+  }
+
+  .ui-chat-shell.desktop {
+    grid-template-columns: 240px minmax(0, 1fr);
   }
 
   .ui-topbar-brand p {
@@ -1930,6 +2027,22 @@
     flex: 1;
   }
 
+  .ui-chat-conversations-header {
+    padding: 0.55rem 0.6rem;
+  }
+
+  .ui-chat-conversation-item-wrap {
+    min-width: 0;
+  }
+
+  .ui-chat-conversation-item {
+    min-width: 0;
+  }
+
+  .ui-chat-rename-box {
+    padding-right: 0;
+  }
+
   .ui-dialog {
     width: min(96vw, 520px);
   }
@@ -1944,17 +2057,6 @@
   .ui-app .ui-batch-overlay {
     align-items: flex-start;
     padding: 0.35rem;
-  }
-
-  .ui-app .ui-batch-filter-bar .filter-group {
-    min-width: 0;
-    flex: 1 1 140px;
-  }
-
-  .ui-app .ui-batch-filter-bar .ui-batch-page-size-group {
-    flex: 0 1 70px;
-    min-width: 70px;
-    max-width: 70px;
   }
 
   .ui-app .ui-batch-content .batch-modal-grid table {
@@ -1984,18 +2086,13 @@
   }
 
   .ui-app .ui-batch-command-shell .batch-modal-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.35rem;
+    justify-content: flex-end;
+    gap: 0.3rem;
   }
 
-  .ui-app .ui-batch-command-shell .batch-modal-actions .batch-action-btn:last-child {
-    grid-column: auto;
-  }
-
-  .ui-app .ui-batch-command-shell .batch-modal-actions .batch-action-btn {
-    padding: 0.4rem 0.35rem;
-    min-height: 2rem;
-    font-size: 0.74rem;
+  .ui-app .ui-batch-command-shell .batch-modal-actions .ui-batch-action-btn {
+    padding: 0.5rem 0.72rem;
+    font-size: 0.85rem;
   }
 
   .ui-app .ui-batch-command-shell .batch-modal-due {
@@ -2003,17 +2100,15 @@
     gap: 0.4rem;
   }
 
+  .ui-app .ui-batch-command-shell .ui-batch-due-picker {
+    width: 100%;
+  }
+
   .ui-app .ui-batch-command-shell .batch-modal-due-actions,
   .ui-app .ui-batch-command-shell .batch-modal-confirm .modal-footer {
     grid-auto-flow: column;
     justify-content: stretch;
     grid-template-columns: 1fr 1fr;
-  }
-
-  .ui-app .ui-batch-footer {
-    position: relative;
-    z-index: 1;
-    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .ui-date-range-popover {
@@ -2207,12 +2302,8 @@
   }
 
   .ui-app .ui-batch-command-shell .batch-modal-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.3rem;
-  }
-
-  .ui-app .ui-batch-command-shell .batch-modal-actions .batch-action-btn:last-child {
-    grid-column: auto;
+    justify-content: flex-end;
+    gap: 0.28rem;
   }
 
   .ui-app .ui-batch-pagination {
@@ -2251,9 +2342,7 @@
     grid-template-columns: 1fr;
   }
 
-  .ui-app .ui-batch-command-shell .btn-secondary,
-  .ui-app .ui-batch-command-shell .btn-primary,
-  .ui-app .ui-batch-command-shell .btn-danger {
+  .ui-app .ui-batch-command-shell .ui-btn {
     width: 100%;
   }
 }

@@ -43,7 +43,7 @@ const TodoListSectionComponent = ({
       </div>
 
       <footer className="ui-pagination">
-        <span>Page {currentPage || 1}</span>
+        <span className="pagination-info">Page {currentPage || 1}</span>
         <div>
           <Button type="button" variant="secondary" onClick={onPreviousPage} disabled={previousPage === null}>
             Previous

@@ -34,7 +34,7 @@ To run the application locally, follow these steps:
 - **Edit & Complete Todos**: Rename or mark todos as done.
 - **Batch Operations**: Select multiple todos and perform batch actions:
   - Change due dates
-  - Mark as done
+  - Mark done
   - Delete
 - **Batch Selection**: Use the header checkbox to select/deselect all visible todos.
 - **Pagination**: Navigate through pages of todos.
@@ -52,7 +52,7 @@ To test the application, follow these steps:
 1. Create a new todo by entering a title and due date in the form and clicking "Add Todo".
 2. View the list of todos and their statuses.
 3. Update a todo by clicking the "Complete" or "Rename" buttons next to each todo.
-4. Select multiple todos and perform batch actions (change due date, mark as done, or delete).
+4. Select multiple todos and perform batch actions (mark done, change due date, or delete).
 5. Use the filter to view only open or done todos.
 6. Check the Board Summary at the top of the list for AI-generated insights.
 7. Use the chat button for AI-powered, real-time help.

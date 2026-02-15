@@ -131,6 +131,18 @@ func TestUnitOfWork_Outbox(t *testing.T) {
 	assert.IsType(t, OutboxRepository{}, outbox)
 }
 
+func TestUnitOfWork_Conversation(t *testing.T) {
+	db, _, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	uow := NewUnitOfWork(db)
+	convRepo := uow.Conversation()
+
+	assert.NotNil(t, convRepo)
+	assert.IsType(t, ConversationRepository{}, convRepo)
+}
+
 func TestUnitOfWork_ChatMessage(t *testing.T) {
 	db, _, err := sqlmock.New()
 	assert.NoError(t, err)

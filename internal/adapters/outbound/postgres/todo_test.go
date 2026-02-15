@@ -246,7 +246,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		setExpectations func(mock sqlmock.Sqlmock)
 		page            int
 		pageSize        int
-		opts            []domain.ListTodoOptions
+		opts            []domain.ListTodoOption
 		expectedTodos   []domain.Todo
 		expectedHasMore bool
 		expectedErr     bool
@@ -375,7 +375,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"filter-by-status": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOptions{
+			opts: []domain.ListTodoOption{
 				domain.WithStatus(domain.TodoStatus_DONE),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
@@ -401,7 +401,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"invalid-status-filter": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOptions{
+			opts: []domain.ListTodoOption{
 				domain.WithStatus("IN_PROGRESS"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
@@ -413,7 +413,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"filter-by-embedding": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOptions{
+			opts: []domain.ListTodoOption{
 				domain.WithEmbedding([]float64{0.1, 0.2, 0.3}),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
@@ -441,7 +441,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"filter-by-title-contains": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOptions{
+			opts: []domain.ListTodoOption{
 				domain.WithTitleContains("report"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
@@ -465,7 +465,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"filter-by-due-date-range": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOptions{
+			opts: []domain.ListTodoOption{
 				domain.WithDueDateRange(
 					time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
 					time.Date(2024, 2, 15, 0, 0, 0, 0, time.UTC),
@@ -497,7 +497,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"sort-by-createdat-asc": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOptions{
+			opts: []domain.ListTodoOption{
 				domain.WithSortBy("createdAtAsc"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
@@ -531,7 +531,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"sort-by-similarity": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOptions{
+			opts: []domain.ListTodoOption{
 				domain.WithEmbedding([]float64{0.1, 0.2, 0.3}),
 				domain.WithSortBy("similarityAsc"),
 			},
@@ -570,7 +570,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"no-embedding-for-similarity-sort": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOptions{
+			opts: []domain.ListTodoOption{
 				domain.WithSortBy("similarityAsc"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
@@ -582,7 +582,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"invalid-sort-by": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOptions{
+			opts: []domain.ListTodoOption{
 				domain.WithSortBy("invalidSort"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {

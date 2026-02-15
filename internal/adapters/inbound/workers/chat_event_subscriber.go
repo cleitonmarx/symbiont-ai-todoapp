@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/pubsub/v2"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/google/uuid"
 )
 
 // ChatEventSubscriber consumes chat-message events from Pub/Sub
@@ -101,7 +102,7 @@ func (s ChatEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 		s.workerExecutionChan <- struct{}{}
 	}
 
-	conversations := make(map[string]chatSummaryConversationBatch)
+	conversations := make(map[uuid.UUID]chatSummaryConversationBatch)
 	for _, msg := range batch {
 		var event domain.ChatMessageEvent
 		if err := json.Unmarshal(msg.Data, &event); err != nil {

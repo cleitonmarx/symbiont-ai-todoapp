@@ -77,6 +77,7 @@ func waitChatSubscriberStop(t *testing.T, doneChan chan struct{}) {
 
 // TestChatEventSubscriber_Run verifies event decoding, coalescing and summary trigger behavior.
 func TestChatEventSubscriber_Run(t *testing.T) {
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	firstMessageID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	secondMessageID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
 	thirdMessageID := uuid.MustParse("323e4567-e89b-12d3-a456-426614174002")
@@ -91,19 +92,19 @@ func TestChatEventSubscriber_Run(t *testing.T) {
 					Type:           domain.EventType_CHAT_MESSAGE_SENT,
 					ChatRole:       domain.ChatRole_Assistant,
 					ChatMessageID:  firstMessageID,
-					ConversationID: "global",
+					ConversationID: conversationID,
 				}),
 				chatMessageEventPayload(t, domain.ChatMessageEvent{
 					Type:           domain.EventType_CHAT_MESSAGE_SENT,
 					ChatRole:       domain.ChatRole_Assistant,
 					ChatMessageID:  secondMessageID,
-					ConversationID: "global",
+					ConversationID: conversationID,
 				}),
 				chatMessageEventPayload(t, domain.ChatMessageEvent{
 					Type:           domain.EventType_CHAT_MESSAGE_SENT,
 					ChatRole:       domain.ChatRole_Assistant,
 					ChatMessageID:  thirdMessageID,
-					ConversationID: "global",
+					ConversationID: conversationID,
 				}),
 			},
 			expectedEvents: []domain.ChatMessageEvent{
@@ -111,7 +112,7 @@ func TestChatEventSubscriber_Run(t *testing.T) {
 					Type:           domain.EventType_CHAT_MESSAGE_SENT,
 					ChatRole:       domain.ChatRole_Assistant,
 					ChatMessageID:  thirdMessageID,
-					ConversationID: "global",
+					ConversationID: conversationID,
 				},
 			},
 		},
@@ -121,19 +122,19 @@ func TestChatEventSubscriber_Run(t *testing.T) {
 					Type:           domain.EventType_CHAT_MESSAGE_SENT,
 					ChatRole:       domain.ChatRole_User,
 					ChatMessageID:  firstMessageID,
-					ConversationID: "conversation-a",
+					ConversationID: conversationID,
 				}),
 				chatMessageEventPayload(t, domain.ChatMessageEvent{
 					Type:           domain.EventType_CHAT_MESSAGE_SENT,
 					ChatRole:       domain.ChatRole_Assistant,
 					ChatMessageID:  secondMessageID,
-					ConversationID: "conversation-b",
+					ConversationID: uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 				}),
 				chatMessageEventPayload(t, domain.ChatMessageEvent{
 					Type:           domain.EventType_CHAT_MESSAGE_SENT,
 					ChatRole:       domain.ChatRole_Assistant,
 					ChatMessageID:  thirdMessageID,
-					ConversationID: "conversation-a",
+					ConversationID: conversationID,
 				}),
 			},
 			expectedEvents: []domain.ChatMessageEvent{
@@ -141,13 +142,13 @@ func TestChatEventSubscriber_Run(t *testing.T) {
 					Type:           domain.EventType_CHAT_MESSAGE_SENT,
 					ChatRole:       domain.ChatRole_Assistant,
 					ChatMessageID:  thirdMessageID,
-					ConversationID: "conversation-a",
+					ConversationID: conversationID,
 				},
 				{
 					Type:           domain.EventType_CHAT_MESSAGE_SENT,
 					ChatRole:       domain.ChatRole_Assistant,
 					ChatMessageID:  secondMessageID,
-					ConversationID: "conversation-b",
+					ConversationID: uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 				},
 			},
 		},
@@ -162,7 +163,7 @@ func TestChatEventSubscriber_Run(t *testing.T) {
 				chatMessageEventPayload(t, domain.ChatMessageEvent{
 					Type:           domain.EventType_TODO_CREATED,
 					ChatMessageID:  firstMessageID,
-					ConversationID: "global",
+					ConversationID: conversationID,
 				}),
 			},
 			expectedEvents: nil,

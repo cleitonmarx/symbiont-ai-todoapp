@@ -94,8 +94,10 @@ type LLMToolFunctionParameterDetail struct {
 
 // LLMStreamEventMeta contains metadata for a streaming chat session
 type LLMStreamEventMeta struct {
-	UserMessageID      uuid.UUID
-	AssistantMessageID uuid.UUID
+	ConversationID      uuid.UUID
+	UserMessageID       uuid.UUID
+	AssistantMessageID  uuid.UUID
+	ConversationCreated bool
 }
 
 // LLMStreamEventDelta contains a text delta from the stream

@@ -6,6 +6,8 @@ import "context"
 type UnitOfWork interface {
 	// Todo returns the repository for managing todos.
 	Todo() TodoRepository
+	// Conversation returns the repository for managing conversations.
+	Conversation() ConversationRepository
 	// ChatMessage returns the repository for managing chat messages.
 	ChatMessage() ChatMessageRepository
 	// ConversationSummary returns the repository for managing conversation summaries.

@@ -7,8 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const GlobalConversationID = "global"
-
 // ChatRole represents the role of a chat message
 type ChatRole string
 
@@ -33,7 +31,7 @@ const (
 // ChatMessage represents an AI chat message in a conversation
 type ChatMessage struct {
 	ID               uuid.UUID
-	ConversationID   string
+	ConversationID   uuid.UUID
 	TurnID           uuid.UUID
 	TurnSequence     int64
 	ChatRole         ChatRole
@@ -57,39 +55,29 @@ func (m ChatMessage) IsToolCallSuccess() bool {
 		m.MessageState == ChatMessageState_Completed
 }
 
-// ListChatMessagesOptions defines optional filters for listing chat messages.
-type ListChatMessagesOptions struct {
-	ConversationID string
+// ListChatMessagesParams defines optional filters for listing chat messages.
+type ListChatMessagesParams struct {
 	AfterMessageID *uuid.UUID
 }
 
 // ListChatMessagesOption configures optional filters for listing chat messages.
-type ListChatMessagesOption func(*ListChatMessagesOptions)
-
-// WithChatMessagesByConversationID filters the query by conversation ID.
-func WithChatMessagesByConversationID(conversationID string) ListChatMessagesOption {
-	return func(options *ListChatMessagesOptions) {
-		options.ConversationID = conversationID
-	}
-}
+type ListChatMessagesOption func(*ListChatMessagesParams)
 
 // WithChatMessagesAfterMessageID filters the query to return messages after a checkpoint message ID.
 func WithChatMessagesAfterMessageID(messageID uuid.UUID) ListChatMessagesOption {
-	return func(options *ListChatMessagesOptions) {
+	return func(options *ListChatMessagesParams) {
 		options.AfterMessageID = &messageID
 	}
 }
 
 // ChatMessageRepository defines the interface for chat message persistence
 type ChatMessageRepository interface {
-	// CreateChatMessages persists chat messages for the global conversation
+	// CreateChatMessages persists chat messages for a conversation
 	CreateChatMessages(ctx context.Context, messages []ChatMessage) error
 
-	// ListChatMessages retrieves messages for the global conversation ordered by creation time.
-	// If limit is greater than 0, only the last N messages are returned.
-	// Returns messages and a boolean indicating if there are more messages.
-	ListChatMessages(ctx context.Context, limit int, options ...ListChatMessagesOption) ([]ChatMessage, bool, error)
+	// ListChatMessages retrieves paginated chat messages for a conversation, with optional filters.
+	ListChatMessages(ctx context.Context, conversationID uuid.UUID, page int, pageSize int, options ...ListChatMessagesOption) ([]ChatMessage, bool, error)
 
-	// DeleteConversation removes all messages for the global conversation
-	DeleteConversation(ctx context.Context) error
+	// DeleteConversationMessages removes all messages for a conversation.
+	DeleteConversationMessages(ctx context.Context, conversationID uuid.UUID) error
 }

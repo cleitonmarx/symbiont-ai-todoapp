@@ -298,7 +298,8 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 
 			if w.Code == http.StatusOK {
 				var resp gen.ConversationListResp
-				json.NewDecoder(w.Body).Decode(&resp)
+				err := json.NewDecoder(w.Body).Decode(&resp)
+				assert.NoError(t, err)
 
 				if tt.expectedHasNextPage {
 					assert.NotNil(t, resp.NextPage)

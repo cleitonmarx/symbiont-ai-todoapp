@@ -190,7 +190,7 @@ func expectPersistSequence(
 	uow.EXPECT().
 		Conversation().
 		Return(conversationRepo).
-		Times(successCount * 2)
+		Times(successCount)
 
 	var (
 		createIdx         int
@@ -264,18 +264,6 @@ func expectPersistSequence(
 			assert.Equal(t, msg.ConversationID, event.ConversationID)
 
 			return nil
-		}).
-		Times(successCount)
-
-	conversationRepo.EXPECT().
-		GetConversation(mock.Anything, mock.Anything).
-		RunAndReturn(func(ctx context.Context, conversationID uuid.UUID) (domain.Conversation, bool, error) {
-			return domain.Conversation{
-				ID:          conversationID,
-				Title:       "Test conversation",
-				TitleSource: domain.ConversationTitleSource_Auto,
-				UpdatedAt:   fixedTime.Add(-time.Second),
-			}, true, nil
 		}).
 		Times(successCount)
 

@@ -58,7 +58,6 @@ func (r ConversationRepository) CreateConversation(
 	}
 
 	var created domain.Conversation
-	var lastMessageAt sql.NullTime
 	err := r.sb.
 		Insert("conversations").
 		Columns(conversationFields...).
@@ -76,15 +75,12 @@ func (r ConversationRepository) CreateConversation(
 			&created.ID,
 			&created.Title,
 			&created.TitleSource,
-			&lastMessageAt,
+			&created.LastMessageAt,
 			&created.CreatedAt,
 			&created.UpdatedAt,
 		)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return domain.Conversation{}, err
-	}
-	if lastMessageAt.Valid {
-		created.LastMessageAt = &lastMessageAt.Time
 	}
 
 	return created, nil
@@ -99,7 +95,6 @@ func (r ConversationRepository) GetConversation(
 	defer span.End()
 
 	var conversation domain.Conversation
-	var lastMessageAt sql.NullTime
 	err := r.sb.
 		Select(conversationFields...).
 		From("conversations").
@@ -110,7 +105,7 @@ func (r ConversationRepository) GetConversation(
 			&conversation.ID,
 			&conversation.Title,
 			&conversation.TitleSource,
-			&lastMessageAt,
+			&conversation.LastMessageAt,
 			&conversation.CreatedAt,
 			&conversation.UpdatedAt,
 		)
@@ -119,9 +114,6 @@ func (r ConversationRepository) GetConversation(
 			return domain.Conversation{}, false, nil
 		}
 		return domain.Conversation{}, false, err
-	}
-	if lastMessageAt.Valid {
-		conversation.LastMessageAt = &lastMessageAt.Time
 	}
 
 	return conversation, true, nil
@@ -188,21 +180,18 @@ func (r ConversationRepository) ListConversations(
 	conversations := []domain.Conversation{}
 	for rows.Next() {
 		var conversation domain.Conversation
-		var lastMessageAt sql.NullTime
 		err := rows.Scan(
 			&conversation.ID,
 			&conversation.Title,
 			&conversation.TitleSource,
-			&lastMessageAt,
+			&conversation.LastMessageAt,
 			&conversation.CreatedAt,
 			&conversation.UpdatedAt,
 		)
 		if telemetry.RecordErrorAndStatus(span, err) {
 			return nil, false, err
 		}
-		if lastMessageAt.Valid {
-			conversation.LastMessageAt = &lastMessageAt.Time
-		}
+
 		conversations = append(conversations, conversation)
 	}
 	if err := rows.Err(); telemetry.RecordErrorAndStatus(span, err) {

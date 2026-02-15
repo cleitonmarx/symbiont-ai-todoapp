@@ -243,7 +243,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 			assert.NoError(t, err)
-			defer db.Close()
+			defer db.Close() //nolint:errcheck
 
 			tt.expect(mock)
 

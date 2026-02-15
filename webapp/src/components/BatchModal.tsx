@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { gqlListTodos, gqlBatchUpdateTodos, gqlBatchDeleteTodos } from '../services/batchGraphqlApi';
 import type { ListTodosQuery, TodoStatus, TodoSortBy } from '../types/graphql';
+import { TodoControlsBar } from '../features/todos/TodoControlsBar';
 import { DateRangePicker } from './ui/DateRangePicker';
 
 interface BatchModalProps {
@@ -39,10 +40,7 @@ const BatchModal: React.FC<BatchModalProps> = ({
   const selectAllMobileRef = useRef<HTMLInputElement | null>(null);
 
 	const isModernLayout = hideTrigger;
-	const handleFilterDateRangeChange = (startDate: string, endDate: string) => {
-		setDueAfter(startDate);
-		setDueBefore(endDate);
-	};
+  const actionLocked = Boolean(action);
 
   useEffect(() => {
     setShow(open);
@@ -195,22 +193,22 @@ const BatchModal: React.FC<BatchModalProps> = ({
       {!action ? (
         <div className="batch-modal-actions" style={isModernLayout ? undefined : { padding: '0.5rem 0' }}>
           <button
-            className="btn-primary batch-action-btn"
+            className="ui-btn ui-btn-primary ui-batch-action-btn"
+            disabled={selected.length === 0 || statusFilter === 'DONE'}
+            onClick={() => setAction('done')}
+          >
+            <span className="ui-batch-label-full">Mark Done</span>
+            <span className="ui-batch-label-short" aria-hidden="true">Done</span>
+          </button>
+          <button
+            className="ui-btn ui-btn-secondary ui-batch-action-btn"
             disabled={selected.length === 0 || statusFilter === 'DONE'}
             onClick={() => setAction('due')}
           >
             <span className="ui-batch-label-full">Change Due Date</span>
             <span className="ui-batch-label-short" aria-hidden="true">Due</span>
           </button>
-          <button
-            className="btn-primary batch-action-btn"
-            disabled={selected.length === 0 || statusFilter === 'DONE'}
-            onClick={() => setAction('done')}
-          >
-            <span className="ui-batch-label-full">Mark as Done</span>
-            <span className="ui-batch-label-short" aria-hidden="true">Done</span>
-          </button>
-          <button className="btn-danger batch-action-btn" disabled={selected.length === 0} onClick={() => setAction('delete')}>
+          <button className="ui-btn ui-btn-danger ui-batch-action-btn" disabled={selected.length === 0} onClick={() => setAction('delete')}>
             <span className="ui-batch-label-full">Delete</span>
             <span className="ui-batch-label-short" aria-hidden="true">Del</span>
           </button>
@@ -220,19 +218,22 @@ const BatchModal: React.FC<BatchModalProps> = ({
       {action === 'due' ? (
         <div className="batch-modal-due" style={isModernLayout ? undefined : { padding: '0.5rem 0' }}>
           <label htmlFor="batch-due-date">New Due Date</label>
-          <input
+          <DateRangePicker
             id="batch-due-date"
-            type="date"
-            value={dueDate}
-            min={getMinDate()}
-            onChange={(event) => setDueDate(event.target.value)}
-            className="batch-date-input"
+            mode="single"
+            startDate={dueDate}
+            endDate={dueDate}
+            minDate={getMinDate()}
+            onChange={(startDate, endDate) => setDueDate(startDate || endDate)}
+            placeholder="Select due date"
+            showClearButton={false}
+            className="ui-batch-due-picker"
           />
           <div className="batch-modal-due-actions">
-            <button className="btn-secondary" onClick={() => setAction(null)}>
+            <button className="ui-btn ui-btn-secondary" onClick={() => setAction(null)}>
               Cancel
             </button>
-            <button className="btn-primary" disabled={!dueDate} onClick={handleBatchAction}>
+            <button className="ui-btn ui-btn-primary" disabled={!dueDate} onClick={handleBatchAction}>
               Confirm
             </button>
           </div>
@@ -243,10 +244,10 @@ const BatchModal: React.FC<BatchModalProps> = ({
         <div className="batch-modal-confirm" style={isModernLayout ? undefined : { padding: '0.5rem 0' }}>
           <span>Mark selected todos as done?</span>
           <div className="modal-footer">
-            <button className="btn-secondary" onClick={() => setAction(null)}>
+            <button className="ui-btn ui-btn-secondary" onClick={() => setAction(null)}>
               Cancel
             </button>
-            <button className="btn-primary" onClick={handleBatchAction}>
+            <button className="ui-btn ui-btn-primary" onClick={handleBatchAction}>
               Confirm
             </button>
           </div>
@@ -257,10 +258,10 @@ const BatchModal: React.FC<BatchModalProps> = ({
         <div className="batch-modal-confirm" style={isModernLayout ? undefined : { padding: '0.5rem 0' }}>
           <span>Delete selected todos?</span>
           <div className="modal-footer">
-            <button className="btn-secondary" onClick={() => setAction(null)}>
+            <button className="ui-btn ui-btn-secondary" onClick={() => setAction(null)}>
               Cancel
             </button>
-            <button className="btn-danger" onClick={handleBatchAction}>
+            <button className="ui-btn ui-btn-danger" onClick={handleBatchAction}>
               Confirm
             </button>
           </div>
@@ -284,95 +285,44 @@ const BatchModal: React.FC<BatchModalProps> = ({
             style={isModernLayout ? undefined : { maxWidth: '80vw' }}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className={`modal-header ${isModernLayout ? 'ui-batch-header' : ''}`} style={isModernLayout ? undefined : { padding: '0.75rem 1rem' }}>
+            <div
+              className={`modal-header ${isModernLayout ? 'ui-batch-header' : ''}`}
+              style={
+                isModernLayout
+                  ? undefined
+                  : { padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }
+              }
+            >
               <h2 style={isModernLayout ? undefined : { margin: 0, fontSize: '1.25rem' }}>Batch Operations</h2>
+              <button type="button" className="ui-icon-btn" onClick={closeModal} aria-label="Close dialog">
+                ×
+              </button>
             </div>
 
-            <div
-              className={`filter-bar ${isModernLayout ? 'ui-batch-filter-bar' : ''}`}
-              style={isModernLayout ? undefined : { padding: '0.5rem 1rem', gap: '0.75rem', margin: '0 0 0.5rem 0' }}
-            >
-              <div className="filter-group">
-                <label>Status:</label>
-                <div className="filter-buttons">
-                  {(['OPEN', 'DONE'] as const).map((status) => (
-                    <button
-                      key={status}
-                      className={`filter-button ${statusFilter === status ? 'active' : ''}`}
-                      onClick={() => setStatusFilter(status)}
-                    >
-                      {status}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="filter-group ui-batch-date-range-group">
-                <label htmlFor="batch-date-range-picker">Due Range:</label>
-                <DateRangePicker
-                  id="batch-date-range-picker"
-                  startDate={dueAfter}
-                  endDate={dueBefore}
-                  onChange={handleFilterDateRangeChange}
-                  placeholder="Select date range"
-                />
-              </div>
-
-              <div className="filter-group">
-                <label>Sort By:</label>
-                <select value={sortBy} onChange={(event) => setSortBy(event.target.value as TodoSortBy)} className="sort-select">
-                  <option value="createdAtAsc">Created At</option>
-                  <option value="createdAtDesc">Created At Desc</option>
-                  <option value="dueDateAsc">Due Date Asc</option>
-                  <option value="dueDateDesc">Due Date Desc</option>
-                  {searchQuery && searchType === 'SIMILARITY' ? (
-                    <>
-                      <option value="similarityAsc">Similarity Asc</option>
-                      <option value="similarityDesc">Similarity Desc</option>
-                    </>
-                  ) : null}
-                </select>
-              </div>
-
-              <div className="filter-group ui-batch-page-size-group">
-                <label htmlFor="batch-page-size-select">Page Size:</label>
-                <select
-                  id="batch-page-size-select"
-                  value={pageSize}
-                  onChange={(event) => setPageSize(Number(event.target.value))}
-                  className="sort-select"
-                >
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
-
-              <div className="filter-group ui-batch-search-group">
-                <label htmlFor="batch-search-input">Search:</label>
-                <input
-                  id="batch-search-input"
-                  type="text"
-                  placeholder="Search todos..."
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  className="search-input"
-                  style={isModernLayout ? undefined : { flex: 1 }}
-                />
-              </div>
-
-              <div className="filter-group ui-batch-search-type-group">
-                <label htmlFor="batch-search-type-select">Search Type:</label>
-                <select
-                  id="batch-search-type-select"
-                  value={searchType}
-                  onChange={(event) => setSearchType(event.target.value as 'TITLE' | 'SIMILARITY')}
-                  className="sort-select"
-                >
-                  <option value="TITLE">Title</option>
-                  <option value="SIMILARITY">Similarity</option>
-                </select>
-              </div>
+            <div className={isModernLayout ? 'ui-batch-filter-shell' : ''} style={isModernLayout ? undefined : { padding: '0 1rem 0.5rem' }}>
+              <TodoControlsBar<'OPEN' | 'DONE'>
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                statusOptions={['OPEN', 'DONE']}
+                disabled={actionLocked}
+                idPrefix="batch"
+                sortBy={sortBy}
+                onSortByChange={(sort) => setSortBy(sort as TodoSortBy)}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+                searchQuery={searchQuery}
+                onSearchQueryChange={setSearchQuery}
+                searchType={searchType}
+                onSearchTypeChange={setSearchType}
+                dueAfter={dueAfter}
+                onDueAfterChange={setDueAfter}
+                dueBefore={dueBefore}
+                onDueBeforeChange={setDueBefore}
+                onClearDateRange={() => {
+                  setDueAfter('');
+                  setDueBefore('');
+                }}
+              />
             </div>
 
             <div className={`modal-content ${isModernLayout ? 'ui-batch-content' : ''}`} style={isModernLayout ? undefined : { padding: '0 1rem 0.1rem 1rem' }}>
@@ -403,6 +353,12 @@ const BatchModal: React.FC<BatchModalProps> = ({
 
               <div className="batch-modal-grid">
                 <table className={isModernLayout ? 'ui-batch-table' : ''}>
+                  <colgroup>
+                    <col className="ui-batch-col-select" />
+                    <col className="ui-batch-col-title" />
+                    <col className="ui-batch-col-due" />
+                    <col className="ui-batch-col-status" />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>
@@ -460,21 +416,21 @@ const BatchModal: React.FC<BatchModalProps> = ({
                 <div className="pagination-buttons">
                   {isModernLayout ? (
                     <>
-                      <button className="btn-secondary" disabled={!hasPreviousPage} onClick={() => setBatchPage(batchPage - 1)}>
+                      <button className="ui-btn ui-btn-secondary" disabled={!hasPreviousPage || actionLocked} onClick={() => setBatchPage(batchPage - 1)}>
                         <span className="ui-batch-label-full">Previous</span>
                         <span className="ui-batch-label-short" aria-hidden="true">Prev</span>
                       </button>
-                      <button className="btn-secondary" disabled={!hasNextPage} onClick={() => setBatchPage(batchPage + 1)}>
+                      <button className="ui-btn ui-btn-secondary" disabled={!hasNextPage || actionLocked} onClick={() => setBatchPage(batchPage + 1)}>
                         <span className="ui-batch-label-full">Next</span>
                         <span className="ui-batch-label-short" aria-hidden="true">Next</span>
                       </button>
                     </>
                   ) : (
                     <>
-                      <button className="btn-primary" disabled={!hasPreviousPage} onClick={() => setBatchPage(batchPage - 1)}>
+                      <button className="ui-btn ui-btn-primary" disabled={!hasPreviousPage || actionLocked} onClick={() => setBatchPage(batchPage - 1)}>
                         ←
                       </button>
-                      <button className="btn-primary" disabled={!hasNextPage} onClick={() => setBatchPage(batchPage + 1)}>
+                      <button className="ui-btn ui-btn-primary" disabled={!hasNextPage || actionLocked} onClick={() => setBatchPage(batchPage + 1)}>
                         →
                       </button>
                     </>
@@ -483,11 +439,6 @@ const BatchModal: React.FC<BatchModalProps> = ({
               </div>
             </div>
 
-            <div className={`modal-footer ${isModernLayout ? 'ui-batch-footer' : ''}`} style={isModernLayout ? undefined : { padding: '0.75rem 1rem' }}>
-              <button type="button" className="btn-secondary" onClick={closeModal}>
-                Close
-              </button>
-            </div>
           </div>
         </div>
       ) : null}

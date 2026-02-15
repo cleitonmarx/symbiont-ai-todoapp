@@ -7,11 +7,13 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestListChatMessagesImpl_Query(t *testing.T) {
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	tests := map[string]struct {
 		setExpectations func(repo *domain.MockChatMessageRepository)
 		page            int
@@ -28,7 +30,7 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 			expectedErr:     nil,
 			setExpectations: func(repo *domain.MockChatMessageRepository) {
 				repo.EXPECT().
-					ListChatMessages(mock.Anything, 50).
+					ListChatMessages(mock.Anything, conversationID, 1, 50).
 					Return(createChatMessages(50, domain.ChatRole_User), true, nil).
 					Once()
 			},
@@ -41,7 +43,7 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 			expectedErr:     nil,
 			setExpectations: func(repo *domain.MockChatMessageRepository) {
 				repo.EXPECT().
-					ListChatMessages(mock.Anything, 50).
+					ListChatMessages(mock.Anything, conversationID, 3, 50).
 					Return(createChatMessages(30, domain.ChatRole_Assistant), false, nil).
 					Once()
 			},
@@ -54,7 +56,7 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 			expectedErr:     errors.New("database error"),
 			setExpectations: func(repo *domain.MockChatMessageRepository) {
 				repo.EXPECT().
-					ListChatMessages(mock.Anything, 50).
+					ListChatMessages(mock.Anything, conversationID, 1, 50).
 					Return(nil, false, errors.New("database error")).
 					Once()
 			},
@@ -67,7 +69,7 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 			expectedErr:     nil,
 			setExpectations: func(repo *domain.MockChatMessageRepository) {
 				repo.EXPECT().
-					ListChatMessages(mock.Anything, 50).
+					ListChatMessages(mock.Anything, conversationID, 1, 50).
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 			},
@@ -80,7 +82,7 @@ func TestListChatMessagesImpl_Query(t *testing.T) {
 			tt.setExpectations(repo)
 
 			uc := NewListChatMessagesImpl(repo)
-			got, hasMore, gotErr := uc.Query(context.Background(), tt.page, tt.pageSize)
+			got, hasMore, gotErr := uc.Query(context.Background(), conversationID, tt.page, tt.pageSize)
 
 			assert.Equal(t, tt.expectedErr, gotErr)
 			assert.Equal(t, tt.expectedLen, len(got))

@@ -38,12 +38,13 @@ export interface ErrorResponse {
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   created_at: string;
 }
 
 export interface ChatHistoryResp {
+  conversation_id: string;
   messages: ChatMessage[];
   page: number;
   next_page: number | null;
@@ -53,17 +54,32 @@ export interface ChatHistoryResp {
 export interface ChatStreamRequest {
   message: string;
   model: string;
+  conversation_id?: string;
 }
 
 export interface ModelListResponse {
   models: string[];
 }
 
+export interface Conversation {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationListResp {
+  conversations: Conversation[];
+  page: number;
+  next_page: number | null;
+  previous_page: number | null;
+}
+
 export interface ChatStreamMeta {
   conversation_id: string;
   user_message_id: string;
   assistant_message_id: string;
-  started_at: string;
+  conversation_created: boolean;
 }
 
 export interface ChatStreamDelta {

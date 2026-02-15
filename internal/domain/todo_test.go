@@ -97,27 +97,27 @@ func TestTodo_Validate(t *testing.T) {
 
 func TestListTodoOptions_WithOptions(t *testing.T) {
 	tests := map[string]struct {
-		opts []ListTodoOptions
+		opts []ListTodoOption
 		want ListTodosParams
 	}{
 		"with-status-and-embedding": {
-			opts: []ListTodoOptions{WithStatus(TodoStatus_DONE), WithEmbedding([]float64{0.1, 0.2, 0.3})},
+			opts: []ListTodoOption{WithStatus(TodoStatus_DONE), WithEmbedding([]float64{0.1, 0.2, 0.3})},
 			want: ListTodosParams{Status: common.Ptr(TodoStatus_DONE), Embedding: []float64{0.1, 0.2, 0.3}},
 		},
 		"with-status-only": {
-			opts: []ListTodoOptions{WithStatus(TodoStatus_DONE)},
+			opts: []ListTodoOption{WithStatus(TodoStatus_DONE)},
 			want: ListTodosParams{Status: common.Ptr(TodoStatus_DONE)},
 		},
 		"with-embedding-only": {
-			opts: []ListTodoOptions{WithEmbedding([]float64{0.1, 0.2, 0.3})},
+			opts: []ListTodoOption{WithEmbedding([]float64{0.1, 0.2, 0.3})},
 			want: ListTodosParams{Embedding: []float64{0.1, 0.2, 0.3}},
 		},
 		"with-title-contains-only": {
-			opts: []ListTodoOptions{WithTitleContains("report")},
+			opts: []ListTodoOption{WithTitleContains("report")},
 			want: ListTodosParams{TitleContains: common.Ptr("report")},
 		},
 		"with-due-date-range-only": {
-			opts: []ListTodoOptions{
+			opts: []ListTodoOption{
 				WithDueDateRange(
 					time.Date(2024, 7, 10, 0, 0, 0, 0, time.UTC),
 					time.Date(2024, 7, 20, 0, 0, 0, 0, time.UTC),
@@ -129,7 +129,7 @@ func TestListTodoOptions_WithOptions(t *testing.T) {
 			},
 		},
 		"with-sort-by-only": {
-			opts: []ListTodoOptions{
+			opts: []ListTodoOption{
 				WithSortBy("dueDateDesc"),
 			},
 			want: ListTodosParams{
@@ -137,7 +137,7 @@ func TestListTodoOptions_WithOptions(t *testing.T) {
 			},
 		},
 		"with-multiple-options": {
-			opts: []ListTodoOptions{
+			opts: []ListTodoOption{
 				WithStatus(TodoStatus_OPEN),
 				WithEmbedding([]float64{0.4, 0.5, 0.6}),
 				WithDueDateRange(

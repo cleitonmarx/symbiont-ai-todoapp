@@ -15,6 +15,7 @@ import (
 )
 
 func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	summaryID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	messageID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
 	updatedAt := time.Date(2026, 2, 12, 12, 0, 0, 0, time.UTC)
@@ -28,14 +29,14 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 		"success": {
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(conversationSummaryFields).
-					AddRow(summaryID, "global", "current state", messageID, updatedAt)
+					AddRow(summaryID, conversationID, "current state", messageID, updatedAt)
 				m.ExpectQuery("SELECT id, conversation_id, current_state_summary, last_summarized_message_id, updated_at FROM conversations_summary WHERE conversation_id = $1 LIMIT 1").
-					WithArgs("global").
+					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
 			expected: domain.ConversationSummary{
 				ID:                      summaryID,
-				ConversationID:          "global",
+				ConversationID:          conversationID,
 				CurrentStateSummary:     "current state",
 				LastSummarizedMessageID: &messageID,
 				UpdatedAt:               updatedAt,
@@ -46,7 +47,7 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 		"not-found": {
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectQuery("SELECT id, conversation_id, current_state_summary, last_summarized_message_id, updated_at FROM conversations_summary WHERE conversation_id = $1 LIMIT 1").
-					WithArgs("global").
+					WithArgs(conversationID).
 					WillReturnError(sql.ErrNoRows)
 			},
 			expected:     domain.ConversationSummary{},
@@ -56,7 +57,7 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 		"database-error": {
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectQuery("SELECT id, conversation_id, current_state_summary, last_summarized_message_id, updated_at FROM conversations_summary WHERE conversation_id = $1 LIMIT 1").
-					WithArgs("global").
+					WithArgs(conversationID).
 					WillReturnError(errors.New("db error"))
 			},
 			expected:     domain.ConversationSummary{},
@@ -74,7 +75,7 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewConversationSummaryRepository(db)
-			got, found, gotErr := repo.GetConversationSummary(context.Background(), "global")
+			got, found, gotErr := repo.GetConversationSummary(context.Background(), conversationID)
 			if tt.expectErr {
 				assert.Error(t, gotErr)
 			} else {
@@ -89,13 +90,14 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 }
 
 func TestConversationSummaryRepository_StoreConversationSummary(t *testing.T) {
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	summaryID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	messageID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
 	updatedAt := time.Date(2026, 2, 12, 12, 0, 0, 0, time.UTC)
 
 	summary := domain.ConversationSummary{
 		ID:                      summaryID,
-		ConversationID:          "global",
+		ConversationID:          conversationID,
 		CurrentStateSummary:     "current state",
 		LastSummarizedMessageID: &messageID,
 		UpdatedAt:               updatedAt,
@@ -144,6 +146,7 @@ func TestConversationSummaryRepository_StoreConversationSummary(t *testing.T) {
 }
 
 func TestConversationSummaryRepository_DeleteConversationSummary(t *testing.T) {
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	tests := map[string]struct {
 		expect    func(sqlmock.Sqlmock)
 		expectErr bool
@@ -151,7 +154,7 @@ func TestConversationSummaryRepository_DeleteConversationSummary(t *testing.T) {
 		"success": {
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectExec("DELETE FROM conversations_summary WHERE conversation_id = $1").
-					WithArgs("global").
+					WithArgs(conversationID).
 					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
 			expectErr: false,
@@ -159,7 +162,7 @@ func TestConversationSummaryRepository_DeleteConversationSummary(t *testing.T) {
 		"database-error": {
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectExec("DELETE FROM conversations_summary WHERE conversation_id = $1").
-					WithArgs("global").
+					WithArgs(conversationID).
 					WillReturnError(errors.New("db error"))
 			},
 			expectErr: true,
@@ -175,7 +178,7 @@ func TestConversationSummaryRepository_DeleteConversationSummary(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewConversationSummaryRepository(db)
-			gotErr := repo.DeleteConversationSummary(context.Background(), "global")
+			gotErr := repo.DeleteConversationSummary(context.Background(), conversationID)
 			if tt.expectErr {
 				assert.Error(t, gotErr)
 			} else {

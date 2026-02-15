@@ -15,6 +15,7 @@ var (
 )
 
 // TodoApp Introspection Graph
+// (GET /introspect)
 func IntrospectHandler(w http.ResponseWriter, r *http.Request) {
 	mermaidGraph, err := depend.ResolveNamed[string]("introspection-graph-mermaid")
 	if err != nil {

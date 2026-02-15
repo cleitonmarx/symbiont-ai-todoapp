@@ -99,7 +99,7 @@ func (lti ListTodosImpl) Query(ctx context.Context, page int, pageSize int, opts
 		opt(&params)
 	}
 
-	var queryOpts []domain.ListTodoOptions
+	var queryOpts []domain.ListTodoOption
 	if params.Status != nil {
 		queryOpts = append(queryOpts, domain.WithStatus(*params.Status))
 	}

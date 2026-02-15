@@ -227,7 +227,7 @@ func TestTodoFetcherTool(t *testing.T) {
 						10,
 						mock.Anything,
 					).
-					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOptions) {
+					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOption) {
 						param := domain.ListTodosParams{}
 						for _, opt := range opts {
 							opt(&param)
@@ -260,7 +260,7 @@ func TestTodoFetcherTool(t *testing.T) {
 						10,
 						mock.Anything,
 					).
-					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOptions) {
+					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOption) {
 						param := domain.ListTodosParams{}
 						for _, opt := range opts {
 							opt(&param)
@@ -293,7 +293,7 @@ func TestTodoFetcherTool(t *testing.T) {
 						10,
 						mock.Anything,
 					).
-					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOptions) {
+					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOption) {
 						param := domain.ListTodosParams{}
 						for _, opt := range opts {
 							opt(&param)
@@ -330,7 +330,7 @@ func TestTodoFetcherTool(t *testing.T) {
 						10,
 						mock.Anything,
 					).
-					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOptions) {
+					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOption) {
 						param := domain.ListTodosParams{}
 						for _, opt := range opts {
 							opt(&param)

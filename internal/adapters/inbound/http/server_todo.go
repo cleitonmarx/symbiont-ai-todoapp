@@ -13,6 +13,8 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// ListTodos returns a paginated list of todos with optional filtering and sorting
+// (GET /api/todos)
 func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, params gen.ListTodosParams) {
 	resp := gen.ListTodosResp{
 		Items: []gen.Todo{},
@@ -57,6 +59,8 @@ func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, param
 	respondJSON(w, http.StatusOK, resp)
 }
 
+// CreateTodo creates a new todo item
+// (POST /api/todos)
 func (api TodoAppServer) CreateTodo(w http.ResponseWriter, r *http.Request) {
 	var req gen.CreateTodoJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -77,6 +81,9 @@ func (api TodoAppServer) CreateTodo(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusCreated, toTodo(todo))
 }
+
+// UpdateTodo updates an existing todo item
+// (PATCH /api/todos/{todo_id})
 func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todoId openapi_types.UUID) {
 	var req gen.UpdateTodoJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -116,6 +123,8 @@ func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todo
 	respondJSON(w, http.StatusOK, toTodo(todo))
 }
 
+// DeleteTodo deletes a todo item by ID
+// (DELETE /api/todos/{todo_id})
 func (api TodoAppServer) DeleteTodo(w http.ResponseWriter, r *http.Request, todoId openapi_types.UUID) {
 	err := api.DeleteTodoUseCase.Execute(r.Context(), todoId)
 	if err != nil {

@@ -97,7 +97,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 		return domain.NewValidationErr("invalid event type for chat summary")
 	}
 
-	if strings.TrimSpace(event.ConversationID) == "" {
+	if event.ConversationID == uuid.Nil {
 		return domain.NewValidationErr("conversation id cannot be empty")
 	}
 
@@ -111,14 +111,12 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 		currentSummary = previous.CurrentStateSummary
 	}
 
-	messageOptions := []domain.ListChatMessagesOption{
-		domain.WithChatMessagesByConversationID(event.ConversationID),
-	}
+	messageOptions := []domain.ListChatMessagesOption{}
 	if found && previous.LastSummarizedMessageID != nil {
 		messageOptions = append(messageOptions, domain.WithChatMessagesAfterMessageID(*previous.LastSummarizedMessageID))
 	}
 
-	unsummarizedMessages, hasMore, err := gcs.chatMessageRepo.ListChatMessages(spanCtx, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, messageOptions...)
+	unsummarizedMessages, hasMore, err := gcs.chatMessageRepo.ListChatMessages(spanCtx, event.ConversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, messageOptions...)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to list chat messages: %w", err)
 	}

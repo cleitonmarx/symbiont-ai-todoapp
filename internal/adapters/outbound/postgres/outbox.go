@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -167,49 +166,28 @@ func (op OutboxRepository) FetchPendingEvents(ctx context.Context, limit int) ([
 	for rows.Next() {
 		var oe domain.OutboxEvent
 		var payloadBytes []byte
-		var (
-			entityType  string
-			topic       string
-			eventType   string
-			status      string
-			lastError   sql.NullString
-			dedupeKey   sql.NullString
-			processedAt sql.NullTime
-		)
+
 		err := rows.Scan(
 			&oe.ID,
-			&entityType,
+			&oe.EntityType,
 			&oe.EntityID,
-			&topic,
-			&eventType,
+			&oe.Topic,
+			&oe.EventType,
 			&payloadBytes,
-			&status,
+			&oe.Status,
 			&oe.RetryCount,
 			&oe.MaxRetries,
-			&lastError,
-			&dedupeKey,
+			&oe.LastError,
+			&oe.DedupeKey,
 			&oe.AvailableAt,
-			&processedAt,
+			&oe.ProcessedAt,
 			&oe.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
-		oe.EntityType = domain.OutboxEntityType(entityType)
-		oe.Topic = domain.OutboxTopic(topic)
-		oe.EventType = domain.EventType(eventType)
-		oe.Status = domain.OutboxStatus(status)
+
 		oe.Payload = payloadBytes
-		if lastError.Valid {
-			oe.LastError = &lastError.String
-		}
-		if dedupeKey.Valid {
-			oe.DedupeKey = &dedupeKey.String
-		}
-		if processedAt.Valid {
-			processedAtValue := processedAt.Time
-			oe.ProcessedAt = &processedAtValue
-		}
 
 		events = append(events, oe)
 	}

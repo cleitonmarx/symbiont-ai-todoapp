@@ -23,65 +23,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoAppServer_ClearChatMessages(t *testing.T) {
-	tests := map[string]struct {
-		setupUsecases  func(*usecases.MockDeleteConversation)
-		expectedStatus int
-		expectedError  *gen.ErrorResp
-	}{
-		"success": {
-			setupUsecases: func(m *usecases.MockDeleteConversation) {
-				m.EXPECT().
-					Execute(mock.Anything).
-					Return(nil)
-			},
-			expectedStatus: http.StatusNoContent,
-		},
-		"use-case-error": {
-			setupUsecases: func(m *usecases.MockDeleteConversation) {
-				m.EXPECT().
-					Execute(mock.Anything).
-					Return(errors.New("database error"))
-			},
-			expectedStatus: http.StatusInternalServerError,
-			expectedError: &gen.ErrorResp{
-				Error: gen.Error{
-					Code:    gen.INTERNALERROR,
-					Message: "internal server error",
-				},
-			},
-		},
-	}
-
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			mockDeleteConversation := usecases.NewMockDeleteConversation(t)
-			tt.setupUsecases(mockDeleteConversation)
-
-			server := &TodoAppServer{
-				DeleteConversationUseCase: mockDeleteConversation,
-			}
-
-			req := httptest.NewRequest(http.MethodDelete, "/api/v1/chat/messages", nil)
-			w := httptest.NewRecorder()
-
-			server.ClearChatMessages(w, req)
-
-			assert.Equal(t, tt.expectedStatus, w.Code)
-
-			if tt.expectedError != nil {
-				var response gen.ErrorResp
-				err := json.Unmarshal(w.Body.Bytes(), &response)
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedError.Error, response.Error)
-			}
-
-			mockDeleteConversation.AssertExpectations(t)
-		})
-	}
-}
-
 func TestTodoAppServer_ListChatMessages(t *testing.T) {
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	fixedTime := time.Date(2026, 1, 22, 10, 30, 0, 0, time.UTC)
 	fixedID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 
@@ -112,12 +55,12 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 			pageSize: 10,
 			setupUsecases: func(m *usecases.MockListChatMessages) {
 				m.EXPECT().
-					Query(mock.Anything, 1, 10).
+					Query(mock.Anything, conversationID, 1, 10).
 					Return([]domain.ChatMessage{domainMessage}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ChatHistoryResp{
-				ConversationId: domain.GlobalConversationID,
+				ConversationId: conversationID,
 				Messages:       []gen.ChatMessage{openAPIMessage},
 				Page:           1,
 			},
@@ -127,12 +70,12 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 			pageSize: 10,
 			setupUsecases: func(m *usecases.MockListChatMessages) {
 				m.EXPECT().
-					Query(mock.Anything, 1, 10).
+					Query(mock.Anything, conversationID, 1, 10).
 					Return([]domain.ChatMessage{}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ChatHistoryResp{
-				ConversationId: domain.GlobalConversationID,
+				ConversationId: conversationID,
 				Messages:       []gen.ChatMessage{},
 				Page:           1,
 			},
@@ -142,12 +85,12 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 			pageSize: 10,
 			setupUsecases: func(m *usecases.MockListChatMessages) {
 				m.EXPECT().
-					Query(mock.Anything, 2, 10).
+					Query(mock.Anything, conversationID, 2, 10).
 					Return([]domain.ChatMessage{domainMessage}, true, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ChatHistoryResp{
-				ConversationId: domain.GlobalConversationID,
+				ConversationId: conversationID,
 				Messages:       []gen.ChatMessage{openAPIMessage},
 				Page:           2,
 				NextPage:       common.Ptr(3),
@@ -159,7 +102,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 			pageSize: 10,
 			setupUsecases: func(m *usecases.MockListChatMessages) {
 				m.EXPECT().
-					Query(mock.Anything, 1, 10).
+					Query(mock.Anything, conversationID, 1, 10).
 					Return(nil, false, errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
@@ -184,8 +127,9 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 			u, err := url.Parse("http://localhost/api/v1/chat/messages")
 			assert.NoError(t, err)
 			q := u.Query()
+			q.Set("conversation_id", conversationID.String())
 			q.Set("page", strconv.Itoa(tt.page))
-			q.Set("pagesize", strconv.Itoa(tt.pageSize))
+			q.Set("pageSize", strconv.Itoa(tt.pageSize))
 			u.RawQuery = q.Encode()
 			req := httptest.NewRequest(http.MethodGet, u.String(), nil)
 
@@ -218,6 +162,7 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 	tests := map[string]struct {
 		requestBody    any
 		setupUsecases  func(*usecases.MockStreamChat)
+		options        []usecases.StreamChatOption
 		expectedStatus int
 		expectedEvents []string
 		expectedError  *gen.ErrorResp
@@ -226,8 +171,34 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 			requestBody: gen.StreamChatJSONRequestBody{Message: "Hello", Model: "qwen2.5:7B-Q4_0"},
 			setupUsecases: func(m *usecases.MockStreamChat) {
 				m.EXPECT().
-					Execute(mock.Anything, "Hello", "qwen2.5:7B-Q4_0", mock.Anything).
-					Run(func(ctx context.Context, msg string, model string, cb domain.LLMStreamEventCallback) {
+					Execute(mock.Anything, "Hello", "qwen2.5:7B-Q4_0", mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, userMessage string, model string, cb domain.LLMStreamEventCallback, opts ...usecases.StreamChatOption) {
+						_ = cb(domain.LLMStreamEventType_Meta, map[string]string{"info": "test"})
+						_ = cb(domain.LLMStreamEventType_Delta, map[string]string{"text": "Hi!"})
+					}).
+					Return(nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectedEvents: []string{"event: meta", "event: delta"},
+		},
+		"success-with-conversation-id": {
+			requestBody: gen.StreamChatJSONRequestBody{
+				Message:        "Hello",
+				Model:          "qwen2.5:7B-Q4_0",
+				ConversationId: common.Ptr(uuid.MustParse("00000000-0000-0000-0000-000000000001")),
+			},
+			setupUsecases: func(m *usecases.MockStreamChat) {
+				m.EXPECT().
+					Execute(mock.Anything, "Hello", "qwen2.5:7B-Q4_0", mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, userMessage string, model string, cb domain.LLMStreamEventCallback, opts ...usecases.StreamChatOption) {
+						// Verify that the conversation ID option is passed correctly
+						params := &usecases.StreamChatParams{}
+						for _, opt := range opts {
+							opt(params)
+						}
+						assert.NotNil(t, params.ConversationID)
+						assert.Equal(t, uuid.MustParse("00000000-0000-0000-0000-000000000001"), *params.ConversationID)
+
 						_ = cb(domain.LLMStreamEventType_Meta, map[string]string{"info": "test"})
 						_ = cb(domain.LLMStreamEventType_Delta, map[string]string{"text": "Hi!"})
 					}).

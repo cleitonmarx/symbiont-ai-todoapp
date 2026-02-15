@@ -96,64 +96,70 @@ func (_c *MockChatMessageRepository_CreateChatMessages_Call) RunAndReturn(run fu
 	return _c
 }
 
-// DeleteConversation provides a mock function for the type MockChatMessageRepository
-func (_mock *MockChatMessageRepository) DeleteConversation(ctx context.Context) error {
-	ret := _mock.Called(ctx)
+// DeleteConversationMessages provides a mock function for the type MockChatMessageRepository
+func (_mock *MockChatMessageRepository) DeleteConversationMessages(ctx context.Context, conversationID uuid.UUID) error {
+	ret := _mock.Called(ctx, conversationID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for DeleteConversation")
+		panic("no return value specified for DeleteConversationMessages")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
+		r0 = returnFunc(ctx, conversationID)
 	} else {
 		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// MockChatMessageRepository_DeleteConversation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteConversation'
-type MockChatMessageRepository_DeleteConversation_Call struct {
+// MockChatMessageRepository_DeleteConversationMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteConversationMessages'
+type MockChatMessageRepository_DeleteConversationMessages_Call struct {
 	*mock.Call
 }
 
-// DeleteConversation is a helper method to define mock.On call
+// DeleteConversationMessages is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockChatMessageRepository_Expecter) DeleteConversation(ctx interface{}) *MockChatMessageRepository_DeleteConversation_Call {
-	return &MockChatMessageRepository_DeleteConversation_Call{Call: _e.mock.On("DeleteConversation", ctx)}
+//   - conversationID uuid.UUID
+func (_e *MockChatMessageRepository_Expecter) DeleteConversationMessages(ctx interface{}, conversationID interface{}) *MockChatMessageRepository_DeleteConversationMessages_Call {
+	return &MockChatMessageRepository_DeleteConversationMessages_Call{Call: _e.mock.On("DeleteConversationMessages", ctx, conversationID)}
 }
 
-func (_c *MockChatMessageRepository_DeleteConversation_Call) Run(run func(ctx context.Context)) *MockChatMessageRepository_DeleteConversation_Call {
+func (_c *MockChatMessageRepository_DeleteConversationMessages_Call) Run(run func(ctx context.Context, conversationID uuid.UUID)) *MockChatMessageRepository_DeleteConversationMessages_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockChatMessageRepository_DeleteConversation_Call) Return(err error) *MockChatMessageRepository_DeleteConversation_Call {
+func (_c *MockChatMessageRepository_DeleteConversationMessages_Call) Return(err error) *MockChatMessageRepository_DeleteConversationMessages_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockChatMessageRepository_DeleteConversation_Call) RunAndReturn(run func(ctx context.Context) error) *MockChatMessageRepository_DeleteConversation_Call {
+func (_c *MockChatMessageRepository_DeleteConversationMessages_Call) RunAndReturn(run func(ctx context.Context, conversationID uuid.UUID) error) *MockChatMessageRepository_DeleteConversationMessages_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ListChatMessages provides a mock function for the type MockChatMessageRepository
-func (_mock *MockChatMessageRepository) ListChatMessages(ctx context.Context, limit int, options ...ListChatMessagesOption) ([]ChatMessage, bool, error) {
+func (_mock *MockChatMessageRepository) ListChatMessages(ctx context.Context, conversationID uuid.UUID, page int, pageSize int, options ...ListChatMessagesOption) ([]ChatMessage, bool, error) {
 	var tmpRet mock.Arguments
 	if len(options) > 0 {
-		tmpRet = _mock.Called(ctx, limit, options)
+		tmpRet = _mock.Called(ctx, conversationID, page, pageSize, options)
 	} else {
-		tmpRet = _mock.Called(ctx, limit)
+		tmpRet = _mock.Called(ctx, conversationID, page, pageSize)
 	}
 	ret := tmpRet
 
@@ -164,23 +170,23 @@ func (_mock *MockChatMessageRepository) ListChatMessages(ctx context.Context, li
 	var r0 []ChatMessage
 	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int, ...ListChatMessagesOption) ([]ChatMessage, bool, error)); ok {
-		return returnFunc(ctx, limit, options...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, int, int, ...ListChatMessagesOption) ([]ChatMessage, bool, error)); ok {
+		return returnFunc(ctx, conversationID, page, pageSize, options...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int, ...ListChatMessagesOption) []ChatMessage); ok {
-		r0 = returnFunc(ctx, limit, options...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, int, int, ...ListChatMessagesOption) []ChatMessage); ok {
+		r0 = returnFunc(ctx, conversationID, page, pageSize, options...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]ChatMessage)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, int, ...ListChatMessagesOption) bool); ok {
-		r1 = returnFunc(ctx, limit, options...)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID, int, int, ...ListChatMessagesOption) bool); ok {
+		r1 = returnFunc(ctx, conversationID, page, pageSize, options...)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, int, ...ListChatMessagesOption) error); ok {
-		r2 = returnFunc(ctx, limit, options...)
+	if returnFunc, ok := ret.Get(2).(func(context.Context, uuid.UUID, int, int, ...ListChatMessagesOption) error); ok {
+		r2 = returnFunc(ctx, conversationID, page, pageSize, options...)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -194,33 +200,45 @@ type MockChatMessageRepository_ListChatMessages_Call struct {
 
 // ListChatMessages is a helper method to define mock.On call
 //   - ctx context.Context
-//   - limit int
+//   - conversationID uuid.UUID
+//   - page int
+//   - pageSize int
 //   - options ...ListChatMessagesOption
-func (_e *MockChatMessageRepository_Expecter) ListChatMessages(ctx interface{}, limit interface{}, options ...interface{}) *MockChatMessageRepository_ListChatMessages_Call {
+func (_e *MockChatMessageRepository_Expecter) ListChatMessages(ctx interface{}, conversationID interface{}, page interface{}, pageSize interface{}, options ...interface{}) *MockChatMessageRepository_ListChatMessages_Call {
 	return &MockChatMessageRepository_ListChatMessages_Call{Call: _e.mock.On("ListChatMessages",
-		append([]interface{}{ctx, limit}, options...)...)}
+		append([]interface{}{ctx, conversationID, page, pageSize}, options...)...)}
 }
 
-func (_c *MockChatMessageRepository_ListChatMessages_Call) Run(run func(ctx context.Context, limit int, options ...ListChatMessagesOption)) *MockChatMessageRepository_ListChatMessages_Call {
+func (_c *MockChatMessageRepository_ListChatMessages_Call) Run(run func(ctx context.Context, conversationID uuid.UUID, page int, pageSize int, options ...ListChatMessagesOption)) *MockChatMessageRepository_ListChatMessages_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 int
+		var arg1 uuid.UUID
 		if args[1] != nil {
-			arg1 = args[1].(int)
+			arg1 = args[1].(uuid.UUID)
 		}
-		var arg2 []ListChatMessagesOption
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 int
+		if args[3] != nil {
+			arg3 = args[3].(int)
+		}
+		var arg4 []ListChatMessagesOption
 		var variadicArgs []ListChatMessagesOption
-		if len(args) > 2 {
-			variadicArgs = args[2].([]ListChatMessagesOption)
+		if len(args) > 4 {
+			variadicArgs = args[4].([]ListChatMessagesOption)
 		}
-		arg2 = variadicArgs
+		arg4 = variadicArgs
 		run(
 			arg0,
 			arg1,
-			arg2...,
+			arg2,
+			arg3,
+			arg4...,
 		)
 	})
 	return _c
@@ -231,7 +249,372 @@ func (_c *MockChatMessageRepository_ListChatMessages_Call) Return(chatMessages [
 	return _c
 }
 
-func (_c *MockChatMessageRepository_ListChatMessages_Call) RunAndReturn(run func(ctx context.Context, limit int, options ...ListChatMessagesOption) ([]ChatMessage, bool, error)) *MockChatMessageRepository_ListChatMessages_Call {
+func (_c *MockChatMessageRepository_ListChatMessages_Call) RunAndReturn(run func(ctx context.Context, conversationID uuid.UUID, page int, pageSize int, options ...ListChatMessagesOption) ([]ChatMessage, bool, error)) *MockChatMessageRepository_ListChatMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockConversationRepository creates a new instance of MockConversationRepository. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockConversationRepository(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockConversationRepository {
+	mock := &MockConversationRepository{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockConversationRepository is an autogenerated mock type for the ConversationRepository type
+type MockConversationRepository struct {
+	mock.Mock
+}
+
+type MockConversationRepository_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockConversationRepository) EXPECT() *MockConversationRepository_Expecter {
+	return &MockConversationRepository_Expecter{mock: &_m.Mock}
+}
+
+// CreateConversation provides a mock function for the type MockConversationRepository
+func (_mock *MockConversationRepository) CreateConversation(context1 context.Context, s string, conversationTitleSource ConversationTitleSource) (Conversation, error) {
+	ret := _mock.Called(context1, s, conversationTitleSource)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateConversation")
+	}
+
+	var r0 Conversation
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, ConversationTitleSource) (Conversation, error)); ok {
+		return returnFunc(context1, s, conversationTitleSource)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, ConversationTitleSource) Conversation); ok {
+		r0 = returnFunc(context1, s, conversationTitleSource)
+	} else {
+		r0 = ret.Get(0).(Conversation)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, ConversationTitleSource) error); ok {
+		r1 = returnFunc(context1, s, conversationTitleSource)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockConversationRepository_CreateConversation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateConversation'
+type MockConversationRepository_CreateConversation_Call struct {
+	*mock.Call
+}
+
+// CreateConversation is a helper method to define mock.On call
+//   - context1 context.Context
+//   - s string
+//   - conversationTitleSource ConversationTitleSource
+func (_e *MockConversationRepository_Expecter) CreateConversation(context1 interface{}, s interface{}, conversationTitleSource interface{}) *MockConversationRepository_CreateConversation_Call {
+	return &MockConversationRepository_CreateConversation_Call{Call: _e.mock.On("CreateConversation", context1, s, conversationTitleSource)}
+}
+
+func (_c *MockConversationRepository_CreateConversation_Call) Run(run func(context1 context.Context, s string, conversationTitleSource ConversationTitleSource)) *MockConversationRepository_CreateConversation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 ConversationTitleSource
+		if args[2] != nil {
+			arg2 = args[2].(ConversationTitleSource)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockConversationRepository_CreateConversation_Call) Return(conversation Conversation, err error) *MockConversationRepository_CreateConversation_Call {
+	_c.Call.Return(conversation, err)
+	return _c
+}
+
+func (_c *MockConversationRepository_CreateConversation_Call) RunAndReturn(run func(context1 context.Context, s string, conversationTitleSource ConversationTitleSource) (Conversation, error)) *MockConversationRepository_CreateConversation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteConversation provides a mock function for the type MockConversationRepository
+func (_mock *MockConversationRepository) DeleteConversation(context1 context.Context, uUID uuid.UUID) error {
+	ret := _mock.Called(context1, uUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteConversation")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
+		r0 = returnFunc(context1, uUID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockConversationRepository_DeleteConversation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteConversation'
+type MockConversationRepository_DeleteConversation_Call struct {
+	*mock.Call
+}
+
+// DeleteConversation is a helper method to define mock.On call
+//   - context1 context.Context
+//   - uUID uuid.UUID
+func (_e *MockConversationRepository_Expecter) DeleteConversation(context1 interface{}, uUID interface{}) *MockConversationRepository_DeleteConversation_Call {
+	return &MockConversationRepository_DeleteConversation_Call{Call: _e.mock.On("DeleteConversation", context1, uUID)}
+}
+
+func (_c *MockConversationRepository_DeleteConversation_Call) Run(run func(context1 context.Context, uUID uuid.UUID)) *MockConversationRepository_DeleteConversation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockConversationRepository_DeleteConversation_Call) Return(err error) *MockConversationRepository_DeleteConversation_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockConversationRepository_DeleteConversation_Call) RunAndReturn(run func(context1 context.Context, uUID uuid.UUID) error) *MockConversationRepository_DeleteConversation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetConversation provides a mock function for the type MockConversationRepository
+func (_mock *MockConversationRepository) GetConversation(context1 context.Context, uUID uuid.UUID) (Conversation, bool, error) {
+	ret := _mock.Called(context1, uUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConversation")
+	}
+
+	var r0 Conversation
+	var r1 bool
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) (Conversation, bool, error)); ok {
+		return returnFunc(context1, uUID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) Conversation); ok {
+		r0 = returnFunc(context1, uUID)
+	} else {
+		r0 = ret.Get(0).(Conversation)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID) bool); ok {
+		r1 = returnFunc(context1, uUID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context, uuid.UUID) error); ok {
+		r2 = returnFunc(context1, uUID)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// MockConversationRepository_GetConversation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetConversation'
+type MockConversationRepository_GetConversation_Call struct {
+	*mock.Call
+}
+
+// GetConversation is a helper method to define mock.On call
+//   - context1 context.Context
+//   - uUID uuid.UUID
+func (_e *MockConversationRepository_Expecter) GetConversation(context1 interface{}, uUID interface{}) *MockConversationRepository_GetConversation_Call {
+	return &MockConversationRepository_GetConversation_Call{Call: _e.mock.On("GetConversation", context1, uUID)}
+}
+
+func (_c *MockConversationRepository_GetConversation_Call) Run(run func(context1 context.Context, uUID uuid.UUID)) *MockConversationRepository_GetConversation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockConversationRepository_GetConversation_Call) Return(conversation Conversation, b bool, err error) *MockConversationRepository_GetConversation_Call {
+	_c.Call.Return(conversation, b, err)
+	return _c
+}
+
+func (_c *MockConversationRepository_GetConversation_Call) RunAndReturn(run func(context1 context.Context, uUID uuid.UUID) (Conversation, bool, error)) *MockConversationRepository_GetConversation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListConversations provides a mock function for the type MockConversationRepository
+func (_mock *MockConversationRepository) ListConversations(ctx context.Context, page int, pageSize int) ([]Conversation, bool, error) {
+	ret := _mock.Called(ctx, page, pageSize)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListConversations")
+	}
+
+	var r0 []Conversation
+	var r1 bool
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int) ([]Conversation, bool, error)); ok {
+		return returnFunc(ctx, page, pageSize)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int) []Conversation); ok {
+		r0 = returnFunc(ctx, page, pageSize)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]Conversation)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int, int) bool); ok {
+		r1 = returnFunc(ctx, page, pageSize)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context, int, int) error); ok {
+		r2 = returnFunc(ctx, page, pageSize)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// MockConversationRepository_ListConversations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListConversations'
+type MockConversationRepository_ListConversations_Call struct {
+	*mock.Call
+}
+
+// ListConversations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - page int
+//   - pageSize int
+func (_e *MockConversationRepository_Expecter) ListConversations(ctx interface{}, page interface{}, pageSize interface{}) *MockConversationRepository_ListConversations_Call {
+	return &MockConversationRepository_ListConversations_Call{Call: _e.mock.On("ListConversations", ctx, page, pageSize)}
+}
+
+func (_c *MockConversationRepository_ListConversations_Call) Run(run func(ctx context.Context, page int, pageSize int)) *MockConversationRepository_ListConversations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockConversationRepository_ListConversations_Call) Return(conversations []Conversation, b bool, err error) *MockConversationRepository_ListConversations_Call {
+	_c.Call.Return(conversations, b, err)
+	return _c
+}
+
+func (_c *MockConversationRepository_ListConversations_Call) RunAndReturn(run func(ctx context.Context, page int, pageSize int) ([]Conversation, bool, error)) *MockConversationRepository_ListConversations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateConversation provides a mock function for the type MockConversationRepository
+func (_mock *MockConversationRepository) UpdateConversation(context1 context.Context, conversation Conversation) error {
+	ret := _mock.Called(context1, conversation)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateConversation")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, Conversation) error); ok {
+		r0 = returnFunc(context1, conversation)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockConversationRepository_UpdateConversation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateConversation'
+type MockConversationRepository_UpdateConversation_Call struct {
+	*mock.Call
+}
+
+// UpdateConversation is a helper method to define mock.On call
+//   - context1 context.Context
+//   - conversation Conversation
+func (_e *MockConversationRepository_Expecter) UpdateConversation(context1 interface{}, conversation interface{}) *MockConversationRepository_UpdateConversation_Call {
+	return &MockConversationRepository_UpdateConversation_Call{Call: _e.mock.On("UpdateConversation", context1, conversation)}
+}
+
+func (_c *MockConversationRepository_UpdateConversation_Call) Run(run func(context1 context.Context, conversation Conversation)) *MockConversationRepository_UpdateConversation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 Conversation
+		if args[1] != nil {
+			arg1 = args[1].(Conversation)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockConversationRepository_UpdateConversation_Call) Return(err error) *MockConversationRepository_UpdateConversation_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockConversationRepository_UpdateConversation_Call) RunAndReturn(run func(context1 context.Context, conversation Conversation) error) *MockConversationRepository_UpdateConversation_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -264,7 +647,7 @@ func (_m *MockConversationSummaryRepository) EXPECT() *MockConversationSummaryRe
 }
 
 // DeleteConversationSummary provides a mock function for the type MockConversationSummaryRepository
-func (_mock *MockConversationSummaryRepository) DeleteConversationSummary(ctx context.Context, conversationID string) error {
+func (_mock *MockConversationSummaryRepository) DeleteConversationSummary(ctx context.Context, conversationID uuid.UUID) error {
 	ret := _mock.Called(ctx, conversationID)
 
 	if len(ret) == 0 {
@@ -272,7 +655,7 @@ func (_mock *MockConversationSummaryRepository) DeleteConversationSummary(ctx co
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
 		r0 = returnFunc(ctx, conversationID)
 	} else {
 		r0 = ret.Error(0)
@@ -287,20 +670,20 @@ type MockConversationSummaryRepository_DeleteConversationSummary_Call struct {
 
 // DeleteConversationSummary is a helper method to define mock.On call
 //   - ctx context.Context
-//   - conversationID string
+//   - conversationID uuid.UUID
 func (_e *MockConversationSummaryRepository_Expecter) DeleteConversationSummary(ctx interface{}, conversationID interface{}) *MockConversationSummaryRepository_DeleteConversationSummary_Call {
 	return &MockConversationSummaryRepository_DeleteConversationSummary_Call{Call: _e.mock.On("DeleteConversationSummary", ctx, conversationID)}
 }
 
-func (_c *MockConversationSummaryRepository_DeleteConversationSummary_Call) Run(run func(ctx context.Context, conversationID string)) *MockConversationSummaryRepository_DeleteConversationSummary_Call {
+func (_c *MockConversationSummaryRepository_DeleteConversationSummary_Call) Run(run func(ctx context.Context, conversationID uuid.UUID)) *MockConversationSummaryRepository_DeleteConversationSummary_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 uuid.UUID
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(uuid.UUID)
 		}
 		run(
 			arg0,
@@ -315,13 +698,13 @@ func (_c *MockConversationSummaryRepository_DeleteConversationSummary_Call) Retu
 	return _c
 }
 
-func (_c *MockConversationSummaryRepository_DeleteConversationSummary_Call) RunAndReturn(run func(ctx context.Context, conversationID string) error) *MockConversationSummaryRepository_DeleteConversationSummary_Call {
+func (_c *MockConversationSummaryRepository_DeleteConversationSummary_Call) RunAndReturn(run func(ctx context.Context, conversationID uuid.UUID) error) *MockConversationSummaryRepository_DeleteConversationSummary_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetConversationSummary provides a mock function for the type MockConversationSummaryRepository
-func (_mock *MockConversationSummaryRepository) GetConversationSummary(ctx context.Context, conversationID string) (ConversationSummary, bool, error) {
+func (_mock *MockConversationSummaryRepository) GetConversationSummary(ctx context.Context, conversationID uuid.UUID) (ConversationSummary, bool, error) {
 	ret := _mock.Called(ctx, conversationID)
 
 	if len(ret) == 0 {
@@ -331,20 +714,20 @@ func (_mock *MockConversationSummaryRepository) GetConversationSummary(ctx conte
 	var r0 ConversationSummary
 	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (ConversationSummary, bool, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) (ConversationSummary, bool, error)); ok {
 		return returnFunc(ctx, conversationID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ConversationSummary); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) ConversationSummary); ok {
 		r0 = returnFunc(ctx, conversationID)
 	} else {
 		r0 = ret.Get(0).(ConversationSummary)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) bool); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID) bool); ok {
 		r1 = returnFunc(ctx, conversationID)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, string) error); ok {
+	if returnFunc, ok := ret.Get(2).(func(context.Context, uuid.UUID) error); ok {
 		r2 = returnFunc(ctx, conversationID)
 	} else {
 		r2 = ret.Error(2)
@@ -359,20 +742,20 @@ type MockConversationSummaryRepository_GetConversationSummary_Call struct {
 
 // GetConversationSummary is a helper method to define mock.On call
 //   - ctx context.Context
-//   - conversationID string
+//   - conversationID uuid.UUID
 func (_e *MockConversationSummaryRepository_Expecter) GetConversationSummary(ctx interface{}, conversationID interface{}) *MockConversationSummaryRepository_GetConversationSummary_Call {
 	return &MockConversationSummaryRepository_GetConversationSummary_Call{Call: _e.mock.On("GetConversationSummary", ctx, conversationID)}
 }
 
-func (_c *MockConversationSummaryRepository_GetConversationSummary_Call) Run(run func(ctx context.Context, conversationID string)) *MockConversationSummaryRepository_GetConversationSummary_Call {
+func (_c *MockConversationSummaryRepository_GetConversationSummary_Call) Run(run func(ctx context.Context, conversationID uuid.UUID)) *MockConversationSummaryRepository_GetConversationSummary_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 uuid.UUID
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(uuid.UUID)
 		}
 		run(
 			arg0,
@@ -387,7 +770,7 @@ func (_c *MockConversationSummaryRepository_GetConversationSummary_Call) Return(
 	return _c
 }
 
-func (_c *MockConversationSummaryRepository_GetConversationSummary_Call) RunAndReturn(run func(ctx context.Context, conversationID string) (ConversationSummary, bool, error)) *MockConversationSummaryRepository_GetConversationSummary_Call {
+func (_c *MockConversationSummaryRepository_GetConversationSummary_Call) RunAndReturn(run func(ctx context.Context, conversationID uuid.UUID) (ConversationSummary, bool, error)) *MockConversationSummaryRepository_GetConversationSummary_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1814,7 +2197,7 @@ func (_c *MockTodoRepository_GetTodo_Call) RunAndReturn(run func(ctx context.Con
 }
 
 // ListTodos provides a mock function for the type MockTodoRepository
-func (_mock *MockTodoRepository) ListTodos(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions) ([]Todo, bool, error) {
+func (_mock *MockTodoRepository) ListTodos(ctx context.Context, page int, pageSize int, opts ...ListTodoOption) ([]Todo, bool, error) {
 	var tmpRet mock.Arguments
 	if len(opts) > 0 {
 		tmpRet = _mock.Called(ctx, page, pageSize, opts)
@@ -1830,22 +2213,22 @@ func (_mock *MockTodoRepository) ListTodos(ctx context.Context, page int, pageSi
 	var r0 []Todo
 	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...ListTodoOptions) ([]Todo, bool, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...ListTodoOption) ([]Todo, bool, error)); ok {
 		return returnFunc(ctx, page, pageSize, opts...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...ListTodoOptions) []Todo); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...ListTodoOption) []Todo); ok {
 		r0 = returnFunc(ctx, page, pageSize, opts...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]Todo)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, int, int, ...ListTodoOptions) bool); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int, int, ...ListTodoOption) bool); ok {
 		r1 = returnFunc(ctx, page, pageSize, opts...)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, int, int, ...ListTodoOptions) error); ok {
+	if returnFunc, ok := ret.Get(2).(func(context.Context, int, int, ...ListTodoOption) error); ok {
 		r2 = returnFunc(ctx, page, pageSize, opts...)
 	} else {
 		r2 = ret.Error(2)
@@ -1862,13 +2245,13 @@ type MockTodoRepository_ListTodos_Call struct {
 //   - ctx context.Context
 //   - page int
 //   - pageSize int
-//   - opts ...ListTodoOptions
+//   - opts ...ListTodoOption
 func (_e *MockTodoRepository_Expecter) ListTodos(ctx interface{}, page interface{}, pageSize interface{}, opts ...interface{}) *MockTodoRepository_ListTodos_Call {
 	return &MockTodoRepository_ListTodos_Call{Call: _e.mock.On("ListTodos",
 		append([]interface{}{ctx, page, pageSize}, opts...)...)}
 }
 
-func (_c *MockTodoRepository_ListTodos_Call) Run(run func(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions)) *MockTodoRepository_ListTodos_Call {
+func (_c *MockTodoRepository_ListTodos_Call) Run(run func(ctx context.Context, page int, pageSize int, opts ...ListTodoOption)) *MockTodoRepository_ListTodos_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1882,10 +2265,10 @@ func (_c *MockTodoRepository_ListTodos_Call) Run(run func(ctx context.Context, p
 		if args[2] != nil {
 			arg2 = args[2].(int)
 		}
-		var arg3 []ListTodoOptions
-		var variadicArgs []ListTodoOptions
+		var arg3 []ListTodoOption
+		var variadicArgs []ListTodoOption
 		if len(args) > 3 {
-			variadicArgs = args[3].([]ListTodoOptions)
+			variadicArgs = args[3].([]ListTodoOption)
 		}
 		arg3 = variadicArgs
 		run(
@@ -1903,7 +2286,7 @@ func (_c *MockTodoRepository_ListTodos_Call) Return(todos []Todo, b bool, err er
 	return _c
 }
 
-func (_c *MockTodoRepository_ListTodos_Call) RunAndReturn(run func(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions) ([]Todo, bool, error)) *MockTodoRepository_ListTodos_Call {
+func (_c *MockTodoRepository_ListTodos_Call) RunAndReturn(run func(ctx context.Context, page int, pageSize int, opts ...ListTodoOption) ([]Todo, bool, error)) *MockTodoRepository_ListTodos_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2244,6 +2627,52 @@ func (_c *MockUnitOfWork_ChatMessage_Call) Return(chatMessageRepository ChatMess
 }
 
 func (_c *MockUnitOfWork_ChatMessage_Call) RunAndReturn(run func() ChatMessageRepository) *MockUnitOfWork_ChatMessage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Conversation provides a mock function for the type MockUnitOfWork
+func (_mock *MockUnitOfWork) Conversation() ConversationRepository {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Conversation")
+	}
+
+	var r0 ConversationRepository
+	if returnFunc, ok := ret.Get(0).(func() ConversationRepository); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ConversationRepository)
+		}
+	}
+	return r0
+}
+
+// MockUnitOfWork_Conversation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Conversation'
+type MockUnitOfWork_Conversation_Call struct {
+	*mock.Call
+}
+
+// Conversation is a helper method to define mock.On call
+func (_e *MockUnitOfWork_Expecter) Conversation() *MockUnitOfWork_Conversation_Call {
+	return &MockUnitOfWork_Conversation_Call{Call: _e.mock.On("Conversation")}
+}
+
+func (_c *MockUnitOfWork_Conversation_Call) Run(run func()) *MockUnitOfWork_Conversation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockUnitOfWork_Conversation_Call) Return(conversationRepository ConversationRepository) *MockUnitOfWork_Conversation_Call {
+	_c.Call.Return(conversationRepository)
+	return _c
+}
+
+func (_c *MockUnitOfWork_Conversation_Call) RunAndReturn(run func() ConversationRepository) *MockUnitOfWork_Conversation_Call {
 	_c.Call.Return(run)
 	return _c
 }

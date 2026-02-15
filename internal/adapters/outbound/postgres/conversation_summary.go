@@ -8,6 +8,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/google/uuid"
 )
 
 var conversationSummaryFields = []string{
@@ -33,7 +34,7 @@ func NewConversationSummaryRepository(br squirrel.BaseRunner) ConversationSummar
 // GetConversationSummary retrieves a conversation summary by conversation ID.
 func (r ConversationSummaryRepository) GetConversationSummary(
 	ctx context.Context,
-	conversationID string,
+	conversationID uuid.UUID,
 ) (domain.ConversationSummary, bool, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
@@ -90,7 +91,7 @@ func (r ConversationSummaryRepository) StoreConversationSummary(ctx context.Cont
 }
 
 // DeleteConversationSummary deletes the conversation summary for a conversation (used for testing).
-func (r ConversationSummaryRepository) DeleteConversationSummary(ctx context.Context, conversationID string) error {
+func (r ConversationSummaryRepository) DeleteConversationSummary(ctx context.Context, conversationID uuid.UUID) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 

@@ -6,11 +6,12 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/google/uuid"
 )
 
 // ListChatMessages defines the interface for the ListChatMessages use case
 type ListChatMessages interface {
-	Query(ctx context.Context, page int, pageSize int) ([]domain.ChatMessage, bool, error)
+	Query(ctx context.Context, conversationID uuid.UUID, page int, pageSize int) ([]domain.ChatMessage, bool, error)
 }
 
 // ListChatMessagesImpl is the implementation of the ListChatMessages use case
@@ -26,11 +27,11 @@ func NewListChatMessagesImpl(chatMessageRepo domain.ChatMessageRepository) ListC
 }
 
 // Query retrieves chat messages with pagination support
-func (lcm ListChatMessagesImpl) Query(ctx context.Context, page int, pageSize int) ([]domain.ChatMessage, bool, error) {
+func (lcm ListChatMessagesImpl) Query(ctx context.Context, conversationID uuid.UUID, page int, pageSize int) ([]domain.ChatMessage, bool, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	messages, hasMore, err := lcm.ChatMessageRepo.ListChatMessages(spanCtx, pageSize)
+	messages, hasMore, err := lcm.ChatMessageRepo.ListChatMessages(spanCtx, conversationID, page, pageSize)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err
 	}

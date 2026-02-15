@@ -32,7 +32,8 @@ type ChatMessageEvent struct {
 	Type           EventType
 	ChatRole       ChatRole
 	ChatMessageID  uuid.UUID
-	ConversationID string
+	ConversationID uuid.UUID
+	CreatedAt      time.Time
 }
 
 // EventPublisher defines the interface for publishing events.

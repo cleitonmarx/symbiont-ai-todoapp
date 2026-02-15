@@ -10,6 +10,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -91,30 +92,29 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 // If limit > 0, returns up to N messages and indicates whether more messages exist.
 func (r ChatMessageRepository) ListChatMessages(
 	ctx context.Context,
-	limit int,
+	conversationID uuid.UUID,
+	page int,
+	pageSize int,
 	options ...domain.ListChatMessagesOption,
 ) ([]domain.ChatMessage, bool, error) {
 	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
-		attribute.Int("limit", limit),
+		attribute.Int("page", page),
+		attribute.Int("page_size", pageSize),
+		attribute.String("conversation_id", conversationID.String()),
 	))
 	defer span.End()
 
-	queryOptions := domain.ListChatMessagesOptions{
-		ConversationID: domain.GlobalConversationID,
-	}
+	queryOptions := domain.ListChatMessagesParams{}
 	for _, option := range options {
 		if option != nil {
 			option(&queryOptions)
 		}
 	}
-	span.SetAttributes(
-		attribute.String("conversation_id", queryOptions.ConversationID),
-	)
 
 	qry := r.sb.
 		Select(chatFields...).
 		From("ai_chat_messages").
-		Where(sq.Eq{"conversation_id": queryOptions.ConversationID})
+		Where(sq.Eq{"conversation_id": conversationID})
 
 	if queryOptions.AfterMessageID != nil {
 		span.SetAttributes(
@@ -129,7 +129,7 @@ func (r ChatMessageRepository) ListChatMessages(
 				).
 				From("ai_chat_messages").
 				Where(sq.Eq{
-					"conversation_id": queryOptions.ConversationID,
+					"conversation_id": conversationID,
 					"id":              *queryOptions.AfterMessageID,
 				}).
 				Limit(1).
@@ -151,8 +151,12 @@ func (r ChatMessageRepository) ListChatMessages(
 		qry = qry.OrderBy("created_at DESC", "id DESC")
 	}
 
-	if limit > 0 {
-		qry = qry.Limit(uint64(limit + 1)) // fetch one extra to detect more
+	if pageSize > 0 {
+		qry = qry.Limit(uint64(pageSize + 1)) // fetch one extra to detect more
+	}
+	if page > 1 && pageSize > 0 {
+		offset := uint64((page - 1) * pageSize)
+		qry = qry.Offset(offset)
 	}
 
 	rows, err := qry.QueryContext(spanCtx)
@@ -201,9 +205,9 @@ func (r ChatMessageRepository) ListChatMessages(
 	}
 
 	hasMore := false
-	if limit > 0 && len(msgs) > limit {
+	if pageSize > 0 && len(msgs) > pageSize {
 		hasMore = true
-		msgs = msgs[:limit]
+		msgs = msgs[:pageSize]
 	}
 
 	// Keep chronological order for callers.
@@ -217,14 +221,14 @@ func (r ChatMessageRepository) ListChatMessages(
 	return msgs, hasMore, nil
 }
 
-// DeleteConversation removes all messages for the global conversation.
-func (r ChatMessageRepository) DeleteConversation(ctx context.Context) error {
+// DeleteConversationMessages removes all messages for a specific conversation.
+func (r ChatMessageRepository) DeleteConversationMessages(ctx context.Context, conversationID uuid.UUID) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	_, err := r.sb.
 		Delete("ai_chat_messages").
-		Where(sq.Eq{"conversation_id": domain.GlobalConversationID}).
+		Where(sq.Eq{"conversation_id": conversationID}).
 		ExecContext(spanCtx)
 
 	if telemetry.RecordErrorAndStatus(span, err) {

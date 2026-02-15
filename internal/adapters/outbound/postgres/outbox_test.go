@@ -99,7 +99,7 @@ func TestOutboxRepository_CreateChatEvent(t *testing.T) {
 		Type:           domain.EventType_CHAT_MESSAGE_SENT,
 		ChatRole:       domain.ChatRole_Assistant,
 		ChatMessageID:  uuid.MustParse("223e4567-e89b-12d3-a456-426614174000"),
-		ConversationID: "global",
+		ConversationID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 	}
 
 	tests := map[string]struct {

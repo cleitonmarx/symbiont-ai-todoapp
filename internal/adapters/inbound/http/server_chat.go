@@ -10,29 +10,21 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 	"go.opentelemetry.io/otel/trace"
 )
 
-func (api TodoAppServer) ClearChatMessages(w http.ResponseWriter, r *http.Request) {
-	err := api.DeleteConversationUseCase.Execute(r.Context())
-	if err != nil {
-		respondError(w, toError(err))
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNoContent)
-}
-
+// List chat messages for a conversation with pagination
+// (GET /api/conversations/{conversation_id}/messages)
 func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request, params gen.ListChatMessagesParams) {
-	messages, hasMore, err := api.ListChatMessagesUseCase.Query(r.Context(), params.Page, params.Pagesize)
+	messages, hasMore, err := api.ListChatMessagesUseCase.Query(r.Context(), params.ConversationId, params.Page, params.PageSize)
 	if err != nil {
 		respondError(w, toError(err))
 		return
 	}
 
 	resp := gen.ChatHistoryResp{
-		ConversationId: domain.GlobalConversationID,
+		ConversationId: params.ConversationId,
 		Messages:       []gen.ChatMessage{},
 		Page:           params.Page,
 	}
@@ -53,6 +45,8 @@ func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request
 
 }
 
+// StreamChat handles streaming chat responses from the LLM
+// (POST /api/chat/stream)
 func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	req := gen.StreamChatJSONRequestBody{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -82,6 +76,11 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
+	var options []usecases.StreamChatOption
+	if req.ConversationId != nil {
+		options = append(options, usecases.WithConversationID(*req.ConversationId))
+	}
+
 	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(eventType domain.LLMStreamEventType, data any) error {
 		dataBytes, err := json.Marshal(data)
 		if err != nil {
@@ -99,7 +98,7 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 		}
 		flusher.Flush()
 		return nil
-	})
+	}, options...)
 	if telemetry.RecordErrorAndStatus(trace.SpanFromContext(r.Context()), err) &&
 		!errors.Is(err, context.Canceled) {
 		api.Logger.Printf("StreamChat: error during streaming: %v", err)
@@ -107,6 +106,8 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListAvailableModels returns the list of available LLM models for chat
+// (GET /api/models)
 func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Request) {
 	models, err := api.ListAvailableLLMModels.Query(r.Context())
 	if err != nil {

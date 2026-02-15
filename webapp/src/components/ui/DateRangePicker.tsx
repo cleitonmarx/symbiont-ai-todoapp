@@ -7,8 +7,10 @@ interface DateRangePickerProps {
   startDate: string;
   endDate: string;
   onChange: (startDate: string, endDate: string) => void;
+  mode?: 'range' | 'single';
   placeholder?: string;
   disabled?: boolean;
+  minDate?: string;
   className?: string;
   align?: 'left' | 'right';
   showClearButton?: boolean;
@@ -68,8 +70,10 @@ export const DateRangePicker = ({
   startDate,
   endDate,
   onChange,
+  mode = 'range',
   placeholder = DEFAULT_PLACEHOLDER,
   disabled = false,
+  minDate = '',
   className = '',
   align = 'left',
   showClearButton = true,
@@ -77,15 +81,26 @@ export const DateRangePicker = ({
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const hasValue = Boolean(startDate || endDate);
+  const minDateValue = useMemo(() => parseDate(minDate), [minDate]);
 
   const selectedRange: DateRange | undefined = useMemo(() => {
+    if (mode !== 'range') {
+      return undefined;
+    }
     const from = parseDate(startDate);
     const to = parseDate(endDate);
     if (!from && !to) {
       return undefined;
     }
     return { from, to };
-  }, [startDate, endDate]);
+  }, [endDate, mode, startDate]);
+
+  const selectedSingleDate = useMemo(() => {
+    if (mode !== 'single') {
+      return undefined;
+    }
+    return parseDate(startDate) ?? parseDate(endDate);
+  }, [endDate, mode, startDate]);
 
   const [leftMonth, setLeftMonth] = useState<Date>(() => {
     const baseMonth = getStartOfMonth(parseDate(startDate) ?? new Date());
@@ -129,14 +144,25 @@ export const DateRangePicker = ({
     const startValue = parseDate(startDate);
     const endValue = parseDate(endDate);
     const startMonth = getStartOfMonth(startValue ?? endValue ?? new Date());
-    const endMonth = endValue ? getStartOfMonth(endValue) : addMonths(startMonth, 1);
     setLeftMonth(startMonth);
-    setRightMonth(endMonth);
-  }, [open]);
+    if (mode === 'range') {
+      const endMonth = endValue ? getStartOfMonth(endValue) : addMonths(startMonth, 1);
+      setRightMonth(endMonth);
+    }
+  }, [endDate, mode, open, startDate]);
 
   const textValue = useMemo(() => {
     const from = parseDate(startDate);
     const to = parseDate(endDate);
+    if (mode === 'single') {
+      if (from) {
+        return toDisplayDate(from);
+      }
+      if (to) {
+        return toDisplayDate(to);
+      }
+      return placeholder;
+    }
     if (from && to) {
       return `${toDisplayDate(from)} - ${toDisplayDate(to)}`;
     }
@@ -147,7 +173,7 @@ export const DateRangePicker = ({
       return `... - ${toDisplayDate(to)}`;
     }
     return placeholder;
-  }, [startDate, endDate, placeholder]);
+  }, [endDate, mode, placeholder, startDate]);
 
   const handleDateRangeSelect = (range: DateRange | undefined) => {
     if (!range?.from) {
@@ -168,6 +194,16 @@ export const DateRangePicker = ({
     const start = range.from <= range.to ? range.from : range.to;
     const end = range.from <= range.to ? range.to : range.from;
     onChange(toIsoDate(start), toIsoDate(end));
+    setOpen(false);
+  };
+
+  const handleSingleDateSelect = (date: Date | undefined) => {
+    if (!date) {
+      onChange('', '');
+      return;
+    }
+    const isoDate = toIsoDate(date);
+    onChange(isoDate, isoDate);
     setOpen(false);
   };
 
@@ -203,14 +239,15 @@ export const DateRangePicker = ({
 
       {open ? (
         <div className="ui-date-range-popover" role="dialog" aria-label="Date range picker">
-          <div className="ui-date-range-calendars">
+          <div className={`ui-date-range-calendars ${mode === 'single' ? 'single' : ''}`.trim()}>
             <div className="ui-date-range-calendar-pane">
               <DayPicker
-                mode="range"
+                mode={mode}
                 month={leftMonth}
                 onMonthChange={handleLeftMonthChange}
-                selected={selectedRange}
-                onSelect={handleDateRangeSelect}
+                selected={mode === 'single' ? selectedSingleDate : selectedRange}
+                onSelect={mode === 'single' ? handleSingleDateSelect : handleDateRangeSelect}
+                disabled={minDateValue ? { before: minDateValue } : undefined}
                 showOutsideDays
                 navLayout="around"
                 captionLayout="dropdown"
@@ -219,21 +256,24 @@ export const DateRangePicker = ({
                 className="ui-date-range-calendar"
               />
             </div>
-            <div className="ui-date-range-calendar-pane">
-              <DayPicker
-                mode="range"
-                month={rightMonth}
-                onMonthChange={handleRightMonthChange}
-                selected={selectedRange}
-                onSelect={handleDateRangeSelect}
-                showOutsideDays
-                navLayout="around"
-                captionLayout="dropdown"
-                startMonth={PICKER_START_MONTH}
-                endMonth={PICKER_END_MONTH}
-                className="ui-date-range-calendar"
-              />
-            </div>
+            {mode === 'range' ? (
+              <div className="ui-date-range-calendar-pane">
+                <DayPicker
+                  mode="range"
+                  month={rightMonth}
+                  onMonthChange={handleRightMonthChange}
+                  selected={selectedRange}
+                  onSelect={handleDateRangeSelect}
+                  disabled={minDateValue ? { before: minDateValue } : undefined}
+                  showOutsideDays
+                  navLayout="around"
+                  captionLayout="dropdown"
+                  startMonth={PICKER_START_MONTH}
+                  endMonth={PICKER_END_MONTH}
+                  className="ui-date-range-calendar"
+                />
+              </div>
+            ) : null}
           </div>
 
           {showClearButton ? (

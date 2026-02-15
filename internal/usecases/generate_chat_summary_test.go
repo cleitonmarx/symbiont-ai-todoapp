@@ -16,7 +16,7 @@ import (
 )
 
 func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
-	conversationID := "global"
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	chatMessageID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	checkpointID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
 	fixedTime := time.Date(2026, 2, 12, 10, 0, 0, 0, time.UTC)
@@ -91,14 +91,13 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Once()
 
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
-					RunAndReturn(func(ctx context.Context, limit int, options ...domain.ListChatMessagesOption) ([]domain.ChatMessage, bool, error) {
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
+					RunAndReturn(func(ctx context.Context, conversationID uuid.UUID, page int, limit int, options ...domain.ListChatMessagesOption) ([]domain.ChatMessage, bool, error) {
 						assert.Equal(t, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, limit)
-						resolved := domain.ListChatMessagesOptions{}
+						resolved := domain.ListChatMessagesParams{}
 						for _, option := range options {
 							option(&resolved)
 						}
-						assert.Equal(t, conversationID, resolved.ConversationID)
 						assert.Nil(t, resolved.AfterMessageID)
 						return nil, false, errors.New("chat db error")
 					}).
@@ -125,7 +124,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Return(domain.ConversationSummary{}, false, nil).
 					Once()
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 			},
@@ -150,7 +149,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Return(domain.ConversationSummary{}, false, nil).
 					Once()
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
 					Return([]domain.ChatMessage{
 						{
 							ID:             chatMessageID,
@@ -206,13 +205,12 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					})
 				}
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
-					RunAndReturn(func(ctx context.Context, limit int, options ...domain.ListChatMessagesOption) ([]domain.ChatMessage, bool, error) {
-						resolved := domain.ListChatMessagesOptions{}
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
+					RunAndReturn(func(ctx context.Context, conversationID uuid.UUID, page int, limit int, options ...domain.ListChatMessagesOption) ([]domain.ChatMessage, bool, error) {
+						resolved := domain.ListChatMessagesParams{}
 						for _, option := range options {
 							option(&resolved)
 						}
-						assert.Equal(t, conversationID, resolved.ConversationID)
 						if assert.NotNil(t, resolved.AfterMessageID) {
 							assert.Equal(t, checkpointID, *resolved.AfterMessageID)
 						}
@@ -271,7 +269,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Return(domain.ConversationSummary{}, false, nil).
 					Once()
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
 					Return([]domain.ChatMessage{
 						{
 							ID:             chatMessageID,
@@ -318,7 +316,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Return(domain.ConversationSummary{}, false, nil).
 					Once()
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
 					Return([]domain.ChatMessage{
 						{
 							ID:             assistantMsgID,
@@ -373,7 +371,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Return(domain.ConversationSummary{}, false, nil).
 					Once()
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
 					Return([]domain.ChatMessage{
 						{
 							ID:             chatMessageID,
@@ -416,7 +414,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Return(domain.ConversationSummary{}, false, nil).
 					Once()
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
 					Return([]domain.ChatMessage{
 						{
 							ID:             chatMessageID,
@@ -453,7 +451,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Return(domain.ConversationSummary{}, false, nil).
 					Once()
 				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, mock.Anything).
 					Return([]domain.ChatMessage{
 						{
 							ID:             chatMessageID,

@@ -1,7 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import '../styles/BatchModal.css';
-
-
 interface CreateTodoFormProps {
   onCreateTodo: (title: string, due_date: string) => void;
 }

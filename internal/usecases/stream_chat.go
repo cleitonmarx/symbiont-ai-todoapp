@@ -30,15 +30,31 @@ const (
 //go:embed prompts/chat.yml
 var chatPrompt embed.FS
 
+// StreamChatParams holds optional parameters for StreamChat execution.
+type StreamChatParams struct {
+	ConversationID *uuid.UUID
+}
+
+// StreamChatOption defines a functional option for configuring StreamChatParams.
+type StreamChatOption func(*StreamChatParams)
+
+func WithConversationID(conversationID uuid.UUID) StreamChatOption {
+	return func(params *StreamChatParams) {
+		params.ConversationID = &conversationID
+	}
+}
+
 // StreamChat defines the interface for the StreamChat use case
 type StreamChat interface {
-	Execute(ctx context.Context, userMessage, model string, onEvent domain.LLMStreamEventCallback) error
+	// Execute streams a chat response and persists the conversation
+	Execute(ctx context.Context, userMessage, model string, onEvent domain.LLMStreamEventCallback, opts ...StreamChatOption) error
 }
 
 // StreamChatImpl is the implementation of the StreamChat use case
 type StreamChatImpl struct {
 	chatMessageRepo         domain.ChatMessageRepository
 	conversationSummaryRepo domain.ConversationSummaryRepository
+	conversationRepo        domain.ConversationRepository
 	uow                     domain.UnitOfWork
 	timeProvider            domain.CurrentTimeProvider
 	llmClient               domain.LLMClient
@@ -51,6 +67,7 @@ type StreamChatImpl struct {
 func NewStreamChatImpl(
 	chatMessageRepo domain.ChatMessageRepository,
 	conversationSummaryRepo domain.ConversationSummaryRepository,
+	conversationRepo domain.ConversationRepository,
 	timeProvider domain.CurrentTimeProvider,
 	llmClient domain.LLMClient,
 	llmToolRegistry domain.LLMToolRegistry,
@@ -61,6 +78,7 @@ func NewStreamChatImpl(
 	return StreamChatImpl{
 		chatMessageRepo:         chatMessageRepo,
 		conversationSummaryRepo: conversationSummaryRepo,
+		conversationRepo:        conversationRepo,
 		uow:                     uow,
 		timeProvider:            timeProvider,
 		llmClient:               llmClient,
@@ -71,9 +89,14 @@ func NewStreamChatImpl(
 }
 
 // Execute streams a chat response and persists the conversation
-func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string, onEvent domain.LLMStreamEventCallback) error {
+func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string, onEvent domain.LLMStreamEventCallback, opts ...StreamChatOption) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
+
+	params := &StreamChatParams{}
+	for _, opt := range opts {
+		opt(params)
+	}
 
 	if strings.TrimSpace(userMessage) == "" {
 		return domain.NewValidationErr("message cannot be empty")
@@ -83,8 +106,33 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return domain.NewValidationErr("model cannot be empty")
 	}
 
+	var (
+		conversation        domain.Conversation
+		conversationCreated bool
+	)
+
+	if params.ConversationID == nil {
+		// Create a new conversation for this chat interaction
+		title := domain.GenerateAutoConversationTitle(userMessage)
+		newConversation, err := sc.conversationRepo.CreateConversation(spanCtx, title, domain.ConversationTitleSource_Auto)
+		if telemetry.RecordErrorAndStatus(span, err) {
+			return err
+		}
+		conversation = newConversation
+		conversationCreated = true
+	} else {
+		c, found, err := sc.conversationRepo.GetConversation(spanCtx, *params.ConversationID)
+		if telemetry.RecordErrorAndStatus(span, err) {
+			return err
+		}
+		if !found {
+			return domain.NewValidationErr("conversation not found")
+		}
+		conversation = c
+	}
+
 	// Fetch chat history and append user message
-	messages, err := sc.fetchChatHistory(spanCtx)
+	messages, err := sc.fetchChatHistory(spanCtx, conversation.ID)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
@@ -103,7 +151,9 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	}
 
 	state := streamChatExecutionState{
-		turnID: uuid.New(),
+		conversation:        conversation,
+		conversationCreated: conversationCreated,
+		turnID:              uuid.New(),
 		tracker: newToolCycleTracker(
 			sc.maxToolCycles,
 			MAX_REPEATED_TOOL_CALL_HIT,
@@ -111,7 +161,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	}
 
 	state.userMsg = domain.ChatMessage{
-		ConversationID: domain.GlobalConversationID,
+		ConversationID: conversation.ID,
 		TurnID:         state.turnID,
 		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_User,
@@ -148,7 +198,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 
 	assistantMsg := domain.ChatMessage{
 		ID:               state.assistantMsgID,
-		ConversationID:   domain.GlobalConversationID,
+		ConversationID:   state.conversation.ID,
 		TurnID:           state.turnID,
 		TurnSequence:     state.nextTurnSequence(),
 		ChatRole:         domain.ChatRole_Assistant,
@@ -174,7 +224,8 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		}
 	}
 
-	if err := sc.persistChatMessage(spanCtx, assistantMsg); telemetry.RecordErrorAndStatus(span, err) {
+	err = sc.persistChatMessage(spanCtx, assistantMsg, state.conversation)
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 
@@ -193,6 +244,8 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 
 // streamChatExecutionState holds mutable state during a stream-chat execution.
 type streamChatExecutionState struct {
+	conversation        domain.Conversation
+	conversationCreated bool
 	assistantMsgContent strings.Builder
 	assistantMsgID      uuid.UUID
 	tokenUsage          domain.LLMUsage
@@ -249,16 +302,18 @@ func (sc StreamChatImpl) handleMetaEvent(
 	}
 
 	meta := data.(domain.LLMStreamEventMeta)
+	meta.ConversationID = state.conversation.ID
+	meta.ConversationCreated = state.conversationCreated
 	state.assistantMsgID = meta.AssistantMessageID
 	state.userMsg.ID = meta.UserMessageID
 	state.userMsg.CreatedAt = sc.timeProvider.Now().UTC()
 	state.userMsg.UpdatedAt = state.userMsg.CreatedAt
 	state.userMsgPersistTried = true
-	if err := sc.persistChatMessage(ctx, state.userMsg); err != nil {
+	if err := sc.persistChatMessage(ctx, state.userMsg, state.conversation); err != nil {
 		return err
 	}
 	state.userMsgPersisted = true
-	return onEvent(domain.LLMStreamEventType_Meta, data)
+	return onEvent(domain.LLMStreamEventType_Meta, meta)
 }
 
 // handleToolCallEvent persists assistant tool-call and tool-result messages, then updates request context.
@@ -277,7 +332,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 
 	assistantToolCallMsg := domain.ChatMessage{
 		ID:             uuid.New(),
-		ConversationID: domain.GlobalConversationID,
+		ConversationID: state.conversation.ID,
 		TurnID:         state.turnID,
 		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_Assistant,
@@ -287,7 +342,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		CreatedAt:      sc.timeProvider.Now().UTC(),
 	}
 	assistantToolCallMsg.UpdatedAt = assistantToolCallMsg.CreatedAt
-	if err := sc.persistChatMessage(ctx, assistantToolCallMsg); err != nil {
+	if err := sc.persistChatMessage(ctx, assistantToolCallMsg, state.conversation); err != nil {
 		return false, err
 	}
 
@@ -300,7 +355,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	now := sc.timeProvider.Now().UTC()
 	toolChatMsg := domain.ChatMessage{
 		ID:             uuid.New(),
-		ConversationID: domain.GlobalConversationID,
+		ConversationID: state.conversation.ID,
 		TurnID:         state.turnID,
 		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_Tool,
@@ -316,7 +371,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		toolChatMsg.ErrorMessage = &toolMessage.Content
 	}
 
-	if err := sc.persistChatMessage(ctx, toolChatMsg); err != nil {
+	if err := sc.persistChatMessage(ctx, toolChatMsg, state.conversation); err != nil {
 		return false, err
 	}
 
@@ -357,10 +412,11 @@ func (sc StreamChatImpl) persistUserMessageIfNeeded(ctx context.Context, state *
 	}
 
 	state.userMsg.ID = uuid.New()
+	state.userMsg.ConversationID = state.conversation.ID
 	state.userMsg.CreatedAt = sc.timeProvider.Now().UTC()
 	state.userMsg.UpdatedAt = state.userMsg.CreatedAt
 	state.userMsgPersistTried = true
-	if err := sc.persistChatMessage(ctx, state.userMsg); err != nil {
+	if err := sc.persistChatMessage(ctx, state.userMsg, state.conversation); err != nil {
 		return err
 	}
 	state.userMsgPersisted = true
@@ -386,7 +442,7 @@ func (sc StreamChatImpl) persistFailureMessages(
 	errorMessage := streamErr.Error()
 	failedAssistantMsg := domain.ChatMessage{
 		ID:               state.assistantMsgID,
-		ConversationID:   domain.GlobalConversationID,
+		ConversationID:   state.conversation.ID,
 		TurnID:           state.turnID,
 		TurnSequence:     state.nextTurnSequence(),
 		ChatRole:         domain.ChatRole_Assistant,
@@ -400,11 +456,11 @@ func (sc StreamChatImpl) persistFailureMessages(
 		CreatedAt:        failedAt,
 		UpdatedAt:        failedAt,
 	}
-	return sc.persistChatMessage(ctx, failedAssistantMsg)
+	return sc.persistChatMessage(ctx, failedAssistantMsg, state.conversation)
 }
 
 // persistChatMessage persists a chat message and emits a corresponding domain event for outbox processing.
-func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.ChatMessage) error {
+func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.ChatMessage, conversation domain.Conversation) error {
 	return sc.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
 		if err := uow.ChatMessage().CreateChatMessages(ctx, []domain.ChatMessage{message}); err != nil {
 			return err
@@ -415,7 +471,19 @@ func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.
 			ChatRole:       message.ChatRole,
 			ChatMessageID:  message.ID,
 			ConversationID: message.ConversationID,
+			CreatedAt:      message.CreatedAt,
 		}); err != nil {
+			return err
+		}
+
+		lastMessageAt := message.CreatedAt
+		if conversation.LastMessageAt == nil || message.CreatedAt.After(*conversation.LastMessageAt) {
+			conversation.LastMessageAt = &lastMessageAt
+		}
+		if message.CreatedAt.After(conversation.UpdatedAt) {
+			conversation.UpdatedAt = message.CreatedAt
+		}
+		if err := uow.Conversation().UpdateConversation(ctx, conversation); err != nil {
 			return err
 		}
 
@@ -424,7 +492,7 @@ func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.
 }
 
 // buildSystemPrompt creates the base chat prompt and injects the latest conversation summary context.
-func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context) ([]domain.LLMChatMessage, error) {
+func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID uuid.UUID) ([]domain.LLMChatMessage, error) {
 	file, err := chatPrompt.Open("prompts/chat.yml")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open chat prompt: %w", err)
@@ -446,7 +514,7 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context) ([]domain.LLMCha
 		}
 	}
 
-	latestSummary, found, err := sc.conversationSummaryRepo.GetConversationSummary(ctx, domain.GlobalConversationID)
+	latestSummary, found, err := sc.conversationSummaryRepo.GetConversationSummary(ctx, conversationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load conversation summary: %w", err)
 	}
@@ -467,15 +535,15 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context) ([]domain.LLMCha
 }
 
 // fetchChatHistory retrieves the chat history excluding old system messages
-func (sc StreamChatImpl) fetchChatHistory(ctx context.Context) ([]domain.LLMChatMessage, error) {
+func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uuid.UUID) ([]domain.LLMChatMessage, error) {
 	// Build system prompt with todo context
-	systemPrompt, err := sc.buildSystemPrompt(ctx)
+	systemPrompt, err := sc.buildSystemPrompt(ctx, conversationID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Load prior conversation to preserve context
-	history, _, err := sc.chatMessageRepo.ListChatMessages(ctx, MAX_CHAT_HISTORY_MESSAGES)
+	history, _, err := sc.chatMessageRepo.ListChatMessages(ctx, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES)
 	if err != nil {
 		return nil, err
 	}
@@ -545,6 +613,7 @@ func (t *toolCycleTracker) hasExceededMaxToolCalls(functionName, arguments strin
 type InitStreamChat struct {
 	ChatMessageRepo         domain.ChatMessageRepository         `resolve:""`
 	ConversationSummaryRepo domain.ConversationSummaryRepository `resolve:""`
+	ConversationRepo        domain.ConversationRepository        `resolve:""`
 	Uow                     domain.UnitOfWork                    `resolve:""`
 	TimeProvider            domain.CurrentTimeProvider           `resolve:""`
 	LLMToolRegistry         domain.LLMToolRegistry               `resolve:""`
@@ -560,6 +629,7 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 	depend.Register[StreamChat](NewStreamChatImpl(
 		i.ChatMessageRepo,
 		i.ConversationSummaryRepo,
+		i.ConversationRepo,
 		i.TimeProvider,
 		i.LLMClient,
 		i.LLMToolRegistry,

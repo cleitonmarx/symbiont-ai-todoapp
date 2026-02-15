@@ -1,6 +1,6 @@
 CREATE TABLE ai_chat_messages (
     id UUID PRIMARY KEY,
-    conversation_id TEXT NOT NULL,
+    conversation_id UUID NOT NULL,
     turn_id UUID NOT NULL,
     turn_sequence INTEGER NOT NULL,
     chat_role TEXT NOT NULL,

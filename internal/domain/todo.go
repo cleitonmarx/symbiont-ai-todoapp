@@ -98,32 +98,32 @@ type ListTodosParams struct {
 	SortBy        *TodoSortBy
 }
 
-// ListTodoOptions defines a function type for modifying ListTodosParams.
-type ListTodoOptions func(*ListTodosParams)
+// ListTodoOption defines a function type for modifying ListTodosParams.
+type ListTodoOption func(*ListTodosParams)
 
 // WithStatus is a ListTodoOptions that filters todos by their status.
-func WithStatus(status TodoStatus) ListTodoOptions {
+func WithStatus(status TodoStatus) ListTodoOption {
 	return func(params *ListTodosParams) {
 		params.Status = &status
 	}
 }
 
 // WithEmbedding is a ListTodoOptions that filters todos by their embedding similarity to the provided embedding.
-func WithEmbedding(embedding []float64) ListTodoOptions {
+func WithEmbedding(embedding []float64) ListTodoOption {
 	return func(params *ListTodosParams) {
 		params.Embedding = embedding
 	}
 }
 
 // WithTitleContains is a ListTodoOptions that filters todos whose title contains the specified substring (case-insensitive).
-func WithTitleContains(substring string) ListTodoOptions {
+func WithTitleContains(substring string) ListTodoOption {
 	return func(params *ListTodosParams) {
 		params.TitleContains = &substring
 	}
 }
 
 // WithDueDateRange is a ListTodoOptions that filters todos by a due date range.
-func WithDueDateRange(dueAfter, dueBefore time.Time) ListTodoOptions {
+func WithDueDateRange(dueAfter, dueBefore time.Time) ListTodoOption {
 	return func(params *ListTodosParams) {
 		params.DueAfter = &dueAfter
 		params.DueBefore = &dueBefore
@@ -131,7 +131,7 @@ func WithDueDateRange(dueAfter, dueBefore time.Time) ListTodoOptions {
 }
 
 // WithSortBy creates a ListTodoOptions to specify sorting criteria.
-func WithSortBy(sort string) ListTodoOptions {
+func WithSortBy(sort string) ListTodoOption {
 	return func(params *ListTodosParams) {
 		if after, ok := strings.CutSuffix(sort, "Desc"); ok {
 			params.SortBy = &TodoSortBy{Field: after, Direction: "DESC"}
@@ -147,7 +147,7 @@ func WithSortBy(sort string) ListTodoOptions {
 // TodoRepository defines the interface for interacting with todo items in the data store.
 type TodoRepository interface {
 	// ListTodos retrieves a list of todo items with pagination support.
-	ListTodos(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions) ([]Todo, bool, error)
+	ListTodos(ctx context.Context, page int, pageSize int, opts ...ListTodoOption) ([]Todo, bool, error)
 
 	// CreateTodo creates a new todo item with the given title.
 	CreateTodo(ctx context.Context, todo Todo) error

@@ -38,7 +38,7 @@ func NewTodoRepository(br squirrel.BaseRunner) TodoRepository {
 }
 
 // ListTodos lists todos with pagination and optional filters.
-func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOptions) ([]domain.Todo, bool, error) {
+func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOption) ([]domain.Todo, bool, error) {
 	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
 		attribute.Int("page", page),
 		attribute.Int("pageSize", pageSize),

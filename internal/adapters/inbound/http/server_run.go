@@ -26,6 +26,8 @@ type TodoAppServer struct {
 	UpdateTodoUseCase         usecases.UpdateTodo             `resolve:""`
 	DeleteTodoUseCase         usecases.DeleteTodo             `resolve:""`
 	GetBoardSummaryUseCase    usecases.GetBoardSummary        `resolve:""`
+	ListConversationsUseCase  usecases.ListConversations      `resolve:""`
+	UpdateConversationUseCase usecases.UpdateConversation     `resolve:""`
 	ListChatMessagesUseCase   usecases.ListChatMessages       `resolve:""`
 	DeleteConversationUseCase usecases.DeleteConversation     `resolve:""`
 	ListAvailableLLMModels    usecases.ListAvailableLLMModels `resolve:""`

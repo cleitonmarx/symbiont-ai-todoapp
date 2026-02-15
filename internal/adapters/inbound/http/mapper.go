@@ -33,6 +33,15 @@ func toTodo(t domain.Todo) gen.Todo {
 	}
 }
 
+func toConversation(c domain.Conversation) gen.Conversation {
+	return gen.Conversation{
+		Id:        c.ID,
+		Title:     c.Title,
+		UpdatedAt: c.UpdatedAt,
+		CreatedAt: c.CreatedAt,
+	}
+}
+
 func toChatMessage(msg domain.ChatMessage) gen.ChatMessage {
 	return gen.ChatMessage{
 		Id:        msg.ID,

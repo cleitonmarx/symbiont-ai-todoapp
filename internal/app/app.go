@@ -47,6 +47,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&usecases.InitDeleteTodo{},
 			&usecases.InitGenerateBoardSummary{},
 			&usecases.InitGenerateChatSummary{},
+			&usecases.InitGenerateConversationTitle{},
 			&usecases.InitGetBoardSummary{},
 			&usecases.InitListConversations{},
 			&usecases.InitUpdateConversation{},
@@ -59,8 +60,9 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 		Host(
 			&http.TodoAppServer{},
 			&graphql.TodoGraphQLServer{},
-			&workers.TodoEventSubscriber{},
-			&workers.ChatEventSubscriber{},
+			&workers.BoardSummaryGenerator{},
+			&workers.ChatSummaryGenerator{},
+			&workers.ConversationTitleGenerator{},
 			&workers.MessageRelay{},
 		).
 		Introspect(&MermaidGraphIntrospector{})

@@ -13,9 +13,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// ChatEventSubscriber consumes chat-message events from Pub/Sub
+// ChatSummaryGenerator is a runnable that consumes chat-message events
 // and triggers conversation summary generation.
-type ChatEventSubscriber struct {
+type ChatSummaryGenerator struct {
 	Logger              *log.Logger                  `resolve:""`
 	Client              *pubsub.Client               `resolve:""`
 	Interval            time.Duration                `config:"CHAT_SUMMARY_BATCH_INTERVAL" default:"3s"`
@@ -25,9 +25,9 @@ type ChatEventSubscriber struct {
 	workerExecutionChan chan struct{}
 }
 
-// Run starts the chat event subscriber worker.
-func (s ChatEventSubscriber) Run(ctx context.Context) error {
-	s.Logger.Println("ChatEventSubscriber: running...")
+// Run starts the chat summary generator worker.
+func (s ChatSummaryGenerator) Run(ctx context.Context) error {
+	s.Logger.Println("ChatSummaryGenerator: running...")
 
 	if s.BatchSize <= 0 {
 		s.BatchSize = 50
@@ -39,7 +39,6 @@ func (s ChatEventSubscriber) Run(ctx context.Context) error {
 	eventCh := make(chan *pubsub.Message, s.BatchSize*2)
 	subscriberInitErrCh := make(chan error, 1)
 
-	// 1. Receive messages in background (blocking call).
 	go func() {
 		err := s.Client.Subscriber(s.SubscriptionID).Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 			select {
@@ -55,7 +54,6 @@ func (s ChatEventSubscriber) Run(ctx context.Context) error {
 		}
 	}()
 
-	// 2. Batch + flush loop.
 	ticker := time.NewTicker(s.Interval)
 	defer ticker.Stop()
 
@@ -64,7 +62,7 @@ func (s ChatEventSubscriber) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			s.Logger.Println("ChatEventSubscriber: stopped")
+			s.Logger.Println("ChatSummaryGenerator: stopped")
 			return nil
 
 		case err := <-subscriberInitErrCh:
@@ -95,8 +93,8 @@ type chatSummaryConversationBatch struct {
 }
 
 // flush processes one batch of Pub/Sub messages.
-func (s ChatEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message) {
-	s.Logger.Printf("ChatEventSubscriber: processing batch size=%d", len(batch))
+func (s ChatSummaryGenerator) flush(ctx context.Context, batch []*pubsub.Message) {
+	s.Logger.Printf("ChatSummaryGenerator: processing batch size=%d", len(batch))
 
 	if s.workerExecutionChan != nil {
 		s.workerExecutionChan <- struct{}{}
@@ -106,7 +104,7 @@ func (s ChatEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 	for _, msg := range batch {
 		var event domain.ChatMessageEvent
 		if err := json.Unmarshal(msg.Data, &event); err != nil {
-			s.Logger.Printf("ChatEventSubscriber: failed to decode event payload: %v", err)
+			s.Logger.Printf("ChatSummaryGenerator: failed to decode event payload: %v", err)
 			msg.Nack()
 			continue
 		}
@@ -133,7 +131,7 @@ func (s ChatEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 				message.Nack()
 			}
 			if !errors.Is(err, context.Canceled) {
-				s.Logger.Printf("ChatEventSubscriber: %v", err)
+				s.Logger.Printf("ChatSummaryGenerator: %v", err)
 			}
 			continue
 		}

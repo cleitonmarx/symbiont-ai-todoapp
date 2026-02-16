@@ -10,9 +10,9 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 )
 
-// TodoEventSubscriber consumes Todo domain events from Pub/Sub
+// BoardSummaryGenerator is a runnable that consumes Todo domain events from Pub/Sub
 // and triggers AI summary generation.
-type TodoEventSubscriber struct {
+type BoardSummaryGenerator struct {
 	Logger               *log.Logger                   `resolve:""`
 	Client               *pubsub.Client                `resolve:""`
 	Interval             time.Duration                 `config:"SUMMARY_BATCH_INTERVAL" default:"3s"`
@@ -22,9 +22,9 @@ type TodoEventSubscriber struct {
 	workerExecutionChan  chan struct{}
 }
 
-// Run starts the subscriber worker.
-func (s TodoEventSubscriber) Run(ctx context.Context) error {
-	s.Logger.Println("TodoEventSubscriber: running...")
+// Run starts the board summary generator worker.
+func (s BoardSummaryGenerator) Run(ctx context.Context) error {
+	s.Logger.Println("BoardSummaryGenerator: running...")
 
 	eventCh := make(chan *pubsub.Message, s.BatchSize*2)
 	subscriberInitErrCh := make(chan error, 1)
@@ -54,7 +54,7 @@ func (s TodoEventSubscriber) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			s.Logger.Println("TodoEventSubscriber: stopped")
+			s.Logger.Println("BoardSummaryGenerator: stopped")
 			return nil
 
 		case err := <-subscriberInitErrCh:
@@ -76,8 +76,8 @@ func (s TodoEventSubscriber) Run(ctx context.Context) error {
 	}
 }
 
-func (s TodoEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message) {
-	s.Logger.Printf("TodoEventSubscriber: processing batch size=%d", len(batch))
+func (s BoardSummaryGenerator) flush(ctx context.Context, batch []*pubsub.Message) {
+	s.Logger.Printf("BoardSummaryGenerator: processing batch size=%d", len(batch))
 
 	if s.workerExecutionChan != nil {
 		s.workerExecutionChan <- struct{}{}
@@ -86,7 +86,7 @@ func (s TodoEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 	// Generate board-level summary once per batch
 	if err := s.GenerateBoardSummary.Execute(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) {
-			s.Logger.Printf("TodoEventSubscriber: %v", err)
+			s.Logger.Printf("BoardSummaryGenerator: %v", err)
 		}
 		return
 	}

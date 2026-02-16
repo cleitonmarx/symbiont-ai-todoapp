@@ -55,7 +55,7 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 				llmClient.EXPECT().Embed(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Title: My new todo | Due Date: 2024-01-01 | Status: OPEN",
+					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: My new todo | Due Date: 2024-01-01 | Status: OPEN",
 				).Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2, 0.3}}, nil)
 
 				uow.EXPECT().Todo().Return(repo)
@@ -104,7 +104,7 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 				llmClient.EXPECT().Embed(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Title: My new todo | Due Date: 2024-01-01 | Status: OPEN",
+					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: My new todo | Due Date: 2024-01-01 | Status: OPEN",
 				).Return(domain.EmbedResponse{}, errors.New("LLM service unavailable"))
 			},
 			expectedTodo: domain.Todo{},
@@ -125,7 +125,7 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 				llmClient.EXPECT().Embed(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Title: My new todo | Due Date: 2024-01-01 | Status: OPEN",
+					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: My new todo | Due Date: 2024-01-01 | Status: OPEN",
 				).Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2, 0.3}}, nil)
 
 				uow.EXPECT().Todo().Return(repo)

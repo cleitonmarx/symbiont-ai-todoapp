@@ -41,11 +41,10 @@ func (uc *UpdateConversationImpl) Execute(ctx context.Context, conversationID uu
 			return domain.NewNotFoundErr(fmt.Sprintf("conversation with ID %s not found", conversationID))
 		}
 
-		conv.Title = title
-		conv.TitleSource = domain.ConversationTitleSource_User
-		if err := conv.Validate(); err != nil {
+		if err := conv.ApplyUserTitle(title); err != nil {
 			return err
 		}
+
 		conv.UpdatedAt = uc.timeProvider.Now().UTC()
 		if err := uow.Conversation().UpdateConversation(ctx, conv); err != nil {
 			return err

@@ -73,6 +73,21 @@ func (c Conversation) CanBeLLMRetitled() bool {
 	return c.TitleSource == ConversationTitleSource_Auto
 }
 
+// ApplyUserTitle applies a user-provided title to the conversation and validates
+// the resulting entity state before mutating the receiver.
+func (c *Conversation) ApplyUserTitle(title string) error {
+	updated := *c
+	updated.Title = title
+	updated.TitleSource = ConversationTitleSource_User
+	if err := updated.Validate(); err != nil {
+		return err
+	}
+
+	c.Title = updated.Title
+	c.TitleSource = updated.TitleSource
+	return nil
+}
+
 // ApplyLLMGeneratedTitle normalizes and validates an LLM-generated title, returning an updated
 // conversation when the title should be applied.
 func (c *Conversation) ApplyLLMGeneratedTitle(rawTitle, focusedSummary string) ConversationTitleApplyStatus {

@@ -187,6 +187,49 @@ func TestConversation_CanBeLLMRetitled(t *testing.T) {
 	assert.False(t, Conversation{TitleSource: ConversationTitleSource_LLM}.CanBeLLMRetitled())
 }
 
+func TestConversation_ApplyUserTitle(t *testing.T) {
+	base := Conversation{
+		ID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		Title:       "Auto title",
+		TitleSource: ConversationTitleSource_Auto,
+	}
+
+	tests := map[string]struct {
+		title      string
+		wantErr    string
+		wantTitle  string
+		wantSource ConversationTitleSource
+	}{
+		"success-sets-user-source": {
+			title:      "Plan Spring Cleaning",
+			wantErr:    "",
+			wantTitle:  "Plan Spring Cleaning",
+			wantSource: ConversationTitleSource_User,
+		},
+		"empty-title-validation-error": {
+			title:      "",
+			wantErr:    "conversation title cannot be empty",
+			wantTitle:  "Auto title",
+			wantSource: ConversationTitleSource_Auto,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			conv := base
+			err := conv.ApplyUserTitle(tt.title)
+			if tt.wantErr != "" {
+				assert.Error(t, err)
+				assert.Equal(t, tt.wantErr, err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantTitle, conv.Title)
+			assert.Equal(t, tt.wantSource, conv.TitleSource)
+		})
+	}
+}
+
 func TestConversation_ApplyLLMGeneratedTitle(t *testing.T) {
 	longText := strings.Repeat("a", 80)
 	base := Conversation{

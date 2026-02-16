@@ -74,6 +74,7 @@ func (di *InitDB) Initialize(ctx context.Context) (context.Context, error) {
 	di.db = otelsql.OpenDB(
 		stdlib.GetPoolConnector(pool),
 		dbSystemAttributes,
+		otelsql.WithAttributesGetter(withQueryAttributes(di.Logger)),
 		otelsql.WithInstrumentAttributesGetter(withQueryAttributes(di.Logger)),
 	)
 

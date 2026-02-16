@@ -26,9 +26,11 @@ services:
       - PUBSUB_TOPIC_ID=Todo
       - TODO_EVENTS_SUBSCRIPTION_ID=todo_summary_generator
       - CHAT_EVENTS_SUBSCRIPTION_ID=chat_message_summary_generator
+      - CHAT_TITLE_EVENTS_SUBSCRIPTION_ID=chat_message_title_generator
       - LLM_MODEL_HOST=http://model-runner.docker.internal
-      - LLM_SUMMARY_MODEL=qwen3:8B-Q4_0
-      - LLM_CHAT_SUMMARY_MODEL=qwen3:8B-Q4_0
+      - LLM_SUMMARY_MODEL=qwen3:14B-Q6_K
+      - LLM_CHAT_SUMMARY_MODEL=qwen3:14B-Q6_K
+      - LLM_CHAT_TITLE_MODEL=qwen3:14B-Q6_K
       - LLM_EMBEDDING_MODEL=embeddinggemma:300M-Q8_0
       - SUMMARY_BATCH_INTERVAL=1s
     models:

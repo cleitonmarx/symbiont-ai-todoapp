@@ -338,12 +338,14 @@ func TestLLMClientAdapter_Chat_ValidationErrors(t *testing.T) {
 
 func TestLLMClientAdapter_Embed(t *testing.T) {
 	tests := map[string]struct {
-		response    string
-		statusCode  int
-		model       string
-		input       string
-		expectErr   bool
-		expectedVec []float64
+		options            []domain.EmbedOption
+		response           string
+		statusCode         int
+		model              string
+		input              string
+		expectRequestInput *string
+		expectErr          bool
+		expectedVec        []float64
 	}{
 		"success": {
 			response: `{
@@ -362,6 +364,26 @@ func TestLLMClientAdapter_Embed(t *testing.T) {
 			model:       "ai/qwen3-embedding",
 			input:       "A dog is an animal",
 			expectedVec: []float64{1.1, 2.2, 3.3},
+		},
+		"with-search-embedding-option-for-gemma": {
+			options: []domain.EmbedOption{domain.WithSearchEmbedding()},
+			response: `{
+				"model": "ai/gemma-embedding",
+				"object": "list",
+				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
+				"data": [
+					{
+						"embedding": [0.5, 0.6, 0.7],
+						"index": 0,
+						"object": "embedding"
+					}
+				]
+			}`,
+			statusCode:         http.StatusOK,
+			model:              "ai/gemma-embedding",
+			input:              "A dog is an animal",
+			expectRequestInput: common.Ptr("task: search tasks | query: A dog is an animal"),
+			expectedVec:        []float64{0.5, 0.6, 0.7},
 		},
 		"no-embedding-data": {
 			response: `{
@@ -394,6 +416,11 @@ func TestLLMClientAdapter_Embed(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.expectRequestInput != nil {
+					var req EmbeddingsRequest
+					json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+					assert.Equal(t, *tt.expectRequestInput, req.Input)
+				}
 				w.WriteHeader(tt.statusCode)
 				w.Write([]byte(tt.response)) //nolint:errcheck
 			}))
@@ -402,7 +429,7 @@ func TestLLMClientAdapter_Embed(t *testing.T) {
 			client := NewDRMAPIClient(server.URL, "", server.Client())
 			adapter := NewLLMClientAdapter(client)
 
-			vec, err := adapter.Embed(context.Background(), tt.model, tt.input)
+			vec, err := adapter.Embed(context.Background(), tt.model, tt.input, tt.options...)
 
 			if tt.expectErr {
 				assert.Error(t, err)

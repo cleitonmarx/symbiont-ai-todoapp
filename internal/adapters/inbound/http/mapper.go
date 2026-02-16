@@ -35,10 +35,11 @@ func toTodo(t domain.Todo) gen.Todo {
 
 func toConversation(c domain.Conversation) gen.Conversation {
 	return gen.Conversation{
-		Id:        c.ID,
-		Title:     c.Title,
-		UpdatedAt: c.UpdatedAt,
-		CreatedAt: c.CreatedAt,
+		Id:          c.ID,
+		Title:       c.Title,
+		TitleSource: gen.ConversationTitleSource(c.TitleSource),
+		UpdatedAt:   c.UpdatedAt,
+		CreatedAt:   c.CreatedAt,
 	}
 }
 

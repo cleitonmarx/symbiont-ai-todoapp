@@ -22,9 +22,16 @@ import (
 
 // Defines values for ChatMessageRole.
 const (
-	Assistant ChatMessageRole = "assistant"
-	System    ChatMessageRole = "system"
-	User      ChatMessageRole = "user"
+	ChatMessageRoleAssistant ChatMessageRole = "assistant"
+	ChatMessageRoleSystem    ChatMessageRole = "system"
+	ChatMessageRoleUser      ChatMessageRole = "user"
+)
+
+// Defines values for ConversationTitleSource.
+const (
+	ConversationTitleSourceAuto ConversationTitleSource = "auto"
+	ConversationTitleSourceLlm  ConversationTitleSource = "llm"
+	ConversationTitleSourceUser ConversationTitleSource = "user"
 )
 
 // Defines values for ErrorCode.
@@ -123,6 +130,9 @@ type Conversation struct {
 	// Title User-defined title for the conversation.
 	Title string `json:"title"`
 
+	// TitleSource Source of the conversation title.
+	TitleSource ConversationTitleSource `json:"title_source"`
+
 	// UpdatedAt Timestamp when the conversation was last updated.
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -141,6 +151,9 @@ type ConversationListResp struct {
 	// PreviousPage Opaque cursor to fetch the previous page of results. Null if there is no previous page.
 	PreviousPage *int `json:"previous_page"`
 }
+
+// ConversationTitleSource Source of the conversation title.
+type ConversationTitleSource string
 
 // CreateTodoRequest Request payload for creating a todo.
 type CreateTodoRequest struct {

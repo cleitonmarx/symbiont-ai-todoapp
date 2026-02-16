@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/Masterminds/squirrel"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/depend"
@@ -27,13 +27,13 @@ var (
 
 // TodoRepository implements the domain.TodoRepository interface using PostgreSQL as the storage backend.
 type TodoRepository struct {
-	sb squirrel.StatementBuilderType
+	sb sq.StatementBuilderType
 }
 
 // NewTodoRepository creates a new instance of TodoRepository.
-func NewTodoRepository(br squirrel.BaseRunner) TodoRepository {
+func NewTodoRepository(br sq.BaseRunner) TodoRepository {
 	return TodoRepository{
-		sb: squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar).RunWith(br),
+		sb: sq.StatementBuilder.PlaceholderFormat(sq.Dollar).RunWith(br),
 	}
 }
 
@@ -68,24 +68,28 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 		if err := params.Status.Validate(); err != nil {
 			return nil, false, err
 		}
-		qry = qry.Where(squirrel.Eq{"status": *params.Status})
+		qry = qry.Where(sq.Eq{"status": *params.Status})
 	}
 
 	if len(params.Embedding) > 0 {
-		qry = qry.Where(squirrel.Expr(
-			"(embedding <=> ?) < 0.5",
-			pgvector.NewVector(toFloat32Truncated(params.Embedding)),
-		))
+		qry = qry.
+			Where(sq.Expr(
+				"(embedding <=> ?) < 0.5",
+				pgvector.NewVector(toFloat32Truncated(params.Embedding)),
+			)).
+			Where(sq.Expr(
+				"set_config('hnsw.ef_search', '400', true) IS NOT NULL",
+			))
 	}
 
 	if params.TitleContains != nil {
-		qry = qry.Where(squirrel.ILike{"title": "%" + *params.TitleContains + "%"})
+		qry = qry.Where(sq.ILike{"title": "%" + *params.TitleContains + "%"})
 	}
 
 	if params.DueAfter != nil && params.DueBefore != nil {
-		qry = qry.Where(squirrel.And{
-			squirrel.GtOrEq{"due_date": *params.DueAfter},
-			squirrel.LtOrEq{"due_date": *params.DueBefore},
+		qry = qry.Where(sq.And{
+			sq.GtOrEq{"due_date": *params.DueAfter},
+			sq.LtOrEq{"due_date": *params.DueBefore},
 		})
 	}
 
@@ -129,7 +133,7 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 }
 
 // applySort applies sorting to the given squirrel SelectBuilder based on the provided ListTodosParams.
-func applySort(qry squirrel.SelectBuilder, params *domain.ListTodosParams) (squirrel.SelectBuilder, error) {
+func applySort(qry sq.SelectBuilder, params *domain.ListTodosParams) (sq.SelectBuilder, error) {
 	if params.SortBy == nil {
 		return qry.OrderBy("due_date ASC"), nil
 	}
@@ -139,7 +143,7 @@ func applySort(qry squirrel.SelectBuilder, params *domain.ListTodosParams) (squi
 	}
 
 	if params.SortBy.Field == "similarity" && len(params.Embedding) > 0 {
-		return qry.OrderByClause(squirrel.Expr(
+		return qry.OrderByClause(sq.Expr(
 			"embedding <#> ? "+params.SortBy.Direction,
 			pgvector.NewVector(toFloat32Truncated(params.Embedding)),
 		)), nil
@@ -197,7 +201,7 @@ func (tr TodoRepository) UpdateTodo(ctx context.Context, todo domain.Todo) error
 		Set("due_date", todo.DueDate).
 		Set("embedding", pgvector.NewVector(toFloat32Truncated(todo.Embedding))).
 		Set("updated_at", todo.UpdatedAt).
-		Where(squirrel.Eq{"id": todo.ID}).
+		Where(sq.Eq{"id": todo.ID}).
 		ExecContext(spanCtx)
 
 	if telemetry.RecordErrorAndStatus(span, err) {
@@ -213,7 +217,7 @@ func (tr TodoRepository) DeleteTodo(ctx context.Context, id uuid.UUID) error {
 
 	_, err := tr.sb.
 		Delete("todos").
-		Where(squirrel.Eq{"id": id}).
+		Where(sq.Eq{"id": id}).
 		ExecContext(spanCtx)
 
 	if telemetry.RecordErrorAndStatus(span, err) {
@@ -233,7 +237,7 @@ func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo
 			todoFields...,
 		).
 		From("todos").
-		Where(squirrel.Eq{"id": id}).
+		Where(sq.Eq{"id": id}).
 		QueryRowContext(spanCtx).
 		Scan(
 			&todo.ID,

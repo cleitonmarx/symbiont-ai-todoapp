@@ -38,6 +38,8 @@ interface UseChatReturn {
 const CHAT_SELECTED_MODEL_STORAGE_KEY = 'todoapp.chat.selectedModel';
 const CONVERSATIONS_PAGE_SIZE = 100;
 const CHAT_MESSAGES_PAGE_SIZE = 200;
+const AUTO_CONVERSATION_TITLE_SOURCE = 'auto';
+const AUTO_TITLE_REFRESH_DELAY_MS = 1200;
 
 const loadPersistedModel = (): string => {
   if (typeof window === 'undefined') {
@@ -86,6 +88,11 @@ const getEventBoolean = (data: Record<string, unknown>, ...keys: string[]): bool
   }
   return undefined;
 };
+
+const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 export const useChat = (onChatDone?: () => void): UseChatReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -190,6 +197,23 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
       setLoadingConversations(false);
     }
   }, [loadMessagesForConversation]);
+
+  const refreshConversationTitleIfAuto = useCallback(
+    async (conversationId: string | null) => {
+      if (!conversationId) {
+        return;
+      }
+
+      const conversation = conversationsRef.current.find((item) => item.id === conversationId);
+      if (!conversation || conversation.title_source !== AUTO_CONVERSATION_TITLE_SOURCE) {
+        return;
+      }
+
+      await wait(AUTO_TITLE_REFRESH_DELAY_MS);
+      await loadConversations();
+    },
+    [loadConversations],
+  );
 
   const loadMessages = useCallback(async () => {
     const conversationId = activeConversationRef.current;
@@ -351,6 +375,8 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
         const decoder = new TextDecoder();
         let assistantContent = '';
         let assistantMessageId = '';
+        let streamConversationId: string | null = activeConversationRef.current;
+        let assistantCompleted = false;
         let buffer = '';
 
         const tempAssistantMsg: ChatMessage = {
@@ -389,6 +415,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
               const eventConversationCreated = getEventBoolean(data, 'conversation_created', 'ConversationCreated', 'conversationCreated');
 
               if (eventConversationId) {
+                streamConversationId = eventConversationId;
                 activeConversationRef.current = eventConversationId;
                 setActiveConversationId(eventConversationId);
               }
@@ -447,6 +474,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
             }
 
             if (eventType === 'done') {
+              assistantCompleted = true;
               const eventAssistantMessageId = getEventString(data, 'assistant_message_id', 'AssistantMessageID', 'assistantMessageId');
               if (eventAssistantMessageId) {
                 assistantMessageId = eventAssistantMessageId;
@@ -455,8 +483,6 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
               setLoading(false);
               readerRef.current = null;
               abortControllerRef.current = null;
-              void loadConversations();
-              onChatDone?.();
               return;
             }
 
@@ -526,7 +552,11 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
         }
 
         setLoading(false);
-        void loadConversations();
+        await loadConversations();
+        if (assistantCompleted) {
+          await refreshConversationTitleIfAuto(streamConversationId);
+          onChatDone?.();
+        }
         clearToolStatus();
         readerRef.current = null;
       } catch (err) {
@@ -541,7 +571,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
         abortControllerRef.current = null;
       }
     },
-    [clearToolStatus, loadConversations, onChatDone, selectedModel, updateToolStatus],
+    [clearToolStatus, loadConversations, onChatDone, refreshConversationTitleIfAuto, selectedModel, updateToolStatus],
   );
 
   return {

@@ -61,9 +61,12 @@ export interface ModelListResponse {
   models: string[];
 }
 
+export type ConversationTitleSource = 'user' | 'llm' | 'auto';
+
 export interface Conversation {
   id: string;
   title: string;
+  title_source: ConversationTitleSource;
   created_at: string;
   updated_at: string;
 }

@@ -34,6 +34,7 @@ import (
 var (
 	boardSummaryQueue        usecases.CompletedBoardSummaryChannel
 	conversationSummaryQueue usecases.CompletedConversationSummaryChannel
+	conversationTitleQueue   usecases.CompletedConversationTitleUpdateChannel
 	restCli                  *rest.ClientWithResponses
 )
 
@@ -41,23 +42,25 @@ func TestMain(m *testing.M) {
 	todoApp := app.NewTodoApp(
 		&initEnvVars{
 			envVars: map[string]string{
-				"VAULT_ADDR":                  "http://localhost:8200",
-				"VAULT_TOKEN":                 "root-token",
-				"VAULT_MOUNT_PATH":            "secret",
-				"VAULT_SECRET_PATH":           "todoapp",
-				"OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4318",
-				"DB_HOST":                     "localhost",
-				"DB_PORT":                     "5432",
-				"DB_NAME":                     "todoappdb",
-				"PUBSUB_EMULATOR_HOST":        "localhost:8681",
-				"PUBSUB_PROJECT_ID":           "local-dev",
-				"PUBSUB_TOPIC_ID":             "Todo",
-				"TODO_EVENTS_SUBSCRIPTION_ID": "todo_summary_generator",
-				"CHAT_EVENTS_SUBSCRIPTION_ID": "chat_message_summary_generator",
-				"LLM_MODEL_HOST":              "http://localhost:12434",
-				"LLM_CHAT_SUMMARY_MODEL":      " qwen3:8B-Q4_0",
-				"LLM_SUMMARY_MODEL":           "qwen3:8B-Q4_0",
-				"LLM_EMBEDDING_MODEL":         "embeddinggemma:300M-Q8_0",
+				"VAULT_ADDR":                        "http://localhost:8200",
+				"VAULT_TOKEN":                       "root-token",
+				"VAULT_MOUNT_PATH":                  "secret",
+				"VAULT_SECRET_PATH":                 "todoapp",
+				"OTEL_EXPORTER_OTLP_ENDPOINT":       "http://localhost:4318",
+				"DB_HOST":                           "localhost",
+				"DB_PORT":                           "5432",
+				"DB_NAME":                           "todoappdb",
+				"PUBSUB_EMULATOR_HOST":              "localhost:8681",
+				"PUBSUB_PROJECT_ID":                 "local-dev",
+				"PUBSUB_TOPIC_ID":                   "Todo",
+				"TODO_EVENTS_SUBSCRIPTION_ID":       "todo_summary_generator",
+				"CHAT_EVENTS_SUBSCRIPTION_ID":       "chat_message_summary_generator",
+				"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID": "chat_message_title_generator",
+				"LLM_MODEL_HOST":                    "http://localhost:12434",
+				"LLM_CHAT_SUMMARY_MODEL":            "qwen3:14B-Q6_K",
+				"LLM_CHAT_TITLE_MODEL":              "qwen3:14B-Q6_K",
+				"LLM_SUMMARY_MODEL":                 "qwen3:14B-Q6_K",
+				"LLM_EMBEDDING_MODEL":               "embeddinggemma:300M-Q8_0",
 			},
 		},
 		&InitDockerCompose{},
@@ -68,6 +71,9 @@ func TestMain(m *testing.M) {
 
 	conversationSummaryQueue = make(usecases.CompletedConversationSummaryChannel)
 	depend.Register(conversationSummaryQueue)
+
+	conversationTitleQueue = make(usecases.CompletedConversationTitleUpdateChannel)
+	depend.Register(conversationTitleQueue)
 
 	var err error
 
@@ -240,21 +246,22 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		modelName      string
 		conversationID uuid.UUID
 	)
+	const createTodoPrompt = "Create a new todo with title \"Integration Test Todo\", due date tomorrow."
 
 	t.Run("fetch-available-models", func(t *testing.T) {
 		modelsResp, err := restCli.ListAvailableModelsWithResponse(t.Context())
 		require.NoError(t, err, "failed to call GetAvailableModels endpoint")
 		require.NotNil(t, modelsResp.JSON200, "expected non-nil response for GetAvailableModels")
 		require.Greater(t, len(modelsResp.JSON200.Models), 0, "expected at least one available model")
-		require.Contains(t, modelsResp.JSON200.Models, "qwen3:8B-Q4_0", "expected available models to include qwen3:8B-Q4_0")
-		i := slices.Index(modelsResp.JSON200.Models, "qwen3:8B-Q4_0")
+		require.Contains(t, modelsResp.JSON200.Models, "qwen3:14B-Q6_K", "expected available models to include qwen3:14B-Q6_K")
+		i := slices.Index(modelsResp.JSON200.Models, "qwen3:14B-Q6_K")
 		modelName = modelsResp.JSON200.Models[i]
 	})
 
 	t.Run("create-todo", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			Model:   modelName,
-			Message: "Create a new todo with title \"Integration Test Todo\", due date tomorrow.",
+			Message: createTodoPrompt,
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
@@ -267,6 +274,30 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
 		fmt.Println("Chat response:", deltaText)
 
+	})
+
+	var lastConversation rest.Conversation
+	t.Run("auto-rename-conversation-title", func(t *testing.T) {
+		resp, err := restCli.ListConversationsWithResponse(t.Context(), &rest.ListConversationsParams{
+			Page:     1,
+			PageSize: 2,
+		})
+		require.NoError(t, err, "failed to call ListConversations endpoint")
+		require.Equal(t, http.StatusOK, resp.StatusCode(), "expected 200 OK response for ListConversations")
+		require.NotNil(t, resp.JSON200, "expected non-nil response for ListConversations")
+		require.Len(t, resp.JSON200.Conversations, 1, "expected 1 conversation in the list")
+
+		autoTitle := domain.GenerateAutoConversationTitle(createTodoPrompt)
+
+		for _, conv := range resp.JSON200.Conversations {
+			if conv.Id == conversationID {
+				lastConversation = conv
+				break
+			}
+		}
+
+		require.Equal(t, autoTitle, lastConversation.Title, "expected conversation title to be auto-generated based on the initial user message")
+		require.Equal(t, rest.ConversationTitleSourceAuto, lastConversation.TitleSource, "expected conversation title source to be 'auto'")
 	})
 
 	t.Run("chat-fetch-todo", func(t *testing.T) {
@@ -326,8 +357,20 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		select {
 		case summary := <-conversationSummaryQueue:
 			require.Contains(t, summary.CurrentStateSummary, "Integration Test Todo")
-		case <-time.After(5 * time.Minute):
+		case <-time.After(2 * time.Minute):
 			t.Fatalf("Timed out waiting for conversation summary in queue")
+		}
+	})
+
+	t.Run("check-conversation-title-update-generated", func(t *testing.T) {
+		select {
+		case titleUpdate := <-conversationTitleQueue:
+			updatedTitleSource := rest.ConversationTitleSource(titleUpdate.TitleSource)
+			require.NotEqual(t, lastConversation.Title, titleUpdate.Title, "expected conversation title to be updated from the initial auto-generated title")
+			require.Equal(t, rest.ConversationTitleSourceLlm, updatedTitleSource, "expected conversation title source to be 'llm'")
+			fmt.Printf("Conversation title updated to: %s, source: %s\n", titleUpdate.Title, titleUpdate.TitleSource)
+		case <-time.After(2 * time.Minute):
+			t.Fatalf("Timed out waiting for conversation title update in queue")
 		}
 	})
 }
@@ -353,6 +396,7 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 		require.NoError(t, err, "failed to call UpdateConversation endpoint")
 		require.NotNil(t, updateResp.JSON200, "expected non-nil response for UpdateConversation")
 		require.Equal(t, newTitle, updateResp.JSON200.Title, "expected conversation title to be updated")
+		require.Equal(t, rest.ConversationTitleSourceUser, updateResp.JSON200.TitleSource, "expected conversation title source to be 'user'")
 	})
 
 	t.Run("list-messages-in-conversation", func(t *testing.T) {

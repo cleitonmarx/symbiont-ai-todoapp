@@ -152,6 +152,23 @@ type LLMModelInfo struct {
 	Type LLMModelType
 }
 
+// LLMClient defines the interface for interacting with an LLM API
+type EmbedParams struct {
+	// ForSearch indicates that the embedding will be used for search
+	ForSearch bool
+}
+
+// EmbedOption defines a function type for modifying EmbedParams.
+type EmbedOption func(*EmbedParams)
+
+// WithSearchEmbedding is an EmbedOption that indicates the embedding will be used for search,
+// which may allow the LLM client to optimize the embedding generation for search use cases.
+func WithSearchEmbedding() func(*EmbedParams) {
+	return func(params *EmbedParams) {
+		params.ForSearch = true
+	}
+}
+
 // LLMStreamEventCallback is called for each event in the stream
 type LLMStreamEventCallback func(eventType LLMStreamEventType, data any) error
 
@@ -165,7 +182,7 @@ type LLMClient interface {
 	Chat(ctx context.Context, req LLMChatRequest) (LLMChatResponse, error)
 
 	// Embed generates an embedding vector for the given input text
-	Embed(ctx context.Context, model, input string) (EmbedResponse, error)
+	Embed(ctx context.Context, model, input string, opts ...EmbedOption) (EmbedResponse, error)
 
 	// AvailableModels retrieves the list of available models
 	AvailableModels(ctx context.Context) ([]LLMModelInfo, error)

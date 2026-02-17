@@ -11,10 +11,12 @@ import (
 type LLMStreamEventType string
 
 const (
-	LLMStreamEventType_Meta     LLMStreamEventType = "meta"
-	LLMStreamEventType_Delta    LLMStreamEventType = "delta"
-	LLMStreamEventType_ToolCall LLMStreamEventType = "tool_call"
-	LLMStreamEventType_Done     LLMStreamEventType = "done"
+	LLMStreamEventType_Meta          LLMStreamEventType = "meta"
+	LLMStreamEventType_Delta         LLMStreamEventType = "delta"
+	LLMStreamEventType_ToolCall      LLMStreamEventType = "tool_call"
+	LLMStreamEventType_ToolStarted   LLMStreamEventType = "tool_call_started"
+	LLMStreamEventType_ToolCompleted LLMStreamEventType = "tool_call_finished"
+	LLMStreamEventType_Done          LLMStreamEventType = "done"
 )
 
 // LLMTool represents a tool that can be executed by the LLM
@@ -113,6 +115,23 @@ type LLMStreamEventToolCall struct {
 	Text      string
 }
 
+// LLMStreamEventToolCallStarted indicates a tool invocation has started.
+type LLMStreamEventToolCallStarted struct {
+	ID        string `json:"id"`
+	Function  string `json:"function"`
+	Arguments string `json:"arguments"`
+	Text      string `json:"text"`
+}
+
+// LLMStreamEventToolCallCompleted indicates a tool invocation has finished.
+type LLMStreamEventToolCallCompleted struct {
+	ID            string  `json:"id"`
+	Function      string  `json:"function"`
+	Success       bool    `json:"success"`
+	Error         *string `json:"error,omitempty"`
+	ShouldRefetch bool    `json:"should_refetch"`
+}
+
 // LLMStreamEventDone contains completion metadata and token usage
 type LLMStreamEventDone struct {
 	Usage              LLMUsage
@@ -175,7 +194,7 @@ type LLMStreamEventCallback func(eventType LLMStreamEventType, data any) error
 // LLMClient defines the interface for interacting with an LLM API
 type LLMClient interface {
 	// ChatStream streams assistant output as events from an LLM server
-	// It calls onEvent with each event (meta, delta, done) and returns any error
+	// It calls onEvent with each event (meta, delta, tool_call/tool_call_started/tool_call_finished, done) and returns any error
 	ChatStream(ctx context.Context, req LLMChatRequest, onEvent LLMStreamEventCallback) error
 
 	// Chat sends a chat request to the LLM and returns the full assistant response

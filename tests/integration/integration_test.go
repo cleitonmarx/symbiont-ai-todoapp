@@ -267,10 +267,11 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText, toolCallText, cID := readChatEventsText(t, chatResp.Body)
+		deltaText, toolStartedText, toolCompletedCount, cID := readChatEventsText(t, chatResp.Body)
 		conversationID = cID
 
-		require.Contains(t, toolCallText, "📝 Creating your todo...")
+		require.Contains(t, toolStartedText, "📝 Creating your todo...")
+		require.GreaterOrEqual(t, toolCompletedCount, 1)
 		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
 		fmt.Println("Chat response:", deltaText)
 
@@ -310,9 +311,10 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText, toolCallText, _ := readChatEventsText(t, chatResp.Body)
+		deltaText, toolStartedText, toolCompletedCount, _ := readChatEventsText(t, chatResp.Body)
 
-		require.Contains(t, toolCallText, "🔎 Fetching todos...")
+		require.Contains(t, toolStartedText, "🔎 Fetching todos...")
+		require.GreaterOrEqual(t, toolCompletedCount, 1)
 		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
 		require.Contains(t, deltaText, "OPEN", "expected chat response to contain created todo status")
 		fmt.Println("Chat response:", deltaText)
@@ -329,9 +331,10 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText, toolCallText, _ := readChatEventsText(t, chatResp.Body)
+		deltaText, toolStartedText, toolCompletedCount, _ := readChatEventsText(t, chatResp.Body)
 
-		require.Contains(t, toolCallText, "✏️ Updating your todo...")
+		require.Contains(t, toolStartedText, "✏️ Updating your todo...")
+		require.GreaterOrEqual(t, toolCompletedCount, 1)
 		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
 		require.Contains(t, deltaText, "DONE", "expected chat response to contain created todo status")
 
@@ -348,8 +351,9 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText, toolCallText, _ := readChatEventsText(t, chatResp.Body)
-		require.Contains(t, toolCallText, "🗑️ Deleting the todo...")
+		deltaText, toolStartedText, toolCompletedCount, _ := readChatEventsText(t, chatResp.Body)
+		require.Contains(t, toolStartedText, "🗑️ Deleting the todo...")
+		require.GreaterOrEqual(t, toolCompletedCount, 1)
 		fmt.Println("Chat response:", deltaText)
 	})
 
@@ -435,15 +439,17 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 	})
 }
 
-func readChatEventsText(t *testing.T, reader io.Reader) (string, string, uuid.UUID) {
+func readChatEventsText(t *testing.T, reader io.Reader) (string, string, int, uuid.UUID) {
 	var (
-		isDelta        = false
-		isToolCall     = false
-		isMeta         = false
-		toolCallText   = strings.Builder{}
-		deltaText      = strings.Builder{}
-		scanner        = bufio.NewScanner(reader)
-		conversationID uuid.UUID
+		isDelta            = false
+		isToolStarted      = false
+		isToolCompleted    = false
+		isMeta             = false
+		toolStartedText    = strings.Builder{}
+		toolCompletedCount = 0
+		deltaText          = strings.Builder{}
+		scanner            = bufio.NewScanner(reader)
+		conversationID     uuid.UUID
 	)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -475,21 +481,36 @@ func readChatEventsText(t *testing.T, reader io.Reader) (string, string, uuid.UU
 			isDelta = true
 		}
 
-		if isToolCall {
-			isToolCall = false
+		if isToolStarted {
+			isToolStarted = false
 			dataline := scanner.Text()
 			dataPayload := strings.TrimSpace(strings.TrimPrefix(dataline, "data:"))
-			var toolCall domain.LLMStreamEventToolCall
-			err := json.Unmarshal([]byte(dataPayload), &toolCall)
-			require.NoError(t, err, "failed to unmarshal chat tool call payload")
-			toolCallText.WriteString(toolCall.Text)
+			var toolStarted domain.LLMStreamEventToolCallStarted
+			err := json.Unmarshal([]byte(dataPayload), &toolStarted)
+			require.NoError(t, err, "failed to unmarshal chat tool started payload")
+			toolStartedText.WriteString(toolStarted.Text)
 		}
 
-		if strings.HasPrefix(line, "event: tool_call") {
-			isToolCall = true
+		if strings.HasPrefix(line, "event: tool_call_started") {
+			isToolStarted = true
 		}
 
+		if isToolCompleted {
+			isToolCompleted = false
+			dataline := scanner.Text()
+			dataPayload := strings.TrimSpace(strings.TrimPrefix(dataline, "data:"))
+			var toolCompleted domain.LLMStreamEventToolCallCompleted
+			err := json.Unmarshal([]byte(dataPayload), &toolCompleted)
+			require.NoError(t, err, "failed to unmarshal chat tool completed payload")
+			toolCompletedCount++
+		}
+
+		if strings.HasPrefix(line, "event: tool_call_finished") {
+			isToolCompleted = true
+		}
 	}
 
-	return deltaText.String(), toolCallText.String(), conversationID
+	require.NoError(t, scanner.Err(), "failed to scan chat stream")
+
+	return deltaText.String(), toolStartedText.String(), toolCompletedCount, conversationID
 }

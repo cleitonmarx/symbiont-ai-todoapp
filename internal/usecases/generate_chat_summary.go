@@ -35,6 +35,12 @@ const (
 
 	// Frequency penalty to reduce repetition in summaries, especially for longer conversations.
 	CHAT_SUMMARY_FREQUENCY_PENALTY = 0.7
+
+	// Maximum number of recent tool calls persisted in conversation summary memory.
+	MAX_RECENT_TOOL_CALLS_IN_SUMMARY = 10
+
+	// Summary field used to persist rolling tool-call history.
+	SUMMARY_RECENT_TOOL_CALLS_FIELD = "recent_tool_calls"
 )
 
 // CompletedConversationSummaryChannel is a channel type for sending processed domain.ConversationSummary items.
@@ -154,6 +160,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	if summaryContent == "" {
 		return nil
 	}
+	summaryContent = mergeRecentToolCallsIntoSummary(currentSummary, summaryContent, unsummarizedMessages)
 
 	summaryID := uuid.New()
 	if found {
@@ -236,6 +243,8 @@ func formatMessageForSummary(message domain.ChatMessage) string {
 	return strings.Join(parts, "\n")
 }
 
+// shouldGenerateSummary determines whether a new conversation summary should be generated
+// based on the unsummarized messages and defined generation policies.
 func (gcs GenerateChatSummaryImpl) shouldGenerateSummary(span trace.Span, messages []domain.ChatMessage, hasMore bool) bool {
 	decision := domain.DetermineConversationSummaryGenerationDecision(
 		messages,
@@ -257,6 +266,162 @@ func (gcs GenerateChatSummaryImpl) shouldGenerateSummary(span trace.Span, messag
 	}
 
 	return decision.ShouldGenerate
+}
+
+// mergeRecentToolCallsIntoSummary extracts recent tool calls from the new unsummarized messages,
+// merges them with any existing tool call history in the previous summary, and upserts the combined list
+// back into the new summary content.
+func mergeRecentToolCallsIntoSummary(previousSummary, newSummary string, messages []domain.ChatMessage) string {
+	existing := parseRecentToolCallsFromSummary(previousSummary)
+	latest := extractRecentToolCalls(messages)
+	merged := append(existing, latest...)
+	merged = keepLastNToolCalls(merged, MAX_RECENT_TOOL_CALLS_IN_SUMMARY)
+	return upsertSummaryField(newSummary, SUMMARY_RECENT_TOOL_CALLS_FIELD, formatRecentToolCalls(merged))
+}
+
+// parseRecentToolCallsFromSummary looks for the recent tool calls field in the given summary content
+// and parses it into a list of tool function names.
+func parseRecentToolCallsFromSummary(summary string) []string {
+	value, ok := findSummaryFieldValue(summary, SUMMARY_RECENT_TOOL_CALLS_FIELD)
+	if !ok {
+		return nil
+	}
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, "none") {
+		return nil
+	}
+
+	parts := strings.Split(value, ";")
+	toolCalls := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(part)
+		if name == "" {
+			continue
+		}
+		toolCalls = append(toolCalls, name)
+	}
+	return keepLastNToolCalls(toolCalls, MAX_RECENT_TOOL_CALLS_IN_SUMMARY)
+}
+
+// extractRecentToolCalls inspects the given list of chat messages and extracts the function names of any tool calls,
+// especially those that are relevant for state changes, to be included in the conversation summary memory.
+func extractRecentToolCalls(messages []domain.ChatMessage) []string {
+	toolCalls := make([]string, 0, len(messages))
+	for _, message := range messages {
+		if len(message.ToolCalls) == 0 {
+			continue
+		}
+		for _, toolCall := range message.ToolCalls {
+			functionName := strings.TrimSpace(toolCall.Function)
+			if functionName == "" {
+				continue
+			}
+			toolCalls = append(toolCalls, functionName)
+		}
+	}
+	return toolCalls
+}
+
+// keepLastNToolCalls ensures that only the most recent N tool calls are kept in the conversation summary memory,
+// to prevent unbounded growth while still retaining relevant recent tool usage history for context in future summaries.
+func keepLastNToolCalls(toolCalls []string, max int) []string {
+	if max <= 0 {
+		return nil
+	}
+	if len(toolCalls) <= max {
+		return toolCalls
+	}
+	return toolCalls[len(toolCalls)-max:]
+}
+
+// formatRecentToolCalls takes a list of tool function names and formats them into a single string representation
+// suitable for inclusion in the conversation summary content.
+func formatRecentToolCalls(toolCalls []string) string {
+	if len(toolCalls) == 0 {
+		return "none"
+	}
+	return strings.Join(toolCalls, "; ")
+}
+
+// findSummaryFieldValue searches the given summary content for a field with the specified name and returns its value if found.
+func findSummaryFieldValue(summary, targetField string) (string, bool) {
+	targetField = strings.ToLower(strings.TrimSpace(targetField))
+	if targetField == "" {
+		return "", false
+	}
+
+	for line := range strings.SplitSeq(summary, "\n") {
+		key, value, ok := parseSummaryFieldLine(line)
+		if !ok {
+			continue
+		}
+		if key == targetField {
+			return value, true
+		}
+	}
+
+	return "", false
+}
+
+// upsertSummaryField takes the given summary content and upserts a field with the specified name and value.
+func upsertSummaryField(summary, fieldName, fieldValue string) string {
+	summary = strings.TrimSpace(summary)
+	fieldName = strings.ToLower(strings.TrimSpace(fieldName))
+	fieldValue = strings.TrimSpace(fieldValue)
+	if summary == "" || fieldName == "" {
+		return summary
+	}
+	if fieldValue == "" {
+		fieldValue = "none"
+	}
+
+	updatedLines := make([]string, 0)
+	replaced := false
+	insertedAfterLastAction := false
+
+	for line := range strings.SplitSeq(summary, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		key, _, ok := parseSummaryFieldLine(trimmed)
+		if ok && key == fieldName {
+			updatedLines = append(updatedLines, fmt.Sprintf("%s: %s", fieldName, fieldValue))
+			replaced = true
+			continue
+		}
+
+		updatedLines = append(updatedLines, trimmed)
+
+		if !replaced && !insertedAfterLastAction && ok && key == "last_action" {
+			updatedLines = append(updatedLines, fmt.Sprintf("%s: %s", fieldName, fieldValue))
+			insertedAfterLastAction = true
+		}
+	}
+
+	if !replaced && !insertedAfterLastAction {
+		updatedLines = append(updatedLines, fmt.Sprintf("%s: %s", fieldName, fieldValue))
+	}
+
+	return strings.Join(updatedLines, "\n")
+}
+
+// parseSummaryFieldLine attempts to parse a line of summary content as a key-value pair separated by a colon.
+// It returns the key, value, and a boolean indicating whether the parsing was successful.
+func parseSummaryFieldLine(line string) (string, string, bool) {
+	key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+	if !ok {
+		return "", "", false
+	}
+
+	key = strings.ToLower(strings.TrimSpace(key))
+	value = strings.TrimSpace(value)
+	if key == "" {
+		return "", "", false
+	}
+
+	return key, value, true
 }
 
 // InitGenerateChatSummary initializes the GenerateChatSummary use case.

@@ -47,6 +47,7 @@ const TodoApp = () => {
     dueBefore,
     setDueBefore,
     clearDateRange,
+    applyAssistantFilters,
   } = useTodos();
 
   const handleUpdateTodo = useCallback((id: string, status?: TodoStatus, title?: string, due_date?: string) => {
@@ -145,6 +146,8 @@ const TodoApp = () => {
           {!isMobile && chatOpen ? (
             <ChatPanel
               onChatDone={refetch}
+              onToolExecuted={refetch}
+              onApplyAssistantFilters={applyAssistantFilters}
               onClose={isTablet ? () => setChatOpen(false) : undefined}
             />
           ) : null}
@@ -163,7 +166,13 @@ const TodoApp = () => {
 
       {isMobile && chatOpen ? (
         <div className="ui-sheet-overlay" role="presentation">
-          <ChatPanel onChatDone={refetch} mode="sheet" onClose={() => setChatOpen(false)} />
+          <ChatPanel
+            onChatDone={refetch}
+            onToolExecuted={refetch}
+            onApplyAssistantFilters={applyAssistantFilters}
+            mode="sheet"
+            onClose={() => setChatOpen(false)}
+          />
         </div>
       ) : null}
 

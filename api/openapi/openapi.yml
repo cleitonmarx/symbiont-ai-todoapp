@@ -356,7 +356,7 @@ paths:
       tags: [AI Chat]
       summary: Stream assistant response for a user message (single global chat)
       description: >
-        Streams Server-Sent Events (SSE). Events: meta, delta, done, error.
+        Streams Server-Sent Events (SSE). Events: meta, delta, tool_call_started, tool_call_finished, done, error.
       requestBody:
         required: true
         content:
@@ -379,6 +379,12 @@ paths:
 
                     event: delta
                     data: {"text":"You have 2 overdue todos:"}
+
+                    event: tool_call_started
+                    data: {"id":"call_1","function":"set_ui_filters","arguments":"{\"search_by_similarity\":\"buy milk\",\"sort_by\":\"similarityAsc\",\"page\":1,\"page_size\":10}","text":"🎛️ Applying filters...\n\n","apply_ui_filters":true,"filters":{"search_query":"buy milk","search_type":"SIMILARITY","sort_by":"similarityAsc","page":1,"page_size":10}}
+
+                    event: tool_call_finished
+                    data: {"id":"call_1","function":"set_ui_filters","ok":true,"should_refetch":true}
 
                     event: done
                     data: {"assistant_message_id":"0f7d6ef6-1f2a-4e0c-9f6d-7d7c7c2e1a11","completed_at":"2026-01-23T22:10:05Z","usage":{"prompt_tokens":123,"completion_tokens":45,"total_tokens":168}}

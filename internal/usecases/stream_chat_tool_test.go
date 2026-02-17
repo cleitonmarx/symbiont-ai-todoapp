@@ -312,7 +312,105 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				})
 			},
 			expectErr:      true,
-			onEventErrType: domain.LLMStreamEventType_ToolCall,
+			onEventErrType: domain.LLMStreamEventType_ToolStarted,
+		},
+		"onEvent-tool-call-finished-error": {
+			userMessage: "Call tool",
+			model:       "test-model",
+			options: []StreamChatOption{
+				WithConversationID(conversationID),
+			},
+			setExpectations: func(
+				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
+				conversationRepo *domain.MockConversationRepository,
+				timeProvider *domain.MockCurrentTimeProvider,
+				client *domain.MockLLMClient,
+				toolRegistry *domain.MockLLMToolRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
+			) {
+				conversationRepo.EXPECT().
+					GetConversation(mock.Anything, conversationID).
+					Return(domain.Conversation{
+						ID: conversationID,
+					}, true, nil).
+					Once()
+
+				toolRegistry.EXPECT().
+					List().
+					Return([]domain.LLMToolDefinition{})
+
+				toolRegistry.EXPECT().
+					StatusMessage("fetch_todos").
+					Return("calling fetch_todos...\n")
+
+				toolRegistry.EXPECT().
+					Call(mock.Anything, mock.Anything, mock.Anything).
+					Return(domain.LLMChatMessage{
+						Role:       domain.ChatRole_Tool,
+						ToolCallID: common.Ptr("func-1"),
+						Content:    "tool result",
+					}).
+					Once()
+
+				expectNowCalls(timeProvider, fixedTime, 6)
+
+				chatRepo.EXPECT().
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
+					Return([]domain.ChatMessage{}, false, nil).
+					Once()
+
+				client.EXPECT().
+					ChatStream(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
+						if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+							UserMessageID:      userMsgID,
+							AssistantMessageID: assistantMsgID,
+						}); err != nil {
+							return err
+						}
+						return onEvent(domain.LLMStreamEventType_ToolCall, domain.LLMStreamEventToolCall{
+							ID:        "func-1",
+							Function:  "fetch_todos",
+							Arguments: `{"page": 1}`,
+						})
+					})
+
+				onEventErr := "onEvent error"
+				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+					{
+						Role:          domain.ChatRole_User,
+						Content:       "Call tool",
+						ID:            &userMsgID,
+						ToolCallsLen:  0,
+						HasToolCallID: false,
+					},
+					{
+						Role:          domain.ChatRole_Assistant,
+						Content:       "",
+						ToolCallsLen:  1,
+						HasToolCallID: false,
+					},
+					{
+						Role:          domain.ChatRole_Tool,
+						Content:       "tool result",
+						ToolCallsLen:  0,
+						HasToolCallID: true,
+					},
+					{
+						Role:          domain.ChatRole_Assistant,
+						Content:       "",
+						ID:            &assistantMsgID,
+						MessageState:  domain.ChatMessageState_Failed,
+						ErrorMessage:  &onEventErr,
+						ToolCallsLen:  0,
+						HasToolCallID: false,
+					},
+				})
+			},
+			expectErr:      true,
+			onEventErrType: domain.LLMStreamEventType_ToolCompleted,
 		},
 		"max-tool-cycles-exceeded": {
 			userMessage: "Keep calling tools",

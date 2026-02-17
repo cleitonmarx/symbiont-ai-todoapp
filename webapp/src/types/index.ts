@@ -1,6 +1,14 @@
 // src/types/index.ts
 
 export type TodoStatus = 'OPEN' | 'DONE';
+export type TodoSearchMode = 'TITLE' | 'SIMILARITY';
+export type TodoSortOption =
+  | 'createdAtAsc'
+  | 'createdAtDesc'
+  | 'dueDateAsc'
+  | 'dueDateDesc'
+  | 'similarityAsc'
+  | 'similarityDesc';
 
 export interface Todo {
   id: string;
@@ -97,4 +105,15 @@ export interface ChatStreamDone {
     completion_tokens: number;
     total_tokens: number;
   };
+}
+
+export interface AssistantTodoFilters {
+  status?: TodoStatus;
+  searchQuery?: string;
+  searchType?: TodoSearchMode;
+  sortBy?: TodoSortOption;
+  dueAfter?: string;
+  dueBefore?: string;
+  page?: number;
+  pageSize?: number;
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -346,7 +347,9 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					Once()
 				timeProvider.EXPECT().Now().Return(fixedTime).Once()
 				summaryRepo.EXPECT().
-					StoreConversationSummary(mock.Anything, mock.Anything).
+					StoreConversationSummary(mock.Anything, mock.MatchedBy(func(summary domain.ConversationSummary) bool {
+						return strings.Contains(summary.CurrentStateSummary, "recent_tool_calls: create_todo")
+					})).
 					Return(nil).
 					Once()
 			},
@@ -498,6 +501,66 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 
 			gotErr := uc.Execute(context.Background(), tt.event)
 			assert.Equal(t, tt.expectedErr, gotErr)
+		})
+	}
+}
+
+func TestMergeRecentToolCallsIntoSummary(t *testing.T) {
+	tests := map[string]struct {
+		previousSummary string
+		newSummary      string
+		messages        []domain.ChatMessage
+		expectedValue   string
+	}{
+		"adds-recent-tool-calls-field-when-missing": {
+			previousSummary: "current_intent: plan tasks\nlast_action: none\noutput_format: concise text",
+			newSummary:      "current_intent: plan tasks\nactive_view: none\nuser_nuances: none\ntasks: none\nlast_action: summarized\noutput_format: concise text",
+			messages: []domain.ChatMessage{
+				{
+					ChatRole: domain.ChatRole_Assistant,
+					ToolCalls: []domain.LLMStreamEventToolCall{
+						{Function: "fetch_todos"},
+						{Function: "set_ui_filters"},
+					},
+				},
+			},
+			expectedValue: "fetch_todos; set_ui_filters",
+		},
+		"caps-recent-tool-calls-at-ten": {
+			previousSummary: "recent_tool_calls: call1; call2; call3; call4; call5; call6; call7; call8; call9",
+			newSummary:      "current_intent: x\nactive_view: none\nuser_nuances: none\ntasks: none\nlast_action: none\noutput_format: concise text",
+			messages: []domain.ChatMessage{
+				{
+					ChatRole: domain.ChatRole_Assistant,
+					ToolCalls: []domain.LLMStreamEventToolCall{
+						{Function: "call10"},
+						{Function: "call11"},
+					},
+				},
+			},
+			expectedValue: "call2; call3; call4; call5; call6; call7; call8; call9; call10; call11",
+		},
+		"replaces-existing-field-in-new-summary": {
+			previousSummary: "current_intent: x",
+			newSummary:      "current_intent: x\nrecent_tool_calls: stale\nlast_action: none\noutput_format: concise text",
+			messages: []domain.ChatMessage{
+				{
+					ChatRole: domain.ChatRole_Assistant,
+					ToolCalls: []domain.LLMStreamEventToolCall{
+						{Function: "create_todo"},
+					},
+				},
+			},
+			expectedValue: "create_todo",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := mergeRecentToolCallsIntoSummary(tt.previousSummary, tt.newSummary, tt.messages)
+			value, ok := findSummaryFieldValue(got, SUMMARY_RECENT_TOOL_CALLS_FIELD)
+			assert.True(t, ok)
+			assert.Equal(t, tt.expectedValue, value)
 		})
 	}
 }

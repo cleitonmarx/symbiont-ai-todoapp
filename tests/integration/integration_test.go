@@ -485,7 +485,7 @@ func readChatEventsText(t *testing.T, reader io.Reader) (string, string, int, uu
 			isToolStarted = false
 			dataline := scanner.Text()
 			dataPayload := strings.TrimSpace(strings.TrimPrefix(dataline, "data:"))
-			var toolStarted domain.LLMStreamEventToolCallStarted
+			var toolStarted domain.LLMStreamEventToolCall
 			err := json.Unmarshal([]byte(dataPayload), &toolStarted)
 			require.NoError(t, err, "failed to unmarshal chat tool started payload")
 			toolStartedText.WriteString(toolStarted.Text)

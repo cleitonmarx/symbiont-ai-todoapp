@@ -347,8 +347,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	}
 
 	toolCall.Text = sc.llmToolRegistry.StatusMessage(toolCall.Function)
-	toolStarted := domain.LLMStreamEventToolCallStarted(toolCall)
-	if err := onEvent(domain.LLMStreamEventType_ToolStarted, toolStarted); err != nil {
+	if err := onEvent(domain.LLMStreamEventType_ToolStarted, toolCall); err != nil {
 		return false, err
 	}
 

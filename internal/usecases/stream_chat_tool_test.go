@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -625,4 +626,15 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 			testStreamChatImpl(t, tt)
 		})
 	}
+}
+
+func Test(t *testing.T) {
+	b, _ := json.Marshal(domain.LLMStreamEventToolCall{
+		ID:        "func-123",
+		Function:  "list_todos",
+		Arguments: `{"page": 1, "page_size": 5, "search_term": "searchTerm"}`,
+		Text:      "calling list_todos",
+	})
+
+	fmt.Println(string(b))
 }

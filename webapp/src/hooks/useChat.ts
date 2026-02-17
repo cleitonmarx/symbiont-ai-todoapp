@@ -55,6 +55,52 @@ const TODO_SORT_OPTIONS = new Set([
   'similarityDesc',
 ]);
 
+interface StreamMetaEventData {
+  conversation_id?: string;
+  user_message_id?: string;
+  assistant_message_id?: string;
+  conversation_created?: boolean;
+}
+
+interface StreamDeltaEventData {
+  text?: string;
+}
+
+interface StreamToolCallStartedEventData {
+  id?: string;
+  function?: string;
+  arguments?: string;
+  text?: string;
+}
+
+interface StreamToolCallFinishedEventData {
+  id?: string;
+  function?: string;
+  success?: boolean;
+  error?: string;
+  should_refetch?: boolean;
+}
+
+interface StreamDoneEventData {
+  assistant_message_id?: string;
+  completed_at?: string;
+}
+
+interface StreamErrorEventData {
+  error?: string;
+}
+
+interface SetUIFiltersArguments {
+  status?: string;
+  search_by_similarity?: string;
+  search_by_title?: string;
+  sort_by?: string;
+  due_after?: string;
+  due_before?: string;
+  page?: number;
+  page_size?: number;
+}
+
 const loadPersistedModel = (): string => {
   if (typeof window === 'undefined') {
     return '';
@@ -83,126 +129,52 @@ const persistModel = (model: string): void => {
   }
 };
 
-const getEventString = (data: Record<string, unknown>, ...keys: string[]): string | undefined => {
-  for (const key of keys) {
-    const value = data[key];
-    if (typeof value === 'string' && value.trim() !== '') {
-      return value;
-    }
-  }
-  return undefined;
-};
-
-const getEventBoolean = (data: Record<string, unknown>, ...keys: string[]): boolean | undefined => {
-  for (const key of keys) {
-    const value = data[key];
-    if (typeof value === 'boolean') {
-      return value;
-    }
-  }
-  return undefined;
-};
-
-const getEventNumber = (data: Record<string, unknown>, ...keys: string[]): number | undefined => {
-  for (const key of keys) {
-    const value = data[key];
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return value;
-    }
-  }
-  return undefined;
-};
-
-const getEventObject = (data: Record<string, unknown>, ...keys: string[]): Record<string, unknown> | undefined => {
-  for (const key of keys) {
-    const value = data[key];
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      return value as Record<string, unknown>;
-    }
-  }
-  return undefined;
-};
-
-const getArgumentsObject = (data: Record<string, unknown>): Record<string, unknown> | undefined => {
-  const rawArguments = getEventString(data, 'arguments', 'Arguments');
+const parseSetUIFiltersArguments = (rawArguments?: string): SetUIFiltersArguments => {
   if (!rawArguments) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(rawArguments);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-  } catch {
-    return undefined;
-  }
-
-  return undefined;
-};
-
-const parseAssistantFilters = (data: Record<string, unknown>): AssistantTodoFilters | null => {
-  const toolName = getEventString(data, 'function', 'Function');
-  const shouldApplyUIFilters = getEventBoolean(data, 'apply_ui_filters', 'applyUiFilters');
-  const shouldApplyFromTool = toolName === 'set_ui_filters';
-  if (!shouldApplyFromTool && !shouldApplyUIFilters) {
-    return null;
-  }
-
-  const filtersData = getEventObject(data, 'filters') ?? getArgumentsObject(data);
-  if (!filtersData) {
     return {};
   }
 
+  return JSON.parse(rawArguments) as SetUIFiltersArguments;
+};
+
+const parseAssistantFilters = (data: StreamToolCallStartedEventData): AssistantTodoFilters | null => {
+  if (data.function !== 'set_ui_filters') {
+    return null;
+  }
+
+  const args = parseSetUIFiltersArguments(data.arguments);
+
   const filters: AssistantTodoFilters = {};
-  const status = getEventString(filtersData, 'status');
-  if (status === 'OPEN' || status === 'DONE') {
-    filters.status = status;
+  if (args.status === 'OPEN' || args.status === 'DONE') {
+    filters.status = args.status;
   }
 
-  const searchBySimilarity = getEventString(filtersData, 'search_by_similarity');
-  const searchByTitle = getEventString(filtersData, 'search_by_title');
-  if (typeof searchBySimilarity === 'string') {
-    filters.searchQuery = searchBySimilarity;
+  if (args.search_by_similarity) {
+    filters.searchQuery = args.search_by_similarity;
     filters.searchType = 'SIMILARITY';
-  } else if (typeof searchByTitle === 'string') {
-    filters.searchQuery = searchByTitle;
+  } else if (args.search_by_title) {
+    filters.searchQuery = args.search_by_title;
     filters.searchType = 'TITLE';
-  } else {
-    const searchQuery = getEventString(filtersData, 'search_query', 'searchQuery');
-    if (typeof searchQuery === 'string') {
-      filters.searchQuery = searchQuery;
-    }
-
-    const searchType = getEventString(filtersData, 'search_type', 'searchType');
-    if (searchType === 'TITLE' || searchType === 'SIMILARITY') {
-      filters.searchType = searchType;
-    }
   }
 
-  const sortBy = getEventString(filtersData, 'sort_by', 'sortBy');
-  if (sortBy && TODO_SORT_OPTIONS.has(sortBy)) {
-    filters.sortBy = sortBy as AssistantTodoFilters['sortBy'];
+  if (args.sort_by && TODO_SORT_OPTIONS.has(args.sort_by)) {
+    filters.sortBy = args.sort_by as AssistantTodoFilters['sortBy'];
   }
 
-  const dueAfter = getEventString(filtersData, 'due_after', 'dueAfter');
-  if (typeof dueAfter === 'string') {
-    filters.dueAfter = dueAfter;
+  if (args.due_after) {
+    filters.dueAfter = args.due_after;
   }
 
-  const dueBefore = getEventString(filtersData, 'due_before', 'dueBefore');
-  if (typeof dueBefore === 'string') {
-    filters.dueBefore = dueBefore;
+  if (args.due_before) {
+    filters.dueBefore = args.due_before;
   }
 
-  const page = getEventNumber(filtersData, 'page');
-  if (typeof page === 'number') {
-    filters.page = page;
+  if (typeof args.page === 'number') {
+    filters.page = args.page;
   }
 
-  const pageSize = getEventNumber(filtersData, 'page_size', 'pageSize');
-  if (typeof pageSize === 'number') {
-    filters.pageSize = pageSize;
+  if (typeof args.page_size === 'number') {
+    filters.pageSize = args.page_size;
   }
 
   return filters;
@@ -533,47 +505,45 @@ export const useChat = ({
 
           const dataStr = dataLines.join('\n');
           try {
-            const data = JSON.parse(dataStr) as Record<string, unknown>;
+            const rawData = JSON.parse(dataStr);
 
             if (eventType === 'meta') {
-              const eventConversationId = getEventString(data, 'conversation_id', 'ConversationID', 'conversationId');
-              const eventUserMessageId = getEventString(data, 'user_message_id', 'UserMessageID', 'userMessageId');
-              const eventAssistantMessageId = getEventString(data, 'assistant_message_id', 'AssistantMessageID', 'assistantMessageId');
-              const eventConversationCreated = getEventBoolean(data, 'conversation_created', 'ConversationCreated', 'conversationCreated');
+              const data = rawData as StreamMetaEventData;
 
-              if (eventConversationId) {
-                streamConversationId = eventConversationId;
-                activeConversationRef.current = eventConversationId;
-                setActiveConversationId(eventConversationId);
+              if (data.conversation_id) {
+                streamConversationId = data.conversation_id;
+                activeConversationRef.current = data.conversation_id;
+                setActiveConversationId(data.conversation_id);
               }
-              if (eventUserMessageId) {
+              if (data.user_message_id) {
+                const userMessageId = data.user_message_id;
                 setMessages((prev) => {
                   const next = [...prev];
                   for (let i = next.length - 1; i >= 0; i--) {
                     if (next[i].role === 'user') {
-                      next[i] = { ...next[i], id: eventUserMessageId };
+                      next[i] = { ...next[i], id: userMessageId };
                       break;
                     }
                   }
                   return next;
                 });
               }
-              if (eventAssistantMessageId) {
-                assistantMessageId = eventAssistantMessageId;
+              if (data.assistant_message_id) {
+                assistantMessageId = data.assistant_message_id;
               }
-              if (eventConversationCreated === true) {
+              if (data.conversation_created === true) {
                 composingNewConversationRef.current = false;
               }
               return;
             }
 
             if (eventType === 'delta') {
-              const deltaText = getEventString(data, 'text', 'Text');
-              if (!deltaText) {
+              const data = rawData as StreamDeltaEventData;
+              if (!data.text) {
                 return;
               }
               clearToolCallingStatus();
-              assistantContent += deltaText;
+              assistantContent += data.text;
 
               setMessages((prev) => {
                 const updated = [...prev];
@@ -592,10 +562,9 @@ export const useChat = ({
             }
 
             if (eventType === 'tool_call_started') {
-              const toolStartedText = getEventString(data, 'text', 'Text');
-              const toolStartedName = getEventString(data, 'function', 'Function');
-              if (toolStartedText) {
-                updateToolCallingStatus(toolStartedText, toolStartedName);
+              const data = rawData as StreamToolCallStartedEventData;
+              if (data.text) {
+                updateToolCallingStatus(data.text, data.function);
               }
               const assistantFilters = parseAssistantFilters(data);
               if (assistantFilters !== null) {
@@ -605,18 +574,18 @@ export const useChat = ({
             }
 
             if (eventType === 'tool_call_finished') {
-              const shouldRefetch = getEventBoolean(data, 'should_refetch', 'shouldRefetch');
-              if (shouldRefetch === true) {
+              const data = rawData as StreamToolCallFinishedEventData;
+              if (data.should_refetch === true) {
                 onToolExecuted?.();
               }
               return;
             }
 
             if (eventType === 'done') {
+              const data = rawData as StreamDoneEventData;
               assistantCompleted = true;
-              const eventAssistantMessageId = getEventString(data, 'assistant_message_id', 'AssistantMessageID', 'assistantMessageId');
-              if (eventAssistantMessageId) {
-                assistantMessageId = eventAssistantMessageId;
+              if (data.assistant_message_id) {
+                assistantMessageId = data.assistant_message_id;
               }
               resetToolActivity();
               setLoading(false);
@@ -626,7 +595,8 @@ export const useChat = ({
             }
 
             if (eventType === 'error') {
-              const errorCode = getEventString(data, 'error', 'Error');
+              const data = rawData as StreamErrorEventData;
+              const errorCode = data.error;
               const errorMsg =
                 errorCode === 'stream_cancelled'
                   ? 'Stream stopped by user'

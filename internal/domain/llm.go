@@ -96,27 +96,19 @@ type LLMToolFunctionParameterDetail struct {
 
 // LLMStreamEventMeta contains metadata for a streaming chat session
 type LLMStreamEventMeta struct {
-	ConversationID      uuid.UUID
-	UserMessageID       uuid.UUID
-	AssistantMessageID  uuid.UUID
-	ConversationCreated bool
+	ConversationID      uuid.UUID `json:"conversation_id"`
+	UserMessageID       uuid.UUID `json:"user_message_id"`
+	AssistantMessageID  uuid.UUID `json:"assistant_message_id"`
+	ConversationCreated bool      `json:"conversation_created"`
 }
 
 // LLMStreamEventDelta contains a text delta from the stream
 type LLMStreamEventDelta struct {
-	Text string
+	Text string `json:"text"`
 }
 
 // LLMStreamEventToolCall contains a function call delta from the stream
 type LLMStreamEventToolCall struct {
-	ID        string
-	Function  string
-	Arguments string
-	Text      string
-}
-
-// LLMStreamEventToolCallStarted indicates a tool invocation has started.
-type LLMStreamEventToolCallStarted struct {
 	ID        string `json:"id"`
 	Function  string `json:"function"`
 	Arguments string `json:"arguments"`
@@ -134,9 +126,9 @@ type LLMStreamEventToolCallCompleted struct {
 
 // LLMStreamEventDone contains completion metadata and token usage
 type LLMStreamEventDone struct {
-	Usage              LLMUsage
-	AssistantMessageID string
-	CompletedAt        string
+	Usage              LLMUsage `json:"usage"`
+	AssistantMessageID string   `json:"assistant_message_id"`
+	CompletedAt        string   `json:"completed_at"`
 }
 
 // LLMUsage contains token usage information

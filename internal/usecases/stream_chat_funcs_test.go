@@ -74,7 +74,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 			capturedContent += delta.Text
 		}
 		if eventType == domain.LLMStreamEventType_ToolStarted {
-			fc := data.(domain.LLMStreamEventToolCallStarted)
+			fc := data.(domain.LLMStreamEventToolCall)
 			capturedContent += fc.Text
 		}
 		return nil

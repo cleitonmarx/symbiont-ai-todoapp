@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -176,75 +177,54 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 		}
 	}
 
-	opts := []domain.ListTodoOption{}
-
-	if (params.DueAfter == nil) != (params.DueBefore == nil) {
-		return domain.LLMChatMessage{
-			Role:       domain.ChatRole_Tool,
-			ToolCallID: &call.ID,
-			Content:    `{"error":"invalid_due_range","details":"due_after and due_before must be provided together."}`,
-		}
-	}
-
-	searchBySimilarity := ""
-	if params.SearchBySimilarity != nil {
-		searchBySimilarity = strings.TrimSpace(*params.SearchBySimilarity)
-	}
-
-	if params.SortBy != nil && strings.HasPrefix(strings.ToLower(*params.SortBy), "similarity") && searchBySimilarity == "" {
-		return domain.LLMChatMessage{
-			Role:       domain.ChatRole_Tool,
-			ToolCallID: &call.ID,
-			Content:    `{"error":"missing_search_by_similarity_for_similarity_sort","details":"search_by_similarity is required when using similarity sorting."}`,
-		}
-	}
-
-	if searchBySimilarity != "" {
-		resp, err := lft.llmCli.Embed(ctx, lft.llmEmbeddingModel, searchBySimilarity)
-		if err != nil {
-			return domain.LLMChatMessage{
-				Role:       domain.ChatRole_Tool,
-				ToolCallID: &call.ID,
-				Content:    fmt.Sprintf(`{"error":"embedding_error","details":"%s"}`, err.Error()),
-			}
-		}
-		RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
-		opts = append(opts, domain.WithEmbedding(resp.Embedding))
-	}
-
-	if params.SearchByTitle != nil {
-		opts = append(opts, domain.WithTitleContains(*params.SearchByTitle))
-	}
-
-	if params.Status != nil {
-		opts = append(opts, domain.WithStatus(domain.TodoStatus(*params.Status)))
-	}
-	if params.SortBy != nil {
-		opts = append(opts, domain.WithSortBy(*params.SortBy))
-	}
-	if params.DueAfter != nil {
+	var dueAfterTime *time.Time
+	var dueBeforeTime *time.Time
+	if params.DueAfter != nil || params.DueBefore != nil {
 		now := lft.timeProvider.Now()
-		dueAfter, ok := domain.ExtractTimeFromText(*params.DueAfter, now, now.Location())
-		if !ok {
-			return domain.LLMChatMessage{
-				Role:       domain.ChatRole_Tool,
-				ToolCallID: &call.ID,
-				Content:    `{"error":"invalid_due_after","details":"Could not parse due_after date."}`,
+		if params.DueAfter != nil {
+			dueAfter, ok := domain.ExtractTimeFromText(*params.DueAfter, now, now.Location())
+			if !ok {
+				return domain.LLMChatMessage{
+					Role:       domain.ChatRole_Tool,
+					ToolCallID: &call.ID,
+					Content:    `{"error":"invalid_due_after","details":"Could not parse due_after date."}`,
+				}
 			}
+			dueAfterTime = &dueAfter
 		}
-		dueBefore, ok := domain.ExtractTimeFromText(*params.DueBefore, now, now.Location())
-		if !ok {
-			return domain.LLMChatMessage{
-				Role:       domain.ChatRole_Tool,
-				ToolCallID: &call.ID,
-				Content:    `{"error":"invalid_due_before","details":"Could not parse due_before date."}`,
+		if params.DueBefore != nil {
+			dueBefore, ok := domain.ExtractTimeFromText(*params.DueBefore, now, now.Location())
+			if !ok {
+				return domain.LLMChatMessage{
+					Role:       domain.ChatRole_Tool,
+					ToolCallID: &call.ID,
+					Content:    `{"error":"invalid_due_before","details":"Could not parse due_before date."}`,
+				}
 			}
+			dueBeforeTime = &dueBefore
 		}
-
-		opts = append(opts, domain.WithDueDateRange(dueAfter, dueBefore))
 	}
 
-	todos, hasMore, err := lft.repo.ListTodos(ctx, params.Page, params.PageSize, opts...)
+	buildResult, err := NewTodoSearchBuilder(lft.llmCli, lft.llmEmbeddingModel).
+		WithStatus((*domain.TodoStatus)(params.Status)).
+		WithDueDateRange(dueAfterTime, dueBeforeTime).
+		WithSortBy(params.SortBy).
+		WithTitleContains(params.SearchByTitle).
+		WithSimilaritySearch(params.SearchBySimilarity).
+		Build(ctx)
+	if err != nil {
+		code := mapTodoFilterBuildErrCode(err)
+		return domain.LLMChatMessage{
+			Role:       domain.ChatRole_Tool,
+			ToolCallID: &call.ID,
+			Content:    fmt.Sprintf(`{"error":"%s","details":"%s"}`, code, err.Error()),
+		}
+	}
+	if buildResult.EmbeddingTotalTokens > 0 {
+		RecordLLMTokensEmbedding(ctx, buildResult.EmbeddingTotalTokens)
+	}
+
+	todos, hasMore, err := lft.repo.ListTodos(ctx, params.Page, params.PageSize, buildResult.Options...)
 	if err != nil {
 		return domain.LLMChatMessage{
 			Role:       domain.ChatRole_Tool,
@@ -298,6 +278,24 @@ func (lft TodoFetcherTool) Call(ctx context.Context, call domain.LLMStreamEventT
 		ToolCallID: &call.ID,
 		Content:    string(content),
 	}
+}
+
+// mapTodoFilterBuildErrCode maps errors from building todo search options to specific error codes for better client handling.
+func mapTodoFilterBuildErrCode(err error) string {
+	var validationErr *domain.ValidationErr
+	if errors.As(err, &validationErr) {
+		switch err.Error() {
+		case "due_after and due_before must be provided together":
+			return "invalid_due_range"
+		case "due_after must be less than or equal to due_before":
+			return "invalid_due_range"
+		case "search_by_similarity is required when using similarity sorting":
+			return "missing_search_by_similarity_for_similarity_sort"
+		default:
+			return "invalid_filters"
+		}
+	}
+	return "embedding_error"
 }
 
 // TodoCreatorTool is an LLM tool for creating todos.

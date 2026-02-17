@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
@@ -13,10 +14,10 @@ import (
 type SearchType string
 
 const (
-	// SearchType_TITLE performs a case-insensitive substring match on todo titles.
-	SearchType_TITLE SearchType = "TITLE"
-	// SearchType_SIMILARITY uses vector similarity search based on the todo embeddings.
-	SearchType_SIMILARITY SearchType = "SIMILARITY"
+	// SearchType_Title performs a case-insensitive substring match on todo titles.
+	SearchType_Title SearchType = "title"
+	// SearchType_Similarity uses vector similarity search based on the todo embeddings.
+	SearchType_Similarity SearchType = "similarity"
 )
 
 // ListTodoParams holds the parameters for listing todos.
@@ -49,6 +50,12 @@ func WithSearchQuery(query string) ListTodoOptions {
 // WithSearchType creates a ListTodoOptions to specify the type of search (e.g., title, similarity).
 func WithSearchType(searchType SearchType) ListTodoOptions {
 	return func(params *ListTodoParams) {
+		switch strings.ToLower(string(searchType)) {
+		case string(SearchType_Title):
+			searchType = SearchType_Title
+		case string(SearchType_Similarity):
+			searchType = SearchType_Similarity
+		}
 		params.SearchType = &searchType
 	}
 }
@@ -99,38 +106,21 @@ func (lti ListTodosImpl) Query(ctx context.Context, page int, pageSize int, opts
 		opt(&params)
 	}
 
-	var queryOpts []domain.ListTodoOption
-	if params.Status != nil {
-		queryOpts = append(queryOpts, domain.WithStatus(*params.Status))
+	builder := NewTodoSearchBuilder(lti.llmClient, lti.llmEmbeddingModel).
+		WithStatus(params.Status).
+		WithDueDateRange(params.DueAfter, params.DueBefore).
+		WithSortBy(params.SortBy).
+		WithSearch(params.Search, params.SearchType)
+
+	buildResult, err := builder.Build(spanCtx)
+	if telemetry.RecordErrorAndStatus(span, err) {
+		return nil, false, err
+	}
+	if buildResult.EmbeddingTotalTokens > 0 {
+		RecordLLMTokensEmbedding(spanCtx, buildResult.EmbeddingTotalTokens)
 	}
 
-	if params.Search != nil {
-		switch {
-		case params.SearchType != nil && *params.SearchType == SearchType_SIMILARITY:
-			// Perform embedding-based similarity search
-			resp, err := lti.llmClient.Embed(spanCtx, lti.llmEmbeddingModel, *params.Search)
-			if telemetry.RecordErrorAndStatus(span, err) {
-				return nil, false, err
-			}
-			RecordLLMTokensEmbedding(spanCtx, resp.TotalTokens)
-
-			queryOpts = append(queryOpts, domain.WithEmbedding(resp.Embedding))
-		case params.SearchType != nil && *params.SearchType == SearchType_TITLE:
-			queryOpts = append(queryOpts, domain.WithTitleContains(*params.Search))
-		default:
-			return nil, false, domain.NewValidationErr("invalid search type")
-		}
-	}
-
-	if params.DueAfter != nil && params.DueBefore != nil {
-		queryOpts = append(queryOpts, domain.WithDueDateRange(*params.DueAfter, *params.DueBefore))
-	}
-
-	if params.SortBy != nil {
-		queryOpts = append(queryOpts, domain.WithSortBy(*params.SortBy))
-	}
-
-	todos, hasMore, err := lti.todoRepo.ListTodos(spanCtx, page, pageSize, queryOpts...)
+	todos, hasMore, err := lti.todoRepo.ListTodos(spanCtx, page, pageSize, buildResult.Options...)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err
 	}

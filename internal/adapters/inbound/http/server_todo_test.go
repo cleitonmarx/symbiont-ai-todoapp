@@ -250,7 +250,7 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 							opt(&p)
 						}
 						assert.Equal(t, "groceries", *p.Search)
-						assert.Equal(t, usecases.SearchType_SIMILARITY, *p.SearchType)
+						assert.Equal(t, usecases.SearchType_Similarity, *p.SearchType)
 					}).
 					Return([]domain.Todo{domainTodo}, false, nil)
 			},
@@ -274,7 +274,7 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 							opt(&p)
 						}
 						assert.Equal(t, "groceries", *p.Search)
-						assert.Equal(t, usecases.SearchType_TITLE, *p.SearchType)
+						assert.Equal(t, usecases.SearchType_Title, *p.SearchType)
 					}).
 					Return([]domain.Todo{domainTodo}, false, nil)
 			},

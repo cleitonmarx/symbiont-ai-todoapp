@@ -16,7 +16,8 @@ interface ChatPanelProps {
 }
 
 const MINUTE_MS = 60 * 1000;
-const DAY_MS = 24 * 60 * MINUTE_MS;
+const HOUR_MINUTES = 60;
+const DAY_MINUTES = 24 * HOUR_MINUTES;
 
 const formatConversationAge = (updatedAt: string): string => {
   const updatedTime = new Date(updatedAt).getTime();
@@ -25,13 +26,15 @@ const formatConversationAge = (updatedAt: string): string => {
   }
 
   const diff = Math.max(0, Date.now() - updatedTime);
-  if (diff < DAY_MS) {
-    const minutes = Math.max(1, Math.floor(diff / MINUTE_MS));
-    return `${minutes}m`;
-  }
+  const totalMinutes = Math.max(1, diff / MINUTE_MS);
 
-  const days = Math.max(1, Math.floor(diff / DAY_MS));
-  return `${days}d`;
+  if (totalMinutes < HOUR_MINUTES) {
+    return `${Math.max(1, Math.round(totalMinutes))}m`;
+  }
+  if (totalMinutes < DAY_MINUTES) {
+    return `${Math.max(1, Math.round(totalMinutes / HOUR_MINUTES))}h`;
+  }
+  return `${Math.max(1, Math.round(totalMinutes / DAY_MINUTES))}d`;
 };
 
 export const ChatPanel = ({ onChatDone, mode = 'panel', onClose }: ChatPanelProps) => {

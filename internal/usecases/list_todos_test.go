@@ -69,7 +69,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 			pageSize: 5,
 			queryParams: []ListTodoOptions{
 				WithSearchQuery("meeting"),
-				WithSearchType(SearchType_SIMILARITY),
+				WithSearchType(SearchType_Similarity),
 			},
 			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
 				llmClient.EXPECT().
@@ -95,7 +95,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 			pageSize: 5,
 			queryParams: []ListTodoOptions{
 				WithSearchQuery("report"),
-				WithSearchType(SearchType_TITLE),
+				WithSearchType(SearchType_Title),
 			},
 			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
 				repo.EXPECT().ListTodos(mock.Anything, 1, 5, mock.Anything).
@@ -159,6 +159,21 @@ func TestListTodosImpl_Query(t *testing.T) {
 			expectedTodos:   []domain.Todo{},
 			expectedHasMore: false,
 			expectedErr:     nil,
+		},
+		"error-when-due-range-is-invalid": {
+			page:     1,
+			pageSize: 10,
+			queryParams: []ListTodoOptions{
+				WithDueDateRange(
+					time.Date(2026, 2, 28, 0, 0, 0, 0, time.UTC),
+					time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
+				),
+			},
+			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+			},
+			expectedTodos:   []domain.Todo(nil),
+			expectedHasMore: false,
+			expectedErr:     domain.NewValidationErr("due_after must be less than or equal to due_before"),
 		},
 		"error-when-search-type-is-not-provided": {
 			page:     1,

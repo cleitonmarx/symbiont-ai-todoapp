@@ -1500,8 +1500,14 @@ func (_c *MockLLMClient_ChatStream_Call) RunAndReturn(run func(ctx context.Conte
 }
 
 // Embed provides a mock function for the type MockLLMClient
-func (_mock *MockLLMClient) Embed(ctx context.Context, model string, input string) (EmbedResponse, error) {
-	ret := _mock.Called(ctx, model, input)
+func (_mock *MockLLMClient) Embed(ctx context.Context, model string, input string, opts ...EmbedOption) (EmbedResponse, error) {
+	var tmpRet mock.Arguments
+	if len(opts) > 0 {
+		tmpRet = _mock.Called(ctx, model, input, opts)
+	} else {
+		tmpRet = _mock.Called(ctx, model, input)
+	}
+	ret := tmpRet
 
 	if len(ret) == 0 {
 		panic("no return value specified for Embed")
@@ -1509,16 +1515,16 @@ func (_mock *MockLLMClient) Embed(ctx context.Context, model string, input strin
 
 	var r0 EmbedResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (EmbedResponse, error)); ok {
-		return returnFunc(ctx, model, input)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, ...EmbedOption) (EmbedResponse, error)); ok {
+		return returnFunc(ctx, model, input, opts...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) EmbedResponse); ok {
-		r0 = returnFunc(ctx, model, input)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, ...EmbedOption) EmbedResponse); ok {
+		r0 = returnFunc(ctx, model, input, opts...)
 	} else {
 		r0 = ret.Get(0).(EmbedResponse)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, model, input)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, ...EmbedOption) error); ok {
+		r1 = returnFunc(ctx, model, input, opts...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1534,11 +1540,13 @@ type MockLLMClient_Embed_Call struct {
 //   - ctx context.Context
 //   - model string
 //   - input string
-func (_e *MockLLMClient_Expecter) Embed(ctx interface{}, model interface{}, input interface{}) *MockLLMClient_Embed_Call {
-	return &MockLLMClient_Embed_Call{Call: _e.mock.On("Embed", ctx, model, input)}
+//   - opts ...EmbedOption
+func (_e *MockLLMClient_Expecter) Embed(ctx interface{}, model interface{}, input interface{}, opts ...interface{}) *MockLLMClient_Embed_Call {
+	return &MockLLMClient_Embed_Call{Call: _e.mock.On("Embed",
+		append([]interface{}{ctx, model, input}, opts...)...)}
 }
 
-func (_c *MockLLMClient_Embed_Call) Run(run func(ctx context.Context, model string, input string)) *MockLLMClient_Embed_Call {
+func (_c *MockLLMClient_Embed_Call) Run(run func(ctx context.Context, model string, input string, opts ...EmbedOption)) *MockLLMClient_Embed_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1552,10 +1560,17 @@ func (_c *MockLLMClient_Embed_Call) Run(run func(ctx context.Context, model stri
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
+		var arg3 []EmbedOption
+		var variadicArgs []EmbedOption
+		if len(args) > 3 {
+			variadicArgs = args[3].([]EmbedOption)
+		}
+		arg3 = variadicArgs
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3...,
 		)
 	})
 	return _c
@@ -1566,7 +1581,7 @@ func (_c *MockLLMClient_Embed_Call) Return(embedResponse EmbedResponse, err erro
 	return _c
 }
 
-func (_c *MockLLMClient_Embed_Call) RunAndReturn(run func(ctx context.Context, model string, input string) (EmbedResponse, error)) *MockLLMClient_Embed_Call {
+func (_c *MockLLMClient_Embed_Call) RunAndReturn(run func(ctx context.Context, model string, input string, opts ...EmbedOption) (EmbedResponse, error)) *MockLLMClient_Embed_Call {
 	_c.Call.Return(run)
 	return _c
 }

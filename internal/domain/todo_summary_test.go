@@ -115,3 +115,41 @@ func TestBoardSummaryContent_BuildComparisonHints(t *testing.T) {
 		})
 	}
 }
+
+func TestBoardSummaryContent_ApplySummary(t *testing.T) {
+	tests := map[string]struct {
+		content BoardSummaryContent
+		summary string
+		want    string
+	}{
+		"strips-overdue-qualifiers": {
+			content: BoardSummaryContent{
+				Overdue: []string{},
+			},
+			summary: "Great progress! Focus on the overdue chimney cleaning and late digital backups.",
+			want:    "Great progress! Focus on the chimney cleaning and digital backups.",
+		},
+		"keeps-overdue-wording": {
+			content: BoardSummaryContent{
+				Overdue: []string{"Schedule chimney cleaning"},
+			},
+			summary: "Focus on the overdue chimney cleaning.",
+			want:    "Focus on the overdue chimney cleaning.",
+		},
+		"preserves-no-overdue-statements": {
+			content: BoardSummaryContent{
+				Overdue: []string{},
+			},
+			summary: "Nice momentum, no overdue tasks right now.",
+			want:    "Nice momentum, no overdue tasks right now.",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			content := tt.content
+			content.ApplySummary(tt.summary)
+			assert.Equal(t, tt.want, content.Summary)
+		})
+	}
+}

@@ -404,6 +404,10 @@ func TestTodoFetcherTool(t *testing.T) {
 		},
 		"fetch-todos-invalid-partial-due-range": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				timeProvider.EXPECT().
+					Now().
+					Return(fixedTime).
+					Once()
 			},
 			functionCall: domain.LLMStreamEventToolCall{
 				Function:  "fetch_todos",
@@ -412,6 +416,23 @@ func TestTodoFetcherTool(t *testing.T) {
 			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_due_range")
+			},
+		},
+		"fetch-todos-invalid-due-range-order": {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
+				timeProvider.EXPECT().
+					Now().
+					Return(fixedTime).
+					Once()
+			},
+			functionCall: domain.LLMStreamEventToolCall{
+				Function:  "fetch_todos",
+				Arguments: `{"page": 1, "page_size": 10, "due_after": "2026-01-30", "due_before": "2026-01-20"}`,
+			},
+			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Contains(t, resp.Content, "invalid_due_range")
+				assert.Contains(t, resp.Content, "due_after must be less than or equal to due_before")
 			},
 		},
 		"fetch-todos-similarity-sort-without-search-term": {

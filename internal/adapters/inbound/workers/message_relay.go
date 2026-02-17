@@ -16,7 +16,7 @@ type MessageRelay struct {
 	workerExecutionChan chan struct{}
 }
 
-// Run starts the periodic processing of outbox events.
+// Run starts the message relay worker.
 func (op MessageRelay) Run(ctx context.Context) error {
 	op.Logger.Println("MessageRelay: running...")
 	ticker := time.NewTicker(op.Interval)

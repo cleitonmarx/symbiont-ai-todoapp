@@ -13,21 +13,20 @@ import (
 	"github.com/google/uuid"
 )
 
-// ChatEventSubscriber consumes chat-message events from Pub/Sub
-// and triggers conversation summary generation.
-type ChatEventSubscriber struct {
-	Logger              *log.Logger                  `resolve:""`
-	Client              *pubsub.Client               `resolve:""`
-	Interval            time.Duration                `config:"CHAT_SUMMARY_BATCH_INTERVAL" default:"3s"`
-	BatchSize           int                          `config:"CHAT_SUMMARY_BATCH_SIZE" default:"50"`
-	SubscriptionID      string                       `config:"CHAT_EVENTS_SUBSCRIPTION_ID"`
-	GenerateChatSummary usecases.GenerateChatSummary `resolve:""`
-	workerExecutionChan chan struct{}
+// ConversationTitleGenerator is a runnable that consumes chat-message events and asynchronously generates conversation titles.
+type ConversationTitleGenerator struct {
+	Logger                    *log.Logger                        `resolve:""`
+	Client                    *pubsub.Client                     `resolve:""`
+	GenerateConversationTitle usecases.GenerateConversationTitle `resolve:""`
+	Interval                  time.Duration                      `config:"CHAT_TITLE_BATCH_INTERVAL" default:"3s"`
+	BatchSize                 int                                `config:"CHAT_TITLE_BATCH_SIZE" default:"50"`
+	SubscriptionID            string                             `config:"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID"`
+	workerExecutionChan       chan struct{}
 }
 
-// Run starts the chat event subscriber worker.
-func (s ChatEventSubscriber) Run(ctx context.Context) error {
-	s.Logger.Println("ChatEventSubscriber: running...")
+// Run starts the conversation title generator worker.
+func (s ConversationTitleGenerator) Run(ctx context.Context) error {
+	s.Logger.Println("ConversationTitleGenerator: running...")
 
 	if s.BatchSize <= 0 {
 		s.BatchSize = 50
@@ -39,12 +38,10 @@ func (s ChatEventSubscriber) Run(ctx context.Context) error {
 	eventCh := make(chan *pubsub.Message, s.BatchSize*2)
 	subscriberInitErrCh := make(chan error, 1)
 
-	// 1. Receive messages in background (blocking call).
 	go func() {
 		err := s.Client.Subscriber(s.SubscriptionID).Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 			select {
 			case eventCh <- msg:
-				// Ack later, after batching.
 			case <-ctx.Done():
 				msg.Nack()
 			}
@@ -55,7 +52,6 @@ func (s ChatEventSubscriber) Run(ctx context.Context) error {
 		}
 	}()
 
-	// 2. Batch + flush loop.
 	ticker := time.NewTicker(s.Interval)
 	defer ticker.Stop()
 
@@ -64,7 +60,7 @@ func (s ChatEventSubscriber) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			s.Logger.Println("ChatEventSubscriber: stopped")
+			s.Logger.Println("ConversationTitleGenerator: stopped")
 			return nil
 
 		case err := <-subscriberInitErrCh:
@@ -86,32 +82,24 @@ func (s ChatEventSubscriber) Run(ctx context.Context) error {
 	}
 }
 
-// chatSummaryConversationBatch groups chat-message events by conversation.
-// It keeps all Pub/Sub messages for ack/nack handling and the latest chat event
-// to avoid triggering summary generation multiple times for the same conversation.
-type chatSummaryConversationBatch struct {
-	LatestEvent domain.ChatMessageEvent
-	Messages    []*pubsub.Message
-}
-
-// flush processes one batch of Pub/Sub messages.
-func (s ChatEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message) {
-	s.Logger.Printf("ChatEventSubscriber: processing batch size=%d", len(batch))
+// flush processes a batch of Pub/Sub messages, grouping them by conversation
+// and invoking the title generator use case.
+func (s ConversationTitleGenerator) flush(ctx context.Context, batch []*pubsub.Message) {
+	s.Logger.Printf("ConversationTitleGenerator: processing batch size=%d", len(batch))
 
 	if s.workerExecutionChan != nil {
 		s.workerExecutionChan <- struct{}{}
 	}
 
-	conversations := make(map[uuid.UUID]chatSummaryConversationBatch)
+	conversations := make(map[uuid.UUID]conversationTitleGeneratorBatch)
 	for _, msg := range batch {
 		var event domain.ChatMessageEvent
 		if err := json.Unmarshal(msg.Data, &event); err != nil {
-			s.Logger.Printf("ChatEventSubscriber: failed to decode event payload: %v", err)
+			s.Logger.Printf("ConversationTitleGenerator: failed to decode event payload: %v", err)
 			msg.Nack()
 			continue
 		}
 
-		// Ignore unrelated events that may be delivered to this subscription.
 		if event.Type != domain.EventType_CHAT_MESSAGE_SENT {
 			msg.Ack()
 			continue
@@ -119,7 +107,7 @@ func (s ChatEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 
 		conversationBatch, found := conversations[event.ConversationID]
 		if !found {
-			conversationBatch = chatSummaryConversationBatch{}
+			conversationBatch = conversationTitleGeneratorBatch{}
 		}
 		conversationBatch.LatestEvent = event
 		conversationBatch.Messages = append(conversationBatch.Messages, msg)
@@ -127,13 +115,13 @@ func (s ChatEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 	}
 
 	for _, conversationBatch := range conversations {
-		err := s.GenerateChatSummary.Execute(ctx, conversationBatch.LatestEvent)
+		err := s.GenerateConversationTitle.Execute(ctx, conversationBatch.LatestEvent)
 		if err != nil {
 			for _, message := range conversationBatch.Messages {
 				message.Nack()
 			}
 			if !errors.Is(err, context.Canceled) {
-				s.Logger.Printf("ChatEventSubscriber: %v", err)
+				s.Logger.Printf("ConversationTitleGenerator: %v", err)
 			}
 			continue
 		}
@@ -142,4 +130,11 @@ func (s ChatEventSubscriber) flush(ctx context.Context, batch []*pubsub.Message)
 			message.Ack()
 		}
 	}
+}
+
+// conversationTitleGeneratorBatch represents a batch of chat message events for a single conversation,
+// along with the latest event for that conversation.
+type conversationTitleGeneratorBatch struct {
+	LatestEvent domain.ChatMessageEvent
+	Messages    []*pubsub.Message
 }

@@ -3,6 +3,7 @@ package modelrunner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -140,13 +141,22 @@ func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, on
 	return onEvent(domain.LLMStreamEventType_Done, done)
 }
 
-func (a LLMClient) Embed(ctx context.Context, model, input string) (domain.EmbedResponse, error) {
+func (a LLMClient) Embed(ctx context.Context, model, input string, opts ...domain.EmbedOption) (domain.EmbedResponse, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
+
+	params := &domain.EmbedParams{}
+	for _, opt := range opts {
+		opt(params)
+	}
 
 	req := EmbeddingsRequest{
 		Model: model,
 		Input: input,
+	}
+
+	if params.ForSearch && strings.Contains(model, "gemma") {
+		req.Input = fmt.Sprintf("task: search tasks | query: %s", input)
 	}
 
 	resp, err := a.client.Embeddings(spanCtx, req)

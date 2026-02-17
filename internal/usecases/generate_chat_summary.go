@@ -96,19 +96,18 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	if event.Type != domain.EventType_CHAT_MESSAGE_SENT {
 		return domain.NewValidationErr("invalid event type for chat summary")
 	}
-
 	if event.ConversationID == uuid.Nil {
 		return domain.NewValidationErr("conversation id cannot be empty")
 	}
 
-	currentSummary := "No current state."
+	currentSummary := domain.DefaultConversationStateSummary
 	previous, found, err := gcs.conversationSummaryRepo.GetConversationSummary(spanCtx, event.ConversationID)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to get conversation summary: %w", err)
 	}
 
-	if found && strings.TrimSpace(previous.CurrentStateSummary) != "" {
-		currentSummary = previous.CurrentStateSummary
+	if found {
+		currentSummary = previous.CurrentStateOrDefault()
 	}
 
 	messageOptions := []domain.ListChatMessagesOption{}
@@ -238,60 +237,26 @@ func formatMessageForSummary(message domain.ChatMessage) string {
 }
 
 func (gcs GenerateChatSummaryImpl) shouldGenerateSummary(span trace.Span, messages []domain.ChatMessage, hasMore bool) bool {
-	if gcs.hasStateChangingToolSuccess(messages) {
+	decision := domain.DetermineConversationSummaryGenerationDecision(
+		messages,
+		hasMore,
+		domain.ConversationSummaryGenerationPolicy{
+			TriggerMessageCount: CHAT_SUMMARY_TRIGGER_MESSAGES,
+			TriggerTokenCount:   CHAT_SUMMARY_TRIGGER_TOKENS,
+		},
+		stateChangingTools,
+	)
+
+	switch decision.Reason {
+	case domain.ConversationSummaryGenerationReason_StateChangingToolSuccess:
 		span.AddEvent("Triggering summary generation due to successful state-changing tool call")
-		return true
+	case domain.ConversationSummaryGenerationReason_MessageCountThreshold:
+		span.AddEvent(fmt.Sprintf("Triggering summary generation due to message count threshold: %d messages", decision.MessageCount))
+	case domain.ConversationSummaryGenerationReason_TokenCountThreshold:
+		span.AddEvent(fmt.Sprintf("Triggering summary generation due to token count threshold: %d tokens", decision.TotalTokens))
 	}
 
-	if hasMore || len(messages) >= CHAT_SUMMARY_TRIGGER_MESSAGES {
-		span.AddEvent(fmt.Sprintf("Triggering summary generation due to message count threshold: %d messages", len(messages)))
-		return true
-	}
-
-	if sumMessagesTotalTokens(messages) >= CHAT_SUMMARY_TRIGGER_TOKENS {
-		span.AddEvent(fmt.Sprintf("Triggering summary generation due to token count threshold: %d tokens", sumMessagesTotalTokens(messages)))
-		return true
-	}
-
-	return false
-}
-
-// hasStateChangingToolSuccess checks if any of the chat messages indicate a
-// successful execution of a state-changing tool,
-func (gcs GenerateChatSummaryImpl) hasStateChangingToolSuccess(messages []domain.ChatMessage) bool {
-	toolCallFunctionsByID := map[string]string{}
-	for _, message := range messages {
-		if message.ChatRole != domain.ChatRole_Assistant {
-			continue
-		}
-		for _, toolCall := range message.ToolCalls {
-			toolCallFunctionsByID[toolCall.ID] = strings.ToLower(toolCall.Function)
-		}
-	}
-
-	for _, message := range messages {
-		if !message.IsToolCallSuccess() {
-			continue
-		}
-		toolFunction, found := toolCallFunctionsByID[*message.ToolCallID]
-		if !found {
-			continue
-		}
-		if _, stateChanging := stateChangingTools[toolFunction]; stateChanging {
-			return true
-		}
-	}
-
-	return false
-}
-
-// sumMessagesTotalTokens calculates the total number of tokens from a list of chat messages.
-func sumMessagesTotalTokens(messages []domain.ChatMessage) int {
-	tokenCount := 0
-	for _, message := range messages {
-		tokenCount += message.TotalTokens
-	}
-	return tokenCount
+	return decision.ShouldGenerate
 }
 
 // InitGenerateChatSummary initializes the GenerateChatSummary use case.

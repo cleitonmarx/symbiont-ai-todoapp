@@ -12,4 +12,4 @@ CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status);
 CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos(due_date);
 CREATE INDEX IF NOT EXISTS idx_todos_created ON todos(created_at);
 CREATE INDEX IF NOT EXISTS idx_todos_status_due_date ON todos(status, due_date);
-CREATE INDEX IF NOT EXISTS idx_todos_embedding ON todos USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+CREATE INDEX IF NOT EXISTS idx_todos_embedding ON todos USING hnsw (embedding vector_cosine_ops) WITH (m = 24, ef_construction = 128);

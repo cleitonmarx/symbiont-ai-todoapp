@@ -744,7 +744,7 @@ components:
     Conversation:
       type: object
       additionalProperties: false
-      required: [id, title, created_at, updated_at]
+      required: [id, title, title_source, created_at, updated_at]
       description: >
         A conversation between the user and the AI assistant.
       properties:
@@ -757,6 +757,8 @@ components:
           type: string
           description: User-defined title for the conversation.
           example: "General Chat"
+        title_source:
+          $ref: "#/components/schemas/ConversationTitleSource"
         created_at:
           type: string
           format: date-time
@@ -767,6 +769,14 @@ components:
           format: date-time
           description: Timestamp when the conversation was last updated.
           example: "2026-01-20T10:15:00Z"
+
+    ConversationTitleSource:
+      type: string
+      description: Source of the conversation title.
+      enum:
+        - user
+        - llm
+        - auto
 
     ConversationListResp:
       type: object

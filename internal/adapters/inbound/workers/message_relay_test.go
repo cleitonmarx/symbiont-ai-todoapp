@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"context"
 	"log"
 	"testing"
 	"time"
@@ -17,31 +16,18 @@ func TestMessageRelay_Run(t *testing.T) {
 	md.EXPECT().Execute(mock.Anything).Return(assert.AnError).Once()
 	md.EXPECT().Execute(mock.Anything).Return(nil).Once()
 
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	signalChan := make(chan struct{})
 
-	mr := MessageRelay{
+	cancel, doneChan := run(t, t.Context(), MessageRelay{
 		MessageDispatcher:   md,
 		Logger:              log.Default(),
 		Interval:            2 * time.Millisecond,
 		workerExecutionChan: signalChan,
-	}
+	})
 
-	go func() {
-		err := mr.Run(cancelCtx)
-		assert.NoError(t, err)
-	}()
-
-	for range 2 {
-		select {
-		case <-signalChan:
-			// Received signal that a batch was processed
-		case <-time.After(1 * time.Second):
-			t.Fatal("timeout waiting for message relay to process batch")
-		}
-	}
+	waitForBatchSignals(t, signalChan, 2, 1*time.Second)
 
 	cancel()
+
+	waitRunnableStop(t, doneChan)
 }

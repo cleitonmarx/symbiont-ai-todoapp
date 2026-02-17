@@ -62,7 +62,7 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 						assert.NotNil(t, p.Search)
 						assert.Equal(t, "groceries", *p.Search)
 						assert.NotNil(t, p.SearchType)
-						assert.Equal(t, usecases.SearchType_SIMILARITY, *p.SearchType)
+						assert.Equal(t, usecases.SearchType_Similarity, *p.SearchType)
 					}).
 					Return([]domain.Todo{testTodo}, false, nil)
 			},
@@ -89,7 +89,7 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 						assert.NotNil(t, p.Search)
 						assert.Equal(t, "meeting", *p.Search)
 						assert.NotNil(t, p.SearchType)
-						assert.Equal(t, usecases.SearchType_TITLE, *p.SearchType)
+						assert.Equal(t, usecases.SearchType_Title, *p.SearchType)
 					}).
 					Return([]domain.Todo{testTodo}, false, nil)
 			},

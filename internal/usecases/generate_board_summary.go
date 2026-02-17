@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
@@ -118,8 +117,7 @@ func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context) (do
 		return domain.BoardSummary{}, false, err
 	}
 
-	new.Summary = strings.TrimSpace(resp.Content)
-	new.Summary = applySummarySafetyGuards(new.Summary, new)
+	new.ApplySummary(resp.Content)
 
 	RecordLLMTokensUsed(ctx, resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
 
@@ -185,54 +183,6 @@ func buildPromptMessages(new domain.BoardSummaryContent, previous domain.BoardSu
 	}
 
 	return messages, nil
-}
-
-var (
-	reNoOverdueTasks    = regexp.MustCompile(`(?i)\bno overdue tasks?\b`)
-	reNoTasksAreOverdue = regexp.MustCompile(`(?i)\bno tasks are overdue\b`)
-	reNothingIsOverdue  = regexp.MustCompile(`(?i)\bnothing is overdue\b`)
-	reOverdueQualifier  = regexp.MustCompile(`(?i)\boverdue\s+`)
-	reLateQualifier     = regexp.MustCompile(`(?i)\blate\s+`)
-	rePastDueQualifier  = regexp.MustCompile(`(?i)\bpast[- ]due\s+`)
-	reExtraSpaces       = regexp.MustCompile(`\s{2,}`)
-	reSpaceBeforePunct  = regexp.MustCompile(`\s+([,.;:!?])`)
-)
-
-// applySummarySafetyGuards cleans the generated summary text to prevent certain phrases
-// from appearing if they are not supported by the current board facts.
-func applySummarySafetyGuards(summary string, content domain.BoardSummaryContent) string {
-	cleaned := strings.TrimSpace(summary)
-	if cleaned == "" {
-		return cleaned
-	}
-
-	// Basic guardrail to prevent markdown formatting from leaking into the summary,
-	// which can cause issues for some LLMs and is not needed for our use case.
-	cleaned = strings.ReplaceAll(cleaned, "**", "")
-	// Guardrail for weaker models: if there are no overdue tasks in current facts,
-	// do not allow overdue/late phrasing to leak into the final summary text.
-	if len(content.Overdue) == 0 {
-
-		// Use placeholders to prevent regexes from interfering with each other
-		cleaned = reNoOverdueTasks.ReplaceAllString(cleaned, "__NO_OVERDUE_TASKS__")
-		cleaned = reNoTasksAreOverdue.ReplaceAllString(cleaned, "__NO_TASKS_ARE_OVERDUE__")
-		cleaned = reNothingIsOverdue.ReplaceAllString(cleaned, "__NOTHING_IS_OVERDUE__")
-
-		// Remove any remaining overdue/late qualifiers that are not supported by current facts
-		cleaned = reOverdueQualifier.ReplaceAllString(cleaned, "")
-		cleaned = reLateQualifier.ReplaceAllString(cleaned, "")
-		cleaned = rePastDueQualifier.ReplaceAllString(cleaned, "")
-		cleaned = reExtraSpaces.ReplaceAllString(cleaned, " ")
-		cleaned = reSpaceBeforePunct.ReplaceAllString(cleaned, "$1")
-		cleaned = strings.TrimSpace(cleaned)
-
-		// Restore placeholders back to user-friendly text
-		cleaned = strings.ReplaceAll(cleaned, "__NO_OVERDUE_TASKS__", "no overdue tasks")
-		cleaned = strings.ReplaceAll(cleaned, "__NO_TASKS_ARE_OVERDUE__", "no tasks are overdue")
-		cleaned = strings.ReplaceAll(cleaned, "__NOTHING_IS_OVERDUE__", "nothing is overdue")
-	}
-
-	return cleaned
 }
 
 // marshalSummaryContent converts the BoardSummaryContent struct into a TOON string for LLM input.

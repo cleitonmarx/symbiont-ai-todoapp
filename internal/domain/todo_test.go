@@ -20,7 +20,7 @@ func TestTodo_ToLLMInput(t *testing.T) {
 	}
 
 	result := todo.ToLLMInput()
-	assert.Equal(t, "ID: 00000000-0000-0000-0000-000000000001 | Title: Finish the report | Due Date: 2024-07-15 | Status: OPEN", result)
+	assert.Equal(t, "ID: 00000000-0000-0000-0000-000000000001 | Task: Finish the report | Due Date: 2024-07-15 | Status: OPEN", result)
 }
 
 func TestTodo_Validate(t *testing.T) {

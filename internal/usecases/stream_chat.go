@@ -347,11 +347,18 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	}
 
 	toolCall.Text = sc.llmToolRegistry.StatusMessage(toolCall.Function)
-	if err := onEvent(domain.LLMStreamEventType_ToolCall, toolCall); err != nil {
+	toolStarted := domain.LLMStreamEventToolCallStarted{
+		ID:        toolCall.ID,
+		Function:  toolCall.Function,
+		Arguments: toolCall.Arguments,
+		Text:      toolCall.Text,
+	}
+	if err := onEvent(domain.LLMStreamEventType_ToolStarted, toolStarted); err != nil {
 		return false, err
 	}
 
 	toolMessage := sc.llmToolRegistry.Call(ctx, toolCall, req.Messages)
+	toolSucceeded := toolMessage.IsToolCallSuccess()
 	now := sc.timeProvider.Now().UTC()
 	toolChatMsg := domain.ChatMessage{
 		ID:             uuid.New(),
@@ -366,12 +373,25 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if !toolMessage.IsToolCallSuccess() {
+	if !toolSucceeded {
 		toolChatMsg.MessageState = domain.ChatMessageState_Failed
 		toolChatMsg.ErrorMessage = &toolMessage.Content
 	}
 
 	if err := sc.persistChatMessage(ctx, toolChatMsg, state.conversation); err != nil {
+		return false, err
+	}
+
+	toolCompleted := domain.LLMStreamEventToolCallCompleted{
+		ID:            toolCall.ID,
+		Function:      toolCall.Function,
+		Success:       toolSucceeded,
+		ShouldRefetch: toolSucceeded,
+	}
+	if !toolSucceeded {
+		toolCompleted.Error = &toolMessage.Content
+	}
+	if err := onEvent(domain.LLMStreamEventType_ToolCompleted, toolCompleted); err != nil {
 		return false, err
 	}
 

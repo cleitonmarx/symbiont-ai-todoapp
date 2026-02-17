@@ -93,8 +93,11 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	if _, err := domain.ShouldHandleConversationSummaryGenerationEvent(event); err != nil {
-		return err
+	if event.Type != domain.EventType_CHAT_MESSAGE_SENT {
+		return domain.NewValidationErr("invalid event type for chat summary")
+	}
+	if event.ConversationID == uuid.Nil {
+		return domain.NewValidationErr("conversation id cannot be empty")
 	}
 
 	currentSummary := domain.DefaultConversationStateSummary

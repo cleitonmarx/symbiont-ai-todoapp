@@ -10,6 +10,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.yaml.in/yaml/v3"
@@ -79,11 +80,13 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event doma
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	shouldHandleEvent, err := domain.ShouldHandleConversationTitleGenerationEvent(event)
-	if err != nil {
-		return err
+	if event.Type != domain.EventType_CHAT_MESSAGE_SENT {
+		return domain.NewValidationErr("invalid event type for conversation title generation")
 	}
-	if !shouldHandleEvent {
+	if event.ConversationID == uuid.Nil {
+		return domain.NewValidationErr("conversation id cannot be empty")
+	}
+	if event.ChatRole != domain.ChatRole_Assistant {
 		return nil
 	}
 

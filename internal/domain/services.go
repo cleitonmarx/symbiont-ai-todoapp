@@ -2,8 +2,6 @@ package domain
 
 import (
 	"strings"
-
-	"github.com/google/uuid"
 )
 
 // GenerateAutoConversationTitle generates a conversation title based on the user's initial message.
@@ -17,33 +15,6 @@ func GenerateAutoConversationTitle(userMessage string) string {
 		return strings.Join(words, " ")
 	}
 	return strings.Join(words[:5], " ") + "..."
-}
-
-// ShouldHandleConversationTitleGenerationEvent validates whether a chat event is eligible
-// for conversation title generation.
-func ShouldHandleConversationTitleGenerationEvent(event ChatMessageEvent) (bool, error) {
-	if event.Type != EventType_CHAT_MESSAGE_SENT {
-		return false, NewValidationErr("invalid event type for conversation title generation")
-	}
-	if event.ConversationID == uuid.Nil {
-		return false, NewValidationErr("conversation id cannot be empty")
-	}
-	if event.ChatRole != ChatRole_Assistant {
-		return false, nil
-	}
-	return true, nil
-}
-
-// ShouldHandleConversationSummaryGenerationEvent validates whether a chat event is eligible
-// for conversation summary generation.
-func ShouldHandleConversationSummaryGenerationEvent(event ChatMessageEvent) (bool, error) {
-	if event.Type != EventType_CHAT_MESSAGE_SENT {
-		return false, NewValidationErr("invalid event type for chat summary")
-	}
-	if event.ConversationID == uuid.Nil {
-		return false, NewValidationErr("conversation id cannot be empty")
-	}
-	return true, nil
 }
 
 // DetermineConversationSummaryGenerationDecision evaluates whether unsummarized messages warrant

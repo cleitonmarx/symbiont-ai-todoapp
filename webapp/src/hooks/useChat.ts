@@ -7,7 +7,7 @@ import {
   streamChat,
   updateConversation,
 } from '../services/chatApi';
-import type { ChatMessage, Conversation } from '../types';
+import type { AssistantTodoFilters, ChatMessage, Conversation } from '../types';
 
 interface UseChatReturn {
   messages: ChatMessage[];
@@ -15,8 +15,8 @@ interface UseChatReturn {
   activeConversationId: string | null;
   models: string[];
   selectedModel: string;
-  toolStatus: string | null;
-  toolStatusCount: number;
+  toolCallingStatus: string | null;
+  toolCallingCount: number;
   loading: boolean;
   loadingModels: boolean;
   loadingConversations: boolean;
@@ -35,11 +35,25 @@ interface UseChatReturn {
   removeConversation: (conversationId: string) => Promise<void>;
 }
 
+interface UseChatOptions {
+  onChatDone?: () => void;
+  onToolExecuted?: () => void;
+  onApplyAssistantFilters?: (filters: AssistantTodoFilters) => void;
+}
+
 const CHAT_SELECTED_MODEL_STORAGE_KEY = 'todoapp.chat.selectedModel';
 const CONVERSATIONS_PAGE_SIZE = 100;
 const CHAT_MESSAGES_PAGE_SIZE = 200;
 const AUTO_CONVERSATION_TITLE_SOURCE = 'auto';
 const AUTO_TITLE_REFRESH_DELAY_MS = 1200;
+const TODO_SORT_OPTIONS = new Set([
+  'createdAtAsc',
+  'createdAtDesc',
+  'dueDateAsc',
+  'dueDateDesc',
+  'similarityAsc',
+  'similarityDesc',
+]);
 
 const loadPersistedModel = (): string => {
   if (typeof window === 'undefined') {
@@ -89,19 +103,128 @@ const getEventBoolean = (data: Record<string, unknown>, ...keys: string[]): bool
   return undefined;
 };
 
+const getEventNumber = (data: Record<string, unknown>, ...keys: string[]): number | undefined => {
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const getEventObject = (data: Record<string, unknown>, ...keys: string[]): Record<string, unknown> | undefined => {
+  for (const key of keys) {
+    const value = data[key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+  }
+  return undefined;
+};
+
+const getArgumentsObject = (data: Record<string, unknown>): Record<string, unknown> | undefined => {
+  const rawArguments = getEventString(data, 'arguments', 'Arguments');
+  if (!rawArguments) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(rawArguments);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+};
+
+const parseAssistantFilters = (data: Record<string, unknown>): AssistantTodoFilters | null => {
+  const toolName = getEventString(data, 'function', 'Function');
+  const shouldApplyUIFilters = getEventBoolean(data, 'apply_ui_filters', 'applyUiFilters');
+  const shouldApplyFromTool = toolName === 'set_ui_filters';
+  if (!shouldApplyFromTool && !shouldApplyUIFilters) {
+    return null;
+  }
+
+  const filtersData = getEventObject(data, 'filters') ?? getArgumentsObject(data);
+  if (!filtersData) {
+    return {};
+  }
+
+  const filters: AssistantTodoFilters = {};
+  const status = getEventString(filtersData, 'status');
+  if (status === 'OPEN' || status === 'DONE') {
+    filters.status = status;
+  }
+
+  const searchBySimilarity = getEventString(filtersData, 'search_by_similarity');
+  const searchByTitle = getEventString(filtersData, 'search_by_title');
+  if (typeof searchBySimilarity === 'string') {
+    filters.searchQuery = searchBySimilarity;
+    filters.searchType = 'SIMILARITY';
+  } else if (typeof searchByTitle === 'string') {
+    filters.searchQuery = searchByTitle;
+    filters.searchType = 'TITLE';
+  } else {
+    const searchQuery = getEventString(filtersData, 'search_query', 'searchQuery');
+    if (typeof searchQuery === 'string') {
+      filters.searchQuery = searchQuery;
+    }
+
+    const searchType = getEventString(filtersData, 'search_type', 'searchType');
+    if (searchType === 'TITLE' || searchType === 'SIMILARITY') {
+      filters.searchType = searchType;
+    }
+  }
+
+  const sortBy = getEventString(filtersData, 'sort_by', 'sortBy');
+  if (sortBy && TODO_SORT_OPTIONS.has(sortBy)) {
+    filters.sortBy = sortBy as AssistantTodoFilters['sortBy'];
+  }
+
+  const dueAfter = getEventString(filtersData, 'due_after', 'dueAfter');
+  if (typeof dueAfter === 'string') {
+    filters.dueAfter = dueAfter;
+  }
+
+  const dueBefore = getEventString(filtersData, 'due_before', 'dueBefore');
+  if (typeof dueBefore === 'string') {
+    filters.dueBefore = dueBefore;
+  }
+
+  const page = getEventNumber(filtersData, 'page');
+  if (typeof page === 'number') {
+    filters.page = page;
+  }
+
+  const pageSize = getEventNumber(filtersData, 'page_size', 'pageSize');
+  if (typeof pageSize === 'number') {
+    filters.pageSize = pageSize;
+  }
+
+  return filters;
+};
+
 const wait = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
 
-export const useChat = (onChatDone?: () => void): UseChatReturn => {
+export const useChat = ({
+  onChatDone,
+  onToolExecuted,
+  onApplyAssistantFilters,
+}: UseChatOptions = {}): UseChatReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [models, setModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState(loadPersistedModel);
-  const [toolStatus, setToolStatus] = useState<string | null>(null);
-  const [toolStatusCount, setToolStatusCount] = useState(0);
+  const [toolCallingStatus, setToolCallingStatus] = useState<string | null>(null);
+  const [toolCallingCount, setToolCallingCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [loadingConversations, setLoadingConversations] = useState(false);
@@ -109,8 +232,8 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const readerRef = useRef<ReadableStreamReader<Uint8Array> | null>(null);
-  const toolStatusKeyRef = useRef<string | null>(null);
-  const toolStatusCountRef = useRef(0);
+  const toolCallingKeyRef = useRef<string | null>(null);
+  const toolCallingCountRef = useRef(0);
   const activeConversationRef = useRef<string | null>(null);
   const conversationsRef = useRef<Conversation[]>([]);
   const hasLoadedConversationsRef = useRef(false);
@@ -124,14 +247,18 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
     conversationsRef.current = conversations;
   }, [conversations]);
 
-  const clearToolStatus = useCallback(() => {
-    toolStatusKeyRef.current = null;
-    toolStatusCountRef.current = 0;
-    setToolStatus(null);
-    setToolStatusCount(0);
+  const clearToolCallingStatus = useCallback(() => {
+    toolCallingKeyRef.current = null;
+    toolCallingCountRef.current = 0;
+    setToolCallingStatus(null);
+    setToolCallingCount(0);
   }, []);
 
-  const updateToolStatus = useCallback((text: string, fnName?: string) => {
+  const resetToolActivity = useCallback(() => {
+    clearToolCallingStatus();
+  }, [clearToolCallingStatus]);
+
+  const updateToolCallingStatus = useCallback((text: string, fnName?: string) => {
     const normalizedText = text.trim();
     if (!normalizedText) {
       return;
@@ -140,15 +267,15 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
     const normalizedFnName = typeof fnName === 'string' ? fnName.trim().toLowerCase() : '';
     const key = normalizedFnName || normalizedText.toLowerCase();
 
-    if (toolStatusKeyRef.current === key) {
-      toolStatusCountRef.current += 1;
+    if (toolCallingKeyRef.current === key) {
+      toolCallingCountRef.current += 1;
     } else {
-      toolStatusKeyRef.current = key;
-      toolStatusCountRef.current = 1;
+      toolCallingKeyRef.current = key;
+      toolCallingCountRef.current = 1;
     }
 
-    setToolStatus(normalizedText);
-    setToolStatusCount(toolStatusCountRef.current);
+    setToolCallingStatus(normalizedText);
+    setToolCallingCount(toolCallingCountRef.current);
   }, []);
 
   const loadMessagesForConversation = useCallback(
@@ -157,7 +284,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
         setLoadingMessages(true);
         const response = await fetchChatMessages(conversationId, 1, CHAT_MESSAGES_PAGE_SIZE);
         setMessages(response.messages || []);
-        clearToolStatus();
+        resetToolActivity();
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load messages');
@@ -165,7 +292,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
         setLoadingMessages(false);
       }
     },
-    [clearToolStatus],
+    [resetToolActivity],
   );
 
   const loadConversations = useCallback(async () => {
@@ -219,11 +346,11 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
     const conversationId = activeConversationRef.current;
     if (!conversationId) {
       setMessages([]);
-      clearToolStatus();
+      resetToolActivity();
       return;
     }
     await loadMessagesForConversation(conversationId);
-  }, [clearToolStatus, loadMessagesForConversation]);
+  }, [loadMessagesForConversation, resetToolActivity]);
 
   const loadModels = useCallback(async () => {
     try {
@@ -259,19 +386,19 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
       readerRef.current = null;
     }
 
-    clearToolStatus();
+    resetToolActivity();
     setLoading(false);
     setError('Stream stopped by user');
-  }, [clearToolStatus]);
+  }, [resetToolActivity]);
 
   const startNewConversation = useCallback(() => {
     composingNewConversationRef.current = true;
     activeConversationRef.current = null;
     setActiveConversationId(null);
     setMessages([]);
-    clearToolStatus();
+    resetToolActivity();
     setError(null);
-  }, [clearToolStatus]);
+  }, [resetToolActivity]);
 
   const selectConversation = useCallback(
     async (conversationId: string | null) => {
@@ -329,12 +456,12 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
 
     try {
       await removeConversation(conversationId);
-      clearToolStatus();
+      resetToolActivity();
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to clear chat');
     }
-  }, [clearToolStatus, removeConversation, startNewConversation]);
+  }, [removeConversation, resetToolActivity, startNewConversation]);
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -348,7 +475,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
 
       try {
         setLoading(true);
-        clearToolStatus();
+        resetToolActivity();
         setError(null);
         abortControllerRef.current = new AbortController();
 
@@ -445,7 +572,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
               if (!deltaText) {
                 return;
               }
-              clearToolStatus();
+              clearToolCallingStatus();
               assistantContent += deltaText;
 
               setMessages((prev) => {
@@ -464,11 +591,23 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
               return;
             }
 
-            if (eventType === 'tool_call') {
-              const functionCallText = getEventString(data, 'text', 'Text');
-              const functionCallName = getEventString(data, 'function', 'Function');
-              if (typeof functionCallText === 'string' && functionCallText.trim() !== '') {
-                updateToolStatus(functionCallText, functionCallName);
+            if (eventType === 'tool_call_started') {
+              const toolStartedText = getEventString(data, 'text', 'Text');
+              const toolStartedName = getEventString(data, 'function', 'Function');
+              if (toolStartedText) {
+                updateToolCallingStatus(toolStartedText, toolStartedName);
+              }
+              const assistantFilters = parseAssistantFilters(data);
+              if (assistantFilters !== null) {
+                onApplyAssistantFilters?.(assistantFilters);
+              }
+              return;
+            }
+
+            if (eventType === 'tool_call_finished') {
+              const shouldRefetch = getEventBoolean(data, 'should_refetch', 'shouldRefetch');
+              if (shouldRefetch === true) {
+                onToolExecuted?.();
               }
               return;
             }
@@ -479,7 +618,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
               if (eventAssistantMessageId) {
                 assistantMessageId = eventAssistantMessageId;
               }
-              clearToolStatus();
+              resetToolActivity();
               setLoading(false);
               readerRef.current = null;
               abortControllerRef.current = null;
@@ -494,7 +633,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
                   : errorCode === 'client_closed'
                     ? 'Connection closed'
                     : 'Failed to get response from assistant';
-              clearToolStatus();
+              resetToolActivity();
               setError(errorMsg);
               setLoading(false);
               readerRef.current = null;
@@ -511,7 +650,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
               void readerRef.current.cancel();
               readerRef.current = null;
             }
-            clearToolStatus();
+            resetToolActivity();
             setLoading(false);
             setError('Stream stopped by user');
             abortControllerRef.current = null;
@@ -557,7 +696,7 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
           await refreshConversationTitleIfAuto(streamConversationId);
           onChatDone?.();
         }
-        clearToolStatus();
+        resetToolActivity();
         readerRef.current = null;
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
@@ -565,13 +704,23 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
         } else {
           setError(err instanceof Error ? err.message : 'Failed to send message');
         }
-        clearToolStatus();
+        resetToolActivity();
         setLoading(false);
         readerRef.current = null;
         abortControllerRef.current = null;
       }
     },
-    [clearToolStatus, loadConversations, onChatDone, refreshConversationTitleIfAuto, selectedModel, updateToolStatus],
+    [
+      clearToolCallingStatus,
+      loadConversations,
+      onApplyAssistantFilters,
+      onChatDone,
+      onToolExecuted,
+      refreshConversationTitleIfAuto,
+      resetToolActivity,
+      selectedModel,
+      updateToolCallingStatus,
+    ],
   );
 
   return {
@@ -580,8 +729,8 @@ export const useChat = (onChatDone?: () => void): UseChatReturn => {
     activeConversationId,
     models,
     selectedModel,
-    toolStatus,
-    toolStatusCount,
+    toolCallingStatus,
+    toolCallingCount,
     loading,
     loadingModels,
     loadingConversations,

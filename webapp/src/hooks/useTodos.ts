@@ -8,7 +8,7 @@ import {
   type TodoSearchType,
 } from '../services/todosApi';
 import { getBoardSummary, type BoardSummary } from '../services/boardApi';
-import type { Todo, CreateTodoRequest, TodoStatus } from '../types';
+import type { Todo, CreateTodoRequest, TodoStatus, AssistantTodoFilters } from '../types';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 export interface UseTodosReturn {
@@ -38,10 +38,23 @@ export interface UseTodosReturn {
   dueBefore: string;
   setDueBefore: (date: string) => void;
   clearDateRange: () => void;
+  applyAssistantFilters: (filters: AssistantTodoFilters) => void;
   refetch: () => void;
 }
 
 const DEFAULT_TODO_PAGE_SIZE = 25;
+const TODO_PAGE_SIZES = [25, 50, 100] as const;
+
+const normalizePageSize = (value?: number): number => {
+  if (!value || !Number.isFinite(value)) {
+    return DEFAULT_TODO_PAGE_SIZE;
+  }
+
+  const integerValue = Math.max(1, Math.round(value));
+  return TODO_PAGE_SIZES.reduce((closest, candidate) =>
+    Math.abs(candidate - integerValue) < Math.abs(closest - integerValue) ? candidate : closest,
+  TODO_PAGE_SIZES[0]);
+};
 
 export const useTodos = (): UseTodosReturn => {
   const queryClient = useQueryClient();
@@ -248,6 +261,35 @@ export const useTodos = (): UseTodosReturn => {
     setDueBeforeState('');
   }, []);
 
+  const applyAssistantFilters = useCallback((filters: AssistantTodoFilters) => {
+    const nextStatus: TodoStatus | 'ALL' =
+      filters.status === 'OPEN' || filters.status === 'DONE' ? filters.status : 'ALL';
+    const nextSearchQuery = (filters.searchQuery ?? '').trim();
+    const nextSearchType: TodoSearchType = filters.searchType === 'SIMILARITY' ? 'SIMILARITY' : 'TITLE';
+    const nextSortBy: TodoSort = filters.sortBy ?? 'dueDateAsc';
+    const nextPageSize = normalizePageSize(filters.pageSize);
+    const nextPage = typeof filters.page === 'number' && filters.page > 0 ? Math.round(filters.page) : 1;
+    const nextDueAfter = (filters.dueAfter ?? '').trim();
+    const nextDueBefore = (filters.dueBefore ?? '').trim();
+
+    setStatusFilterState(nextStatus);
+    setSearchType(nextSearchType);
+    setSearchQuery(nextSearchQuery);
+    setDebouncedSearchQuery(nextSearchQuery);
+    setSortBy(nextSortBy);
+    setPageSize(nextPageSize);
+
+    if (nextDueAfter && nextDueBefore && nextDueBefore >= nextDueAfter) {
+      setDueAfterState(nextDueAfter);
+      setDueBeforeState(nextDueBefore);
+    } else {
+      setDueAfterState('');
+      setDueBeforeState('');
+    }
+
+    setCurrentPage(nextPage);
+  }, []);
+
   return {
     todos,
     boardSummary,
@@ -283,5 +325,6 @@ export const useTodos = (): UseTodosReturn => {
     dueBefore,
     setDueBefore: handleSetDueBefore,
     clearDateRange: handleClearDateRange,
+    applyAssistantFilters,
   };
 };

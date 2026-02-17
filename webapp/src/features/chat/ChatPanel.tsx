@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useChat } from '../../hooks/useChat';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import type { AssistantTodoFilters } from '../../types';
 
 marked.setOptions({
   breaks: true,
@@ -11,6 +12,8 @@ marked.setOptions({
 
 interface ChatPanelProps {
   onChatDone?: () => void;
+  onToolExecuted?: () => void;
+  onApplyAssistantFilters?: (filters: AssistantTodoFilters) => void;
   mode?: 'panel' | 'sheet';
   onClose?: () => void;
 }
@@ -37,7 +40,13 @@ const formatConversationAge = (updatedAt: string): string => {
   return `${Math.max(1, Math.round(totalMinutes / DAY_MINUTES))}d`;
 };
 
-export const ChatPanel = ({ onChatDone, mode = 'panel', onClose }: ChatPanelProps) => {
+export const ChatPanel = ({
+  onChatDone,
+  onToolExecuted,
+  onApplyAssistantFilters,
+  mode = 'panel',
+  onClose,
+}: ChatPanelProps) => {
   const isViewportCompact = useMediaQuery('(max-width: 960px)');
   const isCompact = mode === 'panel' ? true : isViewportCompact;
   const [activeTab, setActiveTab] = useState<'chat' | 'sessions'>('chat');
@@ -47,8 +56,8 @@ export const ChatPanel = ({ onChatDone, mode = 'panel', onClose }: ChatPanelProp
     activeConversationId,
     models,
     selectedModel,
-    toolStatus,
-    toolStatusCount,
+    toolCallingStatus,
+    toolCallingCount,
     loading,
     loadingModels,
     loadingConversations,
@@ -63,7 +72,11 @@ export const ChatPanel = ({ onChatDone, mode = 'panel', onClose }: ChatPanelProp
     selectConversation,
     renameConversation,
     removeConversation,
-  } = useChat(onChatDone);
+  } = useChat({
+    onChatDone,
+    onToolExecuted,
+    onApplyAssistantFilters,
+  });
   const [input, setInput] = useState('');
   const [renderedMessages, setRenderedMessages] = useState<Record<string, string>>({});
   const [renameConversationId, setRenameConversationId] = useState<string | null>(null);
@@ -174,7 +187,7 @@ export const ChatPanel = ({ onChatDone, mode = 'panel', onClose }: ChatPanelProp
   const showChatPane = !isCompact || activeTab === 'chat';
   const sessionsLocked = loading || loadingMessages;
   const chatGuideText = activeConversationId
-    ? 'Break down work, search by title or similarity, sort tasks, or run batch updates.'
+    ? 'Break down work and I can apply filters, sort tasks, or run batch updates.'
     : "Tell me what you need to do and I'll turn it into todos, then help you find, sort, and batch-update them.";
 
   return (
@@ -247,29 +260,6 @@ export const ChatPanel = ({ onChatDone, mode = 'panel', onClose }: ChatPanelProp
             </div>
 
             <div className="ui-chat-conversation-list">
-              <button
-                type="button"
-                className={`ui-chat-conversation-item ${activeConversationId === null ? 'active' : ''}`}
-                onClick={() => {
-                  setConversationError(null);
-                  setRenameConversationId(null);
-                  setRenameValue('');
-                  startNewConversation();
-                  if (isCompact) {
-                    setActiveTab('chat');
-                  }
-                }}
-                disabled={sessionsLocked}
-              >
-                <span className="ui-chat-session-dot" aria-hidden>
-                  •
-                </span>
-                <div className="ui-chat-conversation-body">
-                  <div className="ui-chat-conversation-title">New conversation</div>
-                  <div className="ui-chat-conversation-date">Starts on first message</div>
-                </div>
-              </button>
-
               {conversations.map((conversation) => {
                 const isActive = activeConversationId === conversation.id;
                 const isEditing = renameConversationId === conversation.id;
@@ -422,10 +412,10 @@ export const ChatPanel = ({ onChatDone, mode = 'panel', onClose }: ChatPanelProp
               <div ref={messagesEndRef} />
             </div>
 
-            {toolStatus ? (
+            {toolCallingStatus ? (
               <div className="ui-chat-tool-status">
-                <span>{toolStatus}</span>
-                <span className="ui-chat-tool-count">x{toolStatusCount}</span>
+                <span>{toolCallingStatus}</span>
+                <span className="ui-chat-tool-count">x{toolCallingCount}</span>
               </div>
             ) : null}
 

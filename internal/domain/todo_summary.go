@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -57,6 +58,50 @@ func (new BoardSummaryContent) DiffersFrom(previous BoardSummaryContent) bool {
 		!slices.Equal(new.NearDeadline, previous.NearDeadline)
 }
 
+var (
+	reNoOverdueTasks    = regexp.MustCompile(`(?i)\bno overdue tasks?\b`)
+	reNoTasksAreOverdue = regexp.MustCompile(`(?i)\bno tasks are overdue\b`)
+	reNothingIsOverdue  = regexp.MustCompile(`(?i)\bnothing is overdue\b`)
+	reOverdueQualifier  = regexp.MustCompile(`(?i)\boverdue\s+`)
+	reLateQualifier     = regexp.MustCompile(`(?i)\blate\s+`)
+	rePastDueQualifier  = regexp.MustCompile(`(?i)\bpast[- ]due\s+`)
+	reExtraSpaces       = regexp.MustCompile(`\s{2,}`)
+	reSpaceBeforePunct  = regexp.MustCompile(`\s+([,.;:!?])`)
+)
+
+// ApplySummary applies a generated summary to the content while enforcing
+// domain safety guards based on current board facts.
+func (c *BoardSummaryContent) ApplySummary(summary string) {
+	cleaned := strings.TrimSpace(summary)
+	if cleaned == "" {
+		c.Summary = cleaned
+		return
+	}
+
+	// Prevent markdown formatting from leaking into the final summary text.
+	cleaned = strings.ReplaceAll(cleaned, "**", "")
+	// If there are no overdue tasks in current facts, remove unsupported
+	// overdue/late qualifiers while preserving explicit "no overdue" statements.
+	if len(c.Overdue) == 0 {
+		cleaned = reNoOverdueTasks.ReplaceAllString(cleaned, "__NO_OVERDUE_TASKS__")
+		cleaned = reNoTasksAreOverdue.ReplaceAllString(cleaned, "__NO_TASKS_ARE_OVERDUE__")
+		cleaned = reNothingIsOverdue.ReplaceAllString(cleaned, "__NOTHING_IS_OVERDUE__")
+
+		cleaned = reOverdueQualifier.ReplaceAllString(cleaned, "")
+		cleaned = reLateQualifier.ReplaceAllString(cleaned, "")
+		cleaned = rePastDueQualifier.ReplaceAllString(cleaned, "")
+		cleaned = reExtraSpaces.ReplaceAllString(cleaned, " ")
+		cleaned = reSpaceBeforePunct.ReplaceAllString(cleaned, "$1")
+		cleaned = strings.TrimSpace(cleaned)
+
+		cleaned = strings.ReplaceAll(cleaned, "__NO_OVERDUE_TASKS__", "no overdue tasks")
+		cleaned = strings.ReplaceAll(cleaned, "__NO_TASKS_ARE_OVERDUE__", "no tasks are overdue")
+		cleaned = strings.ReplaceAll(cleaned, "__NOTHING_IS_OVERDUE__", "nothing is overdue")
+	}
+
+	c.Summary = cleaned
+}
+
 // BuildComparisonHints computes hints by comparing this content with a previous version.
 func (c BoardSummaryContent) BuildComparisonHints(previous BoardSummaryContent) ComparisonHints {
 	// Completed progress hints
@@ -81,6 +126,7 @@ func (c BoardSummaryContent) BuildComparisonHints(previous BoardSummaryContent) 
 	}
 }
 
+// extractCompletedCandidates identifies which todo items were likely completed since the last summary by comparing titles.
 func (c BoardSummaryContent) extractCompletedCandidates(previous BoardSummaryContent) []string {
 	currentTitles := make(map[string]struct{})
 	addSummaryTitles(currentTitles, c)
@@ -98,6 +144,7 @@ func (c BoardSummaryContent) extractCompletedCandidates(previous BoardSummaryCon
 	return candidates
 }
 
+// categorizeNextUpItems categorizes next up items based on their reason into overdue, due soon, upcoming, and future buckets.
 func (c BoardSummaryContent) categorizeNextUpItems() (overdue, dueSoon, upcoming, future string) {
 	nextUpOverdue := []string{}
 	nextUpDueSoon := []string{}

@@ -19,19 +19,19 @@ var _ gen.ServerInterface = (*TodoAppServer)(nil)
 
 // TodoAppServer is the REST API and UI HTTP server for the TodoApp application.
 type TodoAppServer struct {
-	Port                      int                             `config:"HTTP_PORT" default:"8080"`
-	Logger                    *log.Logger                     `resolve:""`
-	ListTodosUseCase          usecases.ListTodos              `resolve:""`
-	CreateTodoUseCase         usecases.CreateTodo             `resolve:""`
-	UpdateTodoUseCase         usecases.UpdateTodo             `resolve:""`
-	DeleteTodoUseCase         usecases.DeleteTodo             `resolve:""`
-	GetBoardSummaryUseCase    usecases.GetBoardSummary        `resolve:""`
-	ListConversationsUseCase  usecases.ListConversations      `resolve:""`
-	UpdateConversationUseCase usecases.UpdateConversation     `resolve:""`
-	ListChatMessagesUseCase   usecases.ListChatMessages       `resolve:""`
-	DeleteConversationUseCase usecases.DeleteConversation     `resolve:""`
-	ListAvailableLLMModels    usecases.ListAvailableLLMModels `resolve:""`
-	StreamChatUseCase         usecases.StreamChat             `resolve:""`
+	Port                       int                          `config:"HTTP_PORT" default:"8080"`
+	Logger                     *log.Logger                  `resolve:""`
+	ListTodosUseCase           usecases.ListTodos           `resolve:""`
+	CreateTodoUseCase          usecases.CreateTodo          `resolve:""`
+	UpdateTodoUseCase          usecases.UpdateTodo          `resolve:""`
+	DeleteTodoUseCase          usecases.DeleteTodo          `resolve:""`
+	GetBoardSummaryUseCase     usecases.GetBoardSummary     `resolve:""`
+	ListConversationsUseCase   usecases.ListConversations   `resolve:""`
+	UpdateConversationUseCase  usecases.UpdateConversation  `resolve:""`
+	ListChatMessagesUseCase    usecases.ListChatMessages    `resolve:""`
+	DeleteConversationUseCase  usecases.DeleteConversation  `resolve:""`
+	ListAvailableModelsUseCase usecases.ListAvailableModels `resolve:""`
+	StreamChatUseCase          usecases.StreamChat          `resolve:""`
 }
 
 //go:embed webappdist/*

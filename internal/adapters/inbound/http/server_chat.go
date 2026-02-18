@@ -45,7 +45,7 @@ func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request
 
 }
 
-// StreamChat handles streaming chat responses from the LLM
+// StreamChat handles streaming assistant chat responses
 // (POST /api/chat/stream)
 func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	req := gen.StreamChatJSONRequestBody{}
@@ -81,13 +81,21 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 		options = append(options, usecases.WithConversationID(*req.ConversationId))
 	}
 
-	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(eventType domain.LLMStreamEventType, data any) error {
-		dataBytes, err := json.Marshal(data)
+	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(eventType domain.AssistantEventType, data any) error {
+		sseEventType, sseData, shouldHandle, mapErr := mapAssistantEventToSSE(eventType, data)
+		if mapErr != nil {
+			return mapErr
+		}
+		if !shouldHandle {
+			return nil
+		}
+
+		dataBytes, err := json.Marshal(sseData)
 		if err != nil {
 			return err
 		}
 
-		_, err = fmt.Fprintf(w, "event: %s\n", eventType)
+		_, err = fmt.Fprintf(w, "event: %s\n", sseEventType)
 		if err != nil {
 			return err
 		}
@@ -106,10 +114,112 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ListAvailableModels returns the list of available LLM models for chat
+func mapAssistantEventToSSE(eventType domain.AssistantEventType, data any) (string, any, bool, error) {
+	switch eventType {
+	case domain.AssistantEventType_TurnStarted:
+		started, ok := data.(domain.AssistantTurnStarted)
+		if !ok {
+			return "", nil, false, fmt.Errorf("unexpected assistant turn_started payload type: %T", data)
+		}
+		return string(domain.AssistantEventType_TurnStarted), sseTurnStartedEvent{
+			ConversationID:      started.ConversationID,
+			UserMessageID:       started.UserMessageID,
+			AssistantMessageID:  started.AssistantMessageID,
+			ConversationCreated: started.ConversationCreated,
+		}, true, nil
+	case domain.AssistantEventType_MessageDelta:
+		delta, ok := data.(domain.AssistantMessageDelta)
+		if !ok {
+			return "", nil, false, fmt.Errorf("unexpected assistant message_delta payload type: %T", data)
+		}
+		return string(domain.AssistantEventType_MessageDelta), sseMessageDeltaEvent{
+			Text: delta.Text,
+		}, true, nil
+	case domain.AssistantEventType_ActionStarted:
+		call, ok := data.(domain.AssistantActionCall)
+		if !ok {
+			return "", nil, false, fmt.Errorf("unexpected assistant action_started payload type: %T", data)
+		}
+		return string(domain.AssistantEventType_ActionStarted), sseActionCallEvent{
+			ID:    call.ID,
+			Name:  call.Name,
+			Input: call.Input,
+			Text:  call.Text,
+		}, true, nil
+	case domain.AssistantEventType_ActionCompleted:
+		completed, ok := data.(domain.AssistantActionCompleted)
+		if !ok {
+			return "", nil, false, fmt.Errorf("unexpected assistant action_completed payload type: %T", data)
+		}
+		return string(domain.AssistantEventType_ActionCompleted), sseActionCompletedEvent{
+			ID:            completed.ID,
+			Name:          completed.Name,
+			Success:       completed.Success,
+			Error:         completed.Error,
+			ShouldRefetch: completed.ShouldRefetch,
+		}, true, nil
+	case domain.AssistantEventType_ActionRequested:
+		call, ok := data.(domain.AssistantActionCall)
+		if !ok {
+			return "", nil, false, fmt.Errorf("unexpected assistant action_requested payload type: %T", data)
+		}
+		return string(domain.AssistantEventType_ActionRequested), sseActionCallEvent{
+			ID:    call.ID,
+			Name:  call.Name,
+			Input: call.Input,
+			Text:  call.Text,
+		}, true, nil
+	case domain.AssistantEventType_TurnCompleted:
+		done, ok := data.(domain.AssistantTurnCompleted)
+		if !ok {
+			return "", nil, false, fmt.Errorf("unexpected assistant turn_completed payload type: %T", data)
+		}
+		return string(domain.AssistantEventType_TurnCompleted), sseTurnCompletedEvent{
+			Usage:              done.Usage,
+			AssistantMessageID: done.AssistantMessageID,
+			CompletedAt:        done.CompletedAt,
+		}, true, nil
+	default:
+		return "", nil, false, nil
+	}
+}
+
+type sseTurnStartedEvent struct {
+	ConversationID      any  `json:"conversation_id"`
+	UserMessageID       any  `json:"user_message_id"`
+	AssistantMessageID  any  `json:"assistant_message_id"`
+	ConversationCreated bool `json:"conversation_created"`
+}
+
+type sseMessageDeltaEvent struct {
+	Text string `json:"text"`
+}
+
+type sseActionCallEvent struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Input string `json:"input"`
+	Text  string `json:"text"`
+}
+
+type sseActionCompletedEvent struct {
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Success       bool    `json:"success"`
+	Error         *string `json:"error,omitempty"`
+	ShouldRefetch bool    `json:"should_refetch"`
+}
+
+type sseTurnCompletedEvent struct {
+	Usage              domain.AssistantUsage `json:"usage"`
+	AssistantMessageID string                `json:"assistant_message_id"`
+	CompletedAt        string                `json:"completed_at"`
+}
+
+// ListAvailableModels returns the list of available assistant models for chat
 // (GET /api/models)
 func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Request) {
-	models, err := api.ListAvailableLLMModels.Query(r.Context())
+	models, err := api.ListAvailableModelsUseCase.Query(r.Context())
 	if err != nil {
 		respondError(w, toError(err))
 		return
@@ -117,7 +227,7 @@ func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Requ
 
 	rp := gen.ModelListResp{}
 	for _, m := range models {
-		if m.Type != domain.LLMModelType_Chat {
+		if m.Kind != domain.ModelKindAssistant {
 			continue
 		}
 		rp.Models = append(rp.Models, m.Name)

@@ -33,7 +33,7 @@ func (m AssistantActionManager) Execute(ctx context.Context, call domain.Assista
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"unknown_tool","details":"Tool '%s' is not registered."}`, call.Name),
+			Content:      fmt.Sprintf(`{"error":"unknown_action","details":"Action '%s' is not registered."}`, call.Name),
 		}
 	}
 

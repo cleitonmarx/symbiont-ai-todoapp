@@ -19,17 +19,17 @@ func TestAssistantActionManager(t *testing.T) {
 	}{
 		"list-returns-all-actions": {
 			setupActions: func() []domain.AssistantAction {
-				tool1 := domain.NewMockAssistantAction(t)
-				tool1.EXPECT().
+				action1 := domain.NewMockAssistantAction(t)
+				action1.EXPECT().
 					Definition().
 					Return(mockAssistantActionDefinition("fetch_todos"))
 
-				tool2 := domain.NewMockAssistantAction(t)
-				tool2.EXPECT().
+				action2 := domain.NewMockAssistantAction(t)
+				action2.EXPECT().
 					Definition().
 					Return(mockAssistantActionDefinition("create_todo"))
 
-				return []domain.AssistantAction{tool1, tool2}
+				return []domain.AssistantAction{action1, action2}
 			},
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
 				actions := manager.List()
@@ -41,34 +41,34 @@ func TestAssistantActionManager(t *testing.T) {
 				assert.ElementsMatch(t, []string{"fetch_todos", "create_todo"}, names)
 			},
 		},
-		"status-message-returns-tool-specific-message": {
+		"status-message-returns-action-specific-message": {
 			setupActions: func() []domain.AssistantAction {
-				tool := domain.NewMockAssistantAction(t)
-				tool.EXPECT().
+				action := domain.NewMockAssistantAction(t)
+				action.EXPECT().
 					Definition().
 					Return(mockAssistantActionDefinition("fetch_todos"))
-				tool.EXPECT().StatusMessage().Return("🔎 Fetching todos...")
-				return []domain.AssistantAction{tool}
+				action.EXPECT().StatusMessage().Return("🔎 Fetching todos...")
+				return []domain.AssistantAction{action}
 			},
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
 				msg := manager.StatusMessage("fetch_todos")
 				assert.Equal(t, "🔎 Fetching todos...", msg)
 			},
 		},
-		"status-message-returns-default-when-tool-not-found": {
+		"status-message-returns-default-when-action-not-found": {
 			setupActions: func() []domain.AssistantAction { return []domain.AssistantAction{} },
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
-				msg := manager.StatusMessage("unknown_tool")
+				msg := manager.StatusMessage("unknown_action")
 				assert.Equal(t, "⏳ Processing request...", msg)
 			},
 		},
-		"execute-calls-correct-tool": {
+		"execute-calls-correct-action": {
 			setupActions: func() []domain.AssistantAction {
-				tool := domain.NewMockAssistantAction(t)
-				tool.EXPECT().
+				action := domain.NewMockAssistantAction(t)
+				action.EXPECT().
 					Definition().
 					Return(mockAssistantActionDefinition("fetch_todos"))
-				tool.EXPECT().
+				action.EXPECT().
 					Execute(mock.Anything, mock.MatchedBy(func(call domain.AssistantActionCall) bool {
 						return call.Name == "fetch_todos" && call.Input == "{}" && call.ID == "call-1"
 					}), mock.MatchedBy(func(history []domain.AssistantMessage) bool {
@@ -79,7 +79,7 @@ func TestAssistantActionManager(t *testing.T) {
 						Content:      "todos found",
 						ActionCallID: ptr("call-1"),
 					})
-				return []domain.AssistantAction{tool}
+				return []domain.AssistantAction{action}
 			},
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
 				result := manager.Execute(
@@ -98,16 +98,16 @@ func TestAssistantActionManager(t *testing.T) {
 				}
 			},
 		},
-		"execute-returns-error-for-unknown-tool": {
+		"execute-returns-error-for-unknown-action": {
 			setupActions: func() []domain.AssistantAction { return []domain.AssistantAction{} },
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
 				result := manager.Execute(
 					context.Background(),
-					domain.AssistantActionCall{ID: "x", Name: "unknown_tool"},
+					domain.AssistantActionCall{ID: "x", Name: "unknown_action", Input: ""},
 					nil,
 				)
 				assert.Equal(t, domain.ChatRole_Tool, result.Role)
-				assert.Contains(t, result.Content, "unknown_tool")
+				assert.Contains(t, result.Content, "unknown_action")
 				assert.Contains(t, result.Content, "not registered")
 			},
 		},

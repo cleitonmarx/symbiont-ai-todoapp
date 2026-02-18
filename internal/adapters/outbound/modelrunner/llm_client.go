@@ -3,7 +3,6 @@ package modelrunner
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -16,12 +15,13 @@ import (
 
 // LLMClient adapts DRMAPIClient to domain.LLMClient interface
 type LLMClient struct {
-	client DRMAPIClient
+	client           DRMAPIClient
+	embeddingFactory EmbeddingFactory
 }
 
 // NewLLMClientAdapter creates a new adapter
 func NewLLMClientAdapter(client DRMAPIClient) LLMClient {
-	return LLMClient{client: client}
+	return LLMClient{client: client, embeddingFactory: embeddingFactory{}}
 }
 
 // Chat implements domain.LLMClient.Chat
@@ -141,32 +141,45 @@ func (a LLMClient) ChatStream(ctx context.Context, req domain.LLMChatRequest, on
 	return onEvent(domain.LLMStreamEventType_Done, done)
 }
 
-func (a LLMClient) Embed(ctx context.Context, model, input string, opts ...domain.EmbedOption) (domain.EmbedResponse, error) {
+// EmbedTodo implements domain.LLMClient.EmbedTodo
+func (a LLMClient) EmbedTodo(ctx context.Context, model string, todo domain.Todo) (domain.EmbedResponse, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	params := &domain.EmbedParams{}
-	for _, opt := range opts {
-		opt(params)
+	prompt := a.embeddingFactory.Get(model).GenerateIndexingPrompt(todo)
+	resp, err := a.embed(spanCtx, model, prompt)
+	if telemetry.RecordErrorAndStatus(span, err) {
+		return domain.EmbedResponse{}, err
 	}
+	return resp, nil
+}
 
+// EmbedSearch implements domain.LLMClient.EmbedSearch
+func (a LLMClient) EmbedSearch(ctx context.Context, model, searchInput string) (domain.EmbedResponse, error) {
+	spanCtx, span := telemetry.Start(ctx)
+	defer span.End()
+
+	prompt := a.embeddingFactory.Get(model).GenerateSearchPrompt(searchInput)
+	resp, err := a.embed(spanCtx, model, prompt)
+	if telemetry.RecordErrorAndStatus(span, err) {
+		return domain.EmbedResponse{}, err
+	}
+	return resp, nil
+}
+
+func (a LLMClient) embed(ctx context.Context, model, input string) (domain.EmbedResponse, error) {
 	req := EmbeddingsRequest{
 		Model: model,
 		Input: input,
 	}
 
-	if params.ForSearch && strings.Contains(model, "gemma") {
-		req.Input = fmt.Sprintf("task: search tasks | query: %s", input)
-	}
-
-	resp, err := a.client.Embeddings(spanCtx, req)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	resp, err := a.client.Embeddings(ctx, req)
+	if err != nil {
 		return domain.EmbedResponse{}, err
 	}
 
 	if len(resp.Data) == 0 {
 		err := errors.New("no embedding data in response")
-		telemetry.RecordErrorAndStatus(span, err)
 		return domain.EmbedResponse{}, err
 	}
 

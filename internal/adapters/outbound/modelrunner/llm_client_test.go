@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
@@ -336,20 +337,19 @@ func TestLLMClientAdapter_Chat_ValidationErrors(t *testing.T) {
 	}
 }
 
-func TestLLMClientAdapter_Embed(t *testing.T) {
+func TestLLMClientAdapter_EmbedTodo(t *testing.T) {
+	todo := domain.Todo{Title: "Test", DueDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), Status: domain.TodoStatus_OPEN}
 	tests := map[string]struct {
-		options            []domain.EmbedOption
 		response           string
 		statusCode         int
 		model              string
-		input              string
-		expectRequestInput *string
+		expectRequestInput string
 		expectErr          bool
 		expectedVec        []float64
 	}{
-		"success": {
+		"success-with-embeddinggemma": {
 			response: `{
-                "model": "ai/qwen3-embedding",
+                "model": "ai/embeddinggemma",
                 "object": "list",
                 "usage": { "prompt_tokens": 6, "total_tokens": 6 },
                 "data": [
@@ -360,67 +360,64 @@ func TestLLMClientAdapter_Embed(t *testing.T) {
                     }
                 ]
             }`,
-			statusCode:  http.StatusOK,
-			model:       "ai/qwen3-embedding",
-			input:       "A dog is an animal",
-			expectedVec: []float64{1.1, 2.2, 3.3},
-		},
-		"with-search-embedding-option-for-gemma": {
-			options: []domain.EmbedOption{domain.WithSearchEmbedding()},
-			response: `{
-				"model": "ai/gemma-embedding",
-				"object": "list",
-				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
-				"data": [
-					{
-						"embedding": [0.5, 0.6, 0.7],
-						"index": 0,
-						"object": "embedding"
-					}
-				]
-			}`,
 			statusCode:         http.StatusOK,
-			model:              "ai/gemma-embedding",
-			input:              "A dog is an animal",
-			expectRequestInput: common.Ptr("task: search tasks | query: A dog is an animal"),
-			expectedVec:        []float64{0.5, 0.6, 0.7},
+			model:              "ai/embeddinggemma",
+			expectRequestInput: "title: none | text: Test",
+			expectedVec:        []float64{1.1, 2.2, 3.3},
+		},
+		"success-with-default-embedding-generator": {
+			response: `{
+                "model": "ai/otherembeddingmodel",
+                "object": "list",
+                "usage": { "prompt_tokens": 6, "total_tokens": 6 },
+                "data": [
+                    {
+                        "embedding": [1.1, 2.2, 3.3],
+                        "index": 0,
+                        "object": "embedding"
+                    }
+                ]
+            }`,
+			statusCode:         http.StatusOK,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "title:'Test'\ndue_date:'2024-01-01T00:00:00Z'\nstatus:'OPEN'",
+			expectedVec:        []float64{1.1, 2.2, 3.3},
 		},
 		"no-embedding-data": {
 			response: `{
-                "model": "ai/qwen3-embedding",
+                "model": "ai/otherembeddingmodel",
                 "object": "list",
                 "usage": { "prompt_tokens": 6, "total_tokens": 6 },
                 "data": []
             }`,
-			statusCode: http.StatusOK,
-			model:      "ai/qwen3-embedding",
-			input:      "A dog is an animal",
-			expectErr:  true,
+			statusCode:         http.StatusOK,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "title:'Test'\ndue_date:'2024-01-01T00:00:00Z'\nstatus:'OPEN'",
+			expectErr:          true,
 		},
 		"server-error": {
-			response:   `Internal Server Error`,
-			statusCode: http.StatusInternalServerError,
-			model:      "ai/qwen3-embedding",
-			input:      "A dog is an animal",
-			expectErr:  true,
+			response:           `Internal Server Error`,
+			statusCode:         http.StatusInternalServerError,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "title:'Test'\ndue_date:'2024-01-01T00:00:00Z'\nstatus:'OPEN'",
+			expectErr:          true,
 		},
 		"invalid-json": {
-			response:   `{invalid json}`,
-			statusCode: http.StatusOK,
-			model:      "ai/qwen3-embedding",
-			input:      "A dog is an animal",
-			expectErr:  true,
+			response:           `{invalid json}`,
+			statusCode:         http.StatusOK,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "title:'Test'\ndue_date:'2024-01-01T00:00:00Z'\nstatus:'OPEN'",
+			expectErr:          true,
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if tt.expectRequestInput != nil {
-					var req EmbeddingsRequest
-					json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
-					assert.Equal(t, *tt.expectRequestInput, req.Input)
-				}
+				var req EmbeddingsRequest
+				json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+				assert.Equal(t, tt.expectRequestInput, req.Input)
+
 				w.WriteHeader(tt.statusCode)
 				w.Write([]byte(tt.response)) //nolint:errcheck
 			}))
@@ -429,7 +426,109 @@ func TestLLMClientAdapter_Embed(t *testing.T) {
 			client := NewDRMAPIClient(server.URL, "", server.Client())
 			adapter := NewLLMClientAdapter(client)
 
-			vec, err := adapter.Embed(context.Background(), tt.model, tt.input, tt.options...)
+			vec, err := adapter.EmbedTodo(context.Background(), tt.model, todo)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedVec, vec.Embedding)
+		})
+	}
+}
+
+func TestLLMClientAdapter_EmbedSearch(t *testing.T) {
+	searchInput := "Find todos about books"
+	tests := map[string]struct {
+		response           string
+		statusCode         int
+		model              string
+		expectRequestInput string
+		expectErr          bool
+		expectedVec        []float64
+	}{
+		"success-with-gemma-embedding": {
+			response: `{
+				"model": "ai/embeddinggemma",
+				"object": "list",
+				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
+				"data": [
+					{
+						"embedding": [1.1, 2.2, 3.3],
+						"index": 0,
+						"object": "embedding"
+					}
+				]
+			}`,
+			statusCode:         http.StatusOK,
+			model:              "ai/embeddinggemma",
+			expectRequestInput: "task: search result | query: Find todos about books",
+			expectedVec:        []float64{1.1, 2.2, 3.3},
+		},
+		"success-with-default-embedding-generator": {
+			response: `{
+				"model": "ai/otherembeddingmodel",
+				"object": "list",
+				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
+				"data": [
+					{
+						"embedding": [1.1, 2.2, 3.3],
+						"index": 0,
+						"object": "embedding"
+					}
+				]
+			}`,
+			statusCode:         http.StatusOK,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "Find todos about books",
+			expectedVec:        []float64{1.1, 2.2, 3.3},
+		},
+		"no-embedding-data": {
+			response: `{
+				"model": "ai/otherembeddingmodel",
+				"object": "list",
+				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
+				"data": []
+			}`,
+			statusCode:         http.StatusOK,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "Find todos about books",
+			expectErr:          true,
+		},
+		"server-error": {
+			response:           `Internal Server Error`,
+			statusCode:         http.StatusInternalServerError,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "Find todos about books",
+			expectErr:          true,
+		},
+		"invalid-json": {
+			response:           `{invalid json}`,
+			statusCode:         http.StatusOK,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "Find todos about books",
+			expectErr:          true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var req EmbeddingsRequest
+				json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+				assert.Equal(t, tt.expectRequestInput, req.Input)
+
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.response)) //nolint:errcheck
+			}))
+			defer server.Close()
+
+			client := NewDRMAPIClient(server.URL, "", server.Client())
+			adapter := NewLLMClientAdapter(client)
+
+			vec, err := adapter.EmbedSearch(context.Background(), tt.model, searchInput)
 
 			if tt.expectErr {
 				assert.Error(t, err)

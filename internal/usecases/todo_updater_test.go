@@ -49,10 +49,12 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 				llmClient *domain.MockLLMClient,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
-				llmClient.EXPECT().Embed(
+				llmClient.EXPECT().EmbedTodo(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: Updated Todo | Due Date: 2024-01-01 | Status: OPEN",
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
 				).Return(domain.EmbedResponse{Embedding: []float64{0.4, 0.5, 0.6}}, nil)
 
 				repo := domain.NewMockTodoRepository(t)
@@ -106,10 +108,12 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
-				llmClient.EXPECT().Embed(
+				llmClient.EXPECT().EmbedTodo(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: Updated Todo | Due Date: 2024-01-01 | Status: OPEN",
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
 				).Return(domain.EmbedResponse{}, errors.New("embedding service error"))
 
 				repo := domain.NewMockTodoRepository(t)
@@ -164,10 +168,12 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 				llmClient *domain.MockLLMClient,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
-				llmClient.EXPECT().Embed(
+				llmClient.EXPECT().EmbedTodo(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: Updated Todo | Due Date: 2024-01-01 | Status: OPEN",
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
 				).Return(domain.EmbedResponse{Embedding: []float64{0.4, 0.5, 0.6}}, nil)
 
 				repo := domain.NewMockTodoRepository(t)

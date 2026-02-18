@@ -52,10 +52,12 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 				repo := domain.NewMockTodoRepository(t)
 				outbox := domain.NewMockOutboxRepository(t)
 
-				llmClient.EXPECT().Embed(
+				llmClient.EXPECT().EmbedTodo(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: My new todo | Due Date: 2024-01-01 | Status: OPEN",
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
 				).Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2, 0.3}}, nil)
 
 				uow.EXPECT().Todo().Return(repo)
@@ -63,7 +65,9 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 
 				repo.EXPECT().CreateTodo(
 					mock.Anything,
-					todo,
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
 				).Return(nil)
 
 				outbox.EXPECT().CreateTodoEvent(
@@ -101,10 +105,12 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
-				llmClient.EXPECT().Embed(
+				llmClient.EXPECT().EmbedTodo(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: My new todo | Due Date: 2024-01-01 | Status: OPEN",
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
 				).Return(domain.EmbedResponse{}, errors.New("LLM service unavailable"))
 			},
 			expectedTodo: domain.Todo{},
@@ -122,17 +128,21 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
 				repo := domain.NewMockTodoRepository(t)
-				llmClient.EXPECT().Embed(
+				llmClient.EXPECT().EmbedTodo(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: My new todo | Due Date: 2024-01-01 | Status: OPEN",
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
 				).Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2, 0.3}}, nil)
 
 				uow.EXPECT().Todo().Return(repo)
 
 				repo.EXPECT().CreateTodo(
 					mock.Anything,
-					todo,
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
 				).Return(errors.New("database error"))
 			},
 			expectedTodo: domain.Todo{},

@@ -162,7 +162,7 @@ func (b *TodoSearchBuilder) Build(ctx context.Context) (TodoSearchBuildResult, e
 		return TodoSearchBuildResult{}, domain.NewValidationErr("embedding model cannot be empty for similarity search")
 	}
 
-	resp, err := b.llmClient.Embed(ctx, b.llmEmbeddingModel, similarityQuery)
+	resp, err := b.llmClient.EmbedSearch(ctx, b.llmEmbeddingModel, similarityQuery)
 	if err != nil {
 		return TodoSearchBuildResult{}, err
 	}

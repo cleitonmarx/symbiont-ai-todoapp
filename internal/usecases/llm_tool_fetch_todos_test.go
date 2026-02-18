@@ -59,7 +59,7 @@ func TestTodoFetcherTool(t *testing.T) {
 		"fetch-todos-with-status-and-similarity": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				llmCli.EXPECT().
-					Embed(mock.Anything, "embedding-model", "urgent").
+					EmbedSearch(mock.Anything, "embedding-model", "urgent").
 					Return(domain.EmbedResponse{Embedding: []float64{0.3, 0.4}}, nil).
 					Once()
 
@@ -306,7 +306,7 @@ func TestTodoFetcherTool(t *testing.T) {
 		"fetch-todos-embedding-error": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, llmCli *domain.MockLLMClient, timeProvider *domain.MockCurrentTimeProvider) {
 				llmCli.EXPECT().
-					Embed(mock.Anything, "embedding-model", "search").
+					EmbedSearch(mock.Anything, "embedding-model", "search").
 					Return(domain.EmbedResponse{}, errors.New("embedding failed")).
 					Once()
 			},

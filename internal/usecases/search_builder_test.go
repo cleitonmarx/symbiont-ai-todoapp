@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -48,7 +49,7 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 			dueBefore: &dueBefore,
 			sortBy:    &sortDueDateAsc,
 			searches: []searchInput{
-				{query: &searchGroceries, searchType: ptrSearchType(SearchType_Title)},
+				{query: &searchGroceries, searchType: common.Ptr(SearchType_Title)},
 			},
 			assertRes: func(t *testing.T, _ *domain.MockLLMClient, res TodoSearchBuildResult) {
 				assert.Equal(t, 0, res.EmbeddingTotalTokens)
@@ -77,11 +78,11 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 		"builds-options-with-similarity-embedding": {
 			model: "embedding-model",
 			searches: []searchInput{
-				{query: &searchUrgentSpaced, searchType: ptrSearchType(SearchType_Similarity)},
+				{query: &searchUrgentSpaced, searchType: common.Ptr(SearchType_Similarity)},
 			},
 			setupMocks: func(t *testing.T, llmClient *domain.MockLLMClient) {
 				llmClient.EXPECT().
-					Embed(mock.Anything, "embedding-model", "urgent").
+					EmbedSearch(mock.Anything, "embedding-model", "urgent").
 					Return(domain.EmbedResponse{
 						Embedding:   []float64{0.1, 0.2},
 						TotalTokens: 17,
@@ -100,11 +101,11 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 		"does-not-embed-with-blank-similarity-query": {
 			model: "embedding-model",
 			searches: []searchInput{
-				{query: &searchBlank, searchType: ptrSearchType(SearchType_Similarity)},
+				{query: &searchBlank, searchType: common.Ptr(SearchType_Similarity)},
 			},
 			assertRes: func(t *testing.T, llmClient *domain.MockLLMClient, res TodoSearchBuildResult) {
 				assert.Equal(t, 0, res.EmbeddingTotalTokens)
-				llmClient.AssertNotCalled(t, "Embed", mock.Anything, "embedding-model", mock.Anything)
+				llmClient.AssertNotCalled(t, "EmbedSearch", mock.Anything, "embedding-model", mock.Anything)
 			},
 		},
 		"fails-on-partial-due-range": {
@@ -122,18 +123,18 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 		},
 		"fails-when-embedding-model-missing-for-similarity": {
 			searches: []searchInput{
-				{query: &searchUrgent, searchType: ptrSearchType(SearchType_Similarity)},
+				{query: &searchUrgent, searchType: common.Ptr(SearchType_Similarity)},
 			},
 			wantErr: "embedding model cannot be empty for similarity search",
 		},
 		"returns-embedding-error": {
 			model: "embedding-model",
 			searches: []searchInput{
-				{query: &searchUrgent, searchType: ptrSearchType(SearchType_Similarity)},
+				{query: &searchUrgent, searchType: common.Ptr(SearchType_Similarity)},
 			},
 			setupMocks: func(t *testing.T, llmClient *domain.MockLLMClient) {
 				llmClient.EXPECT().
-					Embed(mock.Anything, "embedding-model", "urgent").
+					EmbedSearch(mock.Anything, "embedding-model", "urgent").
 					Return(domain.EmbedResponse{}, errors.New("embedding failed")).
 					Once()
 			},
@@ -147,8 +148,8 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 		},
 		"fails-when-multiple-search-queries-are-provided": {
 			searches: []searchInput{
-				{query: &searchMeeting, searchType: ptrSearchType(SearchType_Similarity)},
-				{query: &searchReport, searchType: ptrSearchType(SearchType_Title)},
+				{query: &searchMeeting, searchType: common.Ptr(SearchType_Similarity)},
+				{query: &searchReport, searchType: common.Ptr(SearchType_Title)},
 			},
 			wantErr: "only one search query is allowed",
 		},
@@ -182,8 +183,4 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 			}
 		})
 	}
-}
-
-func ptrSearchType(v SearchType) *SearchType {
-	return &v
 }

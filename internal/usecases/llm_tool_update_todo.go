@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/google/uuid"
@@ -107,6 +108,6 @@ func (tut TodoUpdaterTool) Call(ctx context.Context, call domain.LLMStreamEventT
 	return domain.LLMChatMessage{
 		Role:       domain.ChatRole_Tool,
 		ToolCallID: &call.ID,
-		Content:    "Your todo was updated successfully! Updated todo: " + todo.ToLLMInput(),
+		Content:    fmt.Sprintf(`{"message":"Your todo was updated successfully! todo: {"id":"%s", "title":"%s", "due_date":"%s", "status":"%s"}"}`, todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status),
 	}
 }

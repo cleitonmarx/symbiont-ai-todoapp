@@ -68,7 +68,7 @@ func (tui TodoUpdaterImpl) Update(ctx context.Context, uow domain.UnitOfWork, id
 		return domain.Todo{}, err
 	}
 
-	resp, err := tui.llmClient.Embed(ctx, tui.model, td.ToLLMInput())
+	resp, err := tui.llmClient.EmbedTodo(ctx, tui.model, td)
 	if err != nil {
 		return domain.Todo{}, err
 	}

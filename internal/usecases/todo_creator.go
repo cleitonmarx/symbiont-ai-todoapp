@@ -51,7 +51,7 @@ func (tci TodoCreatorImpl) Create(ctx context.Context, uow domain.UnitOfWork, ti
 		return domain.Todo{}, err
 	}
 
-	resp, err := tci.llmClient.Embed(ctx, tci.llmModel, todo.ToLLMInput())
+	resp, err := tci.llmClient.EmbedTodo(ctx, tci.llmModel, todo)
 	if err != nil {
 		return domain.Todo{}, err
 	}

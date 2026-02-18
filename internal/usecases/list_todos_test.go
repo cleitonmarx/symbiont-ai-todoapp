@@ -73,7 +73,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 			},
 			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
 				llmClient.EXPECT().
-					Embed(mock.Anything, "test-model", "meeting").
+					EmbedSearch(mock.Anything, "test-model", "meeting").
 					Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2, 0.3}}, nil)
 
 				repo.EXPECT().ListTodos(mock.Anything, 2, 5, mock.Anything).

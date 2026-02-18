@@ -325,8 +325,8 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	state *streamChatExecutionState,
 	onEvent domain.AssistantEventCallback,
 ) (bool, error) {
-	toolCall := data.(domain.AssistantActionCall)
-	if state.tracker.hasExceededMaxCycles() || state.tracker.hasExceededMaxToolCalls(toolCall.Name, toolCall.Input) {
+	actionCall := data.(domain.AssistantActionCall)
+	if state.tracker.hasExceededMaxCycles() || state.tracker.hasExceededMaxToolCalls(actionCall.Name, actionCall.Input) {
 		return false, nil
 	}
 
@@ -336,7 +336,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		TurnID:         state.turnID,
 		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_Assistant,
-		ActionCalls:    []domain.AssistantActionCall{toolCall},
+		ActionCalls:    []domain.AssistantActionCall{actionCall},
 		Model:          model,
 		MessageState:   domain.ChatMessageState_Completed,
 		CreatedAt:      sc.timeProvider.Now().UTC(),
@@ -346,18 +346,18 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		return false, err
 	}
 
-	toolCall.Text = sc.actionRegistry.StatusMessage(toolCall.Name)
-	if err := onEvent(domain.AssistantEventType_ActionStarted, toolCall); err != nil {
+	actionCall.Text = sc.actionRegistry.StatusMessage(actionCall.Name)
+	if err := onEvent(domain.AssistantEventType_ActionStarted, actionCall); err != nil {
 		return false, err
 	}
 
-	toolMessage := sc.actionRegistry.Execute(ctx, domain.AssistantActionCall{
-		ID:    toolCall.ID,
-		Name:  toolCall.Name,
-		Input: toolCall.Input,
-		Text:  toolCall.Text,
+	actionMessage := sc.actionRegistry.Execute(ctx, domain.AssistantActionCall{
+		ID:    actionCall.ID,
+		Name:  actionCall.Name,
+		Input: actionCall.Input,
+		Text:  actionCall.Text,
 	}, req.Messages)
-	actionSucceeded := toolMessage.IsActionCallSuccess()
+	actionSucceeded := actionMessage.IsActionCallSuccess()
 	now := sc.timeProvider.Now().UTC()
 	toolChatMsg := domain.ChatMessage{
 		ID:             uuid.New(),
@@ -365,8 +365,8 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		TurnID:         state.turnID,
 		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_Tool,
-		ActionCallID:   &toolCall.ID,
-		Content:        toolMessage.Content,
+		ActionCallID:   &actionCall.ID,
+		Content:        actionMessage.Content,
 		Model:          model,
 		MessageState:   domain.ChatMessageState_Completed,
 		CreatedAt:      now,
@@ -374,7 +374,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	}
 	if !actionSucceeded {
 		toolChatMsg.MessageState = domain.ChatMessageState_Failed
-		toolChatMsg.ErrorMessage = &toolMessage.Content
+		toolChatMsg.ErrorMessage = &actionMessage.Content
 	}
 
 	if err := sc.persistChatMessage(ctx, toolChatMsg, state.conversation); err != nil {
@@ -382,13 +382,13 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	}
 
 	toolCompleted := domain.AssistantActionCompleted{
-		ID:            toolCall.ID,
-		Name:          toolCall.Name,
+		ID:            actionCall.ID,
+		Name:          actionCall.Name,
 		Success:       actionSucceeded,
 		ShouldRefetch: actionSucceeded,
 	}
 	if !actionSucceeded {
-		toolCompleted.Error = &toolMessage.Content
+		toolCompleted.Error = &actionMessage.Content
 	}
 	if err := onEvent(domain.AssistantEventType_ActionCompleted, toolCompleted); err != nil {
 		return false, err
@@ -397,13 +397,13 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	req.Messages = append(req.Messages,
 		domain.AssistantMessage{
 			Role:        domain.ChatRole_Assistant,
-			ActionCalls: []domain.AssistantActionCall{toolCall},
+			ActionCalls: []domain.AssistantActionCall{actionCall},
 		},
 		domain.AssistantMessage{
-			Role:         toolMessage.Role,
-			Content:      toolMessage.Content,
-			ActionCallID: toolMessage.ActionCallID,
-			ActionCalls:  toolMessage.ActionCalls,
+			Role:         actionMessage.Role,
+			Content:      actionMessage.Content,
+			ActionCallID: actionMessage.ActionCallID,
+			ActionCalls:  actionMessage.ActionCalls,
 		},
 	)
 

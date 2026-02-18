@@ -113,7 +113,7 @@ func toolFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Ti
 		}
 
 		lastMsg := req.Messages[len(req.Messages)-1]
-		if lastMsg.Content == "Call a tool" {
+		if lastMsg.Content == "Call an action" {
 			err := onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
 				ID:    "func-123",
 				Name:  "list_todos",
@@ -123,7 +123,7 @@ func toolFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Ti
 		}
 
 		if lastMsg.Role == domain.ChatRole_Tool {
-			if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Tool called successfully."}); err != nil {
+			if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Action called successfully."}); err != nil {
 				return err
 			}
 		}

@@ -101,7 +101,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					},
 					{
 						Role:            domain.ChatRole_Assistant,
-						Content:         "Tool called successfully.",
+						Content:         "Action called successfully.",
 						ID:              &assistantMsgID,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
@@ -111,8 +111,8 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 			expectErr:       false,
 			expectedContent: "",
 		},
-		"tool-message-marked-as-failed-when-content-has-error": {
-			userMessage: "Call failing tool",
+		"action-message-marked-as-failed-when-content-has-error": {
+			userMessage: "Call failing action",
 			model:       "test-model",
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
@@ -139,23 +139,23 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					Return([]domain.AssistantActionDefinition{})
 
 				actionRegistry.EXPECT().
-					StatusMessage("failing_tool").
-					Return("calling failing_tool...\n")
+					StatusMessage("failing_action").
+					Return("calling failing_action...\n")
 
 				actionRegistry.EXPECT().
 					Execute(
 						mock.Anything,
 						domain.AssistantActionCall{
 							ID:    "func-error",
-							Name:  "failing_tool",
+							Name:  "failing_action",
 							Input: "{\"input\":\"x\"}",
-							Text:  "calling failing_tool...\n",
+							Text:  "calling failing_action...\n",
 						},
 						mock.MatchedBy(func(msgs []domain.AssistantMessage) bool {
-							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Call failing tool"
+							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Call failing action"
 						}),
 					).
-					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, ActionCallID: common.Ptr("func-error"), Content: "error: failing_tool unavailable"})
+					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, ActionCallID: common.Ptr("func-error"), Content: "error: failing_action unavailable"})
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -178,12 +178,12 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 							}
 							return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
 								ID:    "func-error",
-								Name:  "failing_tool",
+								Name:  "failing_action",
 								Input: "{\"input\":\"x\"}",
 							})
 						}
 
-						if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "I could not complete that tool call."}); err != nil {
+						if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "I could not complete that action call."}); err != nil {
 							return err
 						}
 						return onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
@@ -193,11 +193,11 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					}).
 					Times(2)
 
-				toolErr := "error: failing_tool unavailable"
+				actionErr := "error: failing_action unavailable"
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
 						Role:            domain.ChatRole_User,
-						Content:         "Call failing tool",
+						Content:         "Call failing action",
 						ID:              &userMsgID,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
@@ -211,14 +211,14 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					{
 						Role:            domain.ChatRole_Tool,
 						MessageState:    domain.ChatMessageState_Failed,
-						ErrorMessage:    &toolErr,
-						Content:         toolErr,
+						ErrorMessage:    &actionErr,
+						Content:         actionErr,
 						ActionCallsLen:  0,
 						HasActionCallID: true,
 					},
 					{
 						Role:            domain.ChatRole_Assistant,
-						Content:         "I could not complete that tool call.",
+						Content:         "I could not complete that action call.",
 						ID:              &assistantMsgID,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
@@ -226,10 +226,10 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				})
 			},
 			expectErr:       false,
-			expectedContent: "calling failing_tool...\nI could not complete that tool call.",
+			expectedContent: "calling failing_action...\nI could not complete that action call.",
 		},
 		"onEvent-action-call-error": {
-			userMessage: "Call tool",
+			userMessage: "Call action",
 			model:       "test-model",
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
@@ -286,7 +286,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
 						Role:            domain.ChatRole_User,
-						Content:         "Call tool",
+						Content:         "Call action",
 						ID:              &userMsgID,
 						ActionCallsLen:  0,
 						HasActionCallID: false,

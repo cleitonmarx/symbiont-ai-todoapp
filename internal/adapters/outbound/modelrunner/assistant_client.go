@@ -288,7 +288,7 @@ func toChatRequest(req domain.AssistantTurnRequest) ChatRequest {
 // InitAssistantClient initializes the assistant client dependency.
 type InitAssistantClient struct {
 	HttpClient *http.Client `resolve:""`
-	ModelHost    string       `config:"LLM_MODEL_HOST"`
+	ModelHost  string       `config:"LLM_MODEL_HOST"`
 }
 
 // Initialize registers assistant/model interfaces.

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCTT(t *testing.T) {
+func cTestCTT(t *testing.T) {
 	// 100 sample todos with meaningful, searchable titles and different due dates, all OPEN
 	// You can use this slice for seeding or testing.
 

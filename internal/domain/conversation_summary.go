@@ -25,9 +25,9 @@ type ConversationSummaryGenerationReason string
 const (
 	// ConversationSummaryGenerationReason_None indicates no summary should be generated.
 	ConversationSummaryGenerationReason_None ConversationSummaryGenerationReason = "none"
-	// ConversationSummaryGenerationReason_StateChangingToolSuccess indicates summary generation was triggered
-	// by a successful state-changing tool call.
-	ConversationSummaryGenerationReason_StateChangingToolSuccess ConversationSummaryGenerationReason = "state_changing_tool_success"
+	// ConversationSummaryGenerationReason_StateChangingActionSuccess indicates summary generation was triggered
+	// by a successful state-changing action call.
+	ConversationSummaryGenerationReason_StateChangingActionSuccess ConversationSummaryGenerationReason = "state_changing_action_success"
 	// ConversationSummaryGenerationReason_MessageCountThreshold indicates summary generation was triggered
 	// by accumulated unsummarized message count.
 	ConversationSummaryGenerationReason_MessageCountThreshold ConversationSummaryGenerationReason = "message_count_threshold"

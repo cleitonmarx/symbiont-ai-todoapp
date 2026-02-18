@@ -23,7 +23,7 @@ func DetermineConversationSummaryGenerationDecision(
 	messages []ChatMessage,
 	hasMore bool,
 	policy ConversationSummaryGenerationPolicy,
-	stateChangingTools map[string]struct{},
+	stateChangingActions map[string]struct{},
 ) ConversationSummaryGenerationDecision {
 	totalTokens := sumMessagesTotalTokens(messages)
 	decision := ConversationSummaryGenerationDecision{
@@ -33,9 +33,9 @@ func DetermineConversationSummaryGenerationDecision(
 		TotalTokens:    totalTokens,
 	}
 
-	if hasStateChangingToolSuccess(messages, stateChangingTools) {
+	if hasStateChangingActionSuccess(messages, stateChangingActions) {
 		decision.ShouldGenerate = true
-		decision.Reason = ConversationSummaryGenerationReason_StateChangingToolSuccess
+		decision.Reason = ConversationSummaryGenerationReason_StateChangingActionSuccess
 		return decision
 	}
 
@@ -53,9 +53,9 @@ func DetermineConversationSummaryGenerationDecision(
 	return decision
 }
 
-// hasStateChangingToolSuccess checks if any of the messages indicate a successful execution of a state-changing tool.
-func hasStateChangingToolSuccess(messages []ChatMessage, stateChangingTools map[string]struct{}) bool {
-	if len(stateChangingTools) == 0 {
+// hasStateChangingActionSuccess checks if any of the messages indicate a successful execution of a state-changing tool.
+func hasStateChangingActionSuccess(messages []ChatMessage, stateChangingActions map[string]struct{}) bool {
+	if len(stateChangingActions) == 0 {
 		return false
 	}
 
@@ -77,7 +77,7 @@ func hasStateChangingToolSuccess(messages []ChatMessage, stateChangingTools map[
 		if !found {
 			continue
 		}
-		if _, stateChanging := stateChangingTools[toolFunction]; stateChanging {
+		if _, stateChanging := stateChangingActions[toolFunction]; stateChanging {
 			return true
 		}
 	}

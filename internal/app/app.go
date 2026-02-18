@@ -11,6 +11,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/postgres"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/pubsub"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/time"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 )
@@ -34,12 +35,12 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&time.InitCurrentTimeProvider{},
 			&pubsub.InitClient{},
 			&pubsub.InitPublisher{},
-			&modelrunner.InitLLMClient{},
+			&modelrunner.InitAssistantClient{},
 
 			&usecases.InitTodoCreator{},
 			&usecases.InitTodoDeleter{},
 			&usecases.InitTodoUpdater{},
-			&usecases.InitLLMToolRegistry{},
+			&assistant.InitAssistantActionRegistry{},
 
 			&usecases.InitListTodos{},
 			&usecases.InitCreateTodo{},
@@ -54,7 +55,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&usecases.InitListChatMessages{},
 			&usecases.InitDeleteConversation{},
 			&usecases.InitStreamChat{},
-			&usecases.InitListAvailableLLMModels{},
+			&usecases.InitListAvailableModels{},
 			&usecases.InitRelayOutbox{},
 		).
 		Host(

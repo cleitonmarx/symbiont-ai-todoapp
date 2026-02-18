@@ -232,7 +232,7 @@ func formatMessageForSummary(message domain.ChatMessage) string {
 	}
 
 	if message.ChatRole == domain.ChatRole_Tool {
-		parts = append(parts, fmt.Sprintf("  tool_success: %t", message.IsActionCallSuccess()))
+		parts = append(parts, fmt.Sprintf("  action_success: %t", message.IsActionCallSuccess()))
 	}
 
 	if message.ErrorMessage != nil && strings.TrimSpace(*message.ErrorMessage) != "" {

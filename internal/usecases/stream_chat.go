@@ -19,10 +19,10 @@ const (
 	// Maximum number of chat history messages to include in the context
 	MAX_CHAT_HISTORY_MESSAGES = 5
 
-	// Maximum number of repeated tool call hits to prevent infinite loops
-	MAX_REPEATED_TOOL_CALL_HIT = 5
+	// Maximum number of repeated action call hits to prevent infinite loops
+	MAX_REPEATED_ACTION_CALL_HIT = 5
 
-	// Keep tool-calling deterministic to reduce malformed function arguments.
+	// Keep action-calling deterministic to reduce malformed function arguments.
 	CHAT_TEMPERATURE = 0.2
 	CHAT_TOP_P       = 0.7
 )
@@ -154,9 +154,9 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		conversation:        conversation,
 		conversationCreated: conversationCreated,
 		turnID:              uuid.New(),
-		tracker: newToolCycleTracker(
+		tracker: newActionCycleTracker(
 			sc.maxActionCycles,
-			MAX_REPEATED_TOOL_CALL_HIT,
+			MAX_REPEATED_ACTION_CALL_HIT,
 		),
 	}
 
@@ -254,7 +254,7 @@ type streamChatExecutionState struct {
 	userMsg             domain.ChatMessage
 	userMsgPersisted    bool
 	userMsgPersistTried bool
-	tracker             *toolCycleTracker
+	tracker             *actionCycleTracker
 }
 
 // nextTurnSequence returns the current sequence value and advances the counter.
@@ -278,7 +278,7 @@ func (sc StreamChatImpl) handleStreamEvent(
 	case domain.AssistantEventType_TurnStarted:
 		return false, sc.handleMetaEvent(ctx, data, state, onEvent)
 	case domain.AssistantEventType_ActionRequested:
-		return sc.handleToolCallEvent(ctx, data, model, req, state, onEvent)
+		return sc.handleActionCallEvent(ctx, data, model, req, state, onEvent)
 	case domain.AssistantEventType_MessageDelta:
 		return false, sc.handleDeltaEvent(data, state, onEvent)
 	case domain.AssistantEventType_TurnCompleted:
@@ -316,8 +316,8 @@ func (sc StreamChatImpl) handleMetaEvent(
 	return onEvent(domain.AssistantEventType_TurnStarted, meta)
 }
 
-// handleToolCallEvent persists assistant tool-call and tool-result messages, then updates request context.
-func (sc StreamChatImpl) handleToolCallEvent(
+// handleActionCallEvent persists assistant action-call and action-result messages, then updates request context.
+func (sc StreamChatImpl) handleActionCallEvent(
 	ctx context.Context,
 	data any,
 	model string,
@@ -326,11 +326,11 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	onEvent domain.AssistantEventCallback,
 ) (bool, error) {
 	actionCall := data.(domain.AssistantActionCall)
-	if state.tracker.hasExceededMaxCycles() || state.tracker.hasExceededMaxToolCalls(actionCall.Name, actionCall.Input) {
+	if state.tracker.hasExceededMaxCycles() || state.tracker.hasExceededMaxActionCalls(actionCall.Name, actionCall.Input) {
 		return false, nil
 	}
 
-	assistantToolCallMsg := domain.ChatMessage{
+	assistantActionCallMsg := domain.ChatMessage{
 		ID:             uuid.New(),
 		ConversationID: state.conversation.ID,
 		TurnID:         state.turnID,
@@ -341,8 +341,8 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		MessageState:   domain.ChatMessageState_Completed,
 		CreatedAt:      sc.timeProvider.Now().UTC(),
 	}
-	assistantToolCallMsg.UpdatedAt = assistantToolCallMsg.CreatedAt
-	if err := sc.persistChatMessage(ctx, assistantToolCallMsg, state.conversation); err != nil {
+	assistantActionCallMsg.UpdatedAt = assistantActionCallMsg.CreatedAt
+	if err := sc.persistChatMessage(ctx, assistantActionCallMsg, state.conversation); err != nil {
 		return false, err
 	}
 
@@ -359,7 +359,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	}, req.Messages)
 	actionSucceeded := actionMessage.IsActionCallSuccess()
 	now := sc.timeProvider.Now().UTC()
-	toolChatMsg := domain.ChatMessage{
+	actionChatMsg := domain.ChatMessage{
 		ID:             uuid.New(),
 		ConversationID: state.conversation.ID,
 		TurnID:         state.turnID,
@@ -373,24 +373,24 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		UpdatedAt:      now,
 	}
 	if !actionSucceeded {
-		toolChatMsg.MessageState = domain.ChatMessageState_Failed
-		toolChatMsg.ErrorMessage = &actionMessage.Content
+		actionChatMsg.MessageState = domain.ChatMessageState_Failed
+		actionChatMsg.ErrorMessage = &actionMessage.Content
 	}
 
-	if err := sc.persistChatMessage(ctx, toolChatMsg, state.conversation); err != nil {
+	if err := sc.persistChatMessage(ctx, actionChatMsg, state.conversation); err != nil {
 		return false, err
 	}
 
-	toolCompleted := domain.AssistantActionCompleted{
+	actionCompleted := domain.AssistantActionCompleted{
 		ID:            actionCall.ID,
 		Name:          actionCall.Name,
 		Success:       actionSucceeded,
 		ShouldRefetch: actionSucceeded,
 	}
 	if !actionSucceeded {
-		toolCompleted.Error = &actionMessage.Content
+		actionCompleted.Error = &actionMessage.Content
 	}
-	if err := onEvent(domain.AssistantEventType_ActionCompleted, toolCompleted); err != nil {
+	if err := onEvent(domain.AssistantEventType_ActionCompleted, actionCompleted); err != nil {
 		return false, err
 	}
 
@@ -598,38 +598,38 @@ func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uu
 	return messages, nil
 }
 
-// toolCycleTracker helps track repeated tool calls to prevent infinite loops
-type toolCycleTracker struct {
-	maxToolCycles          int
-	maxRepeatedToolCallHit int
-	toolCycles             int
-	lastToolCallSignature  string
-	repeatToolCallCount    int
+// actionCycleTracker helps track repeated action calls to prevent infinite loops
+type actionCycleTracker struct {
+	maxActionCycles          int
+	maxRepeatedActionCallHit int
+	actionCycles             int
+	lastActionCallSignature  string
+	repeatActionCallCount    int
 }
 
-// newToolCycleTracker creates a new toolCycleTracker
-func newToolCycleTracker(maxToolCycles, maxRepeatedToolCallHit int) *toolCycleTracker {
-	return &toolCycleTracker{
-		maxToolCycles:          maxToolCycles,
-		maxRepeatedToolCallHit: maxRepeatedToolCallHit,
+// newActionCycleTracker creates a new actionCycleTracker
+func newActionCycleTracker(maxActionCycles, maxRepeatedActionCallHit int) *actionCycleTracker {
+	return &actionCycleTracker{
+		maxActionCycles:          maxActionCycles,
+		maxRepeatedActionCallHit: maxRepeatedActionCallHit,
 	}
 }
 
-// hasExceededMaxCycles checks if the maximum number of tool cycles has been exceeded
-func (t *toolCycleTracker) hasExceededMaxCycles() bool {
-	t.toolCycles++
-	return t.toolCycles > t.maxToolCycles
+// hasExceededMaxCycles checks if the maximum number of action cycles has been exceeded
+func (t *actionCycleTracker) hasExceededMaxCycles() bool {
+	t.actionCycles++
+	return t.actionCycles > t.maxActionCycles
 }
 
-// hasExceededMaxToolCalls checks if the same tool call has been repeated too many times
-func (t *toolCycleTracker) hasExceededMaxToolCalls(functionName, arguments string) bool {
+// hasExceededMaxActionCalls checks if the same action call has been repeated too many times
+func (t *actionCycleTracker) hasExceededMaxActionCalls(functionName, arguments string) bool {
 	signature := functionName + ":" + arguments
-	if signature == t.lastToolCallSignature {
-		t.repeatToolCallCount++
-		return t.repeatToolCallCount >= t.maxRepeatedToolCallHit
+	if signature == t.lastActionCallSignature {
+		t.repeatActionCallCount++
+		return t.repeatActionCallCount >= t.maxRepeatedActionCallHit
 	}
-	t.lastToolCallSignature = signature
-	t.repeatToolCallCount = 0
+	t.lastActionCallSignature = signature
+	t.repeatActionCallCount = 0
 	return false
 }
 

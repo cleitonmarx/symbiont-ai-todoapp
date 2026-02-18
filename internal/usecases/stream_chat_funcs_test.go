@@ -101,9 +101,9 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 
 }
 
-// toolFunctionCallback returns a mock assistant callback that simulates a
-// tool call interaction, including meta, delta, and done events.
-func toolFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Time) func(_ context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+// actionFunctionCallback returns a mock assistant callback that simulates a
+// action call interaction, including meta, delta, and done events.
+func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Time) func(_ context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 	return func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 		if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 			UserMessageID:      userMsgID,

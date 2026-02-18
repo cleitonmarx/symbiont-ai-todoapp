@@ -76,7 +76,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				assistant.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(
-						toolFunctionCallback(userMsgID, assistantMsgID, fixedTime),
+						actionFunctionCallback(userMsgID, assistantMsgID, fixedTime),
 					)
 
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
@@ -311,8 +311,8 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 			expectErr:      true,
 			onEventErrType: domain.AssistantEventType_ActionStarted,
 		},
-		"onEvent-tool-call-finished-error": {
-			userMessage: "Call tool",
+		"onEvent-action-call-finished-error": {
+			userMessage: "Call action",
 			model:       "test-model",
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
@@ -344,7 +344,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 
 				actionRegistry.EXPECT().
 					Execute(mock.Anything, mock.Anything, mock.Anything).
-					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, ActionCallID: common.Ptr("func-1"), Content: "tool result"}).
+					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, ActionCallID: common.Ptr("func-1"), Content: "action result"}).
 					Once()
 
 				expectNowCalls(timeProvider, fixedTime, 6)
@@ -374,7 +374,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
 						Role:            domain.ChatRole_User,
-						Content:         "Call tool",
+						Content:         "Call action",
 						ID:              &userMsgID,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
@@ -387,7 +387,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					},
 					{
 						Role:            domain.ChatRole_Tool,
-						Content:         "tool result",
+						Content:         "action result",
 						ActionCallsLen:  0,
 						HasActionCallID: true,
 					},
@@ -405,8 +405,8 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 			expectErr:      true,
 			onEventErrType: domain.AssistantEventType_ActionCompleted,
 		},
-		"max-tool-cycles-exceeded": {
-			userMessage: "Keep calling tools",
+		"max-action-cycles-exceeded": {
+			userMessage: "Keep calling actions",
 			model:       "test-model",
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
@@ -441,12 +441,12 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 
 				actionRegistry.EXPECT().
 					StatusMessage(mock.Anything).
-					Return("calling tool...\n").
+					Return("calling action...\n").
 					Times(7)
 
 				actionRegistry.EXPECT().
 					Execute(mock.Anything, mock.Anything, mock.Anything).
-					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, Content: "tool result", ActionCallID: common.Ptr("func-123")}).
+					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, Content: "action result", ActionCallID: common.Ptr("func-123")}).
 					Times(7)
 
 				callCount := 0
@@ -474,7 +474,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				expectations := []persistCallExpectation{
 					{
 						Role:            domain.ChatRole_User,
-						Content:         "Keep calling tools",
+						Content:         "Keep calling actions",
 						ID:              &userMsgID,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
@@ -490,7 +490,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						},
 						persistCallExpectation{
 							Role:            domain.ChatRole_Tool,
-							Content:         "tool result",
+							Content:         "action result",
 							ActionCallsLen:  0,
 							HasActionCallID: true,
 						},
@@ -506,10 +506,10 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, expectations)
 			},
 			expectErr:       false,
-			expectedContent: "calling tool...\ncalling tool...\ncalling tool...\ncalling tool...\ncalling tool...\ncalling tool...\ncalling tool...\nSorry, I could not process your request. Please try again.\n",
+			expectedContent: "calling action...\ncalling action...\ncalling action...\ncalling action...\ncalling action...\ncalling action...\ncalling action...\nSorry, I could not process your request. Please try again.\n",
 		},
-		"repeated-tool-call-loop": {
-			userMessage: "Call the same tool repeatedly",
+		"repeated-action-call-loop": {
+			userMessage: "Call the same action repeatedly",
 			model:       "test-model",
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
@@ -577,7 +577,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				expectations := []persistCallExpectation{
 					{
 						Role:            domain.ChatRole_User,
-						Content:         "Call the same tool repeatedly",
+						Content:         "Call the same action repeatedly",
 						ID:              &userMsgID,
 						ActionCallsLen:  0,
 						HasActionCallID: false,

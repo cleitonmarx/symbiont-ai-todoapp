@@ -55,33 +55,33 @@ const TODO_SORT_OPTIONS = new Set([
   'similarityDesc',
 ]);
 
-interface StreamMetaEventData {
+interface StreamTurnStartedEventData {
   conversation_id?: string;
   user_message_id?: string;
   assistant_message_id?: string;
   conversation_created?: boolean;
 }
 
-interface StreamDeltaEventData {
+interface StreamMessageDeltaEventData {
   text?: string;
 }
 
-interface StreamToolCallStartedEventData {
+interface StreamActionStartedEventData {
   id?: string;
-  function?: string;
-  arguments?: string;
+  name?: string;
+  input?: string;
   text?: string;
 }
 
-interface StreamToolCallFinishedEventData {
+interface StreamActionCompletedEventData {
   id?: string;
-  function?: string;
+  name?: string;
   success?: boolean;
   error?: string;
   should_refetch?: boolean;
 }
 
-interface StreamDoneEventData {
+interface StreamTurnCompletedEventData {
   assistant_message_id?: string;
   completed_at?: string;
 }
@@ -129,20 +129,20 @@ const persistModel = (model: string): void => {
   }
 };
 
-const parseSetUIFiltersArguments = (rawArguments?: string): SetUIFiltersArguments => {
-  if (!rawArguments) {
+const parseSetUIFiltersArguments = (rawInput?: string): SetUIFiltersArguments => {
+  if (!rawInput) {
     return {};
   }
 
-  return JSON.parse(rawArguments) as SetUIFiltersArguments;
+  return JSON.parse(rawInput) as SetUIFiltersArguments;
 };
 
-const parseAssistantFilters = (data: StreamToolCallStartedEventData): AssistantTodoFilters | null => {
-  if (data.function !== 'set_ui_filters') {
+const parseAssistantFilters = (data: StreamActionStartedEventData): AssistantTodoFilters | null => {
+  if (data.name !== 'set_ui_filters') {
     return null;
   }
 
-  const args = parseSetUIFiltersArguments(data.arguments);
+  const args = parseSetUIFiltersArguments(data.input);
 
   const filters: AssistantTodoFilters = {};
   if (args.status === 'OPEN' || args.status === 'DONE') {
@@ -507,8 +507,8 @@ export const useChat = ({
           try {
             const rawData = JSON.parse(dataStr);
 
-            if (eventType === 'meta') {
-              const data = rawData as StreamMetaEventData;
+            if (eventType === 'turn_started') {
+              const data = rawData as StreamTurnStartedEventData;
 
               if (data.conversation_id) {
                 streamConversationId = data.conversation_id;
@@ -537,8 +537,8 @@ export const useChat = ({
               return;
             }
 
-            if (eventType === 'delta') {
-              const data = rawData as StreamDeltaEventData;
+            if (eventType === 'message_delta') {
+              const data = rawData as StreamMessageDeltaEventData;
               if (!data.text) {
                 return;
               }
@@ -561,10 +561,10 @@ export const useChat = ({
               return;
             }
 
-            if (eventType === 'tool_call_started') {
-              const data = rawData as StreamToolCallStartedEventData;
+            if (eventType === 'action_started') {
+              const data = rawData as StreamActionStartedEventData;
               if (data.text) {
-                updateToolCallingStatus(data.text, data.function);
+                updateToolCallingStatus(data.text, data.name);
               }
               const assistantFilters = parseAssistantFilters(data);
               if (assistantFilters !== null) {
@@ -573,16 +573,16 @@ export const useChat = ({
               return;
             }
 
-            if (eventType === 'tool_call_finished') {
-              const data = rawData as StreamToolCallFinishedEventData;
+            if (eventType === 'action_completed') {
+              const data = rawData as StreamActionCompletedEventData;
               if (data.should_refetch === true) {
                 onToolExecuted?.();
               }
               return;
             }
 
-            if (eventType === 'done') {
-              const data = rawData as StreamDoneEventData;
+            if (eventType === 'turn_completed') {
+              const data = rawData as StreamTurnCompletedEventData;
               assistantCompleted = true;
               if (data.assistant_message_id) {
                 assistantMessageId = data.assistant_message_id;

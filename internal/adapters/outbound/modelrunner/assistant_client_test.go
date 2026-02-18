@@ -34,20 +34,20 @@ func createStreamingServer(chunks []StreamChunk) *httptest.Server {
 }
 
 // collectStreamEvents collects all events from a stream
-func collectStreamEvents(adapter LLMClient, req domain.LLMChatRequest) ([]domain.LLMStreamEventType, []string, *domain.LLMStreamEventDone, error) {
-	var eventTypes []domain.LLMStreamEventType
+func collectStreamEvents(adapter AssistantClient, req domain.AssistantTurnRequest) ([]domain.AssistantEventType, []string, *domain.AssistantTurnCompleted, error) {
+	var eventTypes []domain.AssistantEventType
 	var deltaTexts []string
-	var doneEvent *domain.LLMStreamEventDone
+	var doneEvent *domain.AssistantTurnCompleted
 
-	err := adapter.ChatStream(context.Background(), req, func(eventType domain.LLMStreamEventType, data any) error {
+	err := adapter.RunTurn(context.Background(), req, func(eventType domain.AssistantEventType, data any) error {
 		eventTypes = append(eventTypes, eventType)
 
 		switch eventType {
-		case domain.LLMStreamEventType_Delta:
-			delta := data.(domain.LLMStreamEventDelta)
+		case domain.AssistantEventType_MessageDelta:
+			delta := data.(domain.AssistantMessageDelta)
 			deltaTexts = append(deltaTexts, delta.Text)
-		case domain.LLMStreamEventType_Done:
-			done := data.(domain.LLMStreamEventDone)
+		case domain.AssistantEventType_TurnCompleted:
+			done := data.(domain.AssistantTurnCompleted)
 			doneEvent = &done
 		}
 		return nil
@@ -56,19 +56,19 @@ func collectStreamEvents(adapter LLMClient, req domain.LLMChatRequest) ([]domain
 	return eventTypes, deltaTexts, doneEvent, err
 }
 
-func TestLLMClientAdapter_ChatStream(t *testing.T) {
-	req := domain.LLMChatRequest{
+func TestAssistantClientAdapter_RunTurn(t *testing.T) {
+	req := domain.AssistantTurnRequest{
 		Stream: true,
 		Model:  "test-model",
-		Messages: []domain.LLMChatMessage{
+		Messages: []domain.AssistantMessage{
 			{Role: "user", Content: "test"},
 		},
 	}
 	tests := map[string]struct {
-		req             domain.LLMChatRequest
+		req             domain.AssistantTurnRequest
 		chunks          []StreamChunk
 		expectErr       bool
-		expectedEvents  []domain.LLMStreamEventType
+		expectedEvents  []domain.AssistantEventType
 		expectedContent string
 	}{
 		"multiple-deltas": {
@@ -78,7 +78,13 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: " "}}}},
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "world"}}}, Usage: &Usage{PromptTokens: 5, CompletionTokens: 5, TotalTokens: 10}},
 			},
-			expectedEvents:  []domain.LLMStreamEventType{"meta", "delta", "delta", "delta", "done"},
+			expectedEvents: []domain.AssistantEventType{
+				domain.AssistantEventType_TurnStarted,
+				domain.AssistantEventType_MessageDelta,
+				domain.AssistantEventType_MessageDelta,
+				domain.AssistantEventType_MessageDelta,
+				domain.AssistantEventType_TurnCompleted,
+			},
 			expectedContent: "Hello world",
 		},
 		"empty-delta": {
@@ -86,39 +92,39 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 			chunks: []StreamChunk{
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: ""}}}},
 			},
-			expectedEvents:  []domain.LLMStreamEventType{"meta", "done"},
+			expectedEvents: []domain.AssistantEventType{
+				domain.AssistantEventType_TurnStarted,
+				domain.AssistantEventType_TurnCompleted,
+			},
 			expectedContent: "",
 		},
 		"with-tool-calls": {
-			req: domain.LLMChatRequest{
+			req: domain.AssistantTurnRequest{
 				Model: "test-model",
-				Messages: []domain.LLMChatMessage{
+				Messages: []domain.AssistantMessage{
 					{
 						Role: domain.ChatRole_Assistant,
-						ToolCalls: []domain.LLMStreamEventToolCall{
+						ActionCalls: []domain.AssistantActionCall{
 							{
-								ID:        "toolcall-1",
-								Function:  "list_todos",
-								Arguments: `{"search_term":"books","page":1,"page_size":5}`,
+								ID:    "toolcall-1",
+								Name:  "list_todos",
+								Input: `{"search_term":"books","page":1,"page_size":5}`,
 							},
 						},
 					},
 					{
-						Role:       domain.ChatRole_Tool,
-						ToolCallID: common.Ptr("toolcall-1"),
-						Content:    `{"todos":[{"id":1,"text":"Buy book","done":false}]}`,
+						Role:         domain.ChatRole_Tool,
+						ActionCallID: common.Ptr("toolcall-1"),
+						Content:      `{"todos":[{"id":1,"text":"Buy book","done":false}]}`,
 					},
 				},
-				Tools: []domain.LLMToolDefinition{
+				AvailableActions: []domain.AssistantActionDefinition{
 					{
-						Type: "search_web",
-						Function: domain.LLMToolFunction{
-							Name: "search_web",
-							Parameters: domain.LLMToolFunctionParameters{
-								Type: "object",
-								Properties: map[string]domain.LLMToolFunctionParameterDetail{
-									"search_term": {Type: "string", Description: "The search query", Required: true},
-								},
+						Name: "search_web",
+						Input: domain.AssistantActionInput{
+							Type: "object",
+							Fields: map[string]domain.AssistantActionField{
+								"search_term": {Type: "string", Description: "The search query", Required: true},
 							},
 						},
 					},
@@ -143,7 +149,11 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 				},
 			},
 
-			expectedEvents:  []domain.LLMStreamEventType{"meta", "tool_call", "done"},
+			expectedEvents: []domain.AssistantEventType{
+				domain.AssistantEventType_TurnStarted,
+				domain.AssistantEventType_ActionRequested,
+				domain.AssistantEventType_TurnCompleted,
+			},
 			expectedContent: "",
 		},
 	}
@@ -154,7 +164,7 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewLLMClientAdapter(client)
+			adapter := NewAssistantClientAdapter(client)
 
 			eventTypes, deltaTexts, _, err := collectStreamEvents(adapter, tt.req)
 
@@ -173,23 +183,23 @@ func TestLLMClientAdapter_ChatStream(t *testing.T) {
 	}
 }
 
-func TestLLMClientAdapter_ChatStream_ServerError(t *testing.T) {
+func TestAssistantClientAdapter_RunTurn_ServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}))
 	defer server.Close()
 
 	client := NewDRMAPIClient(server.URL, "", server.Client())
-	adapter := NewLLMClientAdapter(client)
+	adapter := NewAssistantClientAdapter(client)
 
-	req := domain.LLMChatRequest{
+	req := domain.AssistantTurnRequest{
 		Model: "test-model",
-		Messages: []domain.LLMChatMessage{
+		Messages: []domain.AssistantMessage{
 			{Role: "user", Content: "test"},
 		},
 	}
 
-	err := adapter.ChatStream(context.Background(), req, func(eventType domain.LLMStreamEventType, data interface{}) error {
+	err := adapter.RunTurn(context.Background(), req, func(eventType domain.AssistantEventType, data interface{}) error {
 		return nil
 	})
 
@@ -197,14 +207,14 @@ func TestLLMClientAdapter_ChatStream_ServerError(t *testing.T) {
 	assert.Contains(t, err.Error(), "500")
 }
 
-func TestLLMClientAdapter_Chat(t *testing.T) {
+func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 	temp := 0.5
 	topP := 0.9
 
 	tests := map[string]struct {
 		response     string
 		statusCode   int
-		req          domain.LLMChatRequest
+		req          domain.AssistantTurnRequest
 		expectErr    bool
 		expectedResp string
 		validateReq  func(*testing.T, *ChatRequest)
@@ -212,9 +222,9 @@ func TestLLMClientAdapter_Chat(t *testing.T) {
 		"success": {
 			response:   `{"choices":[{"message":{"role":"assistant","content":"Hello!"}}],"usage": {"completion_tokens": 10,"prompt_tokens": 10,"total_tokens": 20}}`,
 			statusCode: http.StatusOK,
-			req: domain.LLMChatRequest{
+			req: domain.AssistantTurnRequest{
 				Model: "test-model",
-				Messages: []domain.LLMChatMessage{
+				Messages: []domain.AssistantMessage{
 					{Role: "user", Content: "hi"},
 				},
 			},
@@ -223,11 +233,11 @@ func TestLLMClientAdapter_Chat(t *testing.T) {
 		"with-params": {
 			response:   `{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`,
 			statusCode: http.StatusOK,
-			req: domain.LLMChatRequest{
+			req: domain.AssistantTurnRequest{
 				Model:       "test-model",
 				Temperature: &temp,
 				TopP:        &topP,
-				Messages: []domain.LLMChatMessage{
+				Messages: []domain.AssistantMessage{
 					{Role: "system", Content: "sys"},
 					{Role: "user", Content: "hi"},
 				},
@@ -245,9 +255,9 @@ func TestLLMClientAdapter_Chat(t *testing.T) {
 		"no-choices": {
 			response:   `{"choices":[]}`,
 			statusCode: http.StatusOK,
-			req: domain.LLMChatRequest{
+			req: domain.AssistantTurnRequest{
 				Model: "test-model",
-				Messages: []domain.LLMChatMessage{
+				Messages: []domain.AssistantMessage{
 					{Role: "user", Content: "hi"},
 				},
 			},
@@ -256,9 +266,9 @@ func TestLLMClientAdapter_Chat(t *testing.T) {
 		"server-error": {
 			response:   `Internal Server Error`,
 			statusCode: http.StatusInternalServerError,
-			req: domain.LLMChatRequest{
+			req: domain.AssistantTurnRequest{
 				Model: "test-model",
-				Messages: []domain.LLMChatMessage{
+				Messages: []domain.AssistantMessage{
 					{Role: "user", Content: "hi"},
 				},
 			},
@@ -267,9 +277,9 @@ func TestLLMClientAdapter_Chat(t *testing.T) {
 		"invalid-json": {
 			response:   `{invalid json}`,
 			statusCode: http.StatusOK,
-			req: domain.LLMChatRequest{
+			req: domain.AssistantTurnRequest{
 				Model: "test-model",
-				Messages: []domain.LLMChatMessage{
+				Messages: []domain.AssistantMessage{
 					{Role: "user", Content: "hi"},
 				},
 			},
@@ -294,9 +304,9 @@ func TestLLMClientAdapter_Chat(t *testing.T) {
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewLLMClientAdapter(client)
+			adapter := NewAssistantClientAdapter(client)
 
-			resp, err := adapter.Chat(context.Background(), tt.req)
+			resp, err := adapter.RunTurnSync(context.Background(), tt.req)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -313,31 +323,31 @@ func TestLLMClientAdapter_Chat(t *testing.T) {
 	}
 }
 
-func TestLLMClientAdapter_Chat_ValidationErrors(t *testing.T) {
+func TestAssistantClientAdapter_RunTurnSync_ValidationErrors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`)) //nolint:errcheck
 	}))
 	defer server.Close()
 
 	client := NewDRMAPIClient(server.URL, "", server.Client())
-	adapter := NewLLMClientAdapter(client)
+	adapter := NewAssistantClientAdapter(client)
 
 	tests := map[string]struct {
-		req domain.LLMChatRequest
+		req domain.AssistantTurnRequest
 	}{
-		"no-model":    {req: domain.LLMChatRequest{Messages: []domain.LLMChatMessage{{Role: "user", Content: "hi"}}}},
-		"no-messages": {req: domain.LLMChatRequest{Model: "test"}},
+		"no-model":    {req: domain.AssistantTurnRequest{Messages: []domain.AssistantMessage{{Role: "user", Content: "hi"}}}},
+		"no-messages": {req: domain.AssistantTurnRequest{Model: "test"}},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := adapter.Chat(context.Background(), tt.req)
+			_, err := adapter.RunTurnSync(context.Background(), tt.req)
 			assert.Error(t, err)
 		})
 	}
 }
 
-func TestLLMClientAdapter_EmbedTodo(t *testing.T) {
+func TestAssistantClientAdapter_VectorizeTodo(t *testing.T) {
 	todo := domain.Todo{Title: "Test", DueDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), Status: domain.TodoStatus_OPEN}
 	tests := map[string]struct {
 		response           string
@@ -424,9 +434,9 @@ func TestLLMClientAdapter_EmbedTodo(t *testing.T) {
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewLLMClientAdapter(client)
+			adapter := NewAssistantClientAdapter(client)
 
-			vec, err := adapter.EmbedTodo(context.Background(), tt.model, todo)
+			vec, err := adapter.VectorizeTodo(context.Background(), tt.model, todo)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -434,12 +444,12 @@ func TestLLMClientAdapter_EmbedTodo(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedVec, vec.Embedding)
+			assert.Equal(t, tt.expectedVec, vec.Vector)
 		})
 	}
 }
 
-func TestLLMClientAdapter_EmbedSearch(t *testing.T) {
+func TestAssistantClientAdapter_VectorizeQuery(t *testing.T) {
 	searchInput := "Find todos about books"
 	tests := map[string]struct {
 		response           string
@@ -526,9 +536,9 @@ func TestLLMClientAdapter_EmbedSearch(t *testing.T) {
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewLLMClientAdapter(client)
+			adapter := NewAssistantClientAdapter(client)
 
-			vec, err := adapter.EmbedSearch(context.Background(), tt.model, searchInput)
+			vec, err := adapter.VectorizeQuery(context.Background(), tt.model, searchInput)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -536,17 +546,17 @@ func TestLLMClientAdapter_EmbedSearch(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedVec, vec.Embedding)
+			assert.Equal(t, tt.expectedVec, vec.Vector)
 		})
 	}
 }
 
-func TestLLMClientAdapter_AvailableModels(t *testing.T) {
+func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
 	tests := map[string]struct {
 		response   string
 		statusCode int
 		expectErr  bool
-		expected   []domain.LLMModelInfo
+		expected   []domain.ModelInfo
 	}{
 		"success": {
 			statusCode: http.StatusOK,
@@ -557,9 +567,9 @@ func TestLLMClientAdapter_AvailableModels(t *testing.T) {
                     { "id": "docker.io/ai/llama3" }
                 ]
             }`,
-			expected: []domain.LLMModelInfo{
-				{Name: "qwen3-embedding", Type: domain.LLMModelType_Embedding},
-				{Name: "llama3", Type: domain.LLMModelType_Chat},
+			expected: []domain.ModelInfo{
+				{Name: "qwen3-embedding", Kind: domain.ModelKindEmbedding},
+				{Name: "llama3", Kind: domain.ModelKindAssistant},
 			},
 		},
 		"empty-list": {
@@ -568,7 +578,7 @@ func TestLLMClientAdapter_AvailableModels(t *testing.T) {
                 "object": "list",
                 "data": []
             }`,
-			expected: []domain.LLMModelInfo{},
+			expected: []domain.ModelInfo{},
 		},
 		"server-error": {
 			statusCode: http.StatusInternalServerError,
@@ -591,9 +601,9 @@ func TestLLMClientAdapter_AvailableModels(t *testing.T) {
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewLLMClientAdapter(client)
+			adapter := NewAssistantClientAdapter(client)
 
-			models, err := adapter.AvailableModels(context.Background())
+			models, err := adapter.ListAvailableModels(context.Background())
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -606,13 +616,13 @@ func TestLLMClientAdapter_AvailableModels(t *testing.T) {
 	}
 }
 
-func TestInitLLMClient_Initialize(t *testing.T) {
-	i := InitLLMClient{}
+func TestInitAssistantClient_Initialize(t *testing.T) {
+	i := InitAssistantClient{}
 
 	_, err := i.Initialize(context.Background())
 	assert.NoError(t, err)
 
-	r, err := depend.Resolve[domain.LLMClient]()
+	r, err := depend.Resolve[domain.Assistant]()
 	assert.NotNil(t, r)
 	assert.NoError(t, err)
 }

@@ -159,7 +159,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	if summaryContent == "" {
 		return nil
 	}
-	summaryContent = mergeRecentToolCallsIntoSummary(currentSummary, summaryContent, unsummarizedMessages)
+	summaryContent = mergeRecentActionCallsIntoSummary(currentSummary, summaryContent, unsummarizedMessages)
 
 	summaryID := uuid.New()
 	if found {
@@ -267,20 +267,20 @@ func (gcs GenerateChatSummaryImpl) shouldGenerateSummary(span trace.Span, messag
 	return decision.ShouldGenerate
 }
 
-// mergeRecentToolCallsIntoSummary extracts recent tool calls from the new unsummarized messages,
-// merges them with any existing tool call history in the previous summary, and upserts the combined list
+// mergeRecentActionCallsIntoSummary extracts recent action calls from the new unsummarized messages,
+// merges them with any existing action call history in the previous summary, and upserts the combined list
 // back into the new summary content.
-func mergeRecentToolCallsIntoSummary(previousSummary, newSummary string, messages []domain.ChatMessage) string {
-	existing := parseRecentToolCallsFromSummary(previousSummary)
-	latest := extractRecentToolCalls(messages)
+func mergeRecentActionCallsIntoSummary(previousSummary, newSummary string, messages []domain.ChatMessage) string {
+	existing := parseRecentActionCallsFromSummary(previousSummary)
+	latest := extractRecentActionCalls(messages)
 	merged := append(existing, latest...)
-	merged = keepLastNToolCalls(merged, MAX_RECENT_ACTION_CALLS_IN_SUMMARY)
-	return upsertSummaryField(newSummary, SUMMARY_RECENT_ACTION_CALLS_FIELD, formatRecentToolCalls(merged))
+	merged = keepLastNActionCalls(merged, MAX_RECENT_ACTION_CALLS_IN_SUMMARY)
+	return upsertSummaryField(newSummary, SUMMARY_RECENT_ACTION_CALLS_FIELD, formatRecentActionCalls(merged))
 }
 
-// parseRecentToolCallsFromSummary looks for the recent tool calls field in the given summary content
-// and parses it into a list of tool function names.
-func parseRecentToolCallsFromSummary(summary string) []string {
+// parseRecentActionCallsFromSummary looks for the recent action calls field in the given summary content
+// and parses it into a list of action function names.
+func parseRecentActionCallsFromSummary(summary string) []string {
 	value, ok := findSummaryFieldValue(summary, SUMMARY_RECENT_ACTION_CALLS_FIELD)
 	if !ok {
 		return nil
@@ -291,55 +291,55 @@ func parseRecentToolCallsFromSummary(summary string) []string {
 	}
 
 	parts := strings.Split(value, ";")
-	toolCalls := make([]string, 0, len(parts))
+	actionCalls := make([]string, 0, len(parts))
 	for _, part := range parts {
 		name := strings.TrimSpace(part)
 		if name == "" {
 			continue
 		}
-		toolCalls = append(toolCalls, name)
+		actionCalls = append(actionCalls, name)
 	}
-	return keepLastNToolCalls(toolCalls, MAX_RECENT_ACTION_CALLS_IN_SUMMARY)
+	return keepLastNActionCalls(actionCalls, MAX_RECENT_ACTION_CALLS_IN_SUMMARY)
 }
 
-// extractRecentToolCalls inspects the given list of chat messages and extracts the function names of any tool calls,
+// extractRecentActionCalls inspects the given list of chat messages and extracts the function names of any action calls,
 // especially those that are relevant for state changes, to be included in the conversation summary memory.
-func extractRecentToolCalls(messages []domain.ChatMessage) []string {
-	toolCalls := make([]string, 0, len(messages))
+func extractRecentActionCalls(messages []domain.ChatMessage) []string {
+	actionCalls := make([]string, 0, len(messages))
 	for _, message := range messages {
 		if len(message.ActionCalls) == 0 {
 			continue
 		}
-		for _, toolCall := range message.ActionCalls {
-			functionName := strings.TrimSpace(toolCall.Name)
+		for _, actionCall := range message.ActionCalls {
+			functionName := strings.TrimSpace(actionCall.Name)
 			if functionName == "" {
 				continue
 			}
-			toolCalls = append(toolCalls, functionName)
+			actionCalls = append(actionCalls, functionName)
 		}
 	}
-	return toolCalls
+	return actionCalls
 }
 
-// keepLastNToolCalls ensures that only the most recent N tool calls are kept in the conversation summary memory,
-// to prevent unbounded growth while still retaining relevant recent tool usage history for context in future summaries.
-func keepLastNToolCalls(toolCalls []string, max int) []string {
+// keepLastNActionCalls ensures that only the most recent N action calls are kept in the conversation summary memory,
+// to prevent unbounded growth while still retaining relevant recent action usage history for context in future summaries.
+func keepLastNActionCalls(actionCalls []string, max int) []string {
 	if max <= 0 {
 		return nil
 	}
-	if len(toolCalls) <= max {
-		return toolCalls
+	if len(actionCalls) <= max {
+		return actionCalls
 	}
-	return toolCalls[len(toolCalls)-max:]
+	return actionCalls[len(actionCalls)-max:]
 }
 
-// formatRecentToolCalls takes a list of tool function names and formats them into a single string representation
+// formatRecentActionCalls takes a list of action function names and formats them into a single string representation
 // suitable for inclusion in the conversation summary content.
-func formatRecentToolCalls(toolCalls []string) string {
-	if len(toolCalls) == 0 {
+func formatRecentActionCalls(actionCalls []string) string {
+	if len(actionCalls) == 0 {
 		return "none"
 	}
-	return strings.Join(toolCalls, "; ")
+	return strings.Join(actionCalls, "; ")
 }
 
 // findSummaryFieldValue searches the given summary content for a field with the specified name and returns its value if found.

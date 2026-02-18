@@ -294,7 +294,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"trigger-by-state-changing-tool-success": {
+		"trigger-by-state-changing-action-success": {
 			model: "summary-model",
 			event: domain.ChatMessageEvent{
 				Type:           domain.EventType_CHAT_MESSAGE_SENT,
@@ -309,9 +309,9 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				assistant *domain.MockAssistant,
 			) {
-				toolCallID := "tool-call-1"
+				actionCallID := "action-call-1"
 				assistantMsgID := uuid.MustParse("623e4567-e89b-12d3-a456-426614174005")
-				toolMsgID := uuid.MustParse("723e4567-e89b-12d3-a456-426614174006")
+				actionMsgID := uuid.MustParse("723e4567-e89b-12d3-a456-426614174006")
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
 					Return(domain.ConversationSummary{}, false, nil).
@@ -325,17 +325,17 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 							ChatRole:       domain.ChatRole_Assistant,
 							ActionCalls: []domain.AssistantActionCall{
 								{
-									ID:   toolCallID,
+									ID:   actionCallID,
 									Name: "create_todo",
 								},
 							},
 							MessageState: domain.ChatMessageState_Completed,
 						},
 						{
-							ID:             toolMsgID,
+							ID:             actionMsgID,
 							ConversationID: conversationID,
 							ChatRole:       domain.ChatRole_Tool,
-							ActionCallID:   &toolCallID,
+							ActionCallID:   &actionCallID,
 							Content:        `{"message":"ok"}`,
 							MessageState:   domain.ChatMessageState_Completed,
 						},
@@ -348,7 +348,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				timeProvider.EXPECT().Now().Return(fixedTime).Once()
 				summaryRepo.EXPECT().
 					StoreConversationSummary(mock.Anything, mock.MatchedBy(func(summary domain.ConversationSummary) bool {
-						return strings.Contains(summary.CurrentStateSummary, "recent_tool_calls: create_todo")
+						return strings.Contains(summary.CurrentStateSummary, "recent_action_calls: create_todo")
 					})).
 					Return(nil).
 					Once()
@@ -505,14 +505,14 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 	}
 }
 
-func TestMergeRecentToolCallsIntoSummary(t *testing.T) {
+func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 	tests := map[string]struct {
 		previousSummary string
 		newSummary      string
 		messages        []domain.ChatMessage
 		expectedValue   string
 	}{
-		"adds-recent-tool-calls-field-when-missing": {
+		"adds-recent-action-calls-field-when-missing": {
 			previousSummary: "current_intent: plan tasks\nlast_action: none\noutput_format: concise text",
 			newSummary:      "current_intent: plan tasks\nactive_view: none\nuser_nuances: none\ntasks: none\nlast_action: summarized\noutput_format: concise text",
 			messages: []domain.ChatMessage{
@@ -526,8 +526,8 @@ func TestMergeRecentToolCallsIntoSummary(t *testing.T) {
 			},
 			expectedValue: "fetch_todos; set_ui_filters",
 		},
-		"caps-recent-tool-calls-at-ten": {
-			previousSummary: "recent_tool_calls: call1; call2; call3; call4; call5; call6; call7; call8; call9",
+		"caps-recent-action-calls-at-ten": {
+			previousSummary: "recent_action_calls: call1; call2; call3; call4; call5; call6; call7; call8; call9",
 			newSummary:      "current_intent: x\nactive_view: none\nuser_nuances: none\ntasks: none\nlast_action: none\noutput_format: concise text",
 			messages: []domain.ChatMessage{
 				{
@@ -542,7 +542,7 @@ func TestMergeRecentToolCallsIntoSummary(t *testing.T) {
 		},
 		"replaces-existing-field-in-new-summary": {
 			previousSummary: "current_intent: x",
-			newSummary:      "current_intent: x\nrecent_tool_calls: stale\nlast_action: none\noutput_format: concise text",
+			newSummary:      "current_intent: x\nrecent_action_calls: stale\nlast_action: none\noutput_format: concise text",
 			messages: []domain.ChatMessage{
 				{
 					ChatRole: domain.ChatRole_Assistant,
@@ -557,7 +557,7 @@ func TestMergeRecentToolCallsIntoSummary(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := mergeRecentToolCallsIntoSummary(tt.previousSummary, tt.newSummary, tt.messages)
+			got := mergeRecentActionCallsIntoSummary(tt.previousSummary, tt.newSummary, tt.messages)
 			value, ok := findSummaryFieldValue(got, SUMMARY_RECENT_ACTION_CALLS_FIELD)
 			assert.True(t, ok)
 			assert.Equal(t, tt.expectedValue, value)

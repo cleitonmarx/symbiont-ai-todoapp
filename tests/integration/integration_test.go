@@ -411,7 +411,7 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 		})
 		require.NoError(t, err, "failed to call ListChatMessages endpoint")
 		require.NotNil(t, messagesResp.JSON200, "expected non-nil response for ListChatMessages")
-		require.Len(t, messagesResp.JSON200.Messages, 8, "expected 8 messages in the conversation (4 user messages + 4 tool calls)")
+		require.Len(t, messagesResp.JSON200.Messages, 8, "expected 8 messages in the conversation (4 user messages + 4 action calls)")
 	})
 
 	t.Run("delete-conversation", func(t *testing.T) {

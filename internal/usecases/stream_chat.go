@@ -60,7 +60,7 @@ type StreamChatImpl struct {
 	assistant               domain.Assistant
 	actionRegistry          domain.AssistantActionRegistry
 	embeddingModel          string
-	maxToolCycles           int
+	maxActionCycles         int
 }
 
 // NewStreamChatImpl creates a new instance of StreamChatImpl
@@ -73,7 +73,7 @@ func NewStreamChatImpl(
 	actionRegistry domain.AssistantActionRegistry,
 	uow domain.UnitOfWork,
 	embeddingModel string,
-	maxToolCycles int,
+	maxActionCycles int,
 ) StreamChatImpl {
 	return StreamChatImpl{
 		chatMessageRepo:         chatMessageRepo,
@@ -84,7 +84,7 @@ func NewStreamChatImpl(
 		assistant:               assistant,
 		actionRegistry:          actionRegistry,
 		embeddingModel:          embeddingModel,
-		maxToolCycles:           maxToolCycles,
+		maxActionCycles:         maxActionCycles,
 	}
 }
 
@@ -155,7 +155,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		conversationCreated: conversationCreated,
 		turnID:              uuid.New(),
 		tracker: newToolCycleTracker(
-			sc.maxToolCycles,
+			sc.maxActionCycles,
 			MAX_REPEATED_TOOL_CALL_HIT,
 		),
 	}
@@ -357,7 +357,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		Input: toolCall.Input,
 		Text:  toolCall.Text,
 	}, req.Messages)
-	toolSucceeded := toolMessage.IsActionCallSuccess()
+	actionSucceeded := toolMessage.IsActionCallSuccess()
 	now := sc.timeProvider.Now().UTC()
 	toolChatMsg := domain.ChatMessage{
 		ID:             uuid.New(),
@@ -372,7 +372,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if !toolSucceeded {
+	if !actionSucceeded {
 		toolChatMsg.MessageState = domain.ChatMessageState_Failed
 		toolChatMsg.ErrorMessage = &toolMessage.Content
 	}
@@ -384,10 +384,10 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	toolCompleted := domain.AssistantActionCompleted{
 		ID:            toolCall.ID,
 		Name:          toolCall.Name,
-		Success:       toolSucceeded,
-		ShouldRefetch: toolSucceeded,
+		Success:       actionSucceeded,
+		ShouldRefetch: actionSucceeded,
 	}
-	if !toolSucceeded {
+	if !actionSucceeded {
 		toolCompleted.Error = &toolMessage.Content
 	}
 	if err := onEvent(domain.AssistantEventType_ActionCompleted, toolCompleted); err != nil {
@@ -643,9 +643,9 @@ type InitStreamChat struct {
 	AssistantActionRegistry domain.AssistantActionRegistry       `resolve:""`
 	Assistant               domain.Assistant                     `resolve:""`
 	EmbeddingModel          string                               `config:"LLM_EMBEDDING_MODEL"`
-	// Maximum number of tool cycles to prevent infinite loops
-	// It restricts how many times the LLM can invoke tools in a single chat session
-	MaxToolCycles int `config:"LLM_MAX_TOOL_CYCLES" default:"50"`
+	// Maximum number of action cycles to prevent infinite loops
+	// It restricts how many times the Assistant can invoke actions in a single chat session
+	MaxActionCycles int `config:"LLM_MAX_ACTION_CYCLES" default:"50"`
 }
 
 // Initialize registers the StreamChat use case in the dependency container
@@ -659,7 +659,7 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 		i.AssistantActionRegistry,
 		i.Uow,
 		i.EmbeddingModel,
-		i.MaxToolCycles,
+		i.MaxActionCycles,
 	))
 	return ctx, nil
 }

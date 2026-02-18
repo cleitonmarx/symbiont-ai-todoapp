@@ -558,7 +558,7 @@ func TestMergeRecentToolCallsIntoSummary(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			got := mergeRecentToolCallsIntoSummary(tt.previousSummary, tt.newSummary, tt.messages)
-			value, ok := findSummaryFieldValue(got, SUMMARY_RECENT_TOOL_CALLS_FIELD)
+			value, ok := findSummaryFieldValue(got, SUMMARY_RECENT_ACTION_CALLS_FIELD)
 			assert.True(t, ok)
 			assert.Equal(t, tt.expectedValue, value)
 		})

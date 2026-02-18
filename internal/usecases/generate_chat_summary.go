@@ -36,19 +36,19 @@ const (
 	// Frequency penalty to reduce repetition in summaries, especially for longer conversations.
 	CHAT_SUMMARY_FREQUENCY_PENALTY = 0.7
 
-	// Maximum number of recent tool calls persisted in conversation summary memory.
-	MAX_RECENT_TOOL_CALLS_IN_SUMMARY = 10
+	// Maximum number of recent action calls persisted in conversation summary memory.
+	MAX_RECENT_ACTION_CALLS_IN_SUMMARY = 10
 
-	// Summary field used to persist rolling tool-call history.
-	SUMMARY_RECENT_TOOL_CALLS_FIELD = "recent_tool_calls"
+	// Summary field used to persist rolling action-call history.
+	SUMMARY_RECENT_ACTION_CALLS_FIELD = "recent_action_calls"
 )
 
 // CompletedConversationSummaryChannel is a channel type for sending processed domain.ConversationSummary items.
 // It is used in integration tests to verify summary generation.
 type CompletedConversationSummaryChannel chan domain.ConversationSummary
 
-// Default list of tool function names that imply task state changes.
-var stateChangingTools = map[string]struct{}{
+// Default list of action function names that imply task state changes.
+var stateChangingActions = map[string]struct{}{
 	"create_todo":          {},
 	"update_todo":          {},
 	"update_todo_due_date": {},
@@ -252,12 +252,12 @@ func (gcs GenerateChatSummaryImpl) shouldGenerateSummary(span trace.Span, messag
 			TriggerMessageCount: CHAT_SUMMARY_TRIGGER_MESSAGES,
 			TriggerTokenCount:   CHAT_SUMMARY_TRIGGER_TOKENS,
 		},
-		stateChangingTools,
+		stateChangingActions,
 	)
 
 	switch decision.Reason {
-	case domain.ConversationSummaryGenerationReason_StateChangingToolSuccess:
-		span.AddEvent("Triggering summary generation due to successful state-changing tool call")
+	case domain.ConversationSummaryGenerationReason_StateChangingActionSuccess:
+		span.AddEvent("Triggering summary generation due to successful state-changing action call")
 	case domain.ConversationSummaryGenerationReason_MessageCountThreshold:
 		span.AddEvent(fmt.Sprintf("Triggering summary generation due to message count threshold: %d messages", decision.MessageCount))
 	case domain.ConversationSummaryGenerationReason_TokenCountThreshold:
@@ -274,14 +274,14 @@ func mergeRecentToolCallsIntoSummary(previousSummary, newSummary string, message
 	existing := parseRecentToolCallsFromSummary(previousSummary)
 	latest := extractRecentToolCalls(messages)
 	merged := append(existing, latest...)
-	merged = keepLastNToolCalls(merged, MAX_RECENT_TOOL_CALLS_IN_SUMMARY)
-	return upsertSummaryField(newSummary, SUMMARY_RECENT_TOOL_CALLS_FIELD, formatRecentToolCalls(merged))
+	merged = keepLastNToolCalls(merged, MAX_RECENT_ACTION_CALLS_IN_SUMMARY)
+	return upsertSummaryField(newSummary, SUMMARY_RECENT_ACTION_CALLS_FIELD, formatRecentToolCalls(merged))
 }
 
 // parseRecentToolCallsFromSummary looks for the recent tool calls field in the given summary content
 // and parses it into a list of tool function names.
 func parseRecentToolCallsFromSummary(summary string) []string {
-	value, ok := findSummaryFieldValue(summary, SUMMARY_RECENT_TOOL_CALLS_FIELD)
+	value, ok := findSummaryFieldValue(summary, SUMMARY_RECENT_ACTION_CALLS_FIELD)
 	if !ok {
 		return nil
 	}
@@ -299,7 +299,7 @@ func parseRecentToolCallsFromSummary(summary string) []string {
 		}
 		toolCalls = append(toolCalls, name)
 	}
-	return keepLastNToolCalls(toolCalls, MAX_RECENT_TOOL_CALLS_IN_SUMMARY)
+	return keepLastNToolCalls(toolCalls, MAX_RECENT_ACTION_CALLS_IN_SUMMARY)
 }
 
 // extractRecentToolCalls inspects the given list of chat messages and extracts the function names of any tool calls,

@@ -148,8 +148,8 @@ type persistCallExpectation struct {
 	PromptTokens     *int
 	CompletionTokens *int
 	TotalTokens      *int
-	ToolCallsLen     int
-	HasToolCallID    bool
+	ActionCallsLen   int
+	HasActionCallID  bool
 	CreateErr        error
 }
 
@@ -223,8 +223,8 @@ func expectPersistSequence(
 			assert.Equal(t, exp.Role, msg.ChatRole)
 			assert.Equal(t, exp.Content, msg.Content)
 			assert.Equal(t, expectedState, msg.MessageState)
-			assert.Equal(t, exp.HasToolCallID, msg.ActionCallID != nil)
-			assert.Len(t, msg.ActionCalls, exp.ToolCallsLen)
+			assert.Equal(t, exp.HasActionCallID, msg.ActionCallID != nil)
+			assert.Len(t, msg.ActionCalls, exp.ActionCallsLen)
 			assert.NotEqual(t, uuid.Nil, msg.TurnID)
 			assert.Equal(t, int64(createIdx-1), msg.TurnSequence)
 			assert.Equal(t, fixedTime, msg.CreatedAt)

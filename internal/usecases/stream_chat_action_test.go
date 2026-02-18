@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
+func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userMsgID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	assistantMsgID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
@@ -21,7 +21,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 
 	tests := map[string]streamChatTestTableEntry{
 		"success-with-action-call": {
-			userMessage: "Call a tool",
+			userMessage: "Call an action",
 			model:       "test-model",
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
@@ -61,7 +61,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 							Text:  "calling list_todos",
 						},
 						mock.MatchedBy(func(msgs []domain.AssistantMessage) bool {
-							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Call a tool"
+							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Call an action"
 						}),
 					).
 					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, ActionCallID: common.Ptr("func-123")})
@@ -81,30 +81,30 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
-						Role:          domain.ChatRole_User,
-						Content:       "Call a tool",
-						ID:            &userMsgID,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_User,
+						Content:         "Call an action",
+						ID:              &userMsgID,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
 					},
 					{
-						Role:          domain.ChatRole_Assistant,
-						Content:       "",
-						ToolCallsLen:  1,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_Assistant,
+						Content:         "",
+						ActionCallsLen:  1,
+						HasActionCallID: false,
 					},
 					{
-						Role:          domain.ChatRole_Tool,
-						Content:       "",
-						ToolCallsLen:  0,
-						HasToolCallID: true,
+						Role:            domain.ChatRole_Tool,
+						Content:         "",
+						ActionCallsLen:  0,
+						HasActionCallID: true,
 					},
 					{
-						Role:          domain.ChatRole_Assistant,
-						Content:       "Tool called successfully.",
-						ID:            &assistantMsgID,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_Assistant,
+						Content:         "Tool called successfully.",
+						ID:              &assistantMsgID,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
 					},
 				})
 			},
@@ -196,32 +196,32 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				toolErr := "error: failing_tool unavailable"
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
-						Role:          domain.ChatRole_User,
-						Content:       "Call failing tool",
-						ID:            &userMsgID,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_User,
+						Content:         "Call failing tool",
+						ID:              &userMsgID,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
 					},
 					{
-						Role:          domain.ChatRole_Assistant,
-						Content:       "",
-						ToolCallsLen:  1,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_Assistant,
+						Content:         "",
+						ActionCallsLen:  1,
+						HasActionCallID: false,
 					},
 					{
-						Role:          domain.ChatRole_Tool,
-						MessageState:  domain.ChatMessageState_Failed,
-						ErrorMessage:  &toolErr,
-						Content:       toolErr,
-						ToolCallsLen:  0,
-						HasToolCallID: true,
+						Role:            domain.ChatRole_Tool,
+						MessageState:    domain.ChatMessageState_Failed,
+						ErrorMessage:    &toolErr,
+						Content:         toolErr,
+						ActionCallsLen:  0,
+						HasActionCallID: true,
 					},
 					{
-						Role:          domain.ChatRole_Assistant,
-						Content:       "I could not complete that tool call.",
-						ID:            &assistantMsgID,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_Assistant,
+						Content:         "I could not complete that tool call.",
+						ID:              &assistantMsgID,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
 					},
 				})
 			},
@@ -285,26 +285,26 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				onEventErr := "onEvent error"
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
-						Role:          domain.ChatRole_User,
-						Content:       "Call tool",
-						ID:            &userMsgID,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_User,
+						Content:         "Call tool",
+						ID:              &userMsgID,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
 					},
 					{
-						Role:          domain.ChatRole_Assistant,
-						Content:       "",
-						ToolCallsLen:  1,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_Assistant,
+						Content:         "",
+						ActionCallsLen:  1,
+						HasActionCallID: false,
 					},
 					{
-						Role:          domain.ChatRole_Assistant,
-						Content:       "",
-						ID:            &assistantMsgID,
-						MessageState:  domain.ChatMessageState_Failed,
-						ErrorMessage:  &onEventErr,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_Assistant,
+						Content:         "",
+						ID:              &assistantMsgID,
+						MessageState:    domain.ChatMessageState_Failed,
+						ErrorMessage:    &onEventErr,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
 					},
 				})
 			},
@@ -373,32 +373,32 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				onEventErr := "onEvent error"
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
-						Role:          domain.ChatRole_User,
-						Content:       "Call tool",
-						ID:            &userMsgID,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_User,
+						Content:         "Call tool",
+						ID:              &userMsgID,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
 					},
 					{
-						Role:          domain.ChatRole_Assistant,
-						Content:       "",
-						ToolCallsLen:  1,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_Assistant,
+						Content:         "",
+						ActionCallsLen:  1,
+						HasActionCallID: false,
 					},
 					{
-						Role:          domain.ChatRole_Tool,
-						Content:       "tool result",
-						ToolCallsLen:  0,
-						HasToolCallID: true,
+						Role:            domain.ChatRole_Tool,
+						Content:         "tool result",
+						ActionCallsLen:  0,
+						HasActionCallID: true,
 					},
 					{
-						Role:          domain.ChatRole_Assistant,
-						Content:       "",
-						ID:            &assistantMsgID,
-						MessageState:  domain.ChatMessageState_Failed,
-						ErrorMessage:  &onEventErr,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_Assistant,
+						Content:         "",
+						ID:              &assistantMsgID,
+						MessageState:    domain.ChatMessageState_Failed,
+						ErrorMessage:    &onEventErr,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
 					},
 				})
 			},
@@ -473,35 +473,35 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 
 				expectations := []persistCallExpectation{
 					{
-						Role:          domain.ChatRole_User,
-						Content:       "Keep calling tools",
-						ID:            &userMsgID,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_User,
+						Content:         "Keep calling tools",
+						ID:              &userMsgID,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
 					},
 				}
 				for i := 0; i < 7; i++ {
 					expectations = append(expectations,
 						persistCallExpectation{
-							Role:          domain.ChatRole_Assistant,
-							Content:       "",
-							ToolCallsLen:  1,
-							HasToolCallID: false,
+							Role:            domain.ChatRole_Assistant,
+							Content:         "",
+							ActionCallsLen:  1,
+							HasActionCallID: false,
 						},
 						persistCallExpectation{
-							Role:          domain.ChatRole_Tool,
-							Content:       "tool result",
-							ToolCallsLen:  0,
-							HasToolCallID: true,
+							Role:            domain.ChatRole_Tool,
+							Content:         "tool result",
+							ActionCallsLen:  0,
+							HasActionCallID: true,
 						},
 					)
 				}
 				expectations = append(expectations, persistCallExpectation{
-					Role:          domain.ChatRole_Assistant,
-					Content:       "Sorry, I could not process your request. Please try again.",
-					ID:            &assistantMsgID,
-					ToolCallsLen:  0,
-					HasToolCallID: false,
+					Role:            domain.ChatRole_Assistant,
+					Content:         "Sorry, I could not process your request. Please try again.",
+					ID:              &assistantMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
 				})
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, expectations)
 			},
@@ -576,35 +576,35 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 
 				expectations := []persistCallExpectation{
 					{
-						Role:          domain.ChatRole_User,
-						Content:       "Call the same tool repeatedly",
-						ID:            &userMsgID,
-						ToolCallsLen:  0,
-						HasToolCallID: false,
+						Role:            domain.ChatRole_User,
+						Content:         "Call the same tool repeatedly",
+						ID:              &userMsgID,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
 					},
 				}
 				for range 5 {
 					expectations = append(expectations,
 						persistCallExpectation{
-							Role:          domain.ChatRole_Assistant,
-							Content:       "",
-							ToolCallsLen:  1,
-							HasToolCallID: false,
+							Role:            domain.ChatRole_Assistant,
+							Content:         "",
+							ActionCallsLen:  1,
+							HasActionCallID: false,
 						},
 						persistCallExpectation{
-							Role:          domain.ChatRole_Tool,
-							Content:       "same result",
-							ToolCallsLen:  0,
-							HasToolCallID: true,
+							Role:            domain.ChatRole_Tool,
+							Content:         "same result",
+							ActionCallsLen:  0,
+							HasActionCallID: true,
 						},
 					)
 				}
 				expectations = append(expectations, persistCallExpectation{
-					Role:          domain.ChatRole_Assistant,
-					Content:       "Sorry, I could not process your request. Please try again.",
-					ID:            &assistantMsgID,
-					ToolCallsLen:  0,
-					HasToolCallID: false,
+					Role:            domain.ChatRole_Assistant,
+					Content:         "Sorry, I could not process your request. Please try again.",
+					ID:              &assistantMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
 				})
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, expectations)
 			},

@@ -29,7 +29,7 @@ type TodoFetcherAction struct {
 	embeddingModel  string
 }
 
-// StatusMessage returns a status message about the tool execution.
+// StatusMessage returns a status message about the action execution.
 func (t TodoFetcherAction) StatusMessage() string {
 	return "🔎 Fetching todos..."
 }
@@ -105,7 +105,7 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 
 	exampleArgs := `{"page":1,"page_size":10,"search_by_similarity":"dinner","sort_by":"similarityAsc"}`
 
-	err := unmarshalToolArguments(call.Input, &params)
+	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,

@@ -25,7 +25,7 @@ func NewTodoCreatorAction(uow domain.UnitOfWork, creator usecases.TodoCreator, t
 	}
 }
 
-// StatusMessage returns a status message about the tool execution.
+// StatusMessage returns a status message about the action execution.
 func (t TodoCreatorAction) StatusMessage() string {
 	return "📝 Creating your todo..."
 }
@@ -34,7 +34,7 @@ func (t TodoCreatorAction) StatusMessage() string {
 func (tct TodoCreatorAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "create_todo",
-		Description: "Create exactly one todo. Required keys: title (string) and due_date (YYYY-MM-DD). No extra keys. For batch creation requests, call this tool once per task until all tasks are saved. Valid: {\"title\":\"Pay rent\",\"due_date\":\"2026-04-30\"}. Invalid: {\"title\":\"Pay rent\",\"due\":\"tomorrow\",\"priority\":\"high\"}.",
+		Description: "Create exactly one todo. Required keys: title (string) and due_date (YYYY-MM-DD). No extra keys. For batch creation requests, call this action once per task until all tasks are saved. Valid: {\"title\":\"Pay rent\",\"due_date\":\"2026-04-30\"}. Invalid: {\"title\":\"Pay rent\",\"due\":\"tomorrow\",\"priority\":\"high\"}.",
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{
@@ -62,7 +62,7 @@ func (tct TodoCreatorAction) Execute(ctx context.Context, call domain.AssistantA
 
 	exampleArgs := `{"title":"Pay rent","due_date":"2026-04-30"}`
 
-	err := unmarshalToolArguments(call.Input, &params)
+	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,

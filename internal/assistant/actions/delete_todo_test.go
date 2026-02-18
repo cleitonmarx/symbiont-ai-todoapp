@@ -92,9 +92,9 @@ func TestTodoDeleterAction(t *testing.T) {
 			deleter := usecases.NewMockTodoDeleter(t)
 			tt.setupMocks(uow, deleter)
 
-			tool := NewTodoDeleterAction(uow, deleter)
+			action := NewTodoDeleterAction(uow, deleter)
 
-			resp := tool.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
+			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
 			tt.validateResp(t, resp)
 		})
 	}

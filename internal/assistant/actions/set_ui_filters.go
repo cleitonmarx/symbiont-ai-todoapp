@@ -91,7 +91,7 @@ func (t UIFiltersSetterAction) Execute(_ context.Context, call domain.AssistantA
 
 	exampleArgs := `{"search_by_similarity":"buy milk","sort_by":"similarityAsc","page":1,"page_size":10}`
 
-	if err := unmarshalToolArguments(call.Input, &params); err != nil {
+	if err := unmarshalActionInput(call.Input, &params); err != nil {
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,

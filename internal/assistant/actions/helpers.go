@@ -31,9 +31,9 @@ func extractDateParam(param string, history []domain.AssistantMessage, reference
 	return time.Time{}, false
 }
 
-// unmarshalToolArguments unmarshals the tool arguments from a JSON string into
+// unmarshalActionInput unmarshals the action input from a JSON string into
 // the target struct, ensuring that only a single JSON object is present and that there are no unknown fields.
-func unmarshalToolArguments(arguments string, target any) error {
+func unmarshalActionInput(arguments string, target any) error {
 	decoder := json.NewDecoder(strings.NewReader(arguments))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
@@ -48,5 +48,5 @@ func unmarshalToolArguments(arguments string, target any) error {
 		}
 		return err
 	}
-	return fmt.Errorf("tool arguments must contain a single JSON object")
+	return fmt.Errorf("action arguments must contain a single JSON object")
 }

@@ -62,7 +62,7 @@ func (tdut TodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.As
 
 	exampleArgs := `{"id":"<uuid>","due_date":"2026-04-30"}`
 
-	err := unmarshalToolArguments(call.Input, &params)
+	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,

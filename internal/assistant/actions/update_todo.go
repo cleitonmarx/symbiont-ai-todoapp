@@ -67,7 +67,7 @@ func (tut TodoUpdaterAction) Execute(ctx context.Context, call domain.AssistantA
 
 	exampleArgs := `{"id":"<uuid>","status":"DONE", "title":"New title"}`
 
-	err := unmarshalToolArguments(call.Input, &params)
+	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,

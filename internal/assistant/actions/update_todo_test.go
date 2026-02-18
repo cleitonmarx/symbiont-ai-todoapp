@@ -119,9 +119,9 @@ func TestTodoUpdaterAction(t *testing.T) {
 			updater := usecases.NewMockTodoUpdater(t)
 			tt.setupMocks(uow, updater)
 
-			tool := NewTodoUpdaterAction(uow, updater)
+			action := NewTodoUpdaterAction(uow, updater)
 
-			resp := tool.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
+			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
 			tt.validateResp(t, resp)
 		})
 	}

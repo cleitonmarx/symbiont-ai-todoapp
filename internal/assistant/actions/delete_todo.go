@@ -22,7 +22,7 @@ func NewTodoDeleterAction(uow domain.UnitOfWork, deleter usecases.TodoDeleter) T
 	}
 }
 
-// StatusMessage returns a status message about the tool execution.
+// StatusMessage returns a status message about the action execution.
 func (t TodoDeleterAction) StatusMessage() string {
 	return "🗑️ Deleting the todo..."
 }
@@ -53,7 +53,7 @@ func (tdt TodoDeleterAction) Execute(ctx context.Context, call domain.AssistantA
 
 	exampleArgs := `{"id":"<uuid>"}`
 
-	err := unmarshalToolArguments(call.Input, &params)
+	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,

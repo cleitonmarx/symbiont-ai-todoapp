@@ -175,9 +175,9 @@ func TestTodoCreatorAction(t *testing.T) {
 			todoCreator := usecases.NewMockTodoCreator(t)
 			tt.setupMocks(uow, timeProvider, todoCreator)
 
-			tool := NewTodoCreatorAction(uow, todoCreator, timeProvider)
+			action := NewTodoCreatorAction(uow, todoCreator, timeProvider)
 
-			resp := tool.Execute(context.Background(), tt.functionCall, tt.history)
+			resp := action.Execute(context.Background(), tt.functionCall, tt.history)
 			tt.validateResp(t, resp)
 		})
 	}

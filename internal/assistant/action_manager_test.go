@@ -14,11 +14,11 @@ import (
 
 func TestAssistantActionManager(t *testing.T) {
 	tests := map[string]struct {
-		setupTools func() []domain.AssistantAction
-		testFunc   func(t *testing.T, manager AssistantActionManager)
+		setupActions func() []domain.AssistantAction
+		testFunc     func(t *testing.T, manager AssistantActionManager)
 	}{
 		"list-returns-all-actions": {
-			setupTools: func() []domain.AssistantAction {
+			setupActions: func() []domain.AssistantAction {
 				tool1 := domain.NewMockAssistantAction(t)
 				tool1.EXPECT().
 					Definition().
@@ -42,7 +42,7 @@ func TestAssistantActionManager(t *testing.T) {
 			},
 		},
 		"status-message-returns-tool-specific-message": {
-			setupTools: func() []domain.AssistantAction {
+			setupActions: func() []domain.AssistantAction {
 				tool := domain.NewMockAssistantAction(t)
 				tool.EXPECT().
 					Definition().
@@ -56,14 +56,14 @@ func TestAssistantActionManager(t *testing.T) {
 			},
 		},
 		"status-message-returns-default-when-tool-not-found": {
-			setupTools: func() []domain.AssistantAction { return []domain.AssistantAction{} },
+			setupActions: func() []domain.AssistantAction { return []domain.AssistantAction{} },
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
 				msg := manager.StatusMessage("unknown_tool")
 				assert.Equal(t, "⏳ Processing request...", msg)
 			},
 		},
 		"execute-calls-correct-tool": {
-			setupTools: func() []domain.AssistantAction {
+			setupActions: func() []domain.AssistantAction {
 				tool := domain.NewMockAssistantAction(t)
 				tool.EXPECT().
 					Definition().
@@ -99,7 +99,7 @@ func TestAssistantActionManager(t *testing.T) {
 			},
 		},
 		"execute-returns-error-for-unknown-tool": {
-			setupTools: func() []domain.AssistantAction { return []domain.AssistantAction{} },
+			setupActions: func() []domain.AssistantAction { return []domain.AssistantAction{} },
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
 				result := manager.Execute(
 					context.Background(),
@@ -115,7 +115,7 @@ func TestAssistantActionManager(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			manager := NewAssistantActionManager(tt.setupTools()...)
+			manager := NewAssistantActionManager(tt.setupActions()...)
 			tt.testFunc(t, manager)
 		})
 	}

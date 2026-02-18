@@ -64,16 +64,16 @@ func hasStateChangingToolSuccess(messages []ChatMessage, stateChangingTools map[
 		if message.ChatRole != ChatRole_Assistant {
 			continue
 		}
-		for _, toolCall := range message.ToolCalls {
-			toolCallFunctionsByID[toolCall.ID] = strings.ToLower(toolCall.Function)
+		for _, toolCall := range message.ActionCalls {
+			toolCallFunctionsByID[toolCall.ID] = strings.ToLower(toolCall.Name)
 		}
 	}
 
 	for _, message := range messages {
-		if !message.IsToolCallSuccess() {
+		if !message.IsActionCallSuccess() {
 			continue
 		}
-		toolFunction, found := toolCallFunctionsByID[*message.ToolCallID]
+		toolFunction, found := toolCallFunctionsByID[*message.ActionCallID]
 		if !found {
 			continue
 		}

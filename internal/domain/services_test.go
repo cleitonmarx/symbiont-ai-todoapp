@@ -68,13 +68,13 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 				return []ChatMessage{
 					{
 						ChatRole: ChatRole_Assistant,
-						ToolCalls: []LLMStreamEventToolCall{
-							{ID: toolCallID, Function: "create_todo"},
+						ActionCalls: []AssistantActionCall{
+							{ID: toolCallID, Name: "create_todo"},
 						},
 					},
 					{
 						ChatRole:     ChatRole_Tool,
-						ToolCallID:   &toolCallID,
+						ActionCallID: &toolCallID,
 						MessageState: ChatMessageState_Completed,
 					},
 				}
@@ -139,13 +139,13 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 				return []ChatMessage{
 					{
 						ChatRole: ChatRole_Assistant,
-						ToolCalls: []LLMStreamEventToolCall{
-							{ID: toolCallID, Function: "search_todo"},
+						ActionCalls: []AssistantActionCall{
+							{ID: toolCallID, Name: "search_todo"},
 						},
 					},
 					{
 						ChatRole:     ChatRole_Tool,
-						ToolCallID:   &toolCallID,
+						ActionCallID: &toolCallID,
 						MessageState: ChatMessageState_Completed,
 					},
 				}
@@ -164,13 +164,13 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 				return []ChatMessage{
 					{
 						ChatRole: ChatRole_Assistant,
-						ToolCalls: []LLMStreamEventToolCall{
-							{ID: toolCallID, Function: "create_todo"},
+						ActionCalls: []AssistantActionCall{
+							{ID: toolCallID, Name: "create_todo"},
 						},
 					},
 					{
 						ChatRole:     ChatRole_Tool,
-						ToolCallID:   &toolCallID,
+						ActionCallID: &toolCallID,
 						MessageState: ChatMessageState_Completed,
 					},
 				}

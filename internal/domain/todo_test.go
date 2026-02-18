@@ -7,21 +7,8 @@ import (
 	"strings"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestTodo_ToLLMInput(t *testing.T) {
-	todo := Todo{
-		ID:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-		Title:   "Finish the report",
-		Status:  TodoStatus_OPEN,
-		DueDate: time.Date(2024, 7, 15, 0, 0, 0, 0, time.UTC),
-	}
-
-	result := todo.ToLLMInput()
-	assert.Equal(t, "ID: 00000000-0000-0000-0000-000000000001 | Task: Finish the report | Due Date: 2024-07-15 | Status: OPEN", result)
-}
 
 func TestTodo_Validate(t *testing.T) {
 	now := time.Date(2024, 7, 15, 0, 0, 0, 0, time.UTC)

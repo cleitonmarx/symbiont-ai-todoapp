@@ -1499,54 +1499,46 @@ func (_c *MockLLMClient_ChatStream_Call) RunAndReturn(run func(ctx context.Conte
 	return _c
 }
 
-// Embed provides a mock function for the type MockLLMClient
-func (_mock *MockLLMClient) Embed(ctx context.Context, model string, input string, opts ...EmbedOption) (EmbedResponse, error) {
-	var tmpRet mock.Arguments
-	if len(opts) > 0 {
-		tmpRet = _mock.Called(ctx, model, input, opts)
-	} else {
-		tmpRet = _mock.Called(ctx, model, input)
-	}
-	ret := tmpRet
+// EmbedSearch provides a mock function for the type MockLLMClient
+func (_mock *MockLLMClient) EmbedSearch(ctx context.Context, model string, searchInput string) (EmbedResponse, error) {
+	ret := _mock.Called(ctx, model, searchInput)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Embed")
+		panic("no return value specified for EmbedSearch")
 	}
 
 	var r0 EmbedResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, ...EmbedOption) (EmbedResponse, error)); ok {
-		return returnFunc(ctx, model, input, opts...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (EmbedResponse, error)); ok {
+		return returnFunc(ctx, model, searchInput)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, ...EmbedOption) EmbedResponse); ok {
-		r0 = returnFunc(ctx, model, input, opts...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) EmbedResponse); ok {
+		r0 = returnFunc(ctx, model, searchInput)
 	} else {
 		r0 = ret.Get(0).(EmbedResponse)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, ...EmbedOption) error); ok {
-		r1 = returnFunc(ctx, model, input, opts...)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, model, searchInput)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// MockLLMClient_Embed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Embed'
-type MockLLMClient_Embed_Call struct {
+// MockLLMClient_EmbedSearch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EmbedSearch'
+type MockLLMClient_EmbedSearch_Call struct {
 	*mock.Call
 }
 
-// Embed is a helper method to define mock.On call
+// EmbedSearch is a helper method to define mock.On call
 //   - ctx context.Context
 //   - model string
-//   - input string
-//   - opts ...EmbedOption
-func (_e *MockLLMClient_Expecter) Embed(ctx interface{}, model interface{}, input interface{}, opts ...interface{}) *MockLLMClient_Embed_Call {
-	return &MockLLMClient_Embed_Call{Call: _e.mock.On("Embed",
-		append([]interface{}{ctx, model, input}, opts...)...)}
+//   - searchInput string
+func (_e *MockLLMClient_Expecter) EmbedSearch(ctx interface{}, model interface{}, searchInput interface{}) *MockLLMClient_EmbedSearch_Call {
+	return &MockLLMClient_EmbedSearch_Call{Call: _e.mock.On("EmbedSearch", ctx, model, searchInput)}
 }
 
-func (_c *MockLLMClient_Embed_Call) Run(run func(ctx context.Context, model string, input string, opts ...EmbedOption)) *MockLLMClient_Embed_Call {
+func (_c *MockLLMClient_EmbedSearch_Call) Run(run func(ctx context.Context, model string, searchInput string)) *MockLLMClient_EmbedSearch_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1560,28 +1552,93 @@ func (_c *MockLLMClient_Embed_Call) Run(run func(ctx context.Context, model stri
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
-		var arg3 []EmbedOption
-		var variadicArgs []EmbedOption
-		if len(args) > 3 {
-			variadicArgs = args[3].([]EmbedOption)
-		}
-		arg3 = variadicArgs
 		run(
 			arg0,
 			arg1,
 			arg2,
-			arg3...,
 		)
 	})
 	return _c
 }
 
-func (_c *MockLLMClient_Embed_Call) Return(embedResponse EmbedResponse, err error) *MockLLMClient_Embed_Call {
+func (_c *MockLLMClient_EmbedSearch_Call) Return(embedResponse EmbedResponse, err error) *MockLLMClient_EmbedSearch_Call {
 	_c.Call.Return(embedResponse, err)
 	return _c
 }
 
-func (_c *MockLLMClient_Embed_Call) RunAndReturn(run func(ctx context.Context, model string, input string, opts ...EmbedOption) (EmbedResponse, error)) *MockLLMClient_Embed_Call {
+func (_c *MockLLMClient_EmbedSearch_Call) RunAndReturn(run func(ctx context.Context, model string, searchInput string) (EmbedResponse, error)) *MockLLMClient_EmbedSearch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// EmbedTodo provides a mock function for the type MockLLMClient
+func (_mock *MockLLMClient) EmbedTodo(ctx context.Context, model string, todo Todo) (EmbedResponse, error) {
+	ret := _mock.Called(ctx, model, todo)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EmbedTodo")
+	}
+
+	var r0 EmbedResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, Todo) (EmbedResponse, error)); ok {
+		return returnFunc(ctx, model, todo)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, Todo) EmbedResponse); ok {
+		r0 = returnFunc(ctx, model, todo)
+	} else {
+		r0 = ret.Get(0).(EmbedResponse)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, Todo) error); ok {
+		r1 = returnFunc(ctx, model, todo)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockLLMClient_EmbedTodo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EmbedTodo'
+type MockLLMClient_EmbedTodo_Call struct {
+	*mock.Call
+}
+
+// EmbedTodo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - model string
+//   - todo Todo
+func (_e *MockLLMClient_Expecter) EmbedTodo(ctx interface{}, model interface{}, todo interface{}) *MockLLMClient_EmbedTodo_Call {
+	return &MockLLMClient_EmbedTodo_Call{Call: _e.mock.On("EmbedTodo", ctx, model, todo)}
+}
+
+func (_c *MockLLMClient_EmbedTodo_Call) Run(run func(ctx context.Context, model string, todo Todo)) *MockLLMClient_EmbedTodo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 Todo
+		if args[2] != nil {
+			arg2 = args[2].(Todo)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockLLMClient_EmbedTodo_Call) Return(embedResponse EmbedResponse, err error) *MockLLMClient_EmbedTodo_Call {
+	_c.Call.Return(embedResponse, err)
+	return _c
+}
+
+func (_c *MockLLMClient_EmbedTodo_Call) RunAndReturn(run func(ctx context.Context, model string, todo Todo) (EmbedResponse, error)) *MockLLMClient_EmbedTodo_Call {
 	_c.Call.Return(run)
 	return _c
 }

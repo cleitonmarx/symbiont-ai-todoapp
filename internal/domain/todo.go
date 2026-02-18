@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -57,11 +56,6 @@ func (t Todo) Validate(now time.Time) error {
 	}
 
 	return nil
-}
-
-// ToLLMInput formats the todo item as a string suitable for LLM input.
-func (t Todo) ToLLMInput() string {
-	return fmt.Sprintf("ID: %s | Task: %s | Due Date: %s | Status: %s", t.ID.String(), t.Title, t.DueDate.Format(time.DateOnly), t.Status)
 }
 
 // TodoSortBy represents sorting criteria for listing todos.

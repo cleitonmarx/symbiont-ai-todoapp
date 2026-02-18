@@ -32,7 +32,7 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 		setExpectations func(
 			uow *domain.MockUnitOfWork,
 			timeProvider *domain.MockCurrentTimeProvider,
-			llmClient *domain.MockLLMClient,
+			semanticEncoder *domain.MockSemanticEncoder,
 		)
 		title        string
 		dueDate      time.Time
@@ -45,20 +45,20 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 			setExpectations: func(
 				uow *domain.MockUnitOfWork,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				semanticEncoder *domain.MockSemanticEncoder,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
 				repo := domain.NewMockTodoRepository(t)
 				outbox := domain.NewMockOutboxRepository(t)
 
-				llmClient.EXPECT().EmbedTodo(
+				semanticEncoder.EXPECT().VectorizeTodo(
 					mock.Anything,
 					"model-name",
 					mock.MatchedBy(func(t domain.Todo) bool {
 						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
 					}),
-				).Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2, 0.3}}, nil)
+				).Return(domain.EmbeddingVector{Vector: []float64{0.1, 0.2, 0.3}}, nil)
 
 				uow.EXPECT().Todo().Return(repo)
 				uow.EXPECT().Outbox().Return(outbox)
@@ -88,7 +88,7 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 			setExpectations: func(
 				uow *domain.MockUnitOfWork,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				semanticEncoder *domain.MockSemanticEncoder,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 			},
@@ -101,17 +101,17 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 			setExpectations: func(
 				uow *domain.MockUnitOfWork,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				semanticEncoder *domain.MockSemanticEncoder,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
-				llmClient.EXPECT().EmbedTodo(
+				semanticEncoder.EXPECT().VectorizeTodo(
 					mock.Anything,
 					"model-name",
 					mock.MatchedBy(func(t domain.Todo) bool {
 						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
 					}),
-				).Return(domain.EmbedResponse{}, errors.New("LLM service unavailable"))
+				).Return(domain.EmbeddingVector{}, errors.New("LLM service unavailable"))
 			},
 			expectedTodo: domain.Todo{},
 			expectedErr:  errors.New("LLM service unavailable"),
@@ -122,19 +122,19 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 			setExpectations: func(
 				uow *domain.MockUnitOfWork,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				semanticEncoder *domain.MockSemanticEncoder,
 			) {
 
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
 				repo := domain.NewMockTodoRepository(t)
-				llmClient.EXPECT().EmbedTodo(
+				semanticEncoder.EXPECT().VectorizeTodo(
 					mock.Anything,
 					"model-name",
 					mock.MatchedBy(func(t domain.Todo) bool {
 						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
 					}),
-				).Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2, 0.3}}, nil)
+				).Return(domain.EmbeddingVector{Vector: []float64{0.1, 0.2, 0.3}}, nil)
 
 				uow.EXPECT().Todo().Return(repo)
 
@@ -153,12 +153,12 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			uow := domain.NewMockUnitOfWork(t)
 			timeProvider := domain.NewMockCurrentTimeProvider(t)
-			llmClient := domain.NewMockLLMClient(t)
+			semanticEncoder := domain.NewMockSemanticEncoder(t)
 			if tt.setExpectations != nil {
-				tt.setExpectations(uow, timeProvider, llmClient)
+				tt.setExpectations(uow, timeProvider, semanticEncoder)
 			}
 
-			cti := NewTodoCreatorImpl(uow, timeProvider, llmClient, "model-name")
+			cti := NewTodoCreatorImpl(uow, timeProvider, semanticEncoder, "model-name")
 			cti.createUUID = fixedUUID
 
 			got, gotErr := cti.Create(context.Background(), uow, tt.title, tt.dueDate)

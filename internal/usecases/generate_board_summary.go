@@ -28,7 +28,7 @@ type GenerateBoardSummary interface {
 type GenerateBoardSummaryImpl struct {
 	repo               domain.BoardSummaryRepository
 	timeProvider       domain.CurrentTimeProvider
-	llmClient          domain.LLMClient
+	assistant          domain.Assistant
 	model              string
 	completedSummaryCh CompletedBoardSummaryChannel
 }
@@ -37,15 +37,14 @@ type GenerateBoardSummaryImpl struct {
 func NewGenerateBoardSummaryImpl(
 	bsr domain.BoardSummaryRepository,
 	tp domain.CurrentTimeProvider,
-	c domain.LLMClient,
+	assistant domain.Assistant,
 	m string,
 	q CompletedBoardSummaryChannel,
-
 ) GenerateBoardSummaryImpl {
 	return GenerateBoardSummaryImpl{
 		repo:               bsr,
 		timeProvider:       tp,
-		llmClient:          c,
+		assistant:          assistant,
 		model:              m,
 		completedSummaryCh: q,
 	}
@@ -104,7 +103,7 @@ func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context) (do
 		return domain.BoardSummary{}, false, fmt.Errorf("failed to build prompt: %w", err)
 	}
 
-	req := domain.LLMChatRequest{
+	req := domain.AssistantTurnRequest{
 		Model:       gs.model,
 		Stream:      false,
 		Temperature: common.Ptr(1.2),
@@ -112,7 +111,7 @@ func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context) (do
 		Messages:    promptMessages,
 	}
 
-	resp, err := gs.llmClient.Chat(ctx, req)
+	resp, err := gs.assistant.RunTurnSync(ctx, req)
 	if err != nil {
 		return domain.BoardSummary{}, false, err
 	}
@@ -136,7 +135,7 @@ func (gs GenerateBoardSummaryImpl) generateBoardSummary(ctx context.Context) (do
 var summaryPrompt embed.FS
 
 // buildPromptMessages constructs the LLM messages for the summary prompt.
-func buildPromptMessages(new domain.BoardSummaryContent, previous domain.BoardSummaryContent) ([]domain.LLMChatMessage, error) {
+func buildPromptMessages(new domain.BoardSummaryContent, previous domain.BoardSummaryContent) ([]domain.AssistantMessage, error) {
 	inputTOON, err := marshalSummaryContent(new)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal summary content: %w", err)
@@ -159,7 +158,7 @@ func buildPromptMessages(new domain.BoardSummaryContent, previous domain.BoardSu
 	}
 	defer file.Close() //nolint:errcheck
 
-	messages := []domain.LLMChatMessage{}
+	messages := []domain.AssistantMessage{}
 	err = yaml.NewDecoder(file).Decode(&messages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode summary prompt: %w", err)
@@ -199,7 +198,7 @@ func marshalSummaryContent(sc domain.BoardSummaryContent) (string, error) {
 type InitGenerateBoardSummary struct {
 	SummaryRepo  domain.BoardSummaryRepository `resolve:""`
 	TimeProvider domain.CurrentTimeProvider    `resolve:""`
-	LLMClient    domain.LLMClient              `resolve:""`
+	Assistant    domain.Assistant              `resolve:""`
 	Model        string                        `config:"LLM_SUMMARY_MODEL"`
 }
 
@@ -207,7 +206,7 @@ type InitGenerateBoardSummary struct {
 func (igbs InitGenerateBoardSummary) Initialize(ctx context.Context) (context.Context, error) {
 	queue, _ := depend.Resolve[CompletedBoardSummaryChannel]()
 	depend.Register[GenerateBoardSummary](NewGenerateBoardSummaryImpl(
-		igbs.SummaryRepo, igbs.TimeProvider, igbs.LLMClient, igbs.Model, queue,
+		igbs.SummaryRepo, igbs.TimeProvider, igbs.Assistant, igbs.Model, queue,
 	))
 	return ctx, nil
 }

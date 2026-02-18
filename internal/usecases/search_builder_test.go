@@ -37,9 +37,9 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 		dueBefore  *time.Time
 		sortBy     *string
 		searches   []searchInput
-		setupMocks func(t *testing.T, llmClient *domain.MockLLMClient)
+		setupMocks func(t *testing.T, semanticEncoder *domain.MockSemanticEncoder)
 		wantErr    string
-		assertRes  func(t *testing.T, llmClient *domain.MockLLMClient, res TodoSearchBuildResult)
+		assertRes  func(t *testing.T, semanticEncoder *domain.MockSemanticEncoder, res TodoSearchBuildResult)
 	}
 
 	tests := map[string]testCase{
@@ -51,7 +51,7 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 			searches: []searchInput{
 				{query: &searchGroceries, searchType: common.Ptr(SearchType_Title)},
 			},
-			assertRes: func(t *testing.T, _ *domain.MockLLMClient, res TodoSearchBuildResult) {
+			assertRes: func(t *testing.T, _ *domain.MockSemanticEncoder, res TodoSearchBuildResult) {
 				assert.Equal(t, 0, res.EmbeddingTotalTokens)
 				params := domain.ListTodosParams{}
 				for _, opt := range res.Options {
@@ -80,16 +80,16 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 			searches: []searchInput{
 				{query: &searchUrgentSpaced, searchType: common.Ptr(SearchType_Similarity)},
 			},
-			setupMocks: func(t *testing.T, llmClient *domain.MockLLMClient) {
-				llmClient.EXPECT().
-					EmbedSearch(mock.Anything, "embedding-model", "urgent").
-					Return(domain.EmbedResponse{
-						Embedding:   []float64{0.1, 0.2},
+			setupMocks: func(t *testing.T, semanticEncoder *domain.MockSemanticEncoder) {
+				semanticEncoder.EXPECT().
+					VectorizeQuery(mock.Anything, "embedding-model", "urgent").
+					Return(domain.EmbeddingVector{
+						Vector:      []float64{0.1, 0.2},
 						TotalTokens: 17,
 					}, nil).
 					Once()
 			},
-			assertRes: func(t *testing.T, _ *domain.MockLLMClient, res TodoSearchBuildResult) {
+			assertRes: func(t *testing.T, _ *domain.MockSemanticEncoder, res TodoSearchBuildResult) {
 				assert.Equal(t, 17, res.EmbeddingTotalTokens)
 				params := domain.ListTodosParams{}
 				for _, opt := range res.Options {
@@ -103,9 +103,9 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 			searches: []searchInput{
 				{query: &searchBlank, searchType: common.Ptr(SearchType_Similarity)},
 			},
-			assertRes: func(t *testing.T, llmClient *domain.MockLLMClient, res TodoSearchBuildResult) {
+			assertRes: func(t *testing.T, semanticEncoder *domain.MockSemanticEncoder, res TodoSearchBuildResult) {
 				assert.Equal(t, 0, res.EmbeddingTotalTokens)
-				llmClient.AssertNotCalled(t, "EmbedSearch", mock.Anything, "embedding-model", mock.Anything)
+				semanticEncoder.AssertNotCalled(t, "VectorizeQuery", mock.Anything, "embedding-model", mock.Anything)
 			},
 		},
 		"fails-on-partial-due-range": {
@@ -132,10 +132,10 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 			searches: []searchInput{
 				{query: &searchUrgent, searchType: common.Ptr(SearchType_Similarity)},
 			},
-			setupMocks: func(t *testing.T, llmClient *domain.MockLLMClient) {
-				llmClient.EXPECT().
-					EmbedSearch(mock.Anything, "embedding-model", "urgent").
-					Return(domain.EmbedResponse{}, errors.New("embedding failed")).
+			setupMocks: func(t *testing.T, semanticEncoder *domain.MockSemanticEncoder) {
+				semanticEncoder.EXPECT().
+					VectorizeQuery(mock.Anything, "embedding-model", "urgent").
+					Return(domain.EmbeddingVector{}, errors.New("embedding failed")).
 					Once()
 			},
 			wantErr: "embedding failed",
@@ -157,12 +157,12 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			llmClient := domain.NewMockLLMClient(t)
+			semanticEncoder := domain.NewMockSemanticEncoder(t)
 			if tt.setupMocks != nil {
-				tt.setupMocks(t, llmClient)
+				tt.setupMocks(t, semanticEncoder)
 			}
 
-			builder := NewTodoSearchBuilder(llmClient, tt.model).
+			builder := NewTodoSearchBuilder(semanticEncoder, tt.model).
 				WithStatus(tt.status).
 				WithDueDateRange(tt.dueAfter, tt.dueBefore).
 				WithSortBy(tt.sortBy)
@@ -179,7 +179,7 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 			}
 
 			if assert.NoError(t, err) && tt.assertRes != nil {
-				tt.assertRes(t, llmClient, res)
+				tt.assertRes(t, semanticEncoder, res)
 			}
 		})
 	}

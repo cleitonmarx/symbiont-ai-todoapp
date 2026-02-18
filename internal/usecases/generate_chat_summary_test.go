@@ -30,7 +30,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 			*domain.MockChatMessageRepository,
 			*domain.MockConversationSummaryRepository,
 			*domain.MockCurrentTimeProvider,
-			*domain.MockLLMClient,
+			*domain.MockAssistant,
 		)
 		expectedErr error
 	}{
@@ -63,7 +63,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -84,7 +84,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -118,7 +118,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -143,7 +143,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -176,7 +176,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				existingSummaryID := uuid.MustParse("323e4567-e89b-12d3-a456-426614174002")
 				summaryRepo.EXPECT().
@@ -219,15 +219,15 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					}).
 					Once()
 
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.MatchedBy(func(req domain.LLMChatRequest) bool {
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.MatchedBy(func(req domain.AssistantTurnRequest) bool {
 						return assert.Equal(t, "summary-model", req.Model) &&
 							assert.Equal(t, common.Ptr(CHAT_SUMMARY_MAX_TOKENS), req.MaxTokens) &&
 							assert.Equal(t, common.Ptr(CHAT_SUMMARY_FREQUENCY_PENALTY), req.FrequencyPenalty)
 					})).
-					Return(domain.LLMChatResponse{
+					Return(domain.AssistantTurnResponse{
 						Content: "Current State:\n- User asked to organize tasks.",
-						Usage: domain.LLMUsage{
+						Usage: domain.AssistantUsage{
 							PromptTokens:     9,
 							CompletionTokens: 4,
 						},
@@ -263,7 +263,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -282,9 +282,9 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 						},
 					}, false, nil).
 					Once()
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{Content: "summary"}, nil).
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{Content: "summary"}, nil).
 					Once()
 				timeProvider.EXPECT().Now().Return(fixedTime).Once()
 				summaryRepo.EXPECT().
@@ -307,7 +307,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				toolCallID := "tool-call-1"
 				assistantMsgID := uuid.MustParse("623e4567-e89b-12d3-a456-426614174005")
@@ -323,10 +323,10 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 							ID:             assistantMsgID,
 							ConversationID: conversationID,
 							ChatRole:       domain.ChatRole_Assistant,
-							ToolCalls: []domain.LLMStreamEventToolCall{
+							ActionCalls: []domain.AssistantActionCall{
 								{
-									ID:       toolCallID,
-									Function: "create_todo",
+									ID:   toolCallID,
+									Name: "create_todo",
 								},
 							},
 							MessageState: domain.ChatMessageState_Completed,
@@ -335,15 +335,15 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 							ID:             toolMsgID,
 							ConversationID: conversationID,
 							ChatRole:       domain.ChatRole_Tool,
-							ToolCallID:     &toolCallID,
+							ActionCallID:   &toolCallID,
 							Content:        `{"message":"ok"}`,
 							MessageState:   domain.ChatMessageState_Completed,
 						},
 					}, false, nil).
 					Once()
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{Content: "summary"}, nil).
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{Content: "summary"}, nil).
 					Once()
 				timeProvider.EXPECT().Now().Return(fixedTime).Once()
 				summaryRepo.EXPECT().
@@ -367,7 +367,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -385,11 +385,11 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 						},
 					}, true, nil).
 					Once()
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{
 						Content: "",
-						Usage: domain.LLMUsage{
+						Usage: domain.AssistantUsage{
 							PromptTokens:     120,
 							CompletionTokens: 512,
 						},
@@ -410,7 +410,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -428,9 +428,9 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 						},
 					}, true, nil).
 					Once()
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{}, errors.New("llm error")).
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{}, errors.New("llm error")).
 					Once()
 			},
 			expectedErr: fmt.Errorf("failed to generate chat summary: %w", errors.New("llm error")),
@@ -447,7 +447,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -465,9 +465,9 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 						},
 					}, true, nil).
 					Once()
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{Content: "summary"}, nil).
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{Content: "summary"}, nil).
 					Once()
 				timeProvider.EXPECT().Now().Return(fixedTime).Once()
 				summaryRepo.EXPECT().
@@ -484,17 +484,17 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 			chatRepo := domain.NewMockChatMessageRepository(t)
 			summaryRepo := domain.NewMockConversationSummaryRepository(t)
 			timeProvider := domain.NewMockCurrentTimeProvider(t)
-			llmClient := domain.NewMockLLMClient(t)
+			assistant := domain.NewMockAssistant(t)
 
 			if tt.setExpectations != nil {
-				tt.setExpectations(t, chatRepo, summaryRepo, timeProvider, llmClient)
+				tt.setExpectations(t, chatRepo, summaryRepo, timeProvider, assistant)
 			}
 
 			uc := NewGenerateChatSummaryImpl(
 				chatRepo,
 				summaryRepo,
 				timeProvider,
-				llmClient,
+				assistant,
 				tt.model,
 				nil,
 			)
@@ -518,9 +518,9 @@ func TestMergeRecentToolCallsIntoSummary(t *testing.T) {
 			messages: []domain.ChatMessage{
 				{
 					ChatRole: domain.ChatRole_Assistant,
-					ToolCalls: []domain.LLMStreamEventToolCall{
-						{Function: "fetch_todos"},
-						{Function: "set_ui_filters"},
+					ActionCalls: []domain.AssistantActionCall{
+						{Name: "fetch_todos"},
+						{Name: "set_ui_filters"},
 					},
 				},
 			},
@@ -532,9 +532,9 @@ func TestMergeRecentToolCallsIntoSummary(t *testing.T) {
 			messages: []domain.ChatMessage{
 				{
 					ChatRole: domain.ChatRole_Assistant,
-					ToolCalls: []domain.LLMStreamEventToolCall{
-						{Function: "call10"},
-						{Function: "call11"},
+					ActionCalls: []domain.AssistantActionCall{
+						{Name: "call10"},
+						{Name: "call11"},
 					},
 				},
 			},
@@ -546,8 +546,8 @@ func TestMergeRecentToolCallsIntoSummary(t *testing.T) {
 			messages: []domain.ChatMessage{
 				{
 					ChatRole: domain.ChatRole_Assistant,
-					ToolCalls: []domain.LLMStreamEventToolCall{
-						{Function: "create_todo"},
+					ActionCalls: []domain.AssistantActionCall{
+						{Name: "create_todo"},
 					},
 				},
 			},

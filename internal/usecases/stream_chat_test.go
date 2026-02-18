@@ -36,8 +36,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -58,9 +58,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 5)
 
@@ -77,9 +77,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) {
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) {
 						foundSummaryContext := false
 						for _, msg := range req.Messages {
 							if msg.Role == domain.ChatRole_Developer && strings.Contains(msg.Content, "Current intent: organize todos") {
@@ -90,17 +90,17 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						assert.True(t, foundSummaryContext)
 
 						// Simulate events
-						_ = onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+						_ = onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						})
-						_ = onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "I'm "})
-						_ = onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "doing "})
-						_ = onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "great!"})
-						_ = onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
+						_ = onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "I'm "})
+						_ = onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "doing "})
+						_ = onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "great!"})
+						_ = onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 							AssistantMessageID: assistantMsgID.String(),
 							CompletedAt:        fixedTime.Format(time.RFC3339),
-							Usage: domain.LLMUsage{
+							Usage: domain.AssistantUsage{
 								PromptTokens:     promptTokens,
 								CompletionTokens: completionTokens,
 								TotalTokens:      totalTokens,
@@ -141,8 +141,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -170,9 +170,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 5)
 
@@ -189,9 +189,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) {
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) {
 						foundSummaryContext := false
 						for _, msg := range req.Messages {
 							if msg.Role == domain.ChatRole_Developer && strings.Contains(msg.Content, "Current intent: organize todos") {
@@ -202,17 +202,17 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						assert.True(t, foundSummaryContext)
 
 						// Simulate events
-						_ = onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+						_ = onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						})
-						_ = onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "I'm "})
-						_ = onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "doing "})
-						_ = onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "great!"})
-						_ = onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
+						_ = onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "I'm "})
+						_ = onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "doing "})
+						_ = onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "great!"})
+						_ = onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 							AssistantMessageID: assistantMsgID.String(),
 							CompletedAt:        fixedTime.Format(time.RFC3339),
-							Usage: domain.LLMUsage{
+							Usage: domain.AssistantUsage{
 								PromptTokens:     promptTokens,
 								CompletionTokens: completionTokens,
 								TotalTokens:      totalTokens,
@@ -255,8 +255,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -267,9 +267,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 5)
 
@@ -278,14 +278,14 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) {
-						_ = onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) {
+						_ = onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						})
-						_ = onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
+						_ = onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 							AssistantMessageID: assistantMsgID.String(),
 							CompletedAt:        fixedTime.Format(time.RFC3339),
 						})
@@ -339,8 +339,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -371,8 +371,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -383,9 +383,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 4)
 
@@ -394,10 +394,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-						return onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+						return onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						})
@@ -424,7 +424,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				})
 			},
 			expectErr:      true,
-			onEventErrType: domain.LLMStreamEventType_Meta,
+			onEventErrType: domain.AssistantEventType_TurnStarted,
 		},
 		"onEvent-delta-error": {
 			userMessage: "Test",
@@ -437,8 +437,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -449,9 +449,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 4)
 
@@ -460,16 +460,16 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-						if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+						if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						}); err != nil {
 							return err
 						}
-						return onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "Hi"})
+						return onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Hi"})
 					})
 
 				onEventErr := "onEvent error"
@@ -493,7 +493,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				})
 			},
 			expectErr:      true,
-			onEventErrType: domain.LLMStreamEventType_Delta,
+			onEventErrType: domain.AssistantEventType_MessageDelta,
 		},
 		"llm-chatstream-error": {
 			userMessage: "Test",
@@ -506,8 +506,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -518,9 +518,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						ID: conversationID,
 					}, true, nil).
 					Once()
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 4)
 
@@ -529,8 +529,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					Return(errors.New("llm error"))
 
 				llmErr := "llm error"
@@ -564,8 +564,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -576,9 +576,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 5)
 
@@ -587,11 +587,11 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) {
-						_ = onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "Hello from model"})
-						_ = onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) {
+						_ = onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Hello from model"})
+						_ = onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 							AssistantMessageID: "",
 							CompletedAt:        fixedTime.Format(time.RFC3339),
 						})
@@ -627,8 +627,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -639,9 +639,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 4)
 
@@ -650,19 +650,19 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-						if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+						if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						}); err != nil {
 							return err
 						}
-						if err := onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "OK"}); err != nil {
+						if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "OK"}); err != nil {
 							return err
 						}
-						return onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
+						return onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 							AssistantMessageID: assistantMsgID.String(),
 							CompletedAt:        fixedTime.Format(time.RFC3339),
 						})
@@ -703,8 +703,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -715,9 +715,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 4)
 
@@ -726,19 +726,19 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-						if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+						if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						}); err != nil {
 							return err
 						}
-						if err := onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "OK"}); err != nil {
+						if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "OK"}); err != nil {
 							return err
 						}
-						return onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
+						return onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 							AssistantMessageID: assistantMsgID.String(),
 							CompletedAt:        fixedTime.Format(time.RFC3339),
 						})

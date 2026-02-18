@@ -44,7 +44,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 		setExpectations func(
 			*domain.MockBoardSummaryRepository,
 			*domain.MockCurrentTimeProvider,
-			*domain.MockLLMClient,
+			*domain.MockAssistant,
 		)
 		expectedErr error
 	}{
@@ -52,7 +52,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 			setExpectations: func(
 				sr *domain.MockBoardSummaryRepository,
 				tp *domain.MockCurrentTimeProvider,
-				c *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 
 				tp.EXPECT().Now().Return(fixedTime)
@@ -66,9 +66,9 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 				sr.EXPECT().GetLatestSummary(mock.Anything).
 					Return(domain.BoardSummary{}, false, nil)
 
-				c.EXPECT().Chat(
+				assistant.EXPECT().RunTurnSync(
 					mock.Anything,
-					mock.MatchedBy(func(req domain.LLMChatRequest) bool {
+					mock.MatchedBy(func(req domain.AssistantTurnRequest) bool {
 						return req.Model == "mistral" &&
 							len(req.Messages) == 2 &&
 							req.Messages[0].Role == "developer" &&
@@ -76,7 +76,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 							strings.Contains(req.Messages[0].Content, "You are a helpful assistant that summarizes todo progress") &&
 							strings.Contains(req.Messages[1].Content, "Open: 2\n  Done: 1")
 					}),
-				).Return(domain.LLMChatResponse{Content: "You have 2 open todos, 1 overdue todo, and 1 completed todo."}, nil)
+				).Return(domain.AssistantTurnResponse{Content: "You have 2 open todos, 1 overdue todo, and 1 completed todo."}, nil)
 
 				sr.EXPECT().StoreSummary(
 					mock.Anything,
@@ -89,7 +89,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 			setExpectations: func(
 				sr *domain.MockBoardSummaryRepository,
 				tp *domain.MockCurrentTimeProvider,
-				c *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				tp.EXPECT().Now().Return(fixedTime)
 
@@ -102,10 +102,10 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 				sr.EXPECT().GetLatestSummary(mock.Anything).
 					Return(domain.BoardSummary{}, false, nil)
 
-				c.EXPECT().Chat(
+				assistant.EXPECT().RunTurnSync(
 					mock.Anything,
 					mock.Anything,
-				).Return(domain.LLMChatResponse{}, assert.AnError)
+				).Return(domain.AssistantTurnResponse{}, assert.AnError)
 			},
 			expectedErr: assert.AnError,
 		},
@@ -113,7 +113,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 			setExpectations: func(
 				sr *domain.MockBoardSummaryRepository,
 				tp *domain.MockCurrentTimeProvider,
-				c *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				tp.EXPECT().Now().Return(fixedTime)
 
@@ -126,10 +126,10 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 				sr.EXPECT().GetLatestSummary(mock.Anything).
 					Return(domain.BoardSummary{}, false, nil)
 
-				c.EXPECT().Chat(
+				assistant.EXPECT().RunTurnSync(
 					mock.Anything,
 					mock.Anything,
-				).Return(domain.LLMChatResponse{Content: "You have 2 open todos, 1 overdue todo, and 1 completed todo."}, nil)
+				).Return(domain.AssistantTurnResponse{Content: "You have 2 open todos, 1 overdue todo, and 1 completed todo."}, nil)
 
 				sr.EXPECT().StoreSummary(
 					mock.Anything,
@@ -144,13 +144,13 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			sr := domain.NewMockBoardSummaryRepository(t)
 			tp := domain.NewMockCurrentTimeProvider(t)
-			c := domain.NewMockLLMClient(t)
+			assistant := domain.NewMockAssistant(t)
 
 			if tt.setExpectations != nil {
-				tt.setExpectations(sr, tp, c)
+				tt.setExpectations(sr, tp, assistant)
 			}
 
-			gbs := NewGenerateBoardSummaryImpl(sr, tp, c, "mistral", nil)
+			gbs := NewGenerateBoardSummaryImpl(sr, tp, assistant, "mistral", nil)
 
 			err := gbs.Execute(context.Background())
 			assert.Equal(t, tt.expectedErr, err)

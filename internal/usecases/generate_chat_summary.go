@@ -69,7 +69,7 @@ type GenerateChatSummaryImpl struct {
 	chatMessageRepo         domain.ChatMessageRepository
 	conversationSummaryRepo domain.ConversationSummaryRepository
 	timeProvider            domain.CurrentTimeProvider
-	llmClient               domain.LLMClient
+	assistant               domain.Assistant
 	model                   string
 	completedSummaryCh      CompletedConversationSummaryChannel
 }
@@ -79,16 +79,15 @@ func NewGenerateChatSummaryImpl(
 	chatMessageRepo domain.ChatMessageRepository,
 	conversationSummaryRepo domain.ConversationSummaryRepository,
 	timeProvider domain.CurrentTimeProvider,
-	llmClient domain.LLMClient,
+	assistant domain.Assistant,
 	model string,
 	q CompletedConversationSummaryChannel,
 ) GenerateChatSummaryImpl {
-
 	return GenerateChatSummaryImpl{
 		chatMessageRepo:         chatMessageRepo,
 		conversationSummaryRepo: conversationSummaryRepo,
 		timeProvider:            timeProvider,
-		llmClient:               llmClient,
+		assistant:               assistant,
 		model:                   model,
 		completedSummaryCh:      q,
 	}
@@ -142,7 +141,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 		return fmt.Errorf("failed to build prompt messages: %w", err)
 	}
 
-	resp, err := gcs.llmClient.Chat(spanCtx, domain.LLMChatRequest{
+	resp, err := gcs.assistant.RunTurnSync(spanCtx, domain.AssistantTurnRequest{
 		Model:            gcs.model,
 		Messages:         promptMessages,
 		Stream:           false,
@@ -191,14 +190,14 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 
 // buildPromptMessages constructs the prompt messages for the LLM based
 // on the current conversation summary and new chat messages.
-func (gcs GenerateChatSummaryImpl) buildPromptMessages(currentState, newMessages string) ([]domain.LLMChatMessage, error) {
+func (gcs GenerateChatSummaryImpl) buildPromptMessages(currentState, newMessages string) ([]domain.AssistantMessage, error) {
 	file, err := chatSummaryPrompt.Open("prompts/chat-summary.yml")
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close() //nolint:errcheck
 
-	messages := []domain.LLMChatMessage{}
+	messages := []domain.AssistantMessage{}
 	err = yaml.NewDecoder(file).Decode(&messages)
 	if err != nil {
 		return nil, err
@@ -233,7 +232,7 @@ func formatMessageForSummary(message domain.ChatMessage) string {
 	}
 
 	if message.ChatRole == domain.ChatRole_Tool {
-		parts = append(parts, fmt.Sprintf("  tool_success: %t", message.IsToolCallSuccess()))
+		parts = append(parts, fmt.Sprintf("  tool_success: %t", message.IsActionCallSuccess()))
 	}
 
 	if message.ErrorMessage != nil && strings.TrimSpace(*message.ErrorMessage) != "" {
@@ -308,11 +307,11 @@ func parseRecentToolCallsFromSummary(summary string) []string {
 func extractRecentToolCalls(messages []domain.ChatMessage) []string {
 	toolCalls := make([]string, 0, len(messages))
 	for _, message := range messages {
-		if len(message.ToolCalls) == 0 {
+		if len(message.ActionCalls) == 0 {
 			continue
 		}
-		for _, toolCall := range message.ToolCalls {
-			functionName := strings.TrimSpace(toolCall.Function)
+		for _, toolCall := range message.ActionCalls {
+			functionName := strings.TrimSpace(toolCall.Name)
 			if functionName == "" {
 				continue
 			}
@@ -429,7 +428,7 @@ type InitGenerateChatSummary struct {
 	ChatMessageRepo         domain.ChatMessageRepository         `resolve:""`
 	ConversationSummaryRepo domain.ConversationSummaryRepository `resolve:""`
 	TimeProvider            domain.CurrentTimeProvider           `resolve:""`
-	LLMClient               domain.LLMClient                     `resolve:""`
+	Assistant               domain.Assistant                     `resolve:""`
 	Model                   string                               `config:"LLM_CHAT_SUMMARY_MODEL"`
 }
 
@@ -440,7 +439,7 @@ func (i InitGenerateChatSummary) Initialize(ctx context.Context) (context.Contex
 		i.ChatMessageRepo,
 		i.ConversationSummaryRepo,
 		i.TimeProvider,
-		i.LLMClient,
+		i.Assistant,
 		i.Model,
 		queue,
 	))

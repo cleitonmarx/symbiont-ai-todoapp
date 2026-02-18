@@ -47,7 +47,7 @@ func WithConversationID(conversationID uuid.UUID) StreamChatOption {
 // StreamChat defines the interface for the StreamChat use case
 type StreamChat interface {
 	// Execute streams a chat response and persists the conversation
-	Execute(ctx context.Context, userMessage, model string, onEvent domain.LLMStreamEventCallback, opts ...StreamChatOption) error
+	Execute(ctx context.Context, userMessage, model string, onEvent domain.AssistantEventCallback, opts ...StreamChatOption) error
 }
 
 // StreamChatImpl is the implementation of the StreamChat use case
@@ -57,9 +57,9 @@ type StreamChatImpl struct {
 	conversationRepo        domain.ConversationRepository
 	uow                     domain.UnitOfWork
 	timeProvider            domain.CurrentTimeProvider
-	llmClient               domain.LLMClient
-	llmToolRegistry         domain.LLMToolRegistry
-	llmEmbeddingModel       string
+	assistant               domain.Assistant
+	actionRegistry          domain.AssistantActionRegistry
+	embeddingModel          string
 	maxToolCycles           int
 }
 
@@ -69,10 +69,10 @@ func NewStreamChatImpl(
 	conversationSummaryRepo domain.ConversationSummaryRepository,
 	conversationRepo domain.ConversationRepository,
 	timeProvider domain.CurrentTimeProvider,
-	llmClient domain.LLMClient,
-	llmToolRegistry domain.LLMToolRegistry,
+	assistant domain.Assistant,
+	actionRegistry domain.AssistantActionRegistry,
 	uow domain.UnitOfWork,
-	llmEmbeddingModel string,
+	embeddingModel string,
 	maxToolCycles int,
 ) StreamChatImpl {
 	return StreamChatImpl{
@@ -81,15 +81,15 @@ func NewStreamChatImpl(
 		conversationRepo:        conversationRepo,
 		uow:                     uow,
 		timeProvider:            timeProvider,
-		llmClient:               llmClient,
-		llmToolRegistry:         llmToolRegistry,
-		llmEmbeddingModel:       llmEmbeddingModel,
+		assistant:               assistant,
+		actionRegistry:          actionRegistry,
+		embeddingModel:          embeddingModel,
 		maxToolCycles:           maxToolCycles,
 	}
 }
 
 // Execute streams a chat response and persists the conversation
-func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string, onEvent domain.LLMStreamEventCallback, opts ...StreamChatOption) error {
+func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string, onEvent domain.AssistantEventCallback, opts ...StreamChatOption) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -136,18 +136,18 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
-	messages = append(messages, domain.LLMChatMessage{
+	messages = append(messages, domain.AssistantMessage{
 		Role:    domain.ChatRole_User,
 		Content: userMessage,
 	})
 
-	req := domain.LLMChatRequest{
-		Model:       model,
-		Messages:    messages,
-		Stream:      true,
-		Temperature: common.Ptr(CHAT_TEMPERATURE),
-		TopP:        common.Ptr(CHAT_TOP_P),
-		Tools:       sc.llmToolRegistry.List(),
+	req := domain.AssistantTurnRequest{
+		Model:            model,
+		Messages:         messages,
+		Stream:           true,
+		Temperature:      common.Ptr(CHAT_TEMPERATURE),
+		TopP:             common.Ptr(CHAT_TOP_P),
+		AvailableActions: sc.actionRegistry.List(),
 	}
 
 	state := streamChatExecutionState{
@@ -173,7 +173,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	for continueChatStreaming := true; continueChatStreaming; {
 		continueChatStreaming = false
 
-		err = sc.llmClient.ChatStream(spanCtx, req, func(eventType domain.LLMStreamEventType, data any) error {
+		err = sc.assistant.RunTurn(spanCtx, req, func(eventType domain.AssistantEventType, data any) error {
 			shouldContinue, eventErr := sc.handleStreamEvent(spanCtx, eventType, data, model, &req, &state, onEvent)
 			if shouldContinue {
 				continueChatStreaming = true
@@ -215,8 +215,8 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	// Append the final assistant message with the full content only if there is content
 	if assistantMsg.Content == "" {
 		assistantMsg.Content = "Sorry, I could not process your request. Please try again."
-		if err := onEvent(domain.LLMStreamEventType_Delta,
-			domain.LLMStreamEventDelta{
+		if err := onEvent(domain.AssistantEventType_MessageDelta,
+			domain.AssistantMessageDelta{
 				Text: assistantMsg.Content + "\n",
 			},
 		); err != nil {
@@ -232,7 +232,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	RecordLLMTokensUsed(spanCtx, state.tokenUsage.PromptTokens, state.tokenUsage.CompletionTokens)
 
 	// Send done event
-	if err := onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
+	if err := onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 		AssistantMessageID: assistantMsg.ID.String(),
 		CompletedAt:        sc.timeProvider.Now().UTC().Format(time.RFC3339),
 		Usage:              state.tokenUsage,
@@ -248,7 +248,7 @@ type streamChatExecutionState struct {
 	conversationCreated bool
 	assistantMsgContent strings.Builder
 	assistantMsgID      uuid.UUID
-	tokenUsage          domain.LLMUsage
+	tokenUsage          domain.AssistantUsage
 	turnID              uuid.UUID
 	turnSequence        int64
 	userMsg             domain.ChatMessage
@@ -267,21 +267,21 @@ func (s *streamChatExecutionState) nextTurnSequence() int64 {
 // handleStreamEvent routes one stream event to the corresponding specialized handler.
 func (sc StreamChatImpl) handleStreamEvent(
 	ctx context.Context,
-	eventType domain.LLMStreamEventType,
+	eventType domain.AssistantEventType,
 	data any,
 	model string,
-	req *domain.LLMChatRequest,
+	req *domain.AssistantTurnRequest,
 	state *streamChatExecutionState,
-	onEvent domain.LLMStreamEventCallback,
+	onEvent domain.AssistantEventCallback,
 ) (bool, error) {
 	switch eventType {
-	case domain.LLMStreamEventType_Meta:
+	case domain.AssistantEventType_TurnStarted:
 		return false, sc.handleMetaEvent(ctx, data, state, onEvent)
-	case domain.LLMStreamEventType_ToolCall:
+	case domain.AssistantEventType_ActionRequested:
 		return sc.handleToolCallEvent(ctx, data, model, req, state, onEvent)
-	case domain.LLMStreamEventType_Delta:
+	case domain.AssistantEventType_MessageDelta:
 		return false, sc.handleDeltaEvent(data, state, onEvent)
-	case domain.LLMStreamEventType_Done:
+	case domain.AssistantEventType_TurnCompleted:
 		sc.handleDoneEvent(data, state)
 		return false, nil
 	default:
@@ -294,14 +294,14 @@ func (sc StreamChatImpl) handleMetaEvent(
 	ctx context.Context,
 	data any,
 	state *streamChatExecutionState,
-	onEvent domain.LLMStreamEventCallback,
+	onEvent domain.AssistantEventCallback,
 ) error {
 	// Capture IDs from the first meta event and persist the user message immediately.
 	if state.assistantMsgID != uuid.Nil {
 		return nil
 	}
 
-	meta := data.(domain.LLMStreamEventMeta)
+	meta := data.(domain.AssistantTurnStarted)
 	meta.ConversationID = state.conversation.ID
 	meta.ConversationCreated = state.conversationCreated
 	state.assistantMsgID = meta.AssistantMessageID
@@ -313,7 +313,7 @@ func (sc StreamChatImpl) handleMetaEvent(
 		return err
 	}
 	state.userMsgPersisted = true
-	return onEvent(domain.LLMStreamEventType_Meta, meta)
+	return onEvent(domain.AssistantEventType_TurnStarted, meta)
 }
 
 // handleToolCallEvent persists assistant tool-call and tool-result messages, then updates request context.
@@ -321,12 +321,12 @@ func (sc StreamChatImpl) handleToolCallEvent(
 	ctx context.Context,
 	data any,
 	model string,
-	req *domain.LLMChatRequest,
+	req *domain.AssistantTurnRequest,
 	state *streamChatExecutionState,
-	onEvent domain.LLMStreamEventCallback,
+	onEvent domain.AssistantEventCallback,
 ) (bool, error) {
-	toolCall := data.(domain.LLMStreamEventToolCall)
-	if state.tracker.hasExceededMaxCycles() || state.tracker.hasExceededMaxToolCalls(toolCall.Function, toolCall.Arguments) {
+	toolCall := data.(domain.AssistantActionCall)
+	if state.tracker.hasExceededMaxCycles() || state.tracker.hasExceededMaxToolCalls(toolCall.Name, toolCall.Input) {
 		return false, nil
 	}
 
@@ -336,7 +336,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		TurnID:         state.turnID,
 		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_Assistant,
-		ToolCalls:      []domain.LLMStreamEventToolCall{toolCall},
+		ActionCalls:    []domain.AssistantActionCall{toolCall},
 		Model:          model,
 		MessageState:   domain.ChatMessageState_Completed,
 		CreatedAt:      sc.timeProvider.Now().UTC(),
@@ -346,13 +346,18 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		return false, err
 	}
 
-	toolCall.Text = sc.llmToolRegistry.StatusMessage(toolCall.Function)
-	if err := onEvent(domain.LLMStreamEventType_ToolStarted, toolCall); err != nil {
+	toolCall.Text = sc.actionRegistry.StatusMessage(toolCall.Name)
+	if err := onEvent(domain.AssistantEventType_ActionStarted, toolCall); err != nil {
 		return false, err
 	}
 
-	toolMessage := sc.llmToolRegistry.Call(ctx, toolCall, req.Messages)
-	toolSucceeded := toolMessage.IsToolCallSuccess()
+	toolMessage := sc.actionRegistry.Execute(ctx, domain.AssistantActionCall{
+		ID:    toolCall.ID,
+		Name:  toolCall.Name,
+		Input: toolCall.Input,
+		Text:  toolCall.Text,
+	}, req.Messages)
+	toolSucceeded := toolMessage.IsActionCallSuccess()
 	now := sc.timeProvider.Now().UTC()
 	toolChatMsg := domain.ChatMessage{
 		ID:             uuid.New(),
@@ -360,7 +365,7 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		TurnID:         state.turnID,
 		TurnSequence:   state.nextTurnSequence(),
 		ChatRole:       domain.ChatRole_Tool,
-		ToolCallID:     &toolCall.ID,
+		ActionCallID:   &toolCall.ID,
 		Content:        toolMessage.Content,
 		Model:          model,
 		MessageState:   domain.ChatMessageState_Completed,
@@ -376,25 +381,30 @@ func (sc StreamChatImpl) handleToolCallEvent(
 		return false, err
 	}
 
-	toolCompleted := domain.LLMStreamEventToolCallCompleted{
+	toolCompleted := domain.AssistantActionCompleted{
 		ID:            toolCall.ID,
-		Function:      toolCall.Function,
+		Name:          toolCall.Name,
 		Success:       toolSucceeded,
 		ShouldRefetch: toolSucceeded,
 	}
 	if !toolSucceeded {
 		toolCompleted.Error = &toolMessage.Content
 	}
-	if err := onEvent(domain.LLMStreamEventType_ToolCompleted, toolCompleted); err != nil {
+	if err := onEvent(domain.AssistantEventType_ActionCompleted, toolCompleted); err != nil {
 		return false, err
 	}
 
 	req.Messages = append(req.Messages,
-		domain.LLMChatMessage{
-			Role:      domain.ChatRole_Assistant,
-			ToolCalls: []domain.LLMStreamEventToolCall{toolCall},
+		domain.AssistantMessage{
+			Role:        domain.ChatRole_Assistant,
+			ActionCalls: []domain.AssistantActionCall{toolCall},
 		},
-		toolMessage,
+		domain.AssistantMessage{
+			Role:         toolMessage.Role,
+			Content:      toolMessage.Content,
+			ActionCallID: toolMessage.ActionCallID,
+			ActionCalls:  toolMessage.ActionCalls,
+		},
 	)
 
 	return true, nil
@@ -404,16 +414,16 @@ func (sc StreamChatImpl) handleToolCallEvent(
 func (sc StreamChatImpl) handleDeltaEvent(
 	data any,
 	state *streamChatExecutionState,
-	onEvent domain.LLMStreamEventCallback,
+	onEvent domain.AssistantEventCallback,
 ) error {
-	delta := data.(domain.LLMStreamEventDelta)
+	delta := data.(domain.AssistantMessageDelta)
 	state.assistantMsgContent.WriteString(delta.Text)
-	return onEvent(domain.LLMStreamEventType_Delta, data)
+	return onEvent(domain.AssistantEventType_MessageDelta, data)
 }
 
 // handleDoneEvent accumulates usage from one stream completion event.
 func (sc StreamChatImpl) handleDoneEvent(data any, state *streamChatExecutionState) {
-	done := data.(domain.LLMStreamEventDone)
+	done := data.(domain.AssistantTurnCompleted)
 	state.tokenUsage.CompletionTokens += done.Usage.CompletionTokens
 	state.tokenUsage.PromptTokens += done.Usage.PromptTokens
 	state.tokenUsage.TotalTokens += done.Usage.TotalTokens
@@ -506,14 +516,14 @@ func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.
 }
 
 // buildSystemPrompt creates the base chat prompt and injects the latest conversation summary context.
-func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID uuid.UUID) ([]domain.LLMChatMessage, error) {
+func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID uuid.UUID) ([]domain.AssistantMessage, error) {
 	file, err := chatPrompt.Open("prompts/chat.yml")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open chat prompt: %w", err)
 	}
 	defer file.Close() //nolint:errcheck
 
-	messages := []domain.LLMChatMessage{}
+	messages := []domain.AssistantMessage{}
 	err = yaml.NewDecoder(file).Decode(&messages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode summary prompt: %w", err)
@@ -537,7 +547,7 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 	if found && strings.TrimSpace(latestSummary.CurrentStateSummary) != "" {
 		summaryText = strings.TrimSpace(latestSummary.CurrentStateSummary)
 	}
-	messages = append(messages, domain.LLMChatMessage{
+	messages = append(messages, domain.AssistantMessage{
 		Role: domain.ChatRole_Developer,
 		Content: fmt.Sprintf(
 			"Conversation summary context:\n%s\n\nUse this as compact memory, but prioritize explicit user instructions in this turn.",
@@ -549,7 +559,7 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 }
 
 // fetchChatHistory retrieves the chat history excluding old system messages
-func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uuid.UUID) ([]domain.LLMChatMessage, error) {
+func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uuid.UUID) ([]domain.AssistantMessage, error) {
 	// Build system prompt with todo context
 	systemPrompt, err := sc.buildSystemPrompt(ctx, conversationID)
 	if err != nil {
@@ -563,7 +573,7 @@ func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uu
 	}
 
 	// Build chat request: system + history (excluding old system messages) + current user turn
-	messages := make([]domain.LLMChatMessage, 0, len(systemPrompt)+len(history)+1)
+	messages := make([]domain.AssistantMessage, 0, len(systemPrompt)+len(history)+1)
 	messages = append(messages, systemPrompt...)
 
 	//Remove orfaned tool messages from history
@@ -577,11 +587,11 @@ func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uu
 	// Append prior conversation history, skipping previous system messages
 	for _, msg := range history {
 		if msg.ChatRole != domain.ChatRole_System {
-			messages = append(messages, domain.LLMChatMessage{
-				Role:       msg.ChatRole,
-				Content:    msg.Content,
-				ToolCallID: msg.ToolCallID,
-				ToolCalls:  msg.ToolCalls,
+			messages = append(messages, domain.AssistantMessage{
+				Role:         msg.ChatRole,
+				Content:      msg.Content,
+				ActionCallID: msg.ActionCallID,
+				ActionCalls:  msg.ActionCalls,
 			})
 		}
 	}
@@ -630,8 +640,8 @@ type InitStreamChat struct {
 	ConversationRepo        domain.ConversationRepository        `resolve:""`
 	Uow                     domain.UnitOfWork                    `resolve:""`
 	TimeProvider            domain.CurrentTimeProvider           `resolve:""`
-	LLMToolRegistry         domain.LLMToolRegistry               `resolve:""`
-	LLMClient               domain.LLMClient                     `resolve:""`
+	AssistantActionRegistry domain.AssistantActionRegistry       `resolve:""`
+	Assistant               domain.Assistant                     `resolve:""`
 	EmbeddingModel          string                               `config:"LLM_EMBEDDING_MODEL"`
 	// Maximum number of tool cycles to prevent infinite loops
 	// It restricts how many times the LLM can invoke tools in a single chat session
@@ -645,8 +655,8 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 		i.ConversationSummaryRepo,
 		i.ConversationRepo,
 		i.TimeProvider,
-		i.LLMClient,
-		i.LLMToolRegistry,
+		i.Assistant,
+		i.AssistantActionRegistry,
 		i.Uow,
 		i.EmbeddingModel,
 		i.MaxToolCycles,

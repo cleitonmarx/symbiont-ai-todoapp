@@ -49,7 +49,7 @@ type GenerateConversationTitleImpl struct {
 	conversationSummaryRepo domain.ConversationSummaryRepository
 	chatMessageRepo         domain.ChatMessageRepository
 	timeProvider            domain.CurrentTimeProvider
-	llmClient               domain.LLMClient
+	assistant               domain.Assistant
 	model                   string
 	completedTitleCh        CompletedConversationTitleUpdateChannel
 }
@@ -60,7 +60,7 @@ func NewGenerateConversationTitleImpl(
 	conversationSummaryRepo domain.ConversationSummaryRepository,
 	chatMessageRepo domain.ChatMessageRepository,
 	timeProvider domain.CurrentTimeProvider,
-	llmClient domain.LLMClient,
+	assistant domain.Assistant,
 	model string,
 	q CompletedConversationTitleUpdateChannel,
 ) GenerateConversationTitleImpl {
@@ -69,7 +69,7 @@ func NewGenerateConversationTitleImpl(
 		conversationSummaryRepo: conversationSummaryRepo,
 		chatMessageRepo:         chatMessageRepo,
 		timeProvider:            timeProvider,
-		llmClient:               llmClient,
+		assistant:               assistant,
 		model:                   model,
 		completedTitleCh:        q,
 	}
@@ -124,7 +124,7 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event doma
 		return fmt.Errorf("failed to build title prompt: %w", err)
 	}
 
-	resp, err := gct.llmClient.Chat(spanCtx, domain.LLMChatRequest{
+	resp, err := gct.assistant.RunTurnSync(spanCtx, domain.AssistantTurnRequest{
 		Model:       gct.model,
 		Messages:    promptMessages,
 		Stream:      false,
@@ -181,14 +181,14 @@ func (gct GenerateConversationTitleImpl) buildPromptMessages(
 	currentTitle string,
 	conversationSummary string,
 	messages []domain.ChatMessage,
-) ([]domain.LLMChatMessage, error) {
+) ([]domain.AssistantMessage, error) {
 	file, err := conversationTitlePrompt.Open("prompts/conversation-title.yml")
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close() //nolint:errcheck
 
-	prompt := []domain.LLMChatMessage{}
+	prompt := []domain.AssistantMessage{}
 	if err := yaml.NewDecoder(file).Decode(&prompt); err != nil {
 		return nil, err
 	}
@@ -395,7 +395,7 @@ type InitGenerateConversationTitle struct {
 	ConversationSummaryRepo domain.ConversationSummaryRepository `resolve:""`
 	ChatMessageRepo         domain.ChatMessageRepository         `resolve:""`
 	TimeProvider            domain.CurrentTimeProvider           `resolve:""`
-	LLMClient               domain.LLMClient                     `resolve:""`
+	Assistant               domain.Assistant                     `resolve:""`
 	Model                   string                               `config:"LLM_CHAT_TITLE_MODEL"`
 }
 
@@ -407,7 +407,7 @@ func (i InitGenerateConversationTitle) Initialize(ctx context.Context) (context.
 		i.ConversationSummaryRepo,
 		i.ChatMessageRepo,
 		i.TimeProvider,
-		i.LLMClient,
+		i.Assistant,
 		i.Model,
 		queue,
 	))

@@ -20,7 +20,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
 
 	tests := map[string]streamChatTestTableEntry{
-		"success-with-function-call": {
+		"success-with-action-call": {
 			userMessage: "Call a tool",
 			model:       "test-model",
 			options: []StreamChatOption{
@@ -31,8 +31,8 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -43,28 +43,28 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					StatusMessage("list_todos").
 					Return("calling list_todos")
 
-				toolRegistry.EXPECT().
-					Call(
+				actionRegistry.EXPECT().
+					Execute(
 						mock.Anything,
-						domain.LLMStreamEventToolCall{
-							ID:        "func-123",
-							Function:  "list_todos",
-							Arguments: "{\"page\": 1, \"page_size\": 5, \"search_term\": \"searchTerm\"}",
-							Text:      "calling list_todos",
+						domain.AssistantActionCall{
+							ID:    "func-123",
+							Name:  "list_todos",
+							Input: "{\"page\": 1, \"page_size\": 5, \"search_term\": \"searchTerm\"}",
+							Text:  "calling list_todos",
 						},
-						mock.MatchedBy(func(msgs []domain.LLMChatMessage) bool {
+						mock.MatchedBy(func(msgs []domain.AssistantMessage) bool {
 							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Call a tool"
 						}),
 					).
-					Return(domain.LLMChatMessage{Role: domain.ChatRole_Tool, ToolCallID: common.Ptr("func-123")})
+					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, ActionCallID: common.Ptr("func-123")})
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -73,8 +73,8 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 
 				expectNowCalls(timeProvider, fixedTime, 7)
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(
 						toolFunctionCallback(userMsgID, assistantMsgID, fixedTime),
 					)
@@ -122,8 +122,8 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -134,32 +134,28 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					StatusMessage("failing_tool").
 					Return("calling failing_tool...\n")
 
-				toolRegistry.EXPECT().
-					Call(
+				actionRegistry.EXPECT().
+					Execute(
 						mock.Anything,
-						domain.LLMStreamEventToolCall{
-							ID:        "func-error",
-							Function:  "failing_tool",
-							Arguments: "{\"input\":\"x\"}",
-							Text:      "calling failing_tool...\n",
+						domain.AssistantActionCall{
+							ID:    "func-error",
+							Name:  "failing_tool",
+							Input: "{\"input\":\"x\"}",
+							Text:  "calling failing_tool...\n",
 						},
-						mock.MatchedBy(func(msgs []domain.LLMChatMessage) bool {
+						mock.MatchedBy(func(msgs []domain.AssistantMessage) bool {
 							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Call failing tool"
 						}),
 					).
-					Return(domain.LLMChatMessage{
-						Role:       domain.ChatRole_Tool,
-						ToolCallID: common.Ptr("func-error"),
-						Content:    "error: failing_tool unavailable",
-					})
+					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, ActionCallID: common.Ptr("func-error"), Content: "error: failing_tool unavailable"})
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -169,28 +165,28 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				expectNowCalls(timeProvider, fixedTime, 7)
 
 				callCount := 0
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 						if callCount == 0 {
 							callCount++
-							if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+							if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 								UserMessageID:      userMsgID,
 								AssistantMessageID: assistantMsgID,
 							}); err != nil {
 								return err
 							}
-							return onEvent(domain.LLMStreamEventType_ToolCall, domain.LLMStreamEventToolCall{
-								ID:        "func-error",
-								Function:  "failing_tool",
-								Arguments: "{\"input\":\"x\"}",
+							return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+								ID:    "func-error",
+								Name:  "failing_tool",
+								Input: "{\"input\":\"x\"}",
 							})
 						}
 
-						if err := onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "I could not complete that tool call."}); err != nil {
+						if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "I could not complete that tool call."}); err != nil {
 							return err
 						}
-						return onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
+						return onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 							AssistantMessageID: assistantMsgID.String(),
 							CompletedAt:        fixedTime.Format(time.RFC3339),
 						})
@@ -232,7 +228,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 			expectErr:       false,
 			expectedContent: "calling failing_tool...\nI could not complete that tool call.",
 		},
-		"onEvent-function-call-error": {
+		"onEvent-action-call-error": {
 			userMessage: "Call tool",
 			model:       "test-model",
 			options: []StreamChatOption{
@@ -243,8 +239,8 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -255,11 +251,11 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					StatusMessage("fetch_todos").
 					Return("calling fetch_todos...\n")
 
@@ -270,19 +266,19 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-						if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+						if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						}); err != nil {
 							return err
 						}
-						return onEvent(domain.LLMStreamEventType_ToolCall, domain.LLMStreamEventToolCall{
-							ID:        "func-1",
-							Function:  "fetch_todos",
-							Arguments: `{"page": 1}`,
+						return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+							ID:    "func-1",
+							Name:  "fetch_todos",
+							Input: `{"page": 1}`,
 						})
 					})
 
@@ -313,7 +309,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				})
 			},
 			expectErr:      true,
-			onEventErrType: domain.LLMStreamEventType_ToolStarted,
+			onEventErrType: domain.AssistantEventType_ActionStarted,
 		},
 		"onEvent-tool-call-finished-error": {
 			userMessage: "Call tool",
@@ -326,8 +322,8 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -338,21 +334,17 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					StatusMessage("fetch_todos").
 					Return("calling fetch_todos...\n")
 
-				toolRegistry.EXPECT().
-					Call(mock.Anything, mock.Anything, mock.Anything).
-					Return(domain.LLMChatMessage{
-						Role:       domain.ChatRole_Tool,
-						ToolCallID: common.Ptr("func-1"),
-						Content:    "tool result",
-					}).
+				actionRegistry.EXPECT().
+					Execute(mock.Anything, mock.Anything, mock.Anything).
+					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, ActionCallID: common.Ptr("func-1"), Content: "tool result"}).
 					Once()
 
 				expectNowCalls(timeProvider, fixedTime, 6)
@@ -362,19 +354,19 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-						if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+						if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						}); err != nil {
 							return err
 						}
-						return onEvent(domain.LLMStreamEventType_ToolCall, domain.LLMStreamEventToolCall{
-							ID:        "func-1",
-							Function:  "fetch_todos",
-							Arguments: `{"page": 1}`,
+						return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+							ID:    "func-1",
+							Name:  "fetch_todos",
+							Input: `{"page": 1}`,
 						})
 					})
 
@@ -411,7 +403,7 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				})
 			},
 			expectErr:      true,
-			onEventErrType: domain.LLMStreamEventType_ToolCompleted,
+			onEventErrType: domain.AssistantEventType_ActionCompleted,
 		},
 		"max-tool-cycles-exceeded": {
 			userMessage: "Keep calling tools",
@@ -424,8 +416,8 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -436,9 +428,9 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 19)
 
@@ -447,22 +439,22 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					StatusMessage(mock.Anything).
 					Return("calling tool...\n").
 					Times(7)
 
-				toolRegistry.EXPECT().
-					Call(mock.Anything, mock.Anything, mock.Anything).
-					Return(domain.LLMChatMessage{Role: domain.ChatRole_Tool, Content: "tool result", ToolCallID: common.Ptr("func-123")}).
+				actionRegistry.EXPECT().
+					Execute(mock.Anything, mock.Anything, mock.Anything).
+					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, Content: "tool result", ActionCallID: common.Ptr("func-123")}).
 					Times(7)
 
 				callCount := 0
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 						if callCount == 0 {
-							if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+							if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 								UserMessageID:      userMsgID,
 								AssistantMessageID: assistantMsgID,
 							}); err != nil {
@@ -471,10 +463,10 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 						}
 
 						callCount++
-						return onEvent(domain.LLMStreamEventType_ToolCall, domain.LLMStreamEventToolCall{
-							ID:        fmt.Sprintf("func-%d", callCount),
-							Function:  "fetch_todos",
-							Arguments: fmt.Sprintf(`{"page": %d}`, callCount),
+						return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+							ID:    fmt.Sprintf("func-%d", callCount),
+							Name:  "fetch_todos",
+							Input: fmt.Sprintf(`{"page": %d}`, callCount),
 						})
 					}).
 					Times(8)
@@ -527,8 +519,8 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				conversationRepo *domain.MockConversationRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				client *domain.MockLLMClient,
-				toolRegistry *domain.MockLLMToolRegistry,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
@@ -539,9 +531,9 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					List().
-					Return([]domain.LLMToolDefinition{})
+					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 15)
 
@@ -550,22 +542,22 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				toolRegistry.EXPECT().
+				actionRegistry.EXPECT().
 					StatusMessage("fetch_todos").
 					Return("calling fetch_todos...\n").
 					Times(5)
 
-				toolRegistry.EXPECT().
-					Call(mock.Anything, mock.Anything, mock.Anything).
-					Return(domain.LLMChatMessage{Role: domain.ChatRole_Tool, Content: "same result", ToolCallID: common.Ptr("func-123")}).
+				actionRegistry.EXPECT().
+					Execute(mock.Anything, mock.Anything, mock.Anything).
+					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, Content: "same result", ActionCallID: common.Ptr("func-123")}).
 					Times(5)
 
 				callCount := 0
-				client.EXPECT().
-					ChatStream(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 						if callCount == 0 {
-							if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+							if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 								UserMessageID:      userMsgID,
 								AssistantMessageID: assistantMsgID,
 							}); err != nil {
@@ -574,10 +566,10 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 						}
 
 						callCount++
-						return onEvent(domain.LLMStreamEventType_ToolCall, domain.LLMStreamEventToolCall{
-							ID:        fmt.Sprintf("func-%d", callCount),
-							Function:  "fetch_todos",
-							Arguments: `{"page": 1}`,
+						return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+							ID:    fmt.Sprintf("func-%d", callCount),
+							Name:  "fetch_todos",
+							Input: `{"page": 1}`,
 						})
 					}).
 					Times(6)
@@ -629,11 +621,11 @@ func TestStreamChatImpl_Execute_ToolCases(t *testing.T) {
 }
 
 func Test(t *testing.T) {
-	b, _ := json.Marshal(domain.LLMStreamEventToolCall{
-		ID:        "func-123",
-		Function:  "list_todos",
-		Arguments: `{"page": 1, "page_size": 5, "search_term": "searchTerm"}`,
-		Text:      "calling list_todos",
+	b, _ := json.Marshal(domain.AssistantActionCall{
+		ID:    "func-123",
+		Name:  "list_todos",
+		Input: `{"page": 1, "page_size": 5, "search_term": "searchTerm"}`,
+		Text:  "calling list_todos",
 	})
 
 	fmt.Println(string(b))

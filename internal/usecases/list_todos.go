@@ -82,17 +82,17 @@ type ListTodos interface {
 
 // ListTodosImpl is the implementation of the ListTodos use case.
 type ListTodosImpl struct {
-	todoRepo          domain.TodoRepository
-	llmClient         domain.LLMClient
-	llmEmbeddingModel string
+	todoRepo        domain.TodoRepository
+	semanticEncoder domain.SemanticEncoder
+	embeddingModel  string
 }
 
 // NewListTodosImpl creates a new instance of ListTodosImpl.
-func NewListTodosImpl(todoRepo domain.TodoRepository, llmClient domain.LLMClient, llmEmbeddingModel string) ListTodosImpl {
+func NewListTodosImpl(todoRepo domain.TodoRepository, semanticEncoder domain.SemanticEncoder, embeddingModel string) ListTodosImpl {
 	return ListTodosImpl{
-		todoRepo:          todoRepo,
-		llmClient:         llmClient,
-		llmEmbeddingModel: llmEmbeddingModel,
+		todoRepo:        todoRepo,
+		semanticEncoder: semanticEncoder,
+		embeddingModel:  embeddingModel,
 	}
 }
 
@@ -106,7 +106,7 @@ func (lti ListTodosImpl) Query(ctx context.Context, page int, pageSize int, opts
 		opt(&params)
 	}
 
-	builder := NewTodoSearchBuilder(lti.llmClient, lti.llmEmbeddingModel).
+	builder := NewTodoSearchBuilder(lti.semanticEncoder, lti.embeddingModel).
 		WithStatus(params.Status).
 		WithDueDateRange(params.DueAfter, params.DueBefore).
 		WithSortBy(params.SortBy).
@@ -129,13 +129,13 @@ func (lti ListTodosImpl) Query(ctx context.Context, page int, pageSize int, opts
 
 // InitListTodos initializes the ListTodos use case and registers it in the dependency container.
 type InitListTodos struct {
-	TodoRepo          domain.TodoRepository `resolve:""`
-	LLMClient         domain.LLMClient      `resolve:""`
-	LLMEmbeddingModel string                `config:"LLM_EMBEDDING_MODEL"`
+	TodoRepo        domain.TodoRepository  `resolve:""`
+	SemanticEncoder domain.SemanticEncoder `resolve:""`
+	EmbeddingModel  string                 `config:"LLM_EMBEDDING_MODEL"`
 }
 
 // Initialize initializes the ListTodosImpl use case and registers it in the dependency container.
 func (ilt InitListTodos) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[ListTodos](NewListTodosImpl(ilt.TodoRepo, ilt.LLMClient, ilt.LLMEmbeddingModel))
+	depend.Register[ListTodos](NewListTodosImpl(ilt.TodoRepo, ilt.SemanticEncoder, ilt.EmbeddingModel))
 	return ctx, nil
 }

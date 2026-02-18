@@ -25,14 +25,14 @@ type streamChatTestTableEntry struct {
 		*domain.MockConversationSummaryRepository,
 		*domain.MockConversationRepository,
 		*domain.MockCurrentTimeProvider,
-		*domain.MockLLMClient,
-		*domain.MockLLMToolRegistry,
+		*domain.MockAssistant,
+		*domain.MockAssistantActionRegistry,
 		*domain.MockUnitOfWork,
 		*domain.MockOutboxRepository,
 	)
 	expectErr       bool
 	expectedContent string
-	onEventErrType  domain.LLMStreamEventType
+	onEventErrType  domain.AssistantEventType
 }
 
 // testStreamChatImpl is a helper function that executes the StreamChatImpl use case with the provided test case entry,
@@ -46,8 +46,8 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	summaryRepo := domain.NewMockConversationSummaryRepository(t)
 	conversationRepo := domain.NewMockConversationRepository(t)
 	timeProvider := domain.NewMockCurrentTimeProvider(t)
-	llmClient := domain.NewMockLLMClient(t)
-	lltToolRegistry := domain.NewMockLLMToolRegistry(t)
+	assistant := domain.NewMockAssistant(t)
+	actionRegistry := domain.NewMockAssistantActionRegistry(t)
 	uow := domain.NewMockUnitOfWork(t)
 	outbox := domain.NewMockOutboxRepository(t)
 
@@ -59,23 +59,33 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	}
 
 	if tt.setExpectations != nil {
-		tt.setExpectations(chatRepo, summaryRepo, conversationRepo, timeProvider, llmClient, lltToolRegistry, uow, outbox)
+		tt.setExpectations(chatRepo, summaryRepo, conversationRepo, timeProvider, assistant, actionRegistry, uow, outbox)
 	}
 
-	useCase := NewStreamChatImpl(chatRepo, summaryRepo, conversationRepo, timeProvider, llmClient, lltToolRegistry, uow, "test-embedding-model", 7)
+	useCase := NewStreamChatImpl(
+		chatRepo,
+		summaryRepo,
+		conversationRepo,
+		timeProvider,
+		assistant,
+		actionRegistry,
+		uow,
+		"test-embedding-model",
+		7,
+	)
 
 	var capturedContent string
-	err := useCase.Execute(context.Background(), tt.userMessage, tt.model, func(eventType domain.LLMStreamEventType, data any) error {
+	err := useCase.Execute(context.Background(), tt.userMessage, tt.model, func(eventType domain.AssistantEventType, data any) error {
 		if tt.onEventErrType != "" && eventType == tt.onEventErrType {
 			return errors.New("onEvent error")
 		}
-		if eventType == domain.LLMStreamEventType_Delta {
-			delta := data.(domain.LLMStreamEventDelta)
+		if eventType == domain.AssistantEventType_MessageDelta {
+			delta := data.(domain.AssistantMessageDelta)
 			capturedContent += delta.Text
 		}
-		if eventType == domain.LLMStreamEventType_ToolStarted {
-			fc := data.(domain.LLMStreamEventToolCall)
-			capturedContent += fc.Text
+		if eventType == domain.AssistantEventType_ActionStarted {
+			actionCall := data.(domain.AssistantActionCall)
+			capturedContent += actionCall.Text
 		}
 		return nil
 	}, tt.options...)
@@ -91,11 +101,11 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 
 }
 
-// toolFunctionCallback returns a mock LLM client callback that simulates a
+// toolFunctionCallback returns a mock assistant callback that simulates a
 // tool call interaction, including meta, delta, and done events.
-func toolFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Time) func(_ context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-	return func(ctx context.Context, req domain.LLMChatRequest, onEvent domain.LLMStreamEventCallback) error {
-		if err := onEvent(domain.LLMStreamEventType_Meta, domain.LLMStreamEventMeta{
+func toolFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Time) func(_ context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+	return func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+		if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 			UserMessageID:      userMsgID,
 			AssistantMessageID: assistantMsgID,
 		}); err != nil {
@@ -104,21 +114,21 @@ func toolFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Ti
 
 		lastMsg := req.Messages[len(req.Messages)-1]
 		if lastMsg.Content == "Call a tool" {
-			err := onEvent(domain.LLMStreamEventType_ToolCall, domain.LLMStreamEventToolCall{
-				ID:        "func-123",
-				Function:  "list_todos",
-				Arguments: `{"page": 1, "page_size": 5, "search_term": "searchTerm"}`,
+			err := onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+				ID:    "func-123",
+				Name:  "list_todos",
+				Input: `{"page": 1, "page_size": 5, "search_term": "searchTerm"}`,
 			})
 			return err
 		}
 
 		if lastMsg.Role == domain.ChatRole_Tool {
-			if err := onEvent(domain.LLMStreamEventType_Delta, domain.LLMStreamEventDelta{Text: "Tool called successfully."}); err != nil {
+			if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Tool called successfully."}); err != nil {
 				return err
 			}
 		}
 
-		if err := onEvent(domain.LLMStreamEventType_Done, domain.LLMStreamEventDone{
+		if err := onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 			AssistantMessageID: assistantMsgID.String(),
 			CompletedAt:        fixedTime.Format(time.RFC3339),
 		}); err != nil {
@@ -213,8 +223,8 @@ func expectPersistSequence(
 			assert.Equal(t, exp.Role, msg.ChatRole)
 			assert.Equal(t, exp.Content, msg.Content)
 			assert.Equal(t, expectedState, msg.MessageState)
-			assert.Equal(t, exp.HasToolCallID, msg.ToolCallID != nil)
-			assert.Len(t, msg.ToolCalls, exp.ToolCallsLen)
+			assert.Equal(t, exp.HasToolCallID, msg.ActionCallID != nil)
+			assert.Len(t, msg.ActionCalls, exp.ToolCallsLen)
 			assert.NotEqual(t, uuid.Nil, msg.TurnID)
 			assert.Equal(t, int64(createIdx-1), msg.TurnSequence)
 			assert.Equal(t, fixedTime, msg.CreatedAt)

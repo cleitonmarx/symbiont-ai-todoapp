@@ -13,7 +13,12 @@
         // This allows Mermaid to use ELK for graph layout when specified in the graph definition.
         // renderGraph will be called once the DOM content is loaded to render the graph.
         mermaid.registerLayoutLoaders(elkLayouts);
-        mermaid.initialize({ startOnLoad: false });
+        mermaid.initialize(
+            { 
+                startOnLoad: false,
+                maxTextSize: 100000,
+            }
+        );
         window.addEventListener('DOMContentLoaded', renderGraph);
 
         // Mermaid's built-in viewBox handling doesn't account for all the various ways nodes and edges can be rendered, 

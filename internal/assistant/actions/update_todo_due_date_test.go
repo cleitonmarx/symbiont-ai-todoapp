@@ -178,9 +178,9 @@ func TestTodoDueDateUpdaterAction(t *testing.T) {
 			updater := usecases.NewMockTodoUpdater(t)
 			tt.setupMocks(uow, timeProvider, updater)
 
-			tool := NewTodoDueDateUpdaterAction(uow, updater, timeProvider)
+			action := NewTodoDueDateUpdaterAction(uow, updater, timeProvider)
 
-			resp := tool.Execute(context.Background(), tt.functionCall, tt.history)
+			resp := action.Execute(context.Background(), tt.functionCall, tt.history)
 			tt.validateResp(t, resp)
 		})
 	}

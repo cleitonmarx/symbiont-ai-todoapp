@@ -24,7 +24,7 @@ func NewTodoUpdaterAction(uow domain.UnitOfWork, updater usecases.TodoUpdater) T
 	}
 }
 
-// StatusMessage returns a status message about the tool execution.
+// StatusMessage returns a status message about the action execution.
 func (t TodoUpdaterAction) StatusMessage() string {
 	return "✏️ Updating your todo..."
 }
@@ -33,7 +33,7 @@ func (t TodoUpdaterAction) StatusMessage() string {
 func (tut TodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "update_todo",
-		Description: "Update metadata for exactly one existing todo. Required key: id (UUID). Optional keys: title and status. Use this tool only for title/status changes (never due date). status must be OPEN or DONE. No extra keys. Valid: {\"id\":\"<uuid>\",\"status\":\"DONE\"}. Invalid: {\"id\":\"<uuid>\",\"due_date\":\"2026-04-30\"}.",
+		Description: "Update metadata for exactly one existing todo. Required key: id (UUID). Optional keys: title and status. Use this action only for title/status changes (never due date). status must be OPEN or DONE. No extra keys. Valid: {\"id\":\"<uuid>\",\"status\":\"DONE\"}. Invalid: {\"id\":\"<uuid>\",\"due_date\":\"2026-04-30\"}.",
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{

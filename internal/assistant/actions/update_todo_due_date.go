@@ -25,7 +25,7 @@ func NewTodoDueDateUpdaterAction(uow domain.UnitOfWork, updater usecases.TodoUpd
 	}
 }
 
-// StatusMessage returns a status message about the tool execution.
+// StatusMessage returns a status message about the action execution.
 func (t TodoDueDateUpdaterAction) StatusMessage() string {
 	return "📅 Updating the due date..."
 }

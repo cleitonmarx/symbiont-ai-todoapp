@@ -53,19 +53,19 @@ func DetermineConversationSummaryGenerationDecision(
 	return decision
 }
 
-// hasStateChangingActionSuccess checks if any of the messages indicate a successful execution of a state-changing tool.
+// hasStateChangingActionSuccess checks if any of the messages indicate a successful execution of a state-changing action.
 func hasStateChangingActionSuccess(messages []ChatMessage, stateChangingActions map[string]struct{}) bool {
 	if len(stateChangingActions) == 0 {
 		return false
 	}
 
-	toolCallFunctionsByID := map[string]string{}
+	actionCallFunctionsByID := map[string]string{}
 	for _, message := range messages {
 		if message.ChatRole != ChatRole_Assistant {
 			continue
 		}
-		for _, toolCall := range message.ActionCalls {
-			toolCallFunctionsByID[toolCall.ID] = strings.ToLower(toolCall.Name)
+		for _, actionCall := range message.ActionCalls {
+			actionCallFunctionsByID[actionCall.ID] = strings.ToLower(actionCall.Name)
 		}
 	}
 
@@ -73,11 +73,11 @@ func hasStateChangingActionSuccess(messages []ChatMessage, stateChangingActions 
 		if !message.IsActionCallSuccess() {
 			continue
 		}
-		toolFunction, found := toolCallFunctionsByID[*message.ActionCallID]
+		actionFunction, found := actionCallFunctionsByID[*message.ActionCallID]
 		if !found {
 			continue
 		}
-		if _, stateChanging := stateChangingActions[toolFunction]; stateChanging {
+		if _, stateChanging := stateChangingActions[actionFunction]; stateChanging {
 			return true
 		}
 	}

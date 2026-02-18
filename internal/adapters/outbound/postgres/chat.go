@@ -22,8 +22,8 @@ var chatFields = []string{
 	"turn_sequence",
 	"chat_role",
 	"content",
-	"tool_call_id",
-	"tool_calls",
+	"action_call_id",
+	"action_calls",
 	"model",
 	"message_state",
 	"error_message",
@@ -52,11 +52,11 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 	defer span.End()
 
 	insertQry := r.sb.
-		Insert("ai_chat_messages").
+		Insert("chat_messages").
 		Columns(chatFields...)
 
 	for _, message := range messages {
-		toolCallsJSON, err := json.Marshal(message.ToolCalls)
+		actionCallsJSON, err := json.Marshal(message.ActionCalls)
 		if telemetry.RecordErrorAndStatus(span, err) {
 			return err
 		}
@@ -68,8 +68,8 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 			message.TurnSequence,
 			message.ChatRole,
 			message.Content,
-			message.ToolCallID,
-			toolCallsJSON,
+			message.ActionCallID,
+			actionCallsJSON,
 			message.Model,
 			message.MessageState,
 			message.ErrorMessage,
@@ -113,7 +113,7 @@ func (r ChatMessageRepository) ListChatMessages(
 
 	qry := r.sb.
 		Select(chatFields...).
-		From("ai_chat_messages").
+		From("chat_messages").
 		Where(sq.Eq{"conversation_id": conversationID})
 
 	if queryOptions.AfterMessageID != nil {
@@ -127,7 +127,7 @@ func (r ChatMessageRepository) ListChatMessages(
 					"created_at AS checkpoint_created_at",
 					"id AS checkpoint_id",
 				).
-				From("ai_chat_messages").
+				From("chat_messages").
 				Where(sq.Eq{
 					"conversation_id": conversationID,
 					"id":              *queryOptions.AfterMessageID,
@@ -138,10 +138,10 @@ func (r ChatMessageRepository) ListChatMessages(
 		).Where(
 			sq.Or{
 				sq.Eq{"checkpoint.checkpoint_id": nil},
-				sq.Expr("ai_chat_messages.created_at > checkpoint.checkpoint_created_at"),
+				sq.Expr("chat_messages.created_at > checkpoint.checkpoint_created_at"),
 				sq.And{
-					sq.Expr("ai_chat_messages.created_at = checkpoint.checkpoint_created_at"),
-					sq.Expr("ai_chat_messages.id > checkpoint.checkpoint_id"),
+					sq.Expr("chat_messages.created_at = checkpoint.checkpoint_created_at"),
+					sq.Expr("chat_messages.id > checkpoint.checkpoint_id"),
 				},
 			},
 		)
@@ -179,7 +179,7 @@ func (r ChatMessageRepository) ListChatMessages(
 			&m.TurnSequence,
 			&m.ChatRole,
 			&m.Content,
-			&m.ToolCallID,
+			&m.ActionCallID,
 			&tcJSON,
 			&m.Model,
 			&m.MessageState,
@@ -194,7 +194,7 @@ func (r ChatMessageRepository) ListChatMessages(
 		}
 
 		if len(tcJSON) > 0 {
-			if err := json.Unmarshal(tcJSON, &m.ToolCalls); telemetry.RecordErrorAndStatus(span, err) {
+			if err := json.Unmarshal(tcJSON, &m.ActionCalls); telemetry.RecordErrorAndStatus(span, err) {
 				return nil, false, err
 			}
 		}
@@ -227,7 +227,7 @@ func (r ChatMessageRepository) DeleteConversationMessages(ctx context.Context, c
 	defer span.End()
 
 	_, err := r.sb.
-		Delete("ai_chat_messages").
+		Delete("chat_messages").
 		Where(sq.Eq{"conversation_id": conversationID}).
 		ExecContext(spanCtx)
 

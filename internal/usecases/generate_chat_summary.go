@@ -373,6 +373,7 @@ func upsertSummaryField(summary, fieldName, fieldValue string) string {
 	if fieldValue == "" {
 		fieldValue = "none"
 	}
+	fieldLine := fmt.Sprintf("%s: %s", fieldName, fieldValue)
 
 	updatedLines := make([]string, 0)
 	replaced := false
@@ -386,21 +387,25 @@ func upsertSummaryField(summary, fieldName, fieldValue string) string {
 
 		key, _, ok := parseSummaryFieldLine(trimmed)
 		if ok && key == fieldName {
-			updatedLines = append(updatedLines, fmt.Sprintf("%s: %s", fieldName, fieldValue))
-			replaced = true
+			// Keep exactly one instance of the target field to avoid duplicates.
+			if !replaced {
+				updatedLines = append(updatedLines, fieldLine)
+				replaced = true
+			}
 			continue
 		}
 
 		updatedLines = append(updatedLines, trimmed)
 
 		if !replaced && !insertedAfterLastAction && ok && key == "last_action" {
-			updatedLines = append(updatedLines, fmt.Sprintf("%s: %s", fieldName, fieldValue))
+			updatedLines = append(updatedLines, fieldLine)
 			insertedAfterLastAction = true
+			replaced = true
 		}
 	}
 
 	if !replaced && !insertedAfterLastAction {
-		updatedLines = append(updatedLines, fmt.Sprintf("%s: %s", fieldName, fieldValue))
+		updatedLines = append(updatedLines, fieldLine)
 	}
 
 	return strings.Join(updatedLines, "\n")

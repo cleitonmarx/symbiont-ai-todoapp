@@ -511,6 +511,7 @@ func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 		newSummary      string
 		messages        []domain.ChatMessage
 		expectedValue   string
+		expectedCount   int
 	}{
 		"adds-recent-action-calls-field-when-missing": {
 			previousSummary: "current_intent: plan tasks\nlast_action: none\noutput_format: concise text",
@@ -525,6 +526,7 @@ func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 				},
 			},
 			expectedValue: "fetch_todos; set_ui_filters",
+			expectedCount: 1,
 		},
 		"caps-recent-action-calls-at-five": {
 			previousSummary: "recent_action_calls: call1; call2; call3; call4; call5; call6; call7; call8; call9",
@@ -539,6 +541,7 @@ func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 				},
 			},
 			expectedValue: "call7; call8; call9; call10; call11",
+			expectedCount: 1,
 		},
 		"replaces-existing-field-in-new-summary": {
 			previousSummary: "current_intent: x",
@@ -552,6 +555,22 @@ func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 				},
 			},
 			expectedValue: "create_todo",
+			expectedCount: 1,
+		},
+		"does-not-duplicate-when-last-action-precedes-existing-field": {
+			previousSummary: "recent_action_calls: set_ui_filters; fetch_todos",
+			newSummary:      "current_intent: Generate summary of April tasks with due dates and statuses\nactive_view: Todos filtered by due date (April 2026) and status (OPEN), sorted by due date ascending\nuser_nuances: Requested overview summary of tasks, prefers concise format with due dates and statuses\ntasks: Plan team meeting agenda|O|2026-04-01; Organize digital files|O|2026-04-02; Read industry news|O|2026-04-03; Prepare for book club|O|2026-04-04\nlast_action: get_tasks -> Success -> Retrieved 10 tasks for April 2026\nrecent_action_calls: stale\noutput_format: summary with counters",
+			messages: []domain.ChatMessage{
+				{
+					ChatRole: domain.ChatRole_Assistant,
+					ActionCalls: []domain.AssistantActionCall{
+						{Name: "set_ui_filters"},
+						{Name: "fetch_todos"},
+					},
+				},
+			},
+			expectedValue: "set_ui_filters; fetch_todos; set_ui_filters; fetch_todos",
+			expectedCount: 1,
 		},
 	}
 
@@ -561,6 +580,7 @@ func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 			value, ok := findSummaryFieldValue(got, SUMMARY_RECENT_ACTION_CALLS_FIELD)
 			assert.True(t, ok)
 			assert.Equal(t, tt.expectedValue, value)
+			assert.Equal(t, tt.expectedCount, strings.Count(got, SUMMARY_RECENT_ACTION_CALLS_FIELD+":"))
 		})
 	}
 }

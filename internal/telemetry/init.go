@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/cleitonmarx/symbiont/depend"
@@ -94,7 +95,8 @@ type InitHttpClient struct {
 func (i InitHttpClient) Initialize(ctx context.Context) (context.Context, error) {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryWaitMax = 5 * time.Second
-	retryClient.RetryMax = 5
+	retryClient.RetryMax = 3
+	retryClient.CheckRetry = dontRetry500StatusPolicy(retryablehttp.ErrorPropagatedRetryPolicy)
 	retryClient.Logger = i.Logger
 
 	stdClient := retryClient.StandardClient()
@@ -125,4 +127,20 @@ func newAppResource(ctx context.Context) (*resource.Resource, error) {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 	return res, nil
+}
+
+// dontRetry500StatusPolicy is a retry policy for the retryablehttp client that prevents
+// retries on HTTP 500 Internal Server Error responses.
+func dontRetry500StatusPolicy(policy retryablehttp.CheckRetry) retryablehttp.CheckRetry {
+	return func(ctx context.Context, resp *http.Response, err error) (bool, error) {
+		// do not retry on context.Canceled or context.DeadlineExceeded
+		if ctx.Err() != nil {
+			return false, ctx.Err()
+		}
+
+		if resp.StatusCode == http.StatusInternalServerError {
+			return false, err
+		}
+		return policy(ctx, resp, err)
+	}
 }

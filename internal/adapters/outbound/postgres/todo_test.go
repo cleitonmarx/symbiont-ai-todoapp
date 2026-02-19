@@ -553,7 +553,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 						fixedTime,
 						fixedTime,
 					)
-				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (embedding <=> $1) < 0.5 AND set_config('hnsw.ef_search', '400', true) IS NOT NULL ORDER BY embedding <#> $2 ASC LIMIT 11 OFFSET 0").
+				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE (embedding <=> $1) < 0.5 AND set_config('hnsw.ef_search', '400', true) IS NOT NULL ORDER BY embedding <=> $2 ASC LIMIT 11 OFFSET 0").
 					WithArgs(
 						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
 						pgvector.NewVector([]float32{0.1, 0.2, 0.3}),

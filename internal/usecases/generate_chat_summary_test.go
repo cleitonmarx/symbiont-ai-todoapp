@@ -30,7 +30,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 			*domain.MockChatMessageRepository,
 			*domain.MockConversationSummaryRepository,
 			*domain.MockCurrentTimeProvider,
-			*domain.MockLLMClient,
+			*domain.MockAssistant,
 		)
 		expectedErr error
 	}{
@@ -63,7 +63,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -84,7 +84,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -118,7 +118,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -143,7 +143,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -176,7 +176,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				existingSummaryID := uuid.MustParse("323e4567-e89b-12d3-a456-426614174002")
 				summaryRepo.EXPECT().
@@ -219,15 +219,15 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 					}).
 					Once()
 
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.MatchedBy(func(req domain.LLMChatRequest) bool {
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.MatchedBy(func(req domain.AssistantTurnRequest) bool {
 						return assert.Equal(t, "summary-model", req.Model) &&
 							assert.Equal(t, common.Ptr(CHAT_SUMMARY_MAX_TOKENS), req.MaxTokens) &&
 							assert.Equal(t, common.Ptr(CHAT_SUMMARY_FREQUENCY_PENALTY), req.FrequencyPenalty)
 					})).
-					Return(domain.LLMChatResponse{
+					Return(domain.AssistantTurnResponse{
 						Content: "Current State:\n- User asked to organize tasks.",
-						Usage: domain.LLMUsage{
+						Usage: domain.AssistantUsage{
 							PromptTokens:     9,
 							CompletionTokens: 4,
 						},
@@ -263,7 +263,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -282,9 +282,9 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 						},
 					}, false, nil).
 					Once()
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{Content: "summary"}, nil).
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{Content: "summary"}, nil).
 					Once()
 				timeProvider.EXPECT().Now().Return(fixedTime).Once()
 				summaryRepo.EXPECT().
@@ -294,7 +294,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"trigger-by-state-changing-tool-success": {
+		"trigger-by-state-changing-action-success": {
 			model: "summary-model",
 			event: domain.ChatMessageEvent{
 				Type:           domain.EventType_CHAT_MESSAGE_SENT,
@@ -307,11 +307,11 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
-				toolCallID := "tool-call-1"
+				actionCallID := "action-call-1"
 				assistantMsgID := uuid.MustParse("623e4567-e89b-12d3-a456-426614174005")
-				toolMsgID := uuid.MustParse("723e4567-e89b-12d3-a456-426614174006")
+				actionMsgID := uuid.MustParse("723e4567-e89b-12d3-a456-426614174006")
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
 					Return(domain.ConversationSummary{}, false, nil).
@@ -323,32 +323,32 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 							ID:             assistantMsgID,
 							ConversationID: conversationID,
 							ChatRole:       domain.ChatRole_Assistant,
-							ToolCalls: []domain.LLMStreamEventToolCall{
+							ActionCalls: []domain.AssistantActionCall{
 								{
-									ID:       toolCallID,
-									Function: "create_todo",
+									ID:   actionCallID,
+									Name: "create_todo",
 								},
 							},
 							MessageState: domain.ChatMessageState_Completed,
 						},
 						{
-							ID:             toolMsgID,
+							ID:             actionMsgID,
 							ConversationID: conversationID,
 							ChatRole:       domain.ChatRole_Tool,
-							ToolCallID:     &toolCallID,
+							ActionCallID:   &actionCallID,
 							Content:        `{"message":"ok"}`,
 							MessageState:   domain.ChatMessageState_Completed,
 						},
 					}, false, nil).
 					Once()
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{Content: "summary"}, nil).
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{Content: "summary"}, nil).
 					Once()
 				timeProvider.EXPECT().Now().Return(fixedTime).Once()
 				summaryRepo.EXPECT().
 					StoreConversationSummary(mock.Anything, mock.MatchedBy(func(summary domain.ConversationSummary) bool {
-						return strings.Contains(summary.CurrentStateSummary, "recent_tool_calls: create_todo")
+						return strings.Contains(summary.CurrentStateSummary, "recent_action_calls: create_todo")
 					})).
 					Return(nil).
 					Once()
@@ -367,7 +367,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -385,11 +385,11 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 						},
 					}, true, nil).
 					Once()
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{
 						Content: "",
-						Usage: domain.LLMUsage{
+						Usage: domain.AssistantUsage{
 							PromptTokens:     120,
 							CompletionTokens: 512,
 						},
@@ -410,7 +410,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -428,9 +428,9 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 						},
 					}, true, nil).
 					Once()
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{}, errors.New("llm error")).
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{}, errors.New("llm error")).
 					Once()
 			},
 			expectedErr: fmt.Errorf("failed to generate chat summary: %w", errors.New("llm error")),
@@ -447,7 +447,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				chatRepo *domain.MockChatMessageRepository,
 				summaryRepo *domain.MockConversationSummaryRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				summaryRepo.EXPECT().
 					GetConversationSummary(mock.Anything, conversationID).
@@ -465,9 +465,9 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 						},
 					}, true, nil).
 					Once()
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{Content: "summary"}, nil).
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{Content: "summary"}, nil).
 					Once()
 				timeProvider.EXPECT().Now().Return(fixedTime).Once()
 				summaryRepo.EXPECT().
@@ -484,17 +484,17 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 			chatRepo := domain.NewMockChatMessageRepository(t)
 			summaryRepo := domain.NewMockConversationSummaryRepository(t)
 			timeProvider := domain.NewMockCurrentTimeProvider(t)
-			llmClient := domain.NewMockLLMClient(t)
+			assistant := domain.NewMockAssistant(t)
 
 			if tt.setExpectations != nil {
-				tt.setExpectations(t, chatRepo, summaryRepo, timeProvider, llmClient)
+				tt.setExpectations(t, chatRepo, summaryRepo, timeProvider, assistant)
 			}
 
 			uc := NewGenerateChatSummaryImpl(
 				chatRepo,
 				summaryRepo,
 				timeProvider,
-				llmClient,
+				assistant,
 				tt.model,
 				nil,
 			)
@@ -505,62 +505,82 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 	}
 }
 
-func TestMergeRecentToolCallsIntoSummary(t *testing.T) {
+func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 	tests := map[string]struct {
 		previousSummary string
 		newSummary      string
 		messages        []domain.ChatMessage
 		expectedValue   string
+		expectedCount   int
 	}{
-		"adds-recent-tool-calls-field-when-missing": {
+		"adds-recent-action-calls-field-when-missing": {
 			previousSummary: "current_intent: plan tasks\nlast_action: none\noutput_format: concise text",
 			newSummary:      "current_intent: plan tasks\nactive_view: none\nuser_nuances: none\ntasks: none\nlast_action: summarized\noutput_format: concise text",
 			messages: []domain.ChatMessage{
 				{
 					ChatRole: domain.ChatRole_Assistant,
-					ToolCalls: []domain.LLMStreamEventToolCall{
-						{Function: "fetch_todos"},
-						{Function: "set_ui_filters"},
+					ActionCalls: []domain.AssistantActionCall{
+						{Name: "fetch_todos"},
+						{Name: "set_ui_filters"},
 					},
 				},
 			},
 			expectedValue: "fetch_todos; set_ui_filters",
+			expectedCount: 1,
 		},
-		"caps-recent-tool-calls-at-ten": {
-			previousSummary: "recent_tool_calls: call1; call2; call3; call4; call5; call6; call7; call8; call9",
+		"caps-recent-action-calls-at-five": {
+			previousSummary: "recent_action_calls: call1; call2; call3; call4; call5; call6; call7; call8; call9",
 			newSummary:      "current_intent: x\nactive_view: none\nuser_nuances: none\ntasks: none\nlast_action: none\noutput_format: concise text",
 			messages: []domain.ChatMessage{
 				{
 					ChatRole: domain.ChatRole_Assistant,
-					ToolCalls: []domain.LLMStreamEventToolCall{
-						{Function: "call10"},
-						{Function: "call11"},
+					ActionCalls: []domain.AssistantActionCall{
+						{Name: "call10"},
+						{Name: "call11"},
 					},
 				},
 			},
-			expectedValue: "call2; call3; call4; call5; call6; call7; call8; call9; call10; call11",
+			expectedValue: "call7; call8; call9; call10; call11",
+			expectedCount: 1,
 		},
 		"replaces-existing-field-in-new-summary": {
 			previousSummary: "current_intent: x",
-			newSummary:      "current_intent: x\nrecent_tool_calls: stale\nlast_action: none\noutput_format: concise text",
+			newSummary:      "current_intent: x\nrecent_action_calls: stale\nlast_action: none\noutput_format: concise text",
 			messages: []domain.ChatMessage{
 				{
 					ChatRole: domain.ChatRole_Assistant,
-					ToolCalls: []domain.LLMStreamEventToolCall{
-						{Function: "create_todo"},
+					ActionCalls: []domain.AssistantActionCall{
+						{Name: "create_todo"},
 					},
 				},
 			},
 			expectedValue: "create_todo",
+			expectedCount: 1,
+		},
+		"does-not-duplicate-when-last-action-precedes-existing-field": {
+			previousSummary: "recent_action_calls: set_ui_filters; fetch_todos",
+			newSummary:      "current_intent: Generate summary of April tasks with due dates and statuses\nactive_view: Todos filtered by due date (April 2026) and status (OPEN), sorted by due date ascending\nuser_nuances: Requested overview summary of tasks, prefers concise format with due dates and statuses\ntasks: Plan team meeting agenda|O|2026-04-01; Organize digital files|O|2026-04-02; Read industry news|O|2026-04-03; Prepare for book club|O|2026-04-04\nlast_action: get_tasks -> Success -> Retrieved 10 tasks for April 2026\nrecent_action_calls: stale\noutput_format: summary with counters",
+			messages: []domain.ChatMessage{
+				{
+					ChatRole: domain.ChatRole_Assistant,
+					ActionCalls: []domain.AssistantActionCall{
+						{Name: "set_ui_filters"},
+						{Name: "fetch_todos"},
+					},
+				},
+			},
+			expectedValue: "set_ui_filters; fetch_todos; set_ui_filters; fetch_todos",
+			expectedCount: 1,
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := mergeRecentToolCallsIntoSummary(tt.previousSummary, tt.newSummary, tt.messages)
-			value, ok := findSummaryFieldValue(got, SUMMARY_RECENT_TOOL_CALLS_FIELD)
+			got := mergeRecentActionCallsIntoSummary(tt.previousSummary, tt.newSummary, tt.messages)
+			value, ok := findSummaryFieldValue(got, SUMMARY_RECENT_ACTION_CALLS_FIELD)
 			assert.True(t, ok)
 			assert.Equal(t, tt.expectedValue, value)
+			assert.Equal(t, tt.expectedCount, strings.Count(got, SUMMARY_RECENT_ACTION_CALLS_FIELD+":"))
 		})
 	}
 }

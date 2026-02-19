@@ -19,7 +19,7 @@ type TodoUpdater interface {
 type TodoUpdaterImpl struct {
 	uow          domain.UnitOfWork
 	timeProvider domain.CurrentTimeProvider
-	llmClient    domain.LLMClient
+	encoder      domain.SemanticEncoder
 	model        string
 }
 
@@ -27,13 +27,13 @@ type TodoUpdaterImpl struct {
 func NewTodoUpdaterImpl(
 	uow domain.UnitOfWork,
 	timeProvider domain.CurrentTimeProvider,
-	llmClient domain.LLMClient,
+	encoder domain.SemanticEncoder,
 	model string,
 ) TodoUpdaterImpl {
 	return TodoUpdaterImpl{
 		uow:          uow,
 		timeProvider: timeProvider,
-		llmClient:    llmClient,
+		encoder:      encoder,
 		model:        model,
 	}
 }
@@ -68,13 +68,13 @@ func (tui TodoUpdaterImpl) Update(ctx context.Context, uow domain.UnitOfWork, id
 		return domain.Todo{}, err
 	}
 
-	resp, err := tui.llmClient.Embed(ctx, tui.model, td.ToLLMInput())
+	resp, err := tui.encoder.VectorizeTodo(ctx, tui.model, td)
 	if err != nil {
 		return domain.Todo{}, err
 	}
 
 	RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
-	td.Embedding = resp.Embedding
+	td.Embedding = resp.Vector
 
 	if err := uow.Todo().UpdateTodo(ctx, td); err != nil {
 		return domain.Todo{}, err
@@ -95,10 +95,10 @@ func (tui TodoUpdaterImpl) Update(ctx context.Context, uow domain.UnitOfWork, id
 
 // InitTodoUpdater initializes the TodoUpdater and registers it in the dependency container.
 type InitTodoUpdater struct {
-	Uow         domain.UnitOfWork          `resolve:""`
-	TimeService domain.CurrentTimeProvider `resolve:""`
-	LLMClient   domain.LLMClient           `resolve:""`
-	Model       string                     `config:"LLM_EMBEDDING_MODEL"`
+	Uow             domain.UnitOfWork          `resolve:""`
+	TimeService     domain.CurrentTimeProvider `resolve:""`
+	SemanticEncoder domain.SemanticEncoder     `resolve:""`
+	Model           string                     `config:"LLM_EMBEDDING_MODEL"`
 }
 
 // Initialize initializes the TodoUpdaterImpl use case.
@@ -106,7 +106,7 @@ func (itu InitTodoUpdater) Initialize(ctx context.Context) (context.Context, err
 	todoUpdater := NewTodoUpdaterImpl(
 		itu.Uow,
 		itu.TimeService,
-		itu.LLMClient,
+		itu.SemanticEncoder,
 		itu.Model,
 	)
 	depend.Register[TodoUpdater](todoUpdater)

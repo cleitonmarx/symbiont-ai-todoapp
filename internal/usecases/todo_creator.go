@@ -19,17 +19,17 @@ type TodoCreatorImpl struct {
 	uow          domain.UnitOfWork
 	timeProvider domain.CurrentTimeProvider
 	createUUID   func() uuid.UUID
-	llmClient    domain.LLMClient
+	encoder      domain.SemanticEncoder
 	llmModel     string
 }
 
 // NewTodoCreatorImpl creates a new instance of TodoCreatorImpl.
-func NewTodoCreatorImpl(uow domain.UnitOfWork, timeProvider domain.CurrentTimeProvider, llmClient domain.LLMClient, llmModel string) TodoCreatorImpl {
+func NewTodoCreatorImpl(uow domain.UnitOfWork, timeProvider domain.CurrentTimeProvider, encoder domain.SemanticEncoder, llmModel string) TodoCreatorImpl {
 	return TodoCreatorImpl{
 		uow:          uow,
 		timeProvider: timeProvider,
 		createUUID:   uuid.New,
-		llmClient:    llmClient,
+		encoder:      encoder,
 		llmModel:     llmModel,
 	}
 }
@@ -51,13 +51,13 @@ func (tci TodoCreatorImpl) Create(ctx context.Context, uow domain.UnitOfWork, ti
 		return domain.Todo{}, err
 	}
 
-	resp, err := tci.llmClient.Embed(ctx, tci.llmModel, todo.ToLLMInput())
+	resp, err := tci.encoder.VectorizeTodo(ctx, tci.llmModel, todo)
 	if err != nil {
 		return domain.Todo{}, err
 	}
 
 	RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
-	todo.Embedding = resp.Embedding
+	todo.Embedding = resp.Vector
 
 	err = uow.Todo().CreateTodo(ctx, todo)
 	if err != nil {
@@ -78,15 +78,15 @@ func (tci TodoCreatorImpl) Create(ctx context.Context, uow domain.UnitOfWork, ti
 
 // InitTodoCreator initializes the TodoCreator and registers it in the dependency container.
 type InitTodoCreator struct {
-	Uow         domain.UnitOfWork          `resolve:""`
-	TimeService domain.CurrentTimeProvider `resolve:""`
-	LLMClient   domain.LLMClient           `resolve:""`
-	Model       string                     `config:"LLM_EMBEDDING_MODEL"`
+	Uow             domain.UnitOfWork          `resolve:""`
+	TimeService     domain.CurrentTimeProvider `resolve:""`
+	SemanticEncoder domain.SemanticEncoder     `resolve:""`
+	Model           string                     `config:"LLM_EMBEDDING_MODEL"`
 }
 
 // Initialize initializes the TodoCreatorImpl use case and registers it in the dependency container.
 func (ict InitTodoCreator) Initialize(ctx context.Context) (context.Context, error) {
-	uc := NewTodoCreatorImpl(ict.Uow, ict.TimeService, ict.LLMClient, ict.Model)
+	uc := NewTodoCreatorImpl(ict.Uow, ict.TimeService, ict.SemanticEncoder, ict.Model)
 	depend.Register[TodoCreator](uc)
 	return ctx, nil
 }

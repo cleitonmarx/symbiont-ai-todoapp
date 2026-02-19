@@ -28,7 +28,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 			*domain.MockConversationSummaryRepository,
 			*domain.MockChatMessageRepository,
 			*domain.MockCurrentTimeProvider,
-			*domain.MockLLMClient,
+			*domain.MockAssistant,
 		)
 		expectedErr error
 	}{
@@ -73,7 +73,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				chatRepo *domain.MockChatMessageRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
@@ -95,7 +95,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				chatRepo *domain.MockChatMessageRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
@@ -121,7 +121,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				chatRepo *domain.MockChatMessageRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
@@ -148,9 +148,9 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{}, errors.New("llm unavailable")).
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{}, errors.New("llm unavailable")).
 					Once()
 			},
 			expectedErr: errors.New("failed to generate conversation title: llm unavailable"),
@@ -168,7 +168,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				chatRepo *domain.MockChatMessageRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
@@ -195,8 +195,8 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.MatchedBy(func(req domain.LLMChatRequest) bool {
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.MatchedBy(func(req domain.AssistantTurnRequest) bool {
 						require.GreaterOrEqual(t, len(req.Messages), 1)
 						assert.Equal(t, domain.ChatRole_System, req.Messages[0].Role)
 						assert.Contains(t, req.Messages[0].Content, "Current title:")
@@ -210,9 +210,9 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 							assert.Equal(t, common.Ptr(CHAT_TITLE_TEMPERATURE), req.Temperature) &&
 							assert.Equal(t, common.Ptr(CHAT_TITLE_TOP_P), req.TopP)
 					})).
-					Return(domain.LLMChatResponse{
+					Return(domain.AssistantTurnResponse{
 						Content: "\"Spring Cleaning Task Breakdown\"",
-						Usage: domain.LLMUsage{
+						Usage: domain.AssistantUsage{
 							PromptTokens:     10,
 							CompletionTokens: 4,
 							TotalTokens:      14,
@@ -247,7 +247,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				chatRepo *domain.MockChatMessageRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
@@ -278,9 +278,9 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{
 						Content: "Prepare weekly meeting agenda and send to team",
 					}, nil).
 					Once()
@@ -300,7 +300,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				chatRepo *domain.MockChatMessageRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
@@ -327,9 +327,9 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{Content: "New Conversation"}, nil).
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{Content: "New Conversation"}, nil).
 					Once()
 			},
 			expectedErr: nil,
@@ -347,7 +347,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				chatRepo *domain.MockChatMessageRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
@@ -374,9 +374,9 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{
 						Content: "Japan Trip planning with research flights accommodation visa checklist and packing",
 					}, nil).
 					Once()
@@ -407,7 +407,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *domain.MockConversationSummaryRepository,
 				chatRepo *domain.MockChatMessageRepository,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				assistant *domain.MockAssistant,
 			) {
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
@@ -434,9 +434,9 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				llmClient.EXPECT().
-					Chat(mock.Anything, mock.Anything).
-					Return(domain.LLMChatResponse{
+				assistant.EXPECT().
+					RunTurnSync(mock.Anything, mock.Anything).
+					Return(domain.AssistantTurnResponse{
 						Content: "Review project timeline\nUpdate client contact info\nPrepare meeting agenda",
 					}, nil).
 					Once()
@@ -451,9 +451,9 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 			summaryRepo := domain.NewMockConversationSummaryRepository(t)
 			chatRepo := domain.NewMockChatMessageRepository(t)
 			timeProvider := domain.NewMockCurrentTimeProvider(t)
-			llmClient := domain.NewMockLLMClient(t)
+			assistant := domain.NewMockAssistant(t)
 			if tt.setExpectations != nil {
-				tt.setExpectations(conversationRepo, summaryRepo, chatRepo, timeProvider, llmClient)
+				tt.setExpectations(conversationRepo, summaryRepo, chatRepo, timeProvider, assistant)
 			}
 
 			uc := NewGenerateConversationTitleImpl(
@@ -461,7 +461,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo,
 				chatRepo,
 				timeProvider,
-				llmClient,
+				assistant,
 				tt.model,
 				nil,
 			)

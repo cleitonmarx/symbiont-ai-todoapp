@@ -1,4 +1,4 @@
-package usecases
+package actions
 
 import (
 	"context"
@@ -8,23 +8,24 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoDueDateUpdaterTool(t *testing.T) {
+func TestTodoDueDateUpdaterAction(t *testing.T) {
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
 	todoID := uuid.New()
 
 	tests := map[string]struct {
-		setupMocks   func(*domain.MockUnitOfWork, *domain.MockCurrentTimeProvider, *MockTodoUpdater)
-		functionCall domain.LLMStreamEventToolCall
-		history      []domain.LLMChatMessage
-		validateResp func(t *testing.T, resp domain.LLMChatMessage)
+		setupMocks   func(*domain.MockUnitOfWork, *domain.MockCurrentTimeProvider, *usecases.MockTodoUpdater)
+		functionCall domain.AssistantActionCall
+		history      []domain.AssistantMessage
+		validateResp func(t *testing.T, resp domain.AssistantMessage)
 	}{
 		"update-due-date-success": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *MockTodoUpdater) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *usecases.MockTodoUpdater) {
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
@@ -54,18 +55,18 @@ func TestTodoDueDateUpdaterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "update_todo_due_date",
-				Arguments: `{"id": "` + todoID.String() + `", "due_date": "2026-02-01"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "update_todo_due_date",
+				Input: `{"id": "` + todoID.String() + `", "due_date": "2026-02-01"}`,
 			},
-			history: []domain.LLMChatMessage{},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			history: []domain.AssistantMessage{},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "updated successfully")
 			},
 		},
 		"update-due-date-uses-history": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *MockTodoUpdater) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *usecases.MockTodoUpdater) {
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
@@ -95,46 +96,46 @@ func TestTodoDueDateUpdaterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "update_todo_due_date",
-				Arguments: `{"id": "` + todoID.String() + `", "due_date": ""}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "update_todo_due_date",
+				Input: `{"id": "` + todoID.String() + `", "due_date": ""}`,
 			},
-			history: []domain.LLMChatMessage{
+			history: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Please set it to tomorrow"},
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "updated successfully")
 			},
 		},
 		"update-due-date-invalid-arguments": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *MockTodoUpdater) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *usecases.MockTodoUpdater) {
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "update_todo_due_date",
-				Arguments: `invalid json`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "update_todo_due_date",
+				Input: `invalid json`,
 			},
-			history: []domain.LLMChatMessage{},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			history: []domain.AssistantMessage{},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
 		"update-due-date-invalid-id": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *MockTodoUpdater) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *usecases.MockTodoUpdater) {
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "update_todo_due_date",
-				Arguments: `{"id": "00000000-0000-0000-0000-000000000000", "due_date": "2026-02-01"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "update_todo_due_date",
+				Input: `{"id": "00000000-0000-0000-0000-000000000000", "due_date": "2026-02-01"}`,
 			},
-			history: []domain.LLMChatMessage{},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			history: []domain.AssistantMessage{},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_todo_id")
 			},
 		},
 		"update-due-date-update-error": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *MockTodoUpdater) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *usecases.MockTodoUpdater) {
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
@@ -158,12 +159,12 @@ func TestTodoDueDateUpdaterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "update_todo_due_date",
-				Arguments: `{"id": "` + todoID.String() + `", "due_date": "2026-02-01"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "update_todo_due_date",
+				Input: `{"id": "` + todoID.String() + `", "due_date": "2026-02-01"}`,
 			},
-			history: []domain.LLMChatMessage{},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			history: []domain.AssistantMessage{},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "update_due_date_error")
 			},
@@ -174,12 +175,12 @@ func TestTodoDueDateUpdaterTool(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			uow := domain.NewMockUnitOfWork(t)
 			timeProvider := domain.NewMockCurrentTimeProvider(t)
-			updater := NewMockTodoUpdater(t)
+			updater := usecases.NewMockTodoUpdater(t)
 			tt.setupMocks(uow, timeProvider, updater)
 
-			tool := NewTodoDueDateUpdaterTool(uow, updater, timeProvider)
+			action := NewTodoDueDateUpdaterAction(uow, updater, timeProvider)
 
-			resp := tool.Call(context.Background(), tt.functionCall, tt.history)
+			resp := action.Execute(context.Background(), tt.functionCall, tt.history)
 			tt.validateResp(t, resp)
 		})
 	}

@@ -36,8 +36,8 @@ type ChatMessage struct {
 	TurnSequence     int64
 	ChatRole         ChatRole
 	Content          string
-	ToolCallID       *string
-	ToolCalls        []LLMStreamEventToolCall
+	ActionCallID     *string
+	ActionCalls      []AssistantActionCall
 	Model            string
 	MessageState     ChatMessageState
 	ErrorMessage     *string
@@ -48,10 +48,10 @@ type ChatMessage struct {
 	UpdatedAt        time.Time
 }
 
-// IsToolCall returns true if the chat message is a tool call, based on its role.
-func (m ChatMessage) IsToolCallSuccess() bool {
+// IsActionCallSuccess returns true if the message represents a successful action call result.
+func (m ChatMessage) IsActionCallSuccess() bool {
 	return m.ChatRole == ChatRole_Tool &&
-		m.ToolCallID != nil &&
+		m.ActionCallID != nil &&
 		m.MessageState == ChatMessageState_Completed
 }
 

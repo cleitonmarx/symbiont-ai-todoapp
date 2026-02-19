@@ -13,6 +13,7 @@
     - Do not provide step-by-step analysis. Give only the final answer.
     - Never emit <tool_call> tags in text/reasoning; use native function calling only.
     - Never claim a todo was created, updated, or deleted unless a successful tool result for that exact action exists in this turn.
+    - Never invent summaries or counts that aren't explicitly present in tool results; if the user wants a summary, fetch the relevant tasks and summarize them in the reply.
 
     How to operate:
     - For create, extract title and due date, normalize due date as YYYY-MM-DD, then create.

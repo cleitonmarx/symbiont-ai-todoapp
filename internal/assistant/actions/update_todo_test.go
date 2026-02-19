@@ -1,4 +1,4 @@
-package usecases
+package actions
 
 import (
 	"context"
@@ -8,21 +8,22 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoUpdaterTool(t *testing.T) {
+func TestTodoUpdaterAction(t *testing.T) {
 	todoID := uuid.New()
 
 	tests := map[string]struct {
-		setupMocks   func(*domain.MockUnitOfWork, *MockTodoUpdater)
-		functionCall domain.LLMStreamEventToolCall
-		validateResp func(t *testing.T, resp domain.LLMChatMessage)
+		setupMocks   func(*domain.MockUnitOfWork, *usecases.MockTodoUpdater)
+		functionCall domain.AssistantActionCall
+		validateResp func(t *testing.T, resp domain.AssistantMessage)
 	}{
 		"update-todo-success": {
-			setupMocks: func(uow *domain.MockUnitOfWork, updater *MockTodoUpdater) {
+			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
 				updater.EXPECT().
 					Update(
 						mock.Anything,
@@ -48,41 +49,41 @@ func TestTodoUpdaterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "update_todo",
-				Arguments: `{"id": "` + todoID.String() + `", "title": "Updated", "status": "DONE"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "update_todo",
+				Input: `{"id": "` + todoID.String() + `", "title": "Updated", "status": "DONE"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "updated successfully")
 			},
 		},
 		"update-todo-invalid-arguments": {
-			setupMocks: func(uow *domain.MockUnitOfWork, updater *MockTodoUpdater) {
+			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "update_todo",
-				Arguments: `invalid json`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "update_todo",
+				Input: `invalid json`,
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
 		"update-todo-invalid-id": {
-			setupMocks: func(uow *domain.MockUnitOfWork, updater *MockTodoUpdater) {
+			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "update_todo",
-				Arguments: `{"id": "invalid-uuid", "title": "Updated"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "update_todo",
+				Input: `{"id": "invalid-uuid", "title": "Updated"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_todo_id")
 			},
 		},
 		"update-todo-update-error": {
-			setupMocks: func(uow *domain.MockUnitOfWork, updater *MockTodoUpdater) {
+			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
 				updater.EXPECT().
 					Update(
 						mock.Anything,
@@ -101,11 +102,11 @@ func TestTodoUpdaterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "update_todo",
-				Arguments: `{"id": "` + todoID.String() + `", "title": "Updated"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "update_todo",
+				Input: `{"id": "` + todoID.String() + `", "title": "Updated"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "update_todo_error")
 			},
@@ -115,12 +116,12 @@ func TestTodoUpdaterTool(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			uow := domain.NewMockUnitOfWork(t)
-			updater := NewMockTodoUpdater(t)
+			updater := usecases.NewMockTodoUpdater(t)
 			tt.setupMocks(uow, updater)
 
-			tool := NewTodoUpdaterTool(uow, updater)
+			action := NewTodoUpdaterAction(uow, updater)
 
-			resp := tool.Call(context.Background(), tt.functionCall, []domain.LLMChatMessage{})
+			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
 			tt.validateResp(t, resp)
 		})
 	}

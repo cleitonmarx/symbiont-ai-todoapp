@@ -172,14 +172,14 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 			setupUsecases: func(m *usecases.MockStreamChat) {
 				m.EXPECT().
 					Execute(mock.Anything, "Hello", "qwen2.5:7B-Q4_0", mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, userMessage string, model string, cb domain.LLMStreamEventCallback, opts ...usecases.StreamChatOption) {
-						_ = cb(domain.LLMStreamEventType_Meta, map[string]string{"info": "test"})
-						_ = cb(domain.LLMStreamEventType_Delta, map[string]string{"text": "Hi!"})
+					Run(func(ctx context.Context, userMessage string, model string, cb domain.AssistantEventCallback, opts ...usecases.StreamChatOption) {
+						_ = cb(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{})
+						_ = cb(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Hi!"})
 					}).
 					Return(nil)
 			},
 			expectedStatus: http.StatusOK,
-			expectedEvents: []string{"event: meta", "event: delta"},
+			expectedEvents: []string{"event: turn_started", "event: message_delta"},
 		},
 		"success-with-conversation-id": {
 			requestBody: gen.StreamChatJSONRequestBody{
@@ -190,7 +190,7 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 			setupUsecases: func(m *usecases.MockStreamChat) {
 				m.EXPECT().
 					Execute(mock.Anything, "Hello", "qwen2.5:7B-Q4_0", mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, userMessage string, model string, cb domain.LLMStreamEventCallback, opts ...usecases.StreamChatOption) {
+					Run(func(ctx context.Context, userMessage string, model string, cb domain.AssistantEventCallback, opts ...usecases.StreamChatOption) {
 						// Verify that the conversation ID option is passed correctly
 						params := &usecases.StreamChatParams{}
 						for _, opt := range opts {
@@ -199,13 +199,13 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 						assert.NotNil(t, params.ConversationID)
 						assert.Equal(t, uuid.MustParse("00000000-0000-0000-0000-000000000001"), *params.ConversationID)
 
-						_ = cb(domain.LLMStreamEventType_Meta, map[string]string{"info": "test"})
-						_ = cb(domain.LLMStreamEventType_Delta, map[string]string{"text": "Hi!"})
+						_ = cb(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{})
+						_ = cb(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Hi!"})
 					}).
 					Return(nil)
 			},
 			expectedStatus: http.StatusOK,
-			expectedEvents: []string{"event: meta", "event: delta"},
+			expectedEvents: []string{"event: turn_started", "event: message_delta"},
 		},
 		"invalid-json": {
 			requestBody:    []byte(`{invalid json}`),
@@ -296,19 +296,19 @@ func (m *mockFlusherRecorder) Flush() {}
 
 func TestTodoAppServer_ListAvailableModels(t *testing.T) {
 	tests := map[string]struct {
-		setupUsecase   func(*usecases.MockListAvailableLLMModels)
+		setupUsecase   func(*usecases.MockListAvailableModels)
 		expectedStatus int
 		expectedBody   *gen.ModelListResp
 		expectedError  *gen.ErrorResp
 	}{
 		"filters-only-chat-models": {
-			setupUsecase: func(m *usecases.MockListAvailableLLMModels) {
+			setupUsecase: func(m *usecases.MockListAvailableModels) {
 				m.EXPECT().
 					Query(mock.Anything).
-					Return([]domain.LLMModelInfo{
-						{Name: "gpt-4", Type: domain.LLMModelType_Chat},
-						{Name: "text-embed", Type: domain.LLMModelType_Embedding},
-						{Name: "gpt-3.5", Type: domain.LLMModelType_Chat},
+					Return([]domain.ModelInfo{
+						{Name: "gpt-4", Kind: domain.ModelKindAssistant},
+						{Name: "text-embed", Kind: domain.ModelKindEmbedding},
+						{Name: "gpt-3.5", Kind: domain.ModelKindAssistant},
 					}, nil)
 			},
 			expectedStatus: http.StatusOK,
@@ -317,7 +317,7 @@ func TestTodoAppServer_ListAvailableModels(t *testing.T) {
 			},
 		},
 		"returns-error-on-usecase-failure": {
-			setupUsecase: func(m *usecases.MockListAvailableLLMModels) {
+			setupUsecase: func(m *usecases.MockListAvailableModels) {
 				m.EXPECT().
 					Query(mock.Anything).
 					Return(nil, errors.New("database error"))
@@ -334,14 +334,14 @@ func TestTodoAppServer_ListAvailableModels(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockListAvailable := usecases.NewMockListAvailableLLMModels(t)
+			mockListAvailable := usecases.NewMockListAvailableModels(t)
 			if tt.setupUsecase != nil {
 				tt.setupUsecase(mockListAvailable)
 			}
 
 			api := TodoAppServer{
-				ListAvailableLLMModels: mockListAvailable,
-				Logger:                 log.New(io.Discard, "", 0),
+				ListAvailableModelsUseCase: mockListAvailable,
+				Logger:                     log.New(io.Discard, "", 0),
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/models", nil)

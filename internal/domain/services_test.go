@@ -51,7 +51,7 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 		TriggerTokenCount:   2000,
 	}
 
-	tools := map[string]struct{}{
+	actions := map[string]struct{}{
 		"create_todo": {},
 		"update_todo": {},
 	}
@@ -59,30 +59,30 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 	tests := map[string]struct {
 		messages []ChatMessage
 		hasMore  bool
-		tools    map[string]struct{}
+		actions  map[string]struct{}
 		want     ConversationSummaryGenerationDecision
 	}{
-		"triggered-by-state-changing-tool-success": {
+		"triggered-by-state-changing-action-success": {
 			messages: func() []ChatMessage {
-				toolCallID := "tool-1"
+				actionCallID := "action-1"
 				return []ChatMessage{
 					{
 						ChatRole: ChatRole_Assistant,
-						ToolCalls: []LLMStreamEventToolCall{
-							{ID: toolCallID, Function: "create_todo"},
+						ActionCalls: []AssistantActionCall{
+							{ID: actionCallID, Name: "create_todo"},
 						},
 					},
 					{
 						ChatRole:     ChatRole_Tool,
-						ToolCallID:   &toolCallID,
+						ActionCallID: &actionCallID,
 						MessageState: ChatMessageState_Completed,
 					},
 				}
 			}(),
-			tools: tools,
+			actions: actions,
 			want: ConversationSummaryGenerationDecision{
 				ShouldGenerate: true,
-				Reason:         ConversationSummaryGenerationReason_StateChangingToolSuccess,
+				Reason:         ConversationSummaryGenerationReason_StateChangingActionSuccess,
 				MessageCount:   2,
 				TotalTokens:    0,
 			},
@@ -100,7 +100,7 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 				{ChatRole: ChatRole_User},
 				{ChatRole: ChatRole_Assistant},
 			},
-			tools: tools,
+			actions: actions,
 			want: ConversationSummaryGenerationDecision{
 				ShouldGenerate: true,
 				Reason:         ConversationSummaryGenerationReason_MessageCountThreshold,
@@ -113,7 +113,7 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 				{ChatRole: ChatRole_User},
 			},
 			hasMore: true,
-			tools:   tools,
+			actions: actions,
 			want: ConversationSummaryGenerationDecision{
 				ShouldGenerate: true,
 				Reason:         ConversationSummaryGenerationReason_MessageCountThreshold,
@@ -125,7 +125,7 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 			messages: []ChatMessage{
 				{ChatRole: ChatRole_Assistant, TotalTokens: 2001},
 			},
-			tools: tools,
+			actions: actions,
 			want: ConversationSummaryGenerationDecision{
 				ShouldGenerate: true,
 				Reason:         ConversationSummaryGenerationReason_TokenCountThreshold,
@@ -133,24 +133,24 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 				TotalTokens:    2001,
 			},
 		},
-		"does-not-trigger-for-non-state-changing-tool": {
+		"does-not-trigger-for-non-state-changing-action": {
 			messages: func() []ChatMessage {
-				toolCallID := "tool-2"
+				actionCallID := "action-2"
 				return []ChatMessage{
 					{
 						ChatRole: ChatRole_Assistant,
-						ToolCalls: []LLMStreamEventToolCall{
-							{ID: toolCallID, Function: "search_todo"},
+						ActionCalls: []AssistantActionCall{
+							{ID: actionCallID, Name: "search_todo"},
 						},
 					},
 					{
 						ChatRole:     ChatRole_Tool,
-						ToolCallID:   &toolCallID,
+						ActionCallID: &actionCallID,
 						MessageState: ChatMessageState_Completed,
 					},
 				}
 			}(),
-			tools: tools,
+			actions: actions,
 			want: ConversationSummaryGenerationDecision{
 				ShouldGenerate: false,
 				Reason:         ConversationSummaryGenerationReason_None,
@@ -158,24 +158,24 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 				TotalTokens:    0,
 			},
 		},
-		"does-not-trigger-with-empty-tools-config": {
+		"does-not-trigger-with-empty-actions-config": {
 			messages: func() []ChatMessage {
-				toolCallID := "tool-3"
+				actionCallID := "action-3"
 				return []ChatMessage{
 					{
 						ChatRole: ChatRole_Assistant,
-						ToolCalls: []LLMStreamEventToolCall{
-							{ID: toolCallID, Function: "create_todo"},
+						ActionCalls: []AssistantActionCall{
+							{ID: actionCallID, Name: "create_todo"},
 						},
 					},
 					{
 						ChatRole:     ChatRole_Tool,
-						ToolCallID:   &toolCallID,
+						ActionCallID: &actionCallID,
 						MessageState: ChatMessageState_Completed,
 					},
 				}
 			}(),
-			tools: map[string]struct{}{},
+			actions: map[string]struct{}{},
 			want: ConversationSummaryGenerationDecision{
 				ShouldGenerate: false,
 				Reason:         ConversationSummaryGenerationReason_None,
@@ -187,7 +187,7 @@ func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := DetermineConversationSummaryGenerationDecision(tt.messages, tt.hasMore, policy, tt.tools)
+			got := DetermineConversationSummaryGenerationDecision(tt.messages, tt.hasMore, policy, tt.actions)
 			assert.Equal(t, tt.want, got)
 		})
 	}

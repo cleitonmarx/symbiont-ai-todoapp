@@ -1,4 +1,4 @@
-package usecases
+package actions
 
 import (
 	"context"
@@ -7,25 +7,26 @@ import (
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoCreatorTool(t *testing.T) {
+func TestTodoCreatorAction(t *testing.T) {
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
 
 	tests := map[string]struct {
 		setupMocks func(
 			*domain.MockUnitOfWork,
 			*domain.MockCurrentTimeProvider,
-			*MockTodoCreator,
+			*usecases.MockTodoCreator,
 		)
-		functionCall domain.LLMStreamEventToolCall
-		history      []domain.LLMChatMessage
-		validateResp func(t *testing.T, resp domain.LLMChatMessage)
+		functionCall domain.AssistantActionCall
+		history      []domain.AssistantMessage
+		validateResp func(t *testing.T, resp domain.AssistantMessage)
 	}{
 		"create-todo-success": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *MockTodoCreator) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
@@ -43,18 +44,18 @@ func TestTodoCreatorTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "create_todo",
-				Arguments: `{"title": "New Todo", "due_date": "2026-01-25"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "create_todo",
+				Input: `{"title": "New Todo", "due_date": "2026-01-25"}`,
 			},
-			history: []domain.LLMChatMessage{},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			history: []domain.AssistantMessage{},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "created successfully")
 			},
 		},
 		"create-todo-empty-due-date-uses-history": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *MockTodoCreator) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
@@ -72,50 +73,50 @@ func TestTodoCreatorTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "create_todo",
-				Arguments: `{"title": "New Todo", "due_date": ""}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "create_todo",
+				Input: `{"title": "New Todo", "due_date": ""}`,
 			},
-			history: []domain.LLMChatMessage{
+			history: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Please set it for tomorrow"},
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "created successfully")
 			},
 		},
 		"create-todo-invalid-arguments": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *MockTodoCreator) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "create_todo",
-				Arguments: `invalid json`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "create_todo",
+				Input: `invalid json`,
 			},
-			history: []domain.LLMChatMessage{},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			history: []domain.AssistantMessage{},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
 		"create-todo-invalid-due-date": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *MockTodoCreator) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "create_todo",
-				Arguments: `{"title": "New Todo", "due_date": "invalid"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "create_todo",
+				Input: `{"title": "New Todo", "due_date": "invalid"}`,
 			},
-			history: []domain.LLMChatMessage{},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			history: []domain.AssistantMessage{},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_due_date")
 			},
 		},
 		"create-todo-create-error": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *MockTodoCreator) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
@@ -133,18 +134,18 @@ func TestTodoCreatorTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "create_todo",
-				Arguments: `{"title": "New Todo", "due_date": "2026-01-25"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "create_todo",
+				Input: `{"title": "New Todo", "due_date": "2026-01-25"}`,
 			},
-			history: []domain.LLMChatMessage{},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			history: []domain.AssistantMessage{},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "create_todo_error")
 			},
 		},
 		"create-todo-uow-error": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *MockTodoCreator) {
+			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
 				timeProvider.EXPECT().
 					Now().
 					Return(fixedTime).
@@ -155,12 +156,12 @@ func TestTodoCreatorTool(t *testing.T) {
 					Return(errors.New("uow error")).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "create_todo",
-				Arguments: `{"title": "New Todo", "due_date": "2026-01-25"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "create_todo",
+				Input: `{"title": "New Todo", "due_date": "2026-01-25"}`,
 			},
-			history: []domain.LLMChatMessage{},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			history: []domain.AssistantMessage{},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "create_todo_error")
 			},
@@ -171,12 +172,12 @@ func TestTodoCreatorTool(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			uow := domain.NewMockUnitOfWork(t)
 			timeProvider := domain.NewMockCurrentTimeProvider(t)
-			todoCreator := NewMockTodoCreator(t)
+			todoCreator := usecases.NewMockTodoCreator(t)
 			tt.setupMocks(uow, timeProvider, todoCreator)
 
-			tool := NewTodoCreatorTool(uow, todoCreator, timeProvider)
+			action := NewTodoCreatorAction(uow, todoCreator, timeProvider)
 
-			resp := tool.Call(context.Background(), tt.functionCall, tt.history)
+			resp := action.Execute(context.Background(), tt.functionCall, tt.history)
 			tt.validateResp(t, resp)
 		})
 	}

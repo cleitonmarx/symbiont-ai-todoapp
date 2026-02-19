@@ -31,11 +31,11 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 		Content:        "hello",
 		Model:          "ai/gpt-oss",
 		MessageState:   domain.ChatMessageState_Completed,
-		ToolCalls: []domain.LLMStreamEventToolCall{
+		ActionCalls: []domain.AssistantActionCall{
 			{
-				ID:        "id",
-				Function:  "test_func",
-				Arguments: "{\"arg1\":0}",
+				ID:    "id",
+				Name:  "test_func",
+				Input: "{\"arg1\":0}",
 			},
 		},
 		CreatedAt: fixedTime,
@@ -48,7 +48,7 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 	}{
 		"success": {
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectExec("INSERT INTO ai_chat_messages (id,conversation_id,turn_id,turn_sequence,chat_role,content,tool_call_id,tool_calls,model,message_state,error_message,prompt_tokens,completion_tokens,total_tokens,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)").
+				m.ExpectExec("INSERT INTO chat_messages (id,conversation_id,turn_id,turn_sequence,chat_role,content,action_call_id,action_calls,model,message_state,error_message,prompt_tokens,completion_tokens,total_tokens,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)").
 					WithArgs(
 						msg.ID,
 						msg.ConversationID,
@@ -56,8 +56,8 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 						msg.TurnSequence,
 						msg.ChatRole,
 						msg.Content,
-						msg.ToolCallID,
-						[]byte(`[{"id":"id","function":"test_func","arguments":"{\"arg1\":0}","text":""}]`),
+						msg.ActionCallID,
+						[]byte(`[{"id":"id","name":"test_func","input":"{\"arg1\":0}","text":""}]`),
 						msg.Model,
 						msg.MessageState,
 						nil,
@@ -73,7 +73,7 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 		},
 		"database-error": {
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectExec("INSERT INTO ai_chat_messages (id,conversation_id,turn_id,turn_sequence,chat_role,content,tool_call_id,tool_calls,model,message_state,error_message,prompt_tokens,completion_tokens,total_tokens,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)").
+				m.ExpectExec("INSERT INTO chat_messages (id,conversation_id,turn_id,turn_sequence,chat_role,content,action_call_id,action_calls,model,message_state,error_message,prompt_tokens,completion_tokens,total_tokens,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)").
 					WithArgs(
 						msg.ID,
 						msg.ConversationID,
@@ -81,8 +81,8 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 						msg.TurnSequence,
 						msg.ChatRole,
 						msg.Content,
-						msg.ToolCallID,
-						[]byte(`[{"id":"id","function":"test_func","arguments":"{\"arg1\":0}","text":""}]`),
+						msg.ActionCallID,
+						[]byte(`[{"id":"id","name":"test_func","input":"{\"arg1\":0}","text":""}]`),
 						msg.Model,
 						msg.MessageState,
 						nil,
@@ -163,14 +163,14 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 					AddRow(row(fixedID3, conversationID, turnID3, 2, t3)...).
 					AddRow(row(fixedID2, conversationID, turnID2, 1, t2)...).
 					AddRow(row(fixedID1, conversationID, turnID1, 0, t1)...)
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, tool_call_id, tool_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
 			expectedMsgs: []domain.ChatMessage{
-				{ID: fixedID1, ConversationID: conversationID, TurnID: turnID1, TurnSequence: 0, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t1, UpdatedAt: t1},
-				{ID: fixedID2, ConversationID: conversationID, TurnID: turnID2, TurnSequence: 1, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t2, UpdatedAt: t2},
-				{ID: fixedID3, ConversationID: conversationID, TurnID: turnID3, TurnSequence: 2, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t3, UpdatedAt: t3},
+				{ID: fixedID1, ConversationID: conversationID, TurnID: turnID1, TurnSequence: 0, ChatRole: domain.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t1, UpdatedAt: t1},
+				{ID: fixedID2, ConversationID: conversationID, TurnID: turnID2, TurnSequence: 1, ChatRole: domain.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t2, UpdatedAt: t2},
+				{ID: fixedID3, ConversationID: conversationID, TurnID: turnID3, TurnSequence: 2, ChatRole: domain.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t3, UpdatedAt: t3},
 			},
 			expectedHasMore: false,
 			expectErr:       false,
@@ -184,7 +184,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 					AddRow(row(fixedID2, conversationID, turnID2, 1, t2)...).
 					AddRow(row(fixedID1, conversationID, turnID1, 0, t1)...)
 
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, tool_call_id, tool_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3").
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
@@ -202,7 +202,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 				rows := sqlmock.NewRows(chatFields).
 					AddRow(row(fixedID1, conversationID, turnID1, 0, t1)...)
 
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, tool_call_id, tool_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3 OFFSET 2").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3 OFFSET 2").
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
@@ -217,7 +217,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			pageSize: 10,
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(chatFields)
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, tool_call_id, tool_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
@@ -229,7 +229,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			page:     1,
 			pageSize: 10,
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, tool_call_id, tool_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM ai_chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
 					WithArgs(conversationID).
 					WillReturnError(errors.New("db error"))
 			},
@@ -311,13 +311,13 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 					AddRow(row(fixedID2, turnID, 1, fixedTime)...).
 					AddRow(row(fixedID3, turnID, 2, fixedTime)...).
 					AddRow(row(fixedID4, turnID, 3, fixedTime)...)
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, tool_call_id, tool_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM ai_chat_messages LEFT JOIN ( SELECT created_at AS checkpoint_created_at, id AS checkpoint_id FROM ai_chat_messages WHERE conversation_id = $1 AND id = $2 LIMIT 1 ) checkpoint ON TRUE WHERE conversation_id = $3 AND (checkpoint.checkpoint_id IS NULL OR ai_chat_messages.created_at > checkpoint.checkpoint_created_at OR (ai_chat_messages.created_at = checkpoint.checkpoint_created_at AND ai_chat_messages.id > checkpoint.checkpoint_id)) ORDER BY created_at ASC, id ASC LIMIT 3").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM chat_messages LEFT JOIN ( SELECT created_at AS checkpoint_created_at, id AS checkpoint_id FROM chat_messages WHERE conversation_id = $1 AND id = $2 LIMIT 1 ) checkpoint ON TRUE WHERE conversation_id = $3 AND (checkpoint.checkpoint_id IS NULL OR chat_messages.created_at > checkpoint.checkpoint_created_at OR (chat_messages.created_at = checkpoint.checkpoint_created_at AND chat_messages.id > checkpoint.checkpoint_id)) ORDER BY created_at ASC, id ASC LIMIT 3").
 					WithArgs(conversationID, fixedID1, conversationID).
 					WillReturnRows(rows)
 			},
 			expectedMsgs: []domain.ChatMessage{
-				{ID: fixedID2, ConversationID: conversationID, TurnID: turnID, TurnSequence: 1, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: fixedTime, UpdatedAt: fixedTime},
-				{ID: fixedID3, ConversationID: conversationID, TurnID: turnID, TurnSequence: 2, ChatRole: domain.ChatRole("user"), Content: "content", ToolCallID: nil, ToolCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+				{ID: fixedID2, ConversationID: conversationID, TurnID: turnID, TurnSequence: 1, ChatRole: domain.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+				{ID: fixedID3, ConversationID: conversationID, TurnID: turnID, TurnSequence: 2, ChatRole: domain.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: true,
 			expectErr:       false,
@@ -329,7 +329,7 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 				domain.WithChatMessagesAfterMessageID(fixedID1),
 			},
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, tool_call_id, tool_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM ai_chat_messages LEFT JOIN ( SELECT created_at AS checkpoint_created_at, id AS checkpoint_id FROM ai_chat_messages WHERE conversation_id = $1 AND id = $2 LIMIT 1 ) checkpoint ON TRUE WHERE conversation_id = $3 AND (checkpoint.checkpoint_id IS NULL OR ai_chat_messages.created_at > checkpoint.checkpoint_created_at OR (ai_chat_messages.created_at = checkpoint.checkpoint_created_at AND ai_chat_messages.id > checkpoint.checkpoint_id)) ORDER BY created_at ASC, id ASC LIMIT 11").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at FROM chat_messages LEFT JOIN ( SELECT created_at AS checkpoint_created_at, id AS checkpoint_id FROM chat_messages WHERE conversation_id = $1 AND id = $2 LIMIT 1 ) checkpoint ON TRUE WHERE conversation_id = $3 AND (checkpoint.checkpoint_id IS NULL OR chat_messages.created_at > checkpoint.checkpoint_created_at OR (chat_messages.created_at = checkpoint.checkpoint_created_at AND chat_messages.id > checkpoint.checkpoint_id)) ORDER BY created_at ASC, id ASC LIMIT 11").
 					WithArgs(conversationID, fixedID1, conversationID).
 					WillReturnError(errors.New("db error"))
 			},
@@ -369,7 +369,7 @@ func TestChatMessageRepository_DeleteConversationMessages(t *testing.T) {
 	}{
 		"success": {
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectExec("DELETE FROM ai_chat_messages WHERE conversation_id = $1").
+				m.ExpectExec("DELETE FROM chat_messages WHERE conversation_id = $1").
 					WithArgs(conversationID).
 					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
@@ -377,7 +377,7 @@ func TestChatMessageRepository_DeleteConversationMessages(t *testing.T) {
 		},
 		"database-error": {
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectExec("DELETE FROM ai_chat_messages WHERE conversation_id = $1").
+				m.ExpectExec("DELETE FROM chat_messages WHERE conversation_id = $1").
 					WithArgs(conversationID).
 					WillReturnError(errors.New("db error"))
 			},

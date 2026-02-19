@@ -144,7 +144,7 @@ func applySort(qry sq.SelectBuilder, params *domain.ListTodosParams) (sq.SelectB
 
 	if params.SortBy.Field == "similarity" && len(params.Embedding) > 0 {
 		return qry.OrderByClause(sq.Expr(
-			"embedding <#> ? "+params.SortBy.Direction,
+			"embedding <=> ? "+params.SortBy.Direction,
 			pgvector.NewVector(toFloat32Truncated(params.Embedding)),
 		)), nil
 	} else if params.SortBy.Field == "similarity" && len(params.Embedding) == 0 {

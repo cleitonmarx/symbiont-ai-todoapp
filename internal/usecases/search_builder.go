@@ -23,8 +23,8 @@ type todoSearchClause struct {
 // TodoSearchBuilder builds todo list options and centralizes validation plus
 // optional similarity embedding generation for usecases.
 type TodoSearchBuilder struct {
-	llmClient         domain.LLMClient
-	llmEmbeddingModel string
+	semanticEncoder domain.SemanticEncoder
+	embeddingModel  string
 
 	status       *domain.TodoStatus
 	dueAfter     *time.Time
@@ -34,10 +34,10 @@ type TodoSearchBuilder struct {
 }
 
 // NewTodoSearchBuilder creates a new TodoSearchBuilder.
-func NewTodoSearchBuilder(llmClient domain.LLMClient, llmEmbeddingModel string) *TodoSearchBuilder {
+func NewTodoSearchBuilder(semanticEncoder domain.SemanticEncoder, embeddingModel string) *TodoSearchBuilder {
 	return &TodoSearchBuilder{
-		llmClient:         llmClient,
-		llmEmbeddingModel: llmEmbeddingModel,
+		semanticEncoder: semanticEncoder,
+		embeddingModel:  embeddingModel,
 	}
 }
 
@@ -155,18 +155,18 @@ func (b *TodoSearchBuilder) Build(ctx context.Context) (TodoSearchBuildResult, e
 		return result, nil
 	}
 
-	if b.llmClient == nil {
-		return TodoSearchBuildResult{}, domain.NewValidationErr("llm client is required for similarity search")
+	if b.semanticEncoder == nil {
+		return TodoSearchBuildResult{}, domain.NewValidationErr("semantic encoder is required for similarity search")
 	}
-	if strings.TrimSpace(b.llmEmbeddingModel) == "" {
+	if strings.TrimSpace(b.embeddingModel) == "" {
 		return TodoSearchBuildResult{}, domain.NewValidationErr("embedding model cannot be empty for similarity search")
 	}
 
-	resp, err := b.llmClient.Embed(ctx, b.llmEmbeddingModel, similarityQuery)
+	resp, err := b.semanticEncoder.VectorizeQuery(ctx, b.embeddingModel, similarityQuery)
 	if err != nil {
 		return TodoSearchBuildResult{}, err
 	}
-	result.Options = append(result.Options, domain.WithEmbedding(resp.Embedding))
+	result.Options = append(result.Options, domain.WithEmbedding(resp.Vector))
 	result.EmbeddingTotalTokens = resp.TotalTokens
 	return result, nil
 }

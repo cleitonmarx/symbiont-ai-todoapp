@@ -23,7 +23,7 @@ func DetermineConversationSummaryGenerationDecision(
 	messages []ChatMessage,
 	hasMore bool,
 	policy ConversationSummaryGenerationPolicy,
-	stateChangingTools map[string]struct{},
+	stateChangingActions map[string]struct{},
 ) ConversationSummaryGenerationDecision {
 	totalTokens := sumMessagesTotalTokens(messages)
 	decision := ConversationSummaryGenerationDecision{
@@ -33,9 +33,9 @@ func DetermineConversationSummaryGenerationDecision(
 		TotalTokens:    totalTokens,
 	}
 
-	if hasStateChangingToolSuccess(messages, stateChangingTools) {
+	if hasStateChangingActionSuccess(messages, stateChangingActions) {
 		decision.ShouldGenerate = true
-		decision.Reason = ConversationSummaryGenerationReason_StateChangingToolSuccess
+		decision.Reason = ConversationSummaryGenerationReason_StateChangingActionSuccess
 		return decision
 	}
 
@@ -53,31 +53,31 @@ func DetermineConversationSummaryGenerationDecision(
 	return decision
 }
 
-// hasStateChangingToolSuccess checks if any of the messages indicate a successful execution of a state-changing tool.
-func hasStateChangingToolSuccess(messages []ChatMessage, stateChangingTools map[string]struct{}) bool {
-	if len(stateChangingTools) == 0 {
+// hasStateChangingActionSuccess checks if any of the messages indicate a successful execution of a state-changing action.
+func hasStateChangingActionSuccess(messages []ChatMessage, stateChangingActions map[string]struct{}) bool {
+	if len(stateChangingActions) == 0 {
 		return false
 	}
 
-	toolCallFunctionsByID := map[string]string{}
+	actionCallFunctionsByID := map[string]string{}
 	for _, message := range messages {
 		if message.ChatRole != ChatRole_Assistant {
 			continue
 		}
-		for _, toolCall := range message.ToolCalls {
-			toolCallFunctionsByID[toolCall.ID] = strings.ToLower(toolCall.Function)
+		for _, actionCall := range message.ActionCalls {
+			actionCallFunctionsByID[actionCall.ID] = strings.ToLower(actionCall.Name)
 		}
 	}
 
 	for _, message := range messages {
-		if !message.IsToolCallSuccess() {
+		if !message.IsActionCallSuccess() {
 			continue
 		}
-		toolFunction, found := toolCallFunctionsByID[*message.ToolCallID]
+		actionFunction, found := actionCallFunctionsByID[*message.ActionCallID]
 		if !found {
 			continue
 		}
-		if _, stateChanging := stateChangingTools[toolFunction]; stateChanging {
+		if _, stateChanging := stateChangingActions[actionFunction]; stateChanging {
 			return true
 		}
 	}

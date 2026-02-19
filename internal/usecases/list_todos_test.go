@@ -15,7 +15,7 @@ import (
 
 func TestListTodosImpl_Query(t *testing.T) {
 	tests := map[string]struct {
-		setExpectations func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient)
+		setExpectations func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder)
 		page            int
 		pageSize        int
 		queryParams     []ListTodoOptions
@@ -26,7 +26,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 		"success": {
 			page:     1,
 			pageSize: 10,
-			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+			setExpectations: func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				repo.EXPECT().ListTodos(mock.Anything, 1, 10, mock.Anything).Return([]domain.Todo{
 					{ID: uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"), Title: "Todo 1", Status: domain.TodoStatus_OPEN},
 					{ID: uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"), Title: "Todo 2", Status: domain.TodoStatus_OPEN},
@@ -45,7 +45,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 			queryParams: []ListTodoOptions{
 				WithStatus(domain.TodoStatus_DONE),
 			},
-			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+			setExpectations: func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				repo.EXPECT().ListTodos(mock.Anything, 1, 10, mock.Anything).
 					Run(func(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOption) {
 						var params domain.ListTodosParams
@@ -71,10 +71,10 @@ func TestListTodosImpl_Query(t *testing.T) {
 				WithSearchQuery("meeting"),
 				WithSearchType(SearchType_Similarity),
 			},
-			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
-				llmClient.EXPECT().
-					Embed(mock.Anything, "test-model", "meeting").
-					Return(domain.EmbedResponse{Embedding: []float64{0.1, 0.2, 0.3}}, nil)
+			setExpectations: func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+				semanticEncoder.EXPECT().
+					VectorizeQuery(mock.Anything, "test-model", "meeting").
+					Return(domain.EmbeddingVector{Vector: []float64{0.1, 0.2, 0.3}}, nil)
 
 				repo.EXPECT().ListTodos(mock.Anything, 2, 5, mock.Anything).
 					Run(func(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOption) {
@@ -97,7 +97,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 				WithSearchQuery("report"),
 				WithSearchType(SearchType_Title),
 			},
-			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+			setExpectations: func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				repo.EXPECT().ListTodos(mock.Anything, 1, 5, mock.Anything).
 					Run(func(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOption) {
 						var params domain.ListTodosParams
@@ -122,7 +122,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 					time.Date(2024, 12, 31, 23, 59, 59, 0, time.UTC),
 				),
 			},
-			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+			setExpectations: func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				repo.EXPECT().ListTodos(mock.Anything, 1, 10, mock.Anything).
 					Run(func(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOption) {
 						var params domain.ListTodosParams
@@ -144,7 +144,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 			queryParams: []ListTodoOptions{
 				WithSortBy("createdAtDesc"),
 			},
-			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+			setExpectations: func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				repo.EXPECT().ListTodos(mock.Anything, 1, 10, mock.Anything).
 					Run(func(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOption) {
 						var params domain.ListTodosParams
@@ -169,7 +169,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 					time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
 				),
 			},
-			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+			setExpectations: func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 			},
 			expectedTodos:   []domain.Todo(nil),
 			expectedHasMore: false,
@@ -181,7 +181,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 			queryParams: []ListTodoOptions{
 				WithSearchQuery("meeting"),
 			},
-			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+			setExpectations: func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 			},
 			expectedTodos:   []domain.Todo(nil),
 			expectedHasMore: false,
@@ -190,7 +190,7 @@ func TestListTodosImpl_Query(t *testing.T) {
 		"repository-error": {
 			page:     1,
 			pageSize: 10,
-			setExpectations: func(repo *domain.MockTodoRepository, llmClient *domain.MockLLMClient) {
+			setExpectations: func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				repo.EXPECT().ListTodos(mock.Anything, 1, 10, mock.Anything).Return(nil, false, errors.New("database error"))
 			},
 			expectedTodos:   nil,
@@ -202,12 +202,12 @@ func TestListTodosImpl_Query(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			repo := domain.NewMockTodoRepository(t)
-			llmCli := domain.NewMockLLMClient(t)
+			semanticEncoder := domain.NewMockSemanticEncoder(t)
 			if tt.setExpectations != nil {
-				tt.setExpectations(repo, llmCli)
+				tt.setExpectations(repo, semanticEncoder)
 			}
 
-			lti := NewListTodosImpl(repo, llmCli, "test-model")
+			lti := NewListTodosImpl(repo, semanticEncoder, "test-model")
 
 			got, hasMore, gotErr := lti.Query(context.Background(), tt.page, tt.pageSize, tt.queryParams...)
 			assert.Equal(t, tt.expectedErr, gotErr)

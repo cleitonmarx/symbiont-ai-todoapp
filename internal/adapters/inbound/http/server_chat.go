@@ -45,7 +45,7 @@ func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request
 
 }
 
-// StreamChat handles streaming chat responses from the LLM
+// StreamChat handles streaming assistant chat responses
 // (POST /api/chat/stream)
 func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	req := gen.StreamChatJSONRequestBody{}
@@ -81,12 +81,11 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 		options = append(options, usecases.WithConversationID(*req.ConversationId))
 	}
 
-	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(eventType domain.LLMStreamEventType, data any) error {
+	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(eventType domain.AssistantEventType, data any) error {
 		dataBytes, err := json.Marshal(data)
 		if err != nil {
 			return err
 		}
-
 		_, err = fmt.Fprintf(w, "event: %s\n", eventType)
 		if err != nil {
 			return err
@@ -96,6 +95,7 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
+
 		flusher.Flush()
 		return nil
 	}, options...)
@@ -106,10 +106,10 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ListAvailableModels returns the list of available LLM models for chat
+// ListAvailableModels returns the list of available assistant models for chat
 // (GET /api/models)
 func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Request) {
-	models, err := api.ListAvailableLLMModels.Query(r.Context())
+	models, err := api.ListAvailableModelsUseCase.Query(r.Context())
 	if err != nil {
 		respondError(w, toError(err))
 		return
@@ -117,7 +117,7 @@ func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Requ
 
 	rp := gen.ModelListResp{}
 	for _, m := range models {
-		if m.Type != domain.LLMModelType_Chat {
+		if m.Kind != domain.ModelKindAssistant {
 			continue
 		}
 		rp.Models = append(rp.Models, m.Name)

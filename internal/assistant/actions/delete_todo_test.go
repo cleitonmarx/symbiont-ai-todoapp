@@ -1,4 +1,4 @@
-package usecases
+package actions
 
 import (
 	"context"
@@ -6,21 +6,22 @@ import (
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoDeleterTool(t *testing.T) {
+func TestTodoDeleterAction(t *testing.T) {
 	todoID := uuid.New()
 
 	tests := map[string]struct {
-		setupMocks   func(*domain.MockUnitOfWork, *MockTodoDeleter)
-		functionCall domain.LLMStreamEventToolCall
-		validateResp func(t *testing.T, resp domain.LLMChatMessage)
+		setupMocks   func(*domain.MockUnitOfWork, *usecases.MockTodoDeleter)
+		functionCall domain.AssistantActionCall
+		validateResp func(t *testing.T, resp domain.AssistantMessage)
 	}{
 		"delete-todo-success": {
-			setupMocks: func(uow *domain.MockUnitOfWork, deleter *MockTodoDeleter) {
+			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
 				deleter.EXPECT().
 					Delete(
 						mock.Anything,
@@ -36,29 +37,29 @@ func TestTodoDeleterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "delete_todo",
-				Arguments: `{"id": "` + todoID.String() + `"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "delete_todo",
+				Input: `{"id": "` + todoID.String() + `"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "deleted successfully")
 			},
 		},
 		"delete-todo-invalid-arguments": {
-			setupMocks: func(uow *domain.MockUnitOfWork, deleter *MockTodoDeleter) {
+			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "delete_todo",
-				Arguments: `invalid json`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "delete_todo",
+				Input: `invalid json`,
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
 		"delete-todo-delete-error": {
-			setupMocks: func(uow *domain.MockUnitOfWork, deleter *MockTodoDeleter) {
+			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
 				deleter.EXPECT().
 					Delete(
 						mock.Anything,
@@ -74,11 +75,11 @@ func TestTodoDeleterTool(t *testing.T) {
 					}).
 					Once()
 			},
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "delete_todo",
-				Arguments: `{"id": "` + todoID.String() + `"}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "delete_todo",
+				Input: `{"id": "` + todoID.String() + `"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "delete_todo_error")
 			},
@@ -88,12 +89,12 @@ func TestTodoDeleterTool(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			uow := domain.NewMockUnitOfWork(t)
-			deleter := NewMockTodoDeleter(t)
+			deleter := usecases.NewMockTodoDeleter(t)
 			tt.setupMocks(uow, deleter)
 
-			tool := NewTodoDeleterTool(uow, deleter)
+			action := NewTodoDeleterAction(uow, deleter)
 
-			resp := tool.Call(context.Background(), tt.functionCall, []domain.LLMChatMessage{})
+			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
 			tt.validateResp(t, resp)
 		})
 	}

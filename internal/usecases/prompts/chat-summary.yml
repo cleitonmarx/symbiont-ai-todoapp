@@ -38,7 +38,7 @@
     user_nuances: <preferences/constraints/style, max 50 words, or none>
     tasks: <t1; t2; ...; t6 or none>, where each task is "<title>|<O/D>|<due>" and add "#<id>|" only if required next
     last_action: <tool + meaningful result, max 50 words, or none>. Example: `create_task` -> Success -> Task ID UUID created
-    recent_tool_calls: <up to 10 tool names in chronological order separated by '; ', or none>
+    recent_action_calls: <up to 5 tool names in chronological order separated by '; ', or none>
     output_format: list, summary with counters, or concise text.
 
     existing_memory:

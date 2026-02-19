@@ -30,7 +30,7 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 		setExpectations func(
 			uow *domain.MockUnitOfWork,
 			timeProvider *domain.MockCurrentTimeProvider,
-			llmClient *domain.MockLLMClient)
+			semanticEncoder *domain.MockSemanticEncoder)
 		id           uuid.UUID
 		title        *string
 		status       *domain.TodoStatus
@@ -46,14 +46,16 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 			setExpectations: func(
 				uow *domain.MockUnitOfWork,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				semanticEncoder *domain.MockSemanticEncoder,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
-				llmClient.EXPECT().Embed(
+				semanticEncoder.EXPECT().VectorizeTodo(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: Updated Todo | Due Date: 2024-01-01 | Status: OPEN",
-				).Return(domain.EmbedResponse{Embedding: []float64{0.4, 0.5, 0.6}}, nil)
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
+				).Return(domain.EmbeddingVector{Vector: []float64{0.4, 0.5, 0.6}}, nil)
 
 				repo := domain.NewMockTodoRepository(t)
 				outbox := domain.NewMockOutboxRepository(t)
@@ -84,7 +86,7 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 			setExpectations: func(
 				uow *domain.MockUnitOfWork,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				semanticEncoder *domain.MockSemanticEncoder,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 				repo := domain.NewMockTodoRepository(t)
@@ -102,15 +104,17 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 			setExpectations: func(
 				uow *domain.MockUnitOfWork,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				semanticEncoder *domain.MockSemanticEncoder,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
-				llmClient.EXPECT().Embed(
+				semanticEncoder.EXPECT().VectorizeTodo(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: Updated Todo | Due Date: 2024-01-01 | Status: OPEN",
-				).Return(domain.EmbedResponse{}, errors.New("embedding service error"))
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
+				).Return(domain.EmbeddingVector{}, errors.New("embedding service error"))
 
 				repo := domain.NewMockTodoRepository(t)
 
@@ -126,7 +130,7 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 			setExpectations: func(
 				uow *domain.MockUnitOfWork,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				semanticEncoder *domain.MockSemanticEncoder,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 
@@ -143,7 +147,7 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 			setExpectations: func(
 				uow *domain.MockUnitOfWork,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				semanticEncoder *domain.MockSemanticEncoder,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
 				repo := domain.NewMockTodoRepository(t)
@@ -161,14 +165,16 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 			setExpectations: func(
 				uow *domain.MockUnitOfWork,
 				timeProvider *domain.MockCurrentTimeProvider,
-				llmClient *domain.MockLLMClient,
+				semanticEncoder *domain.MockSemanticEncoder,
 			) {
 				timeProvider.EXPECT().Now().Return(fixedTime)
-				llmClient.EXPECT().Embed(
+				semanticEncoder.EXPECT().VectorizeTodo(
 					mock.Anything,
 					"model-name",
-					"ID: 123e4567-e89b-12d3-a456-426614174000 | Task: Updated Todo | Due Date: 2024-01-01 | Status: OPEN",
-				).Return(domain.EmbedResponse{Embedding: []float64{0.4, 0.5, 0.6}}, nil)
+					mock.MatchedBy(func(t domain.Todo) bool {
+						return t.Title == todo.Title && t.DueDate.Equal(todo.DueDate)
+					}),
+				).Return(domain.EmbeddingVector{Vector: []float64{0.4, 0.5, 0.6}}, nil)
 
 				repo := domain.NewMockTodoRepository(t)
 				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, true, nil)
@@ -186,12 +192,12 @@ func TestTodoUpdaterImpl_Update(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			uow := domain.NewMockUnitOfWork(t)
 			timeProvider := domain.NewMockCurrentTimeProvider(t)
-			llmClient := domain.NewMockLLMClient(t)
+			semanticEncoder := domain.NewMockSemanticEncoder(t)
 			if tt.setExpectations != nil {
-				tt.setExpectations(uow, timeProvider, llmClient)
+				tt.setExpectations(uow, timeProvider, semanticEncoder)
 			}
 
-			uti := NewTodoUpdaterImpl(uow, timeProvider, llmClient, "model-name")
+			uti := NewTodoUpdaterImpl(uow, timeProvider, semanticEncoder, "model-name")
 
 			got, gotErr := uti.Update(t.Context(), uow, tt.id, tt.title, tt.status, tt.dueDate)
 			assert.Equal(t, tt.expectedErr, gotErr)

@@ -1,4 +1,4 @@
-package usecases
+package actions
 
 import (
 	"context"
@@ -10,17 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUIFiltersSetterTool(t *testing.T) {
+func TestUIFiltersSetterAction(t *testing.T) {
 	tests := map[string]struct {
-		functionCall domain.LLMStreamEventToolCall
-		validateResp func(t *testing.T, resp domain.LLMChatMessage)
+		functionCall domain.AssistantActionCall
+		validateResp func(t *testing.T, resp domain.AssistantMessage)
 	}{
 		"set-ui-filters-success-similarity": {
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "set_ui_filters",
-				Arguments: `{"status":"OPEN","search_by_similarity":"buy milk","sort_by":"similarityAsc","page":1,"page_size":10}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `{"status":"OPEN","search_by_similarity":"buy milk","sort_by":"similarityAsc","page":1,"page_size":10}`,
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				var output map[string]any
 				err := json.Unmarshal([]byte(resp.Content), &output)
@@ -35,22 +35,22 @@ func TestUIFiltersSetterTool(t *testing.T) {
 			},
 		},
 		"set-ui-filters-invalid-status": {
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "set_ui_filters",
-				Arguments: `{"status":"OPEN,DONE","page":1,"page_size":10}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `{"status":"OPEN,DONE","page":1,"page_size":10}`,
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 				assert.Contains(t, resp.Content, "status must be OPEN or DONE")
 			},
 		},
 		"set-ui-filters-invalid-both-search-modes": {
-			functionCall: domain.LLMStreamEventToolCall{
-				Function:  "set_ui_filters",
-				Arguments: `{"search_by_similarity":"buy","search_by_title":"buy","page":1,"page_size":10}`,
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `{"search_by_similarity":"buy","search_by_title":"buy","page":1,"page_size":10}`,
 			},
-			validateResp: func(t *testing.T, resp domain.LLMChatMessage) {
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 				assert.Contains(t, resp.Content, "either search_by_similarity or search_by_title")
@@ -60,8 +60,8 @@ func TestUIFiltersSetterTool(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tool := NewUIFiltersSetterTool()
-			resp := tool.Call(context.Background(), tt.functionCall, []domain.LLMChatMessage{})
+			tool := NewUIFiltersSetterAction()
+			resp := tool.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
 			tt.validateResp(t, resp)
 		})
 	}

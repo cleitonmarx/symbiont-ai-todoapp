@@ -36,19 +36,19 @@ const (
 	// Frequency penalty to reduce repetition in summaries, especially for longer conversations.
 	CHAT_SUMMARY_FREQUENCY_PENALTY = 0.7
 
-	// Maximum number of recent tool calls persisted in conversation summary memory.
-	MAX_RECENT_TOOL_CALLS_IN_SUMMARY = 10
+	// Maximum number of recent action calls persisted in conversation summary memory.
+	MAX_RECENT_ACTION_CALLS_IN_SUMMARY = 5
 
-	// Summary field used to persist rolling tool-call history.
-	SUMMARY_RECENT_TOOL_CALLS_FIELD = "recent_tool_calls"
+	// Summary field used to persist rolling action-call history.
+	SUMMARY_RECENT_ACTION_CALLS_FIELD = "recent_action_calls"
 )
 
 // CompletedConversationSummaryChannel is a channel type for sending processed domain.ConversationSummary items.
 // It is used in integration tests to verify summary generation.
 type CompletedConversationSummaryChannel chan domain.ConversationSummary
 
-// Default list of tool function names that imply task state changes.
-var stateChangingTools = map[string]struct{}{
+// Default list of action function names that imply task state changes.
+var stateChangingActions = map[string]struct{}{
 	"create_todo":          {},
 	"update_todo":          {},
 	"update_todo_due_date": {},
@@ -69,7 +69,7 @@ type GenerateChatSummaryImpl struct {
 	chatMessageRepo         domain.ChatMessageRepository
 	conversationSummaryRepo domain.ConversationSummaryRepository
 	timeProvider            domain.CurrentTimeProvider
-	llmClient               domain.LLMClient
+	assistant               domain.Assistant
 	model                   string
 	completedSummaryCh      CompletedConversationSummaryChannel
 }
@@ -79,16 +79,15 @@ func NewGenerateChatSummaryImpl(
 	chatMessageRepo domain.ChatMessageRepository,
 	conversationSummaryRepo domain.ConversationSummaryRepository,
 	timeProvider domain.CurrentTimeProvider,
-	llmClient domain.LLMClient,
+	assistant domain.Assistant,
 	model string,
 	q CompletedConversationSummaryChannel,
 ) GenerateChatSummaryImpl {
-
 	return GenerateChatSummaryImpl{
 		chatMessageRepo:         chatMessageRepo,
 		conversationSummaryRepo: conversationSummaryRepo,
 		timeProvider:            timeProvider,
-		llmClient:               llmClient,
+		assistant:               assistant,
 		model:                   model,
 		completedSummaryCh:      q,
 	}
@@ -142,7 +141,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 		return fmt.Errorf("failed to build prompt messages: %w", err)
 	}
 
-	resp, err := gcs.llmClient.Chat(spanCtx, domain.LLMChatRequest{
+	resp, err := gcs.assistant.RunTurnSync(spanCtx, domain.AssistantTurnRequest{
 		Model:            gcs.model,
 		Messages:         promptMessages,
 		Stream:           false,
@@ -160,7 +159,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	if summaryContent == "" {
 		return nil
 	}
-	summaryContent = mergeRecentToolCallsIntoSummary(currentSummary, summaryContent, unsummarizedMessages)
+	summaryContent = mergeRecentActionCallsIntoSummary(currentSummary, summaryContent, unsummarizedMessages)
 
 	summaryID := uuid.New()
 	if found {
@@ -191,14 +190,14 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 
 // buildPromptMessages constructs the prompt messages for the LLM based
 // on the current conversation summary and new chat messages.
-func (gcs GenerateChatSummaryImpl) buildPromptMessages(currentState, newMessages string) ([]domain.LLMChatMessage, error) {
+func (gcs GenerateChatSummaryImpl) buildPromptMessages(currentState, newMessages string) ([]domain.AssistantMessage, error) {
 	file, err := chatSummaryPrompt.Open("prompts/chat-summary.yml")
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close() //nolint:errcheck
 
-	messages := []domain.LLMChatMessage{}
+	messages := []domain.AssistantMessage{}
 	err = yaml.NewDecoder(file).Decode(&messages)
 	if err != nil {
 		return nil, err
@@ -233,7 +232,7 @@ func formatMessageForSummary(message domain.ChatMessage) string {
 	}
 
 	if message.ChatRole == domain.ChatRole_Tool {
-		parts = append(parts, fmt.Sprintf("  tool_success: %t", message.IsToolCallSuccess()))
+		parts = append(parts, fmt.Sprintf("  action_success: %t", message.IsActionCallSuccess()))
 	}
 
 	if message.ErrorMessage != nil && strings.TrimSpace(*message.ErrorMessage) != "" {
@@ -253,12 +252,12 @@ func (gcs GenerateChatSummaryImpl) shouldGenerateSummary(span trace.Span, messag
 			TriggerMessageCount: CHAT_SUMMARY_TRIGGER_MESSAGES,
 			TriggerTokenCount:   CHAT_SUMMARY_TRIGGER_TOKENS,
 		},
-		stateChangingTools,
+		stateChangingActions,
 	)
 
 	switch decision.Reason {
-	case domain.ConversationSummaryGenerationReason_StateChangingToolSuccess:
-		span.AddEvent("Triggering summary generation due to successful state-changing tool call")
+	case domain.ConversationSummaryGenerationReason_StateChangingActionSuccess:
+		span.AddEvent("Triggering summary generation due to successful state-changing action call")
 	case domain.ConversationSummaryGenerationReason_MessageCountThreshold:
 		span.AddEvent(fmt.Sprintf("Triggering summary generation due to message count threshold: %d messages", decision.MessageCount))
 	case domain.ConversationSummaryGenerationReason_TokenCountThreshold:
@@ -268,21 +267,21 @@ func (gcs GenerateChatSummaryImpl) shouldGenerateSummary(span trace.Span, messag
 	return decision.ShouldGenerate
 }
 
-// mergeRecentToolCallsIntoSummary extracts recent tool calls from the new unsummarized messages,
-// merges them with any existing tool call history in the previous summary, and upserts the combined list
+// mergeRecentActionCallsIntoSummary extracts recent action calls from the new unsummarized messages,
+// merges them with any existing action call history in the previous summary, and upserts the combined list
 // back into the new summary content.
-func mergeRecentToolCallsIntoSummary(previousSummary, newSummary string, messages []domain.ChatMessage) string {
-	existing := parseRecentToolCallsFromSummary(previousSummary)
-	latest := extractRecentToolCalls(messages)
+func mergeRecentActionCallsIntoSummary(previousSummary, newSummary string, messages []domain.ChatMessage) string {
+	existing := parseRecentActionCallsFromSummary(previousSummary)
+	latest := extractRecentActionCalls(messages)
 	merged := append(existing, latest...)
-	merged = keepLastNToolCalls(merged, MAX_RECENT_TOOL_CALLS_IN_SUMMARY)
-	return upsertSummaryField(newSummary, SUMMARY_RECENT_TOOL_CALLS_FIELD, formatRecentToolCalls(merged))
+	merged = keepLastNActionCalls(merged, MAX_RECENT_ACTION_CALLS_IN_SUMMARY)
+	return upsertSummaryField(newSummary, SUMMARY_RECENT_ACTION_CALLS_FIELD, formatRecentActionCalls(merged))
 }
 
-// parseRecentToolCallsFromSummary looks for the recent tool calls field in the given summary content
-// and parses it into a list of tool function names.
-func parseRecentToolCallsFromSummary(summary string) []string {
-	value, ok := findSummaryFieldValue(summary, SUMMARY_RECENT_TOOL_CALLS_FIELD)
+// parseRecentActionCallsFromSummary looks for the recent action calls field in the given summary content
+// and parses it into a list of action function names.
+func parseRecentActionCallsFromSummary(summary string) []string {
+	value, ok := findSummaryFieldValue(summary, SUMMARY_RECENT_ACTION_CALLS_FIELD)
 	if !ok {
 		return nil
 	}
@@ -292,55 +291,55 @@ func parseRecentToolCallsFromSummary(summary string) []string {
 	}
 
 	parts := strings.Split(value, ";")
-	toolCalls := make([]string, 0, len(parts))
+	actionCalls := make([]string, 0, len(parts))
 	for _, part := range parts {
 		name := strings.TrimSpace(part)
 		if name == "" {
 			continue
 		}
-		toolCalls = append(toolCalls, name)
+		actionCalls = append(actionCalls, name)
 	}
-	return keepLastNToolCalls(toolCalls, MAX_RECENT_TOOL_CALLS_IN_SUMMARY)
+	return keepLastNActionCalls(actionCalls, MAX_RECENT_ACTION_CALLS_IN_SUMMARY)
 }
 
-// extractRecentToolCalls inspects the given list of chat messages and extracts the function names of any tool calls,
+// extractRecentActionCalls inspects the given list of chat messages and extracts the function names of any action calls,
 // especially those that are relevant for state changes, to be included in the conversation summary memory.
-func extractRecentToolCalls(messages []domain.ChatMessage) []string {
-	toolCalls := make([]string, 0, len(messages))
+func extractRecentActionCalls(messages []domain.ChatMessage) []string {
+	actionCalls := make([]string, 0, len(messages))
 	for _, message := range messages {
-		if len(message.ToolCalls) == 0 {
+		if len(message.ActionCalls) == 0 {
 			continue
 		}
-		for _, toolCall := range message.ToolCalls {
-			functionName := strings.TrimSpace(toolCall.Function)
+		for _, actionCall := range message.ActionCalls {
+			functionName := strings.TrimSpace(actionCall.Name)
 			if functionName == "" {
 				continue
 			}
-			toolCalls = append(toolCalls, functionName)
+			actionCalls = append(actionCalls, functionName)
 		}
 	}
-	return toolCalls
+	return actionCalls
 }
 
-// keepLastNToolCalls ensures that only the most recent N tool calls are kept in the conversation summary memory,
-// to prevent unbounded growth while still retaining relevant recent tool usage history for context in future summaries.
-func keepLastNToolCalls(toolCalls []string, max int) []string {
+// keepLastNActionCalls ensures that only the most recent N action calls are kept in the conversation summary memory,
+// to prevent unbounded growth while still retaining relevant recent action usage history for context in future summaries.
+func keepLastNActionCalls(actionCalls []string, max int) []string {
 	if max <= 0 {
 		return nil
 	}
-	if len(toolCalls) <= max {
-		return toolCalls
+	if len(actionCalls) <= max {
+		return actionCalls
 	}
-	return toolCalls[len(toolCalls)-max:]
+	return actionCalls[len(actionCalls)-max:]
 }
 
-// formatRecentToolCalls takes a list of tool function names and formats them into a single string representation
+// formatRecentActionCalls takes a list of action function names and formats them into a single string representation
 // suitable for inclusion in the conversation summary content.
-func formatRecentToolCalls(toolCalls []string) string {
-	if len(toolCalls) == 0 {
+func formatRecentActionCalls(actionCalls []string) string {
+	if len(actionCalls) == 0 {
 		return "none"
 	}
-	return strings.Join(toolCalls, "; ")
+	return strings.Join(actionCalls, "; ")
 }
 
 // findSummaryFieldValue searches the given summary content for a field with the specified name and returns its value if found.
@@ -374,6 +373,7 @@ func upsertSummaryField(summary, fieldName, fieldValue string) string {
 	if fieldValue == "" {
 		fieldValue = "none"
 	}
+	fieldLine := fmt.Sprintf("%s: %s", fieldName, fieldValue)
 
 	updatedLines := make([]string, 0)
 	replaced := false
@@ -387,21 +387,25 @@ func upsertSummaryField(summary, fieldName, fieldValue string) string {
 
 		key, _, ok := parseSummaryFieldLine(trimmed)
 		if ok && key == fieldName {
-			updatedLines = append(updatedLines, fmt.Sprintf("%s: %s", fieldName, fieldValue))
-			replaced = true
+			// Keep exactly one instance of the target field to avoid duplicates.
+			if !replaced {
+				updatedLines = append(updatedLines, fieldLine)
+				replaced = true
+			}
 			continue
 		}
 
 		updatedLines = append(updatedLines, trimmed)
 
 		if !replaced && !insertedAfterLastAction && ok && key == "last_action" {
-			updatedLines = append(updatedLines, fmt.Sprintf("%s: %s", fieldName, fieldValue))
+			updatedLines = append(updatedLines, fieldLine)
 			insertedAfterLastAction = true
+			replaced = true
 		}
 	}
 
 	if !replaced && !insertedAfterLastAction {
-		updatedLines = append(updatedLines, fmt.Sprintf("%s: %s", fieldName, fieldValue))
+		updatedLines = append(updatedLines, fieldLine)
 	}
 
 	return strings.Join(updatedLines, "\n")
@@ -429,7 +433,7 @@ type InitGenerateChatSummary struct {
 	ChatMessageRepo         domain.ChatMessageRepository         `resolve:""`
 	ConversationSummaryRepo domain.ConversationSummaryRepository `resolve:""`
 	TimeProvider            domain.CurrentTimeProvider           `resolve:""`
-	LLMClient               domain.LLMClient                     `resolve:""`
+	Assistant               domain.Assistant                     `resolve:""`
 	Model                   string                               `config:"LLM_CHAT_SUMMARY_MODEL"`
 }
 
@@ -440,7 +444,7 @@ func (i InitGenerateChatSummary) Initialize(ctx context.Context) (context.Contex
 		i.ChatMessageRepo,
 		i.ConversationSummaryRepo,
 		i.TimeProvider,
-		i.LLMClient,
+		i.Assistant,
 		i.Model,
 		queue,
 	))

@@ -385,6 +385,12 @@ func TestTodoFetcherAction(t *testing.T) {
 			tt.setupMocks(todoRepo, semanticEncoder, timeProvider)
 
 			action := NewTodoFetcherAction(todoRepo, semanticEncoder, timeProvider, "embedding-model")
+			assert.NotEmpty(t, action.StatusMessage())
+
+			definition := action.Definition()
+			assert.Equal(t, "fetch_todos", definition.Name)
+			assert.NotEmpty(t, definition.Description)
+			assert.NotEmpty(t, definition.Input)
 
 			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
 			tt.validateResp(t, resp)

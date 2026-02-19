@@ -176,6 +176,12 @@ func TestTodoCreatorAction(t *testing.T) {
 			tt.setupMocks(uow, timeProvider, todoCreator)
 
 			action := NewTodoCreatorAction(uow, todoCreator, timeProvider)
+			assert.NotEmpty(t, action.StatusMessage())
+
+			definition := action.Definition()
+			assert.Equal(t, "create_todo", definition.Name)
+			assert.NotEmpty(t, definition.Description)
+			assert.NotEmpty(t, definition.Input)
 
 			resp := action.Execute(context.Background(), tt.functionCall, tt.history)
 			tt.validateResp(t, resp)

@@ -179,6 +179,12 @@ func TestTodoDueDateUpdaterAction(t *testing.T) {
 			tt.setupMocks(uow, timeProvider, updater)
 
 			action := NewTodoDueDateUpdaterAction(uow, updater, timeProvider)
+			assert.NotEmpty(t, action.StatusMessage())
+
+			definition := action.Definition()
+			assert.Equal(t, "update_todo_due_date", definition.Name)
+			assert.NotEmpty(t, definition.Description)
+			assert.NotEmpty(t, definition.Input)
 
 			resp := action.Execute(context.Background(), tt.functionCall, tt.history)
 			tt.validateResp(t, resp)

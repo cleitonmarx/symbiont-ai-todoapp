@@ -120,6 +120,12 @@ func TestTodoUpdaterAction(t *testing.T) {
 			tt.setupMocks(uow, updater)
 
 			action := NewTodoUpdaterAction(uow, updater)
+			assert.NotEmpty(t, action.StatusMessage())
+
+			definition := action.Definition()
+			assert.Equal(t, "update_todo", definition.Name)
+			assert.NotEmpty(t, definition.Description)
+			assert.NotEmpty(t, definition.Input)
 
 			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
 			tt.validateResp(t, resp)

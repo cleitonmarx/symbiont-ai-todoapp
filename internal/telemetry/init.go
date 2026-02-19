@@ -133,6 +133,11 @@ func newAppResource(ctx context.Context) (*resource.Resource, error) {
 // retries on HTTP 500 Internal Server Error responses.
 func dontRetry500StatusPolicy(policy retryablehttp.CheckRetry) retryablehttp.CheckRetry {
 	return func(ctx context.Context, resp *http.Response, err error) (bool, error) {
+		// do not retry on context.Canceled or context.DeadlineExceeded
+		if ctx.Err() != nil {
+			return false, ctx.Err()
+		}
+
 		if resp.StatusCode == http.StatusInternalServerError {
 			return false, err
 		}

@@ -106,13 +106,13 @@ func (lti ListTodosImpl) Query(ctx context.Context, page int, pageSize int, opts
 		opt(&params)
 	}
 
-	builder := NewTodoSearchBuilder(lti.semanticEncoder, lti.embeddingModel).
+	builder := NewTodoSearchBuilder().
 		WithStatus(params.Status).
 		WithDueDateRange(params.DueAfter, params.DueBefore).
 		WithSortBy(params.SortBy).
 		WithSearch(params.Search, params.SearchType)
 
-	buildResult, err := builder.Build(spanCtx)
+	buildResult, err := builder.Build(spanCtx, lti.semanticEncoder, lti.embeddingModel)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, false, err
 	}

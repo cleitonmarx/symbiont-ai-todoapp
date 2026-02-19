@@ -37,7 +37,7 @@ const (
 	CHAT_SUMMARY_FREQUENCY_PENALTY = 0.7
 
 	// Maximum number of recent action calls persisted in conversation summary memory.
-	MAX_RECENT_ACTION_CALLS_IN_SUMMARY = 10
+	MAX_RECENT_ACTION_CALLS_IN_SUMMARY = 5
 
 	// Summary field used to persist rolling action-call history.
 	SUMMARY_RECENT_ACTION_CALLS_FIELD = "recent_action_calls"

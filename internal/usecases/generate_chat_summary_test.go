@@ -526,7 +526,7 @@ func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 			},
 			expectedValue: "fetch_todos; set_ui_filters",
 		},
-		"caps-recent-action-calls-at-ten": {
+		"caps-recent-action-calls-at-five": {
 			previousSummary: "recent_action_calls: call1; call2; call3; call4; call5; call6; call7; call8; call9",
 			newSummary:      "current_intent: x\nactive_view: none\nuser_nuances: none\ntasks: none\nlast_action: none\noutput_format: concise text",
 			messages: []domain.ChatMessage{
@@ -538,7 +538,7 @@ func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 					},
 				},
 			},
-			expectedValue: "call2; call3; call4; call5; call6; call7; call8; call9; call10; call11",
+			expectedValue: "call7; call8; call9; call10; call11",
 		},
 		"replaces-existing-field-in-new-summary": {
 			previousSummary: "current_intent: x",

@@ -16,21 +16,18 @@ type ListAvailableModels interface {
 // ListAvailableModelsImpl implements the ListAvailableModels use case
 type ListAvailableModelsImpl struct {
 	assistantCatalog domain.AssistantModelCatalog
-	embeddingCatalog domain.EmbeddingModelCatalog
 }
 
 // NewListAvailableModelsImpl creates a new ListAvailableModelsImpl instance
 func NewListAvailableModelsImpl(
 	assistantCatalog domain.AssistantModelCatalog,
-	embeddingCatalog domain.EmbeddingModelCatalog,
 ) *ListAvailableModelsImpl {
 	return &ListAvailableModelsImpl{
 		assistantCatalog: assistantCatalog,
-		embeddingCatalog: embeddingCatalog,
 	}
 }
 
-// Query retrieves the list of available assistant and embedding models
+// Query retrieves the list of available assistant models
 func (uc ListAvailableModelsImpl) Query(ctx context.Context) ([]domain.ModelInfo, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
@@ -39,22 +36,12 @@ func (uc ListAvailableModelsImpl) Query(ctx context.Context) ([]domain.ModelInfo
 	if err != nil {
 		return nil, err
 	}
-	embeddingModels, err := uc.embeddingCatalog.ListEmbeddingModels(spanCtx)
-	if err != nil {
-		return nil, err
-	}
 
-	res := make([]domain.ModelInfo, 0, len(assistantModels)+len(embeddingModels))
+	res := make([]domain.ModelInfo, 0, len(assistantModels))
 	for _, m := range assistantModels {
 		res = append(res, domain.ModelInfo{
 			Name: m.Name,
 			Kind: domain.ModelKindAssistant,
-		})
-	}
-	for _, m := range embeddingModels {
-		res = append(res, domain.ModelInfo{
-			Name: m.Name,
-			Kind: domain.ModelKindEmbedding,
 		})
 	}
 	return res, nil
@@ -62,14 +49,12 @@ func (uc ListAvailableModelsImpl) Query(ctx context.Context) ([]domain.ModelInfo
 
 type InitListAvailableModels struct {
 	AssistantCatalog domain.AssistantModelCatalog `resolve:""`
-	EmbeddingCatalog domain.EmbeddingModelCatalog `resolve:""`
 }
 
 // Initialize registers the ListAvailableModels use case in the dependency container
 func (i InitListAvailableModels) Initialize(ctx context.Context) (context.Context, error) {
 	depend.Register[ListAvailableModels](NewListAvailableModelsImpl(
 		i.AssistantCatalog,
-		i.EmbeddingCatalog,
 	))
 	return ctx, nil
 }

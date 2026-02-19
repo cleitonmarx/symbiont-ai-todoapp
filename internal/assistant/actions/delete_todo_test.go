@@ -43,7 +43,7 @@ func TestTodoDeleterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "deleted successfully")
+				assert.Contains(t, resp.Content, "todos[1]{ID,Deleted}")
 			},
 		},
 		"delete-todo-invalid-arguments": {

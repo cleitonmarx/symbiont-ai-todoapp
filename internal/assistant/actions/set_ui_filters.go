@@ -2,12 +2,10 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 )
 
 // UIFiltersSetterAction is an assistant action for synchronizing UI filter state.
@@ -95,136 +93,40 @@ func (t UIFiltersSetterAction) Execute(_ context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"%s","example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
 		}
 	}
 
-	if params.Status != nil {
-		normalizedStatus := strings.ToUpper(strings.TrimSpace(*params.Status))
-		if normalizedStatus != "OPEN" && normalizedStatus != "DONE" {
-			return domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
-				ActionCallID: &call.ID,
-				Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"status must be OPEN or DONE. Omit status for all.","example":%s}`, exampleArgs),
-			}
-		}
-		params.Status = &normalizedStatus
-	}
-
-	if params.SearchBySimilarity != nil && strings.TrimSpace(*params.SearchBySimilarity) == "" {
-		params.SearchBySimilarity = nil
-	}
-	if params.SearchByTitle != nil && strings.TrimSpace(*params.SearchByTitle) == "" {
-		params.SearchByTitle = nil
-	}
-	if params.SearchBySimilarity != nil && params.SearchByTitle != nil {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
-			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"use either search_by_similarity or search_by_title, not both.","example":%s}`, exampleArgs),
+	var dueAfterTime *time.Time
+	var dueBeforeTime *time.Time
+	if params.DueAfter != nil || params.DueBefore != nil {
+		var errMsg *domain.AssistantMessage
+		dueAfterTime, dueBeforeTime, errMsg = parseDueDateParams(params.DueAfter, params.DueBefore, exampleArgs)
+		if errMsg != nil {
+			errMsg.ActionCallID = &call.ID
+			return *errMsg
 		}
 	}
 
-	if params.SortBy != nil {
-		sortBy := strings.TrimSpace(*params.SortBy)
-		switch sortBy {
-		case "dueDateAsc", "dueDateDesc", "createdAtAsc", "createdAtDesc", "similarityAsc", "similarityDesc":
-			params.SortBy = &sortBy
-		default:
-			return domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
-				ActionCallID: &call.ID,
-				Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"sort_by is invalid.","example":%s}`, exampleArgs),
-			}
-		}
-	}
-
-	if (params.DueAfter == nil) != (params.DueBefore == nil) {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
-			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"due_after and due_before must be provided together.","example":%s}`, exampleArgs),
-		}
-	}
-	if params.DueAfter != nil && params.DueBefore != nil {
-		dueAfter := strings.TrimSpace(*params.DueAfter)
-		dueBefore := strings.TrimSpace(*params.DueBefore)
-		if _, err := time.Parse(time.DateOnly, dueAfter); err != nil {
-			return domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
-				ActionCallID: &call.ID,
-				Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"due_after must be YYYY-MM-DD.","example":%s}`, exampleArgs),
-			}
-		}
-		if _, err := time.Parse(time.DateOnly, dueBefore); err != nil {
-			return domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
-				ActionCallID: &call.ID,
-				Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"due_before must be YYYY-MM-DD.","example":%s}`, exampleArgs),
-			}
-		}
-		params.DueAfter = &dueAfter
-		params.DueBefore = &dueBefore
-	}
-
-	if params.Page != nil && *params.Page <= 0 {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
-			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"page must be >= 1.","example":%s}`, exampleArgs),
-		}
-	}
-	if params.PageSize != nil && *params.PageSize <= 0 {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
-			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"page_size must be >= 1.","example":%s}`, exampleArgs),
-		}
-	}
-
-	filters := map[string]any{}
-	if params.Status != nil {
-		filters["status"] = *params.Status
-	}
-	if params.SearchBySimilarity != nil {
-		filters["search_query"] = strings.TrimSpace(*params.SearchBySimilarity)
-		filters["search_type"] = "SIMILARITY"
-	}
-	if params.SearchByTitle != nil {
-		filters["search_query"] = strings.TrimSpace(*params.SearchByTitle)
-		filters["search_type"] = "TITLE"
-	}
-	if params.SortBy != nil {
-		filters["sort_by"] = *params.SortBy
-	}
-	if params.DueAfter != nil {
-		filters["due_after"] = *params.DueAfter
-	}
-	if params.DueBefore != nil {
-		filters["due_before"] = *params.DueBefore
-	}
-	if params.Page != nil {
-		filters["page"] = *params.Page
-	}
-	if params.PageSize != nil {
-		filters["page_size"] = *params.PageSize
-	}
-
-	content, err := json.Marshal(map[string]any{
-		"message": "ui_filters_set",
-		"filters": filters,
-	})
+	err := usecases.NewTodoSearchBuilder().
+		WithStatus((*domain.TodoStatus)(params.Status)).
+		WithDueDateRange(dueAfterTime, dueBeforeTime).
+		WithSortBy(params.SortBy).
+		WithTitleContains(params.SearchByTitle).
+		WithSimilaritySearch(params.SearchBySimilarity).
+		Validate()
 	if err != nil {
+		code := mapTodoFilterBuildErrCode(err)
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"marshal_error","details":"%s"}`, err.Error()),
+			Content:      newActionError(code, err.Error(), exampleArgs),
 		}
 	}
 
 	return domain.AssistantMessage{
 		Role:         domain.ChatRole_Tool,
 		ActionCallID: &call.ID,
-		Content:      string(content),
+		Content:      "ok",
 	}
 }

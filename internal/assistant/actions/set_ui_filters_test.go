@@ -2,30 +2,13 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestUIFiltersSetterAction(t *testing.T) {
-	parseOutput := func(t *testing.T, content string) map[string]any {
-		t.Helper()
-		var output map[string]any
-		err := json.Unmarshal([]byte(content), &output)
-		require.NoError(t, err)
-		return output
-	}
-
-	requireFilters := func(t *testing.T, output map[string]any) map[string]any {
-		t.Helper()
-		filters, ok := output["filters"].(map[string]any)
-		require.True(t, ok)
-		return filters
-	}
-
 	tests := map[string]struct {
 		functionCall domain.AssistantActionCall
 		validateResp func(t *testing.T, resp domain.AssistantMessage)
@@ -37,48 +20,7 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				output := parseOutput(t, resp.Content)
-				assert.Equal(t, "ui_filters_set", output["message"])
-				filters := requireFilters(t, output)
-				assert.Equal(t, "OPEN", filters["status"])
-				assert.Equal(t, "buy milk", filters["search_query"])
-				assert.Equal(t, "SIMILARITY", filters["search_type"])
-				assert.Equal(t, "similarityAsc", filters["sort_by"])
-			},
-		},
-		"set-ui-filters-success-title-search-with-normalization": {
-			functionCall: domain.AssistantActionCall{
-				Name:  "set_ui_filters",
-				Input: `{"status":" open ","search_by_title":"  quarterly report  ","sort_by":" dueDateDesc ","due_after":" 2026-02-01 ","due_before":" 2026-02-28 ","page":2,"page_size":25}`,
-			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				output := parseOutput(t, resp.Content)
-				assert.Equal(t, "ui_filters_set", output["message"])
-				filters := requireFilters(t, output)
-				assert.Equal(t, "OPEN", filters["status"])
-				assert.Equal(t, "quarterly report", filters["search_query"])
-				assert.Equal(t, "TITLE", filters["search_type"])
-				assert.Equal(t, "dueDateDesc", filters["sort_by"])
-				assert.Equal(t, "2026-02-01", filters["due_after"])
-				assert.Equal(t, "2026-02-28", filters["due_before"])
-				assert.Equal(t, float64(2), filters["page"])
-				assert.Equal(t, float64(25), filters["page_size"])
-			},
-		},
-		"set-ui-filters-success-empty-similarity-is-ignored": {
-			functionCall: domain.AssistantActionCall{
-				Name:  "set_ui_filters",
-				Input: `{"search_by_similarity":"   ","page":1,"page_size":10}`,
-			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				output := parseOutput(t, resp.Content)
-				filters := requireFilters(t, output)
-				assert.NotContains(t, filters, "search_query")
-				assert.NotContains(t, filters, "search_type")
-				assert.Equal(t, float64(1), filters["page"])
-				assert.Equal(t, float64(10), filters["page_size"])
+				assert.Equal(t, "ok", resp.Content)
 			},
 		},
 		"set-ui-filters-success-one-search-empty-other-search-used": {
@@ -88,10 +30,7 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				output := parseOutput(t, resp.Content)
-				filters := requireFilters(t, output)
-				assert.Equal(t, "buy milk", filters["search_query"])
-				assert.Equal(t, "TITLE", filters["search_type"])
+				assert.Equal(t, "ok", resp.Content)
 			},
 		},
 		"set-ui-filters-invalid-status": {
@@ -145,7 +84,7 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_arguments")
+				assert.Contains(t, resp.Content, "invalid_due_range")
 				assert.Contains(t, resp.Content, "due_after and due_before must be provided together")
 			},
 		},
@@ -156,8 +95,8 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_arguments")
-				assert.Contains(t, resp.Content, "due_after must be YYYY-MM-DD")
+				assert.Contains(t, resp.Content, "invalid_due_after")
+				assert.Contains(t, resp.Content, "could not parse due_after date")
 			},
 		},
 		"set-ui-filters-invalid-due-before-format": {
@@ -167,30 +106,8 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_arguments")
-				assert.Contains(t, resp.Content, "due_before must be YYYY-MM-DD")
-			},
-		},
-		"set-ui-filters-invalid-page-boundary": {
-			functionCall: domain.AssistantActionCall{
-				Name:  "set_ui_filters",
-				Input: `{"page":0}`,
-			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_arguments")
-				assert.Contains(t, resp.Content, "page must be >= 1")
-			},
-		},
-		"set-ui-filters-invalid-page-size-boundary": {
-			functionCall: domain.AssistantActionCall{
-				Name:  "set_ui_filters",
-				Input: `{"page_size":0}`,
-			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_arguments")
-				assert.Contains(t, resp.Content, "page_size must be >= 1")
+				assert.Contains(t, resp.Content, "invalid_due_before")
+				assert.Contains(t, resp.Content, "could not parse due_before date")
 			},
 		},
 		"set-ui-filters-invalid-sort-by": {
@@ -200,7 +117,7 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_arguments")
+				assert.Contains(t, resp.Content, "invalid_sort_by")
 				assert.Contains(t, resp.Content, "sort_by is invalid")
 			},
 		},

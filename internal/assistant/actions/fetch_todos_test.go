@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func TestTodoFetcherAction(t *testing.T) {
@@ -27,13 +25,12 @@ func TestTodoFetcherAction(t *testing.T) {
 		setupMocks func(
 			*domain.MockTodoRepository,
 			*domain.MockSemanticEncoder,
-			*domain.MockCurrentTimeProvider,
 		)
 		functionCall domain.AssistantActionCall
 		validateResp func(t *testing.T, resp domain.AssistantMessage)
 	}{
 		"fetch-todos-success": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -50,14 +47,11 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				var output map[string]any
-				err := json.Unmarshal([]byte(resp.Content), &output)
-				require.NoError(t, err)
-				assert.NotNil(t, output["todos"])
+				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}:")
 			},
 		},
 		"fetch-todos-with-status-and-similarity": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				semanticEncoder.EXPECT().
 					VectorizeQuery(mock.Anything, "embedding-model", "urgent").
 					Return(domain.EmbeddingVector{Vector: []float64{0.3, 0.4}}, nil).
@@ -88,14 +82,11 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				var output map[string]any
-				err := json.Unmarshal([]byte(resp.Content), &output)
-				require.NoError(t, err)
-				assert.NotNil(t, output["todos"])
+				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}:")
 			},
 		},
 		"fetch-todos-by-title": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -120,14 +111,11 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				var output map[string]any
-				err := json.Unmarshal([]byte(resp.Content), &output)
-				require.NoError(t, err)
-				assert.NotNil(t, output["todos"])
+				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}:")
 			},
 		},
 		"fetch-todos-with-sortby": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 
 				todoRepo.EXPECT().
 					ListTodos(
@@ -151,21 +139,11 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				var output map[string]any
-				err := json.Unmarshal([]byte(resp.Content), &output)
-				require.NoError(t, err)
-				todos, ok := output["todos"].([]any)
-				require.True(t, ok)
-				assert.Len(t, todos, 0)
+				assert.Contains(t, resp.Content, "todos[0]:")
 			},
 		},
 		"fetch-todos-with-due-date-filters": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime).
-					Once()
-
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -192,19 +170,11 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				var output map[string]any
-				err := json.Unmarshal([]byte(resp.Content), &output)
-				require.NoError(t, err)
-				assert.NotNil(t, output["todos"])
+				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}:")
 			},
 		},
 		"fetch-todos-invalid-due-after": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
-
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime).
-					Once()
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 			},
 			functionCall: domain.AssistantActionCall{
 				Name:  "fetch_todos",
@@ -216,12 +186,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 		},
 		"fetch-todos-invalid-due-before": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
-
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime).
-					Once()
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 			},
 			functionCall: domain.AssistantActionCall{
 				Name:  "fetch_todos",
@@ -234,7 +199,7 @@ func TestTodoFetcherAction(t *testing.T) {
 		},
 
 		"fetch-todos-invalid-arguments": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 			},
 			functionCall: domain.AssistantActionCall{
 				Name:  "fetch_todos",
@@ -246,7 +211,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 		},
 		"fetch-todos-invalid-status-with-concatenated-field": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 			},
 			functionCall: domain.AssistantActionCall{
 				Name:  "fetch_todos",
@@ -259,11 +224,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 		},
 		"fetch-todos-invalid-partial-due-range": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime).
-					Once()
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 			},
 			functionCall: domain.AssistantActionCall{
 				Name:  "fetch_todos",
@@ -275,11 +236,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 		},
 		"fetch-todos-invalid-due-range-order": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime).
-					Once()
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 			},
 			functionCall: domain.AssistantActionCall{
 				Name:  "fetch_todos",
@@ -292,7 +249,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 		},
 		"fetch-todos-similarity-sort-without-search-term": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 			},
 			functionCall: domain.AssistantActionCall{
 				Name:  "fetch_todos",
@@ -304,7 +261,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 		},
 		"fetch-todos-embedding-error": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				semanticEncoder.EXPECT().
 					VectorizeQuery(mock.Anything, "embedding-model", "search").
 					Return(domain.EmbeddingVector{}, errors.New("embedding failed")).
@@ -320,7 +277,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 		},
 		"fetch-todos-list-error": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, 1, 10, mock.Anything).
 					Return(nil, false, errors.New("db error")).
@@ -336,7 +293,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 		},
 		"fetch-todos-has-more": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, 1, 10, mock.Anything).
 					Return([]domain.Todo{testTodo}, true, nil).
@@ -348,14 +305,11 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				var output map[string]any
-				err := json.Unmarshal([]byte(resp.Content), &output)
-				require.NoError(t, err)
-				assert.Equal(t, float64(2), output["next_page"])
+				assert.Contains(t, resp.Content, "next_page: 2\ntodos[1]")
 			},
 		},
 		"fetch-todos-no-results": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder, timeProvider *domain.MockCurrentTimeProvider) {
+			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, 1, 10, mock.Anything).
 					Return([]domain.Todo{}, false, nil).
@@ -367,12 +321,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				var output map[string]any
-				err := json.Unmarshal([]byte(resp.Content), &output)
-				require.NoError(t, err)
-				todos, ok := output["todos"].([]any)
-				require.True(t, ok)
-				assert.Len(t, todos, 0)
+				assert.Contains(t, resp.Content, "todos[0]")
 			},
 		},
 	}
@@ -381,10 +330,9 @@ func TestTodoFetcherAction(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			todoRepo := domain.NewMockTodoRepository(t)
 			semanticEncoder := domain.NewMockSemanticEncoder(t)
-			timeProvider := domain.NewMockCurrentTimeProvider(t)
-			tt.setupMocks(todoRepo, semanticEncoder, timeProvider)
+			tt.setupMocks(todoRepo, semanticEncoder)
 
-			action := NewTodoFetcherAction(todoRepo, semanticEncoder, timeProvider, "embedding-model")
+			action := NewTodoFetcherAction(todoRepo, semanticEncoder, "embedding-model")
 			assert.NotEmpty(t, action.StatusMessage())
 
 			definition := action.Definition()

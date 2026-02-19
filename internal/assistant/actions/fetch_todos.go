@@ -2,20 +2,19 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/toon-format/toon-go"
 )
 
 // NewTodoFetcherAction creates a new instance of TodoFetcherAction.
-func NewTodoFetcherAction(repo domain.TodoRepository, semanticEncoder domain.SemanticEncoder, timeProvider domain.CurrentTimeProvider, embeddingModel string) TodoFetcherAction {
+func NewTodoFetcherAction(repo domain.TodoRepository, semanticEncoder domain.SemanticEncoder, embeddingModel string) TodoFetcherAction {
 	return TodoFetcherAction{
 		repo:            repo,
-		timeProvider:    timeProvider,
 		semanticEncoder: semanticEncoder,
 		embeddingModel:  embeddingModel,
 	}
@@ -24,7 +23,6 @@ func NewTodoFetcherAction(repo domain.TodoRepository, semanticEncoder domain.Sem
 // TodoFetcherAction is an assistant action for fetching todos.
 type TodoFetcherAction struct {
 	repo            domain.TodoRepository
-	timeProvider    domain.CurrentTimeProvider
 	semanticEncoder domain.SemanticEncoder
 	embeddingModel  string
 }
@@ -110,51 +108,34 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"%s", "example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("invalid_arguments", fmt.Sprintf("failed to parse action input: %s", err.Error()), exampleArgs),
 		}
 	}
 
 	var dueAfterTime *time.Time
 	var dueBeforeTime *time.Time
 	if params.DueAfter != nil || params.DueBefore != nil {
-		now := lft.timeProvider.Now()
-		if params.DueAfter != nil {
-			dueAfter, ok := domain.ExtractTimeFromText(*params.DueAfter, now, now.Location())
-			if !ok {
-				return domain.AssistantMessage{
-					Role:         domain.ChatRole_Tool,
-					ActionCallID: &call.ID,
-					Content:      `{"error":"invalid_due_after","details":"Could not parse due_after date."}`,
-				}
-			}
-			dueAfterTime = &dueAfter
-		}
-		if params.DueBefore != nil {
-			dueBefore, ok := domain.ExtractTimeFromText(*params.DueBefore, now, now.Location())
-			if !ok {
-				return domain.AssistantMessage{
-					Role:         domain.ChatRole_Tool,
-					ActionCallID: &call.ID,
-					Content:      `{"error":"invalid_due_before","details":"Could not parse due_before date."}`,
-				}
-			}
-			dueBeforeTime = &dueBefore
+		var errMsg *domain.AssistantMessage
+		dueAfterTime, dueBeforeTime, errMsg = parseDueDateParams(params.DueAfter, params.DueBefore, exampleArgs)
+		if errMsg != nil {
+			errMsg.ActionCallID = &call.ID
+			return *errMsg
 		}
 	}
 
-	buildResult, err := usecases.NewTodoSearchBuilder(lft.semanticEncoder, lft.embeddingModel).
+	buildResult, err := usecases.NewTodoSearchBuilder().
 		WithStatus((*domain.TodoStatus)(params.Status)).
 		WithDueDateRange(dueAfterTime, dueBeforeTime).
 		WithSortBy(params.SortBy).
 		WithTitleContains(params.SearchByTitle).
 		WithSimilaritySearch(params.SearchBySimilarity).
-		Build(ctx)
+		Build(ctx, lft.semanticEncoder, lft.embeddingModel)
 	if err != nil {
 		code := mapTodoFilterBuildErrCode(err)
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"%s","details":"%s"}`, code, err.Error()),
+			Content:      newActionError(code, err.Error(), exampleArgs),
 		}
 	}
 	if buildResult.EmbeddingTotalTokens > 0 {
@@ -166,7 +147,7 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"list_todos_error","details":"%s"}`, err.Error()),
+			Content:      newActionError("list_todos_error", fmt.Sprintf("failed to list todos:%s", err.Error()), exampleArgs),
 		}
 	}
 
@@ -175,10 +156,10 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 	}
 
 	type result struct {
-		ID      string `json:"id"`
-		Title   string `json:"title"`
-		DueDate string `json:"due_date"`
-		Status  string `json:"status"`
+		ID      string `toon:"id"`
+		Title   string `toon:"title"`
+		DueDate string `toon:"due_date"`
+		Status  string `toon:"status"`
 	}
 
 	todosResult := make([]result, len(todos))
@@ -201,12 +182,12 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 		"todos":     todosResult,
 		"next_page": nextPage,
 	}
-	content, err := json.Marshal(output)
+	content, err := toon.Marshal(output)
 	if err != nil {
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"marshal_error","details":"%s"}`, err.Error()),
+			Content:      newActionError("marshal_error", err.Error(), ""),
 		}
 	}
 
@@ -228,6 +209,8 @@ func mapTodoFilterBuildErrCode(err error) string {
 			return "invalid_due_range"
 		case "search_by_similarity is required when using similarity sorting":
 			return "missing_search_by_similarity_for_similarity_sort"
+		case "sort_by is invalid":
+			return "invalid_sort_by"
 		default:
 			return "invalid_filters"
 		}

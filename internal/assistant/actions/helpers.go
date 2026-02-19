@@ -50,3 +50,45 @@ func unmarshalActionInput(arguments string, target any) error {
 	}
 	return fmt.Errorf("action arguments must contain a single JSON object")
 }
+
+// newActionError constructs a standardized error message for assistant actions.
+func newActionError(errorType, details, example string) string {
+	return fmt.Sprintf("errors[1]{error,details,example}%s,%s,%s", errorType, details, example)
+}
+
+// parseDueDateParams parses and validates due date parameters, returning pointers to parsed times.
+func parseDueDateParams(dueAfter, dueBefore *string, exampleArgs string) (*time.Time, *time.Time, *domain.AssistantMessage) {
+	var (
+		dueAfterTime  *time.Time
+		dueBeforeTime *time.Time
+		now           = time.Now().UTC()
+	)
+
+	if dueAfter != nil {
+		parsedTime, ok := domain.ExtractTimeFromText(*dueAfter, now, now.Location())
+		if !ok {
+			errMsg := domain.AssistantMessage{
+				Role:         domain.ChatRole_Tool,
+				ActionCallID: nil,
+				Content:      newActionError("invalid_due_after", "could not parse due_after date", exampleArgs),
+			}
+			return nil, nil, &errMsg
+		}
+		dueAfterTime = &parsedTime
+	}
+
+	if dueBefore != nil {
+		parsedTime, ok := domain.ExtractTimeFromText(*dueBefore, now, now.Location())
+		if !ok {
+			errMsg := domain.AssistantMessage{
+				Role:         domain.ChatRole_Tool,
+				ActionCallID: nil,
+				Content:      newActionError("invalid_due_before", "could not parse due_before date", exampleArgs),
+			}
+			return nil, nil, &errMsg
+		}
+		dueBeforeTime = &parsedTime
+	}
+
+	return dueAfterTime, dueBeforeTime, nil
+}

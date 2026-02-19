@@ -58,7 +58,7 @@ func (tdt TodoDeleterAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"%s", "example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("invalid_arguments", fmt.Sprintf("Failed to parse action input: %s", err.Error()), exampleArgs),
 		}
 	}
 
@@ -69,13 +69,13 @@ func (tdt TodoDeleterAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"delete_todo_error","details":"%s"}`, err.Error()),
+			Content:      newActionError("delete_todo_error", fmt.Sprintf("Failed to delete todo: %s", err.Error()), exampleArgs),
 		}
 	}
 
 	return domain.AssistantMessage{
 		Role:         domain.ChatRole_Tool,
 		ActionCallID: &call.ID,
-		Content:      `{"message":"The todo was deleted successfully!"}`,
+		Content:      fmt.Sprintf("todos[1]{id,deleted}\n%s,true", params.ID),
 	}
 }

@@ -62,7 +62,7 @@ func TestTodoDueDateUpdaterAction(t *testing.T) {
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "todos[1]{ID,Title,DueDate,Status}")
+				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}")
 			},
 		},
 		"update-due-date-uses-history": {
@@ -105,7 +105,7 @@ func TestTodoDueDateUpdaterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "todos[1]{ID,Title,DueDate,Status}")
+				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}")
 			},
 		},
 		"update-due-date-invalid-arguments": {

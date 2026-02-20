@@ -116,7 +116,6 @@ func TestTodoFetcherAction(t *testing.T) {
 		},
 		"fetch-todos-with-sortby": {
 			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
-
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -129,13 +128,13 @@ func TestTodoFetcherAction(t *testing.T) {
 						for _, opt := range opts {
 							opt(&param)
 						}
-						assert.Equal(t, &domain.TodoSortBy{Field: "duedate", Direction: "ASC"}, param.SortBy)
+						assert.Equal(t, &domain.TodoSortBy{Field: "dueDate", Direction: "ASC"}, param.SortBy)
 					}).
 					Return([]domain.Todo{}, false, nil)
 			},
 			functionCall: domain.AssistantActionCall{
 				Name:  "fetch_todos",
-				Input: `{"page": 1, "page_size": 10, "sort_by": "duedateAsc"}`,
+				Input: `{"page": 1, "page_size": 10, "sort_by": "dueDateAsc"}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
@@ -219,7 +218,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_filters")
+				assert.Contains(t, resp.Content, "invalid_status")
 				assert.Contains(t, resp.Content, "status must be either OPEN or DONE")
 			},
 		},

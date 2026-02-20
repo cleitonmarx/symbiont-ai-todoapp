@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -196,24 +195,4 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 		ActionCallID: &call.ID,
 		Content:      string(content),
 	}
-}
-
-// mapTodoFilterBuildErrCode maps errors from building todo search options to specific error codes for better client handling.
-func mapTodoFilterBuildErrCode(err error) string {
-	var validationErr *domain.ValidationErr
-	if errors.As(err, &validationErr) {
-		switch err.Error() {
-		case "due_after and due_before must be provided together":
-			return "invalid_due_range"
-		case "due_after must be less than or equal to due_before":
-			return "invalid_due_range"
-		case "search_by_similarity is required when using similarity sorting":
-			return "missing_search_by_similarity_for_similarity_sort"
-		case "sort_by is invalid":
-			return "invalid_sort_by"
-		default:
-			return "invalid_filters"
-		}
-	}
-	return "embedding_error"
 }

@@ -106,6 +106,6 @@ func (tut TodoUpdaterAction) Execute(ctx context.Context, call domain.AssistantA
 	return domain.AssistantMessage{
 		Role:         domain.ChatRole_Tool,
 		ActionCallID: &call.ID,
-		Content:      fmt.Sprintf("todos[1]{ID,Title,DueDate,Status}\n%s,%s,%s,%s", todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status),
+		Content:      fmt.Sprintf("todos[1]{id,title,due_date,status}\n%s,%s,%s,%s", todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status),
 	}
 }

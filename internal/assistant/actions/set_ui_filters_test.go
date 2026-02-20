@@ -40,8 +40,8 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_arguments")
-				assert.Contains(t, resp.Content, "status must be OPEN or DONE")
+				assert.Contains(t, resp.Content, "invalid_status")
+				assert.Contains(t, resp.Content, "status must be either OPEN or DONE")
 			},
 		},
 		"set-ui-filters-invalid-both-search-modes": {
@@ -51,8 +51,8 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_arguments")
-				assert.Contains(t, resp.Content, "either search_by_similarity or search_by_title")
+				assert.Contains(t, resp.Content, "multiple_search_queries")
+				assert.Contains(t, resp.Content, "only one search query is allowed")
 			},
 		},
 		"set-ui-filters-invalid-unknown-field": {

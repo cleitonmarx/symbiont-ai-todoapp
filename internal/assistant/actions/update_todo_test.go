@@ -55,7 +55,7 @@ func TestTodoUpdaterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "updated successfully")
+				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}")
 			},
 		},
 		"update-todo-invalid-arguments": {

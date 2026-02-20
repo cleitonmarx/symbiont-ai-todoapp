@@ -17,13 +17,3 @@ type SemanticEncoder interface {
 	// VectorizeAssistantActionDefinition generates a semantic vector for one assistant action definition.
 	VectorizeAssistantActionDefinition(ctx context.Context, model string, action AssistantActionDefinition) (EmbeddingVector, error)
 }
-
-// EmbeddingModelInfo describes a model usable for vectorization.
-type EmbeddingModelInfo struct {
-	Name string
-}
-
-// EmbeddingModelCatalog exposes available embedding-capable models.
-type EmbeddingModelCatalog interface {
-	ListEmbeddingModels(ctx context.Context) ([]EmbeddingModelInfo, error)
-}

@@ -86,6 +86,14 @@ type AssistantActionDefinition struct {
 	Name        string
 	Description string
 	Input       AssistantActionInput
+	Hints       AssistantActionHints
+}
+
+// AssistantActionHints holds compact, runtime guidance for dynamic prompt injection.
+type AssistantActionHints struct {
+	UseWhen   string
+	AvoidWhen string
+	ArgRules  string
 }
 
 // AssistantActionField represents one action input field.

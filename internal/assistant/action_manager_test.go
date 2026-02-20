@@ -16,12 +16,12 @@ import (
 
 func TestAssistantActionManager(t *testing.T) {
 	tests := map[string]struct {
-		setupActions   func() []assistantActionDetails
+		setupActions   func() []assistantActionVector
 		embeddingModel string
 		testFunc       func(t *testing.T, manager AssistantActionManager)
 	}{
 		"list-returns-all-actions": {
-			setupActions: func() []assistantActionDetails {
+			setupActions: func() []assistantActionVector {
 				action1 := domain.NewMockAssistantAction(t)
 				action1.EXPECT().
 					Definition().
@@ -32,7 +32,7 @@ func TestAssistantActionManager(t *testing.T) {
 					Definition().
 					Return(mockAssistantActionDefinition("create_todo"))
 
-				return []assistantActionDetails{
+				return []assistantActionVector{
 					{Action: action1},
 					{Action: action2},
 				}
@@ -48,13 +48,13 @@ func TestAssistantActionManager(t *testing.T) {
 			},
 		},
 		"status-message-returns-action-specific-message": {
-			setupActions: func() []assistantActionDetails {
+			setupActions: func() []assistantActionVector {
 				action := domain.NewMockAssistantAction(t)
 				action.EXPECT().
 					Definition().
 					Return(mockAssistantActionDefinition("fetch_todos"))
 				action.EXPECT().StatusMessage().Return("🔎 Fetching todos...")
-				return []assistantActionDetails{{Action: action}}
+				return []assistantActionVector{{Action: action}}
 			},
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
 				msg := manager.StatusMessage("fetch_todos")
@@ -62,14 +62,14 @@ func TestAssistantActionManager(t *testing.T) {
 			},
 		},
 		"status-message-returns-default-when-action-not-found": {
-			setupActions: func() []assistantActionDetails { return []assistantActionDetails{} },
+			setupActions: func() []assistantActionVector { return []assistantActionVector{} },
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
 				msg := manager.StatusMessage("unknown_action")
 				assert.Equal(t, "⏳ Processing request...", msg)
 			},
 		},
 		"execute-calls-correct-action": {
-			setupActions: func() []assistantActionDetails {
+			setupActions: func() []assistantActionVector {
 				action := domain.NewMockAssistantAction(t)
 				action.EXPECT().
 					Definition().
@@ -85,7 +85,7 @@ func TestAssistantActionManager(t *testing.T) {
 						Content:      "todos found",
 						ActionCallID: common.Ptr("call-1"),
 					})
-				return []assistantActionDetails{{Action: action}}
+				return []assistantActionVector{{Action: action}}
 			},
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
 				result := manager.Execute(
@@ -105,7 +105,7 @@ func TestAssistantActionManager(t *testing.T) {
 			},
 		},
 		"execute-returns-error-for-unknown-action": {
-			setupActions: func() []assistantActionDetails { return []assistantActionDetails{} },
+			setupActions: func() []assistantActionVector { return []assistantActionVector{} },
 			testFunc: func(t *testing.T, manager AssistantActionManager) {
 				result := manager.Execute(
 					context.Background(),
@@ -128,7 +128,7 @@ func TestAssistantActionManager(t *testing.T) {
 }
 
 func TestAssistantActionManager_List_And_StatusMessages(t *testing.T) {
-	actionDetails := []assistantActionDetails{
+	actionDetails := []assistantActionVector{
 		{Action: actions.NewUIFiltersSetterAction()},
 		{Action: actions.NewTodoFetcherAction(nil, nil, "")},
 		{Action: actions.NewTodoCreatorAction(nil, nil, nil)},
@@ -169,6 +169,40 @@ func TestAssistantActionManager_List_And_StatusMessages(t *testing.T) {
 		"📅 Updating the due date...",
 		"🗑️ Deleting the todo...",
 	}, statusMessages)
+}
+
+func TestAssistantActionManager_List_IsSortedByName(t *testing.T) {
+	tests := map[string]struct {
+		actionNames   []string
+		expectedNames []string
+	}{
+		"sorts-actions-by-name": {
+			actionNames:   []string{"update_todo", "create_todo", "delete_todo"},
+			expectedNames: []string{"create_todo", "delete_todo", "update_todo"},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			actionVectors := make([]assistantActionVector, 0, len(tt.actionNames))
+			for _, actionName := range tt.actionNames {
+				actionVectors = append(actionVectors, assistantActionVector{
+					Action: newStaticAssistantAction(actionName),
+				})
+			}
+
+			manager := NewAssistantActionManager(nil, "", actionVectors...)
+			actions := manager.List()
+			require.Len(t, actions, len(tt.expectedNames))
+
+			names := make([]string, 0, len(actions))
+			for _, action := range actions {
+				names = append(names, action.Name)
+			}
+
+			assert.Equal(t, tt.expectedNames, names)
+		})
+	}
 }
 
 func TestInitAssistantActionRegistry_Initialize(t *testing.T) {
@@ -249,19 +283,19 @@ func TestAssistantActionManager_ListRelevant(t *testing.T) {
 			Once()
 
 		manager := NewAssistantActionManager(mockEncoder, "test-model",
-			assistantActionDetails{
+			assistantActionVector{
 				Action:  newStaticAssistantAction("update_todo"),
 				Vectors: []float64{1, 0},
 			},
-			assistantActionDetails{
+			assistantActionVector{
 				Action:  newStaticAssistantAction("update_todo_due_date"),
 				Vectors: []float64{0.95, 0.05},
 			},
-			assistantActionDetails{
+			assistantActionVector{
 				Action:  newStaticAssistantAction("create_todo"),
 				Vectors: []float64{0.8, 0.2},
 			},
-			assistantActionDetails{
+			assistantActionVector{
 				Action:  newStaticAssistantAction("fetch_todos"),
 				Vectors: []float64{0.6, 0.4},
 			},
@@ -282,11 +316,11 @@ func TestAssistantActionManager_ListRelevant(t *testing.T) {
 			Once()
 
 		manager := NewAssistantActionManager(mockEncoder, "test-model",
-			assistantActionDetails{
+			assistantActionVector{
 				Action:  newStaticAssistantAction("fetch_todos"),
 				Vectors: []float64{1, 0},
 			},
-			assistantActionDetails{
+			assistantActionVector{
 				Action:  newStaticAssistantAction("set_ui_filters"),
 				Vectors: []float64{0.9, 0.1},
 			},
@@ -306,11 +340,11 @@ func TestAssistantActionManager_ListRelevant(t *testing.T) {
 			Once()
 
 		manager := NewAssistantActionManager(mockEncoder, "test-model",
-			assistantActionDetails{
+			assistantActionVector{
 				Action:  newStaticAssistantAction("create_todo"),
 				Vectors: []float64{1, 0},
 			},
-			assistantActionDetails{
+			assistantActionVector{
 				Action:  newStaticAssistantAction("update_todo"),
 				Vectors: []float64{1, 0},
 			},

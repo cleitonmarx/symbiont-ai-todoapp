@@ -17,7 +17,9 @@ const (
 	defaultRelevantActionsMinScore = 0.35
 )
 
-type assistantActionDetails struct {
+// assistantActionVector holds an assistant action and its corresponding
+// vector embedding for relevance scoring.
+type assistantActionVector struct {
 	Action  domain.AssistantAction
 	Vectors []float64
 }
@@ -26,12 +28,12 @@ type assistantActionDetails struct {
 type AssistantActionManager struct {
 	se             domain.SemanticEncoder
 	embeddingModel string
-	actionsDetails map[string]assistantActionDetails
+	actionsDetails map[string]assistantActionVector
 }
 
 // NewAssistantActionManager creates an assistant action registry.
-func NewAssistantActionManager(se domain.SemanticEncoder, embeddingModel string, actionsDetails ...assistantActionDetails) AssistantActionManager {
-	actionMap := make(map[string]assistantActionDetails)
+func NewAssistantActionManager(se domain.SemanticEncoder, embeddingModel string, actionsDetails ...assistantActionVector) AssistantActionManager {
+	actionMap := make(map[string]assistantActionVector)
 	for _, action := range actionsDetails {
 		actionMap[action.Action.Definition().Name] = action
 	}
@@ -73,6 +75,9 @@ func (m AssistantActionManager) List() []domain.AssistantActionDefinition {
 	for _, action := range m.actionsDetails {
 		res = append(res, action.Action.Definition())
 	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Name < res[j].Name
+	})
 	return res
 }
 
@@ -113,13 +118,10 @@ func (m AssistantActionManager) ListRelevant(ctx context.Context, userInput stri
 		return scoredActions[i].score > scoredActions[j].score
 	})
 
-	limit := defaultRelevantActionsTopK
-	if len(scoredActions) < limit {
-		limit = len(scoredActions)
-	}
+	limit := min(len(scoredActions), defaultRelevantActionsTopK)
 
 	relevant := make([]domain.AssistantActionDefinition, 0, limit)
-	for i := 0; i < limit; i++ {
+	for i := range limit {
 		relevant = append(relevant, scoredActions[i].definition)
 	}
 	return relevant
@@ -164,24 +166,25 @@ func (i InitAssistantActionRegistry) Initialize(ctx context.Context) (context.Co
 		),
 	}
 
-	actionDetails, err := buildAssistantActionDetails(ctx, actions, i.SemanticEncoder, i.EmbeddingModel)
+	actionVectors, err := generateActionVectors(ctx, actions, i.SemanticEncoder, i.EmbeddingModel)
 	if err != nil {
-		return ctx, fmt.Errorf("failed to build assistant action details: %w", err)
+		return ctx, fmt.Errorf("failed to build assistant action vectors: %w", err)
 	}
 
-	actionRegistry := NewAssistantActionManager(i.SemanticEncoder, i.EmbeddingModel, actionDetails...)
+	actionRegistry := NewAssistantActionManager(i.SemanticEncoder, i.EmbeddingModel, actionVectors...)
 	depend.Register[domain.AssistantActionRegistry](actionRegistry)
 	return ctx, nil
 }
 
-func buildAssistantActionDetails(ctx context.Context, actions []domain.AssistantAction, encoder domain.SemanticEncoder, embeddingModel string) ([]assistantActionDetails, error) {
-	var details []assistantActionDetails
+// generateActionVectors generates vector embeddings for a list of assistant actions.
+func generateActionVectors(ctx context.Context, actions []domain.AssistantAction, encoder domain.SemanticEncoder, embeddingModel string) ([]assistantActionVector, error) {
+	var details []assistantActionVector
 	for _, action := range actions {
 		vector, err := encoder.VectorizeAssistantActionDefinition(ctx, embeddingModel, action.Definition())
 		if err != nil {
 			return nil, fmt.Errorf("failed to vectorize action '%s': %w", action.Definition().Name, err)
 		}
-		details = append(details, assistantActionDetails{
+		details = append(details, assistantActionVector{
 			Action:  action,
 			Vectors: vector.Vector,
 		})

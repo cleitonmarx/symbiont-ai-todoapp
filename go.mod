@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/pubsub/v2 v2.4.0
 	github.com/99designs/gqlgen v0.17.87
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/DataDog/go-sqllexer v0.1.12
+	github.com/DataDog/go-sqllexer v0.2.0
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/XSAM/otelsql v0.41.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de

@@ -587,8 +587,8 @@ func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 
 func TestNormalizeConversationSummary(t *testing.T) {
 	tests := map[string]struct {
-		previous string
-		candidate string
+		previous   string
+		candidate  string
 		assertions func(t *testing.T, got string)
 	}{
 		"fills-missing-fields-from-previous-and-defaults": {

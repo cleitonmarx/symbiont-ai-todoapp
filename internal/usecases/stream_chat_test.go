@@ -84,7 +84,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Run(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) {
 						foundSummaryContext := false
 						for _, msg := range req.Messages {
-							if msg.Role == domain.ChatRole_Developer && strings.Contains(msg.Content, "Current intent: organize todos") {
+							if msg.Role == domain.ChatRole_System && strings.Contains(msg.Content, "Current intent: organize todos") {
 								foundSummaryContext = true
 								break
 							}
@@ -199,7 +199,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Run(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) {
 						foundSummaryContext := false
 						for _, msg := range req.Messages {
-							if msg.Role == domain.ChatRole_Developer && strings.Contains(msg.Content, "Current intent: organize todos") {
+							if msg.Role == domain.ChatRole_System && strings.Contains(msg.Content, "Current intent: organize todos") {
 								foundSummaryContext = true
 								break
 							}

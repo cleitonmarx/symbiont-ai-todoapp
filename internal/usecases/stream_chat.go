@@ -27,7 +27,9 @@ const (
 	CHAT_TEMPERATURE = 0.2
 	CHAT_TOP_P       = 0.7
 
-	MAX_TOOL_SELECTION_CHARS = 400
+	MAX_ACTION_SELECTION_CHARS = 400
+	MAX_ACTION_HINT_ACTIONS    = 3
+	MAX_ACTION_PROMPT_CHARS    = 800
 )
 
 //go:embed prompts/chat.yml
@@ -114,26 +116,35 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return err
 	}
 
-	messages, err := sc.fetchChatHistory(spanCtx, conversation.ID)
+	messagesHistory, err := sc.fetchChatHistory(spanCtx, conversation.ID)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
 
-	messages = append(messages, domain.AssistantMessage{
+	messagesHistory = append(messagesHistory, domain.AssistantMessage{
 		Role:    domain.ChatRole_User,
 		Content: userMessage,
 	})
 
+	relevantActions := sc.actionRegistry.ListRelevant(
+		spanCtx,
+		buildActionSelectionText(messagesHistory),
+	)
+
+	if toolingPrompt := buildActionsPrompt(relevantActions); toolingPrompt != "" {
+		messagesHistory = append(messagesHistory, domain.AssistantMessage{
+			Role:    domain.ChatRole_System,
+			Content: toolingPrompt,
+		})
+	}
+
 	req := domain.AssistantTurnRequest{
-		Model:       model,
-		Messages:    messages,
-		Stream:      true,
-		Temperature: common.Ptr(CHAT_TEMPERATURE),
-		TopP:        common.Ptr(CHAT_TOP_P),
-		AvailableActions: sc.actionRegistry.ListRelevant(
-			spanCtx,
-			buildActionSelectionText(messages),
-		),
+		Model:            model,
+		Messages:         messagesHistory,
+		Stream:           true,
+		Temperature:      common.Ptr(CHAT_TEMPERATURE),
+		TopP:             common.Ptr(CHAT_TOP_P),
+		AvailableActions: relevantActions,
 	}
 
 	state := streamChatExecutionState{
@@ -257,129 +268,6 @@ func (sc StreamChatImpl) createOrRetrieveConversation(ctx context.Context, param
 	return conversation, conversationCreated, nil
 }
 
-// buildActionSelectionText constructs the text used for selecting relevant actions
-// based on the current user input and recent conversation history.
-func buildActionSelectionText(messages []domain.AssistantMessage) string {
-	if len(messages) == 0 {
-		return ""
-	}
-
-	lastMessage := messages[len(messages)-1]
-	if lastMessage.Role != domain.ChatRole_User {
-		return ""
-	}
-
-	currentInput := strings.TrimSpace(lastMessage.Content)
-	if currentInput == "" {
-		return ""
-	}
-
-	selectionText := currentInput
-	if isAmbiguousActionSelectionInput(currentInput) && len(messages) > 1 {
-		if previousInput, ok := previousUserInput(messages[:len(messages)-1]); ok {
-			selectionText = previousInput + "\n" + currentInput
-		}
-	}
-
-	return truncateToLastChars(selectionText, MAX_TOOL_SELECTION_CHARS)
-}
-
-// isAmbiguousActionSelectionInput checks if the user input contains phrases
-// or words that may ambiguously refer to previous actions or messages,
-// which can help determine if we should include previous user
-// input for better action relevance.
-func isAmbiguousActionSelectionInput(userInput string) bool {
-	lowered := strings.ToLower(strings.TrimSpace(userInput))
-	if lowered == "" {
-		return false
-	}
-
-	ambiguousPhrases := []string{
-		"same as before",
-		"as before",
-		"do it",
-		"do that",
-		"that one",
-		"this one",
-		"same thing",
-	}
-	for _, phrase := range ambiguousPhrases {
-		if strings.Contains(lowered, phrase) {
-			return true
-		}
-	}
-
-	ambiguousWords := map[string]struct{}{
-		"it": {}, "that": {}, "this": {}, "them": {}, "same": {}, "also": {}, "again": {}, "too": {}, "there": {},
-	}
-	words := strings.FieldsFunc(lowered, func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
-	})
-	for _, word := range words {
-		if _, ok := ambiguousWords[word]; ok {
-			return true
-		}
-	}
-	return false
-}
-
-// previousUserInput scans the messages in reverse to find the most recent non-empty user message.
-func previousUserInput(messages []domain.AssistantMessage) (string, bool) {
-	for i := len(messages) - 1; i >= 0; i-- {
-		msg := messages[i]
-		if msg.Role != domain.ChatRole_User {
-			continue
-		}
-
-		content := strings.TrimSpace(msg.Content)
-		if content == "" {
-			continue
-		}
-
-		return content, true
-	}
-
-	return "", false
-}
-
-// truncateToLastChars truncates the input string to the last maxChars characters,
-// ensuring it does not cut off in the middle of a rune.
-func truncateToLastChars(input string, maxChars int) string {
-	trimmed := strings.TrimSpace(input)
-	if maxChars <= 0 {
-		return ""
-	}
-
-	runes := []rune(trimmed)
-	if len(runes) <= maxChars {
-		return trimmed
-	}
-
-	return string(runes[len(runes)-maxChars:])
-}
-
-// streamChatExecutionState holds mutable state during a stream-chat execution.
-type streamChatExecutionState struct {
-	conversation        domain.Conversation
-	conversationCreated bool
-	assistantMsgContent strings.Builder
-	assistantMsgID      uuid.UUID
-	tokenUsage          domain.AssistantUsage
-	turnID              uuid.UUID
-	turnSequence        int64
-	userMsg             domain.ChatMessage
-	userMsgPersisted    bool
-	userMsgPersistTried bool
-	tracker             *actionCycleTracker
-}
-
-// nextTurnSequence returns the current sequence value and advances the counter.
-func (s *streamChatExecutionState) nextTurnSequence() int64 {
-	current := s.turnSequence
-	s.turnSequence++
-	return current
-}
-
 // handleStreamEvent routes one stream event to the corresponding specialized handler.
 func (sc StreamChatImpl) handleStreamEvent(
 	ctx context.Context,
@@ -467,12 +355,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 		return false, err
 	}
 
-	actionMessage := sc.actionRegistry.Execute(ctx, domain.AssistantActionCall{
-		ID:    actionCall.ID,
-		Name:  actionCall.Name,
-		Input: actionCall.Input,
-		Text:  actionCall.Text,
-	}, req.Messages)
+	actionMessage := sc.actionRegistry.Execute(ctx, actionCall, req.Messages)
 	actionSucceeded := actionMessage.IsActionCallSuccess()
 	now := sc.timeProvider.Now()
 	actionChatMsg := domain.ChatMessage{
@@ -664,7 +547,7 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 		summaryText = strings.TrimSpace(latestSummary.CurrentStateSummary)
 	}
 	messages = append(messages, domain.AssistantMessage{
-		Role: domain.ChatRole_Developer,
+		Role: domain.ChatRole_System,
 		Content: fmt.Sprintf(
 			"Conversation summary context:\n%s\n\nUse this as compact memory, but prioritize explicit user instructions in this turn.",
 			summaryText,
@@ -714,6 +597,28 @@ func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uu
 	return messages, nil
 }
 
+// streamChatExecutionState holds mutable state during a stream-chat execution.
+type streamChatExecutionState struct {
+	conversation        domain.Conversation
+	conversationCreated bool
+	assistantMsgContent strings.Builder
+	assistantMsgID      uuid.UUID
+	tokenUsage          domain.AssistantUsage
+	turnID              uuid.UUID
+	turnSequence        int64
+	userMsg             domain.ChatMessage
+	userMsgPersisted    bool
+	userMsgPersistTried bool
+	tracker             *actionCycleTracker
+}
+
+// nextTurnSequence returns the current sequence value and advances the counter.
+func (s *streamChatExecutionState) nextTurnSequence() int64 {
+	current := s.turnSequence
+	s.turnSequence++
+	return current
+}
+
 // actionCycleTracker helps track repeated action calls to prevent infinite loops
 type actionCycleTracker struct {
 	maxActionCycles          int
@@ -747,6 +652,150 @@ func (t *actionCycleTracker) hasExceededMaxActionCalls(functionName, arguments s
 	t.lastActionCallSignature = signature
 	t.repeatActionCallCount = 0
 	return false
+}
+
+// buildActionSelectionText constructs the text used for selecting relevant actions
+// based on the current user input and recent conversation history.
+func buildActionSelectionText(messages []domain.AssistantMessage) string {
+	if len(messages) == 0 {
+		return ""
+	}
+
+	lastMessage := messages[len(messages)-1]
+	if lastMessage.Role != domain.ChatRole_User {
+		return ""
+	}
+
+	currentInput := strings.TrimSpace(lastMessage.Content)
+	if currentInput == "" {
+		return ""
+	}
+
+	selectionText := currentInput
+	if isAmbiguousActionSelectionInput(currentInput) && len(messages) > 1 {
+		if previousInput, ok := previousUserInput(messages[:len(messages)-1]); ok {
+			selectionText = previousInput + "\n" + currentInput
+		}
+	}
+
+	return truncateToLastChars(selectionText, MAX_ACTION_SELECTION_CHARS)
+}
+
+// buildActionsPrompt creates a compact system prompt containing only the
+// relevant action guidance for this turn.
+func buildActionsPrompt(actions []domain.AssistantActionDefinition) string {
+	if len(actions) == 0 {
+		return ""
+	}
+
+	limit := min(len(actions), MAX_ACTION_HINT_ACTIONS)
+	selected := actions[:limit]
+
+	var b strings.Builder
+	b.WriteString("Tooling rules for this turn:\n")
+	b.WriteString("- Use only tools listed below.\n")
+	b.WriteString("- Arguments must be strict JSON matching each tool schema.\n")
+	b.WriteString("Tools in scope:\n")
+
+	for _, action := range selected {
+		b.WriteString("- ")
+		b.WriteString(action.Name)
+		b.WriteString(": ")
+		b.WriteString(action.ComposeHint())
+		b.WriteString("\n")
+	}
+
+	return truncateToFirstChars(strings.TrimSpace(b.String()), MAX_ACTION_PROMPT_CHARS)
+}
+
+// isAmbiguousActionSelectionInput checks if the user input contains phrases
+// or words that may ambiguously refer to previous actions or messages,
+// which can help determine if we should include previous user
+// input for better action relevance.
+func isAmbiguousActionSelectionInput(userInput string) bool {
+	lowered := strings.ToLower(strings.TrimSpace(userInput))
+	if lowered == "" {
+		return false
+	}
+
+	ambiguousPhrases := []string{
+		"same as before",
+		"as before",
+		"do it",
+		"do that",
+		"that one",
+		"this one",
+		"same thing",
+	}
+	for _, phrase := range ambiguousPhrases {
+		if strings.Contains(lowered, phrase) {
+			return true
+		}
+	}
+
+	ambiguousWords := map[string]struct{}{
+		"it": {}, "that": {}, "this": {}, "them": {}, "same": {}, "also": {}, "again": {}, "too": {}, "there": {},
+	}
+	words := strings.FieldsFunc(lowered, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	})
+	for _, word := range words {
+		if _, ok := ambiguousWords[word]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// previousUserInput scans the messages in reverse to find the most recent non-empty user message.
+func previousUserInput(messages []domain.AssistantMessage) (string, bool) {
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
+		if msg.Role != domain.ChatRole_User {
+			continue
+		}
+
+		content := strings.TrimSpace(msg.Content)
+		if content == "" {
+			continue
+		}
+
+		return content, true
+	}
+
+	return "", false
+}
+
+// truncateToLastChars truncates the input string to the last maxChars characters,
+// ensuring it does not cut off in the middle of a rune.
+func truncateToLastChars(input string, maxChars int) string {
+	trimmed := strings.TrimSpace(input)
+	if maxChars <= 0 {
+		return ""
+	}
+
+	runes := []rune(trimmed)
+	if len(runes) <= maxChars {
+		return trimmed
+	}
+
+	return string(runes[len(runes)-maxChars:])
+}
+
+// truncateToFirstChars truncates the input string to the first maxChars characters
+// without splitting a rune.
+func truncateToFirstChars(input string, maxChars int) string {
+	trimmed := strings.TrimSpace(input)
+	if maxChars <= 0 {
+		return ""
+	}
+
+	runes := []rune(trimmed)
+	if len(runes) <= maxChars {
+		return trimmed
+	}
+
+	return string(runes[:maxChars])
 }
 
 // InitStreamChat is the initializer for the StreamChat use case

@@ -482,6 +482,65 @@ func (_c *MockAssistantActionRegistry_List_Call) RunAndReturn(run func() []Assis
 	return _c
 }
 
+// ListRelevant provides a mock function for the type MockAssistantActionRegistry
+func (_mock *MockAssistantActionRegistry) ListRelevant(ctx context.Context, userInput string) []AssistantActionDefinition {
+	ret := _mock.Called(ctx, userInput)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListRelevant")
+	}
+
+	var r0 []AssistantActionDefinition
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []AssistantActionDefinition); ok {
+		r0 = returnFunc(ctx, userInput)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]AssistantActionDefinition)
+		}
+	}
+	return r0
+}
+
+// MockAssistantActionRegistry_ListRelevant_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRelevant'
+type MockAssistantActionRegistry_ListRelevant_Call struct {
+	*mock.Call
+}
+
+// ListRelevant is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userInput string
+func (_e *MockAssistantActionRegistry_Expecter) ListRelevant(ctx interface{}, userInput interface{}) *MockAssistantActionRegistry_ListRelevant_Call {
+	return &MockAssistantActionRegistry_ListRelevant_Call{Call: _e.mock.On("ListRelevant", ctx, userInput)}
+}
+
+func (_c *MockAssistantActionRegistry_ListRelevant_Call) Run(run func(ctx context.Context, userInput string)) *MockAssistantActionRegistry_ListRelevant_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAssistantActionRegistry_ListRelevant_Call) Return(assistantActionDefinitions []AssistantActionDefinition) *MockAssistantActionRegistry_ListRelevant_Call {
+	_c.Call.Return(assistantActionDefinitions)
+	return _c
+}
+
+func (_c *MockAssistantActionRegistry_ListRelevant_Call) RunAndReturn(run func(ctx context.Context, userInput string) []AssistantActionDefinition) *MockAssistantActionRegistry_ListRelevant_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StatusMessage provides a mock function for the type MockAssistantActionRegistry
 func (_mock *MockAssistantActionRegistry) StatusMessage(actionName string) string {
 	ret := _mock.Called(actionName)
@@ -1892,6 +1951,78 @@ type MockSemanticEncoder_Expecter struct {
 
 func (_m *MockSemanticEncoder) EXPECT() *MockSemanticEncoder_Expecter {
 	return &MockSemanticEncoder_Expecter{mock: &_m.Mock}
+}
+
+// VectorizeAssistantActionDefinition provides a mock function for the type MockSemanticEncoder
+func (_mock *MockSemanticEncoder) VectorizeAssistantActionDefinition(ctx context.Context, model string, action AssistantActionDefinition) (EmbeddingVector, error) {
+	ret := _mock.Called(ctx, model, action)
+
+	if len(ret) == 0 {
+		panic("no return value specified for VectorizeAssistantActionDefinition")
+	}
+
+	var r0 EmbeddingVector
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, AssistantActionDefinition) (EmbeddingVector, error)); ok {
+		return returnFunc(ctx, model, action)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, AssistantActionDefinition) EmbeddingVector); ok {
+		r0 = returnFunc(ctx, model, action)
+	} else {
+		r0 = ret.Get(0).(EmbeddingVector)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, AssistantActionDefinition) error); ok {
+		r1 = returnFunc(ctx, model, action)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockSemanticEncoder_VectorizeAssistantActionDefinition_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'VectorizeAssistantActionDefinition'
+type MockSemanticEncoder_VectorizeAssistantActionDefinition_Call struct {
+	*mock.Call
+}
+
+// VectorizeAssistantActionDefinition is a helper method to define mock.On call
+//   - ctx context.Context
+//   - model string
+//   - action AssistantActionDefinition
+func (_e *MockSemanticEncoder_Expecter) VectorizeAssistantActionDefinition(ctx interface{}, model interface{}, action interface{}) *MockSemanticEncoder_VectorizeAssistantActionDefinition_Call {
+	return &MockSemanticEncoder_VectorizeAssistantActionDefinition_Call{Call: _e.mock.On("VectorizeAssistantActionDefinition", ctx, model, action)}
+}
+
+func (_c *MockSemanticEncoder_VectorizeAssistantActionDefinition_Call) Run(run func(ctx context.Context, model string, action AssistantActionDefinition)) *MockSemanticEncoder_VectorizeAssistantActionDefinition_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 AssistantActionDefinition
+		if args[2] != nil {
+			arg2 = args[2].(AssistantActionDefinition)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockSemanticEncoder_VectorizeAssistantActionDefinition_Call) Return(embeddingVector EmbeddingVector, err error) *MockSemanticEncoder_VectorizeAssistantActionDefinition_Call {
+	_c.Call.Return(embeddingVector, err)
+	return _c
+}
+
+func (_c *MockSemanticEncoder_VectorizeAssistantActionDefinition_Call) RunAndReturn(run func(ctx context.Context, model string, action AssistantActionDefinition) (EmbeddingVector, error)) *MockSemanticEncoder_VectorizeAssistantActionDefinition_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // VectorizeQuery provides a mock function for the type MockSemanticEncoder

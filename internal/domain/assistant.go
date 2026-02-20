@@ -141,4 +141,5 @@ type AssistantActionRegistry interface {
 	Execute(context.Context, AssistantActionCall, []AssistantMessage) AssistantMessage
 	StatusMessage(actionName string) string
 	List() []AssistantActionDefinition
+	ListRelevant(ctx context.Context, userInput string) []AssistantActionDefinition
 }

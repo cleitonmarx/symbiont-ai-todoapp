@@ -146,6 +146,19 @@ func (a AssistantClient) VectorizeQuery(ctx context.Context, model, query string
 	return vec, nil
 }
 
+// VectorizeAssistantActionDefinition implements domain.SemanticEncoder.
+func (a AssistantClient) VectorizeAssistantActionDefinition(ctx context.Context, model string, action domain.AssistantActionDefinition) (domain.EmbeddingVector, error) {
+	spanCtx, span := telemetry.Start(ctx)
+	defer span.End()
+
+	prompt := a.embeddingFactory.Get(model).GenerateAssistentActionDefinitionPrompt(action)
+	vec, err := a.embed(spanCtx, model, prompt)
+	if telemetry.RecordErrorAndStatus(span, err) {
+		return domain.EmbeddingVector{}, err
+	}
+	return vec, nil
+}
+
 func (a AssistantClient) embed(ctx context.Context, model, input string) (domain.EmbeddingVector, error) {
 	req := EmbeddingsRequest{Model: model, Input: input}
 	resp, err := a.client.Embeddings(ctx, req)

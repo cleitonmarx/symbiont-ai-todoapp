@@ -551,6 +551,112 @@ func TestAssistantClientAdapter_VectorizeQuery(t *testing.T) {
 	}
 }
 
+func TestAssistantClientAdapter_VectorizeAssistantActionDefinition(t *testing.T) {
+	action := domain.AssistantActionDefinition{
+		Name:        "update_todo_due_date",
+		Description: "Update due date for exactly one existing todo.",
+	}
+
+	tests := map[string]struct {
+		response           string
+		statusCode         int
+		model              string
+		expectRequestInput string
+		expectErr          bool
+		expectedVec        []float64
+	}{
+		"success-with-gemma-embedding": {
+			response: `{
+				"model": "ai/embeddinggemma",
+				"object": "list",
+				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
+				"data": [
+					{
+						"embedding": [1.1, 2.2, 3.3],
+						"index": 0,
+						"object": "embedding"
+					}
+				]
+			}`,
+			statusCode:         http.StatusOK,
+			model:              "ai/embeddinggemma",
+			expectRequestInput: "title: update_todo_due_date | text: Update due date for exactly one existing todo.",
+			expectedVec:        []float64{1.1, 2.2, 3.3},
+		},
+		"success-with-default-embedding-generator": {
+			response: `{
+				"model": "ai/otherembeddingmodel",
+				"object": "list",
+				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
+				"data": [
+					{
+						"embedding": [1.1, 2.2, 3.3],
+						"index": 0,
+						"object": "embedding"
+					}
+				]
+			}`,
+			statusCode:         http.StatusOK,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "title:'update_todo_due_date'\ndescription:'Update due date for exactly one existing todo.'",
+			expectedVec:        []float64{1.1, 2.2, 3.3},
+		},
+		"no-embedding-data": {
+			response: `{
+				"model": "ai/otherembeddingmodel",
+				"object": "list",
+				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
+				"data": []
+			}`,
+			statusCode:         http.StatusOK,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "title:'update_todo_due_date'\ndescription:'Update due date for exactly one existing todo.'",
+			expectErr:          true,
+		},
+		"server-error": {
+			response:           `Internal Server Error`,
+			statusCode:         http.StatusInternalServerError,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "title:'update_todo_due_date'\ndescription:'Update due date for exactly one existing todo.'",
+			expectErr:          true,
+		},
+		"invalid-json": {
+			response:           `{invalid json}`,
+			statusCode:         http.StatusOK,
+			model:              "ai/otherembeddingmodel",
+			expectRequestInput: "title:'update_todo_due_date'\ndescription:'Update due date for exactly one existing todo.'",
+			expectErr:          true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var req EmbeddingsRequest
+				json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+				assert.Equal(t, tt.expectRequestInput, req.Input)
+
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.response)) //nolint:errcheck
+			}))
+			defer server.Close()
+
+			client := NewDRMAPIClient(server.URL, "", server.Client())
+			adapter := NewAssistantClientAdapter(client)
+
+			vec, err := adapter.VectorizeAssistantActionDefinition(context.Background(), tt.model, action)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedVec, vec.Vector)
+		})
+	}
+}
+
 func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
 	tests := map[string]struct {
 		response   string

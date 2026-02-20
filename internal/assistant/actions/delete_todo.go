@@ -33,7 +33,8 @@ func (tdt TodoDeleterAction) Definition() domain.AssistantActionDefinition {
 		Name:        "delete_todo",
 		Description: "Delete one todo by id.",
 		Hints: domain.AssistantActionHints{
-			UseWhen:   "Use to delete one known todo by id.",
+			UseWhen: "Use to delete one known todo by id.\n" +
+				"- For multiple deletes, execute repeated delete_todo calls with each todo id.",
 			AvoidWhen: "Do not use when id is missing or ambiguous; fetch first.",
 			ArgRules:  "Required key: id (UUID). No extra keys.",
 		},

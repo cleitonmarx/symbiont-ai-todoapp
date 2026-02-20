@@ -35,7 +35,8 @@ func (tut TodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 		Name:        "update_todo",
 		Description: "Update title or status for one todo.",
 		Hints: domain.AssistantActionHints{
-			UseWhen:   "Use for title/status changes on one existing todo.",
+			UseWhen: "Use for title/status changes on one existing todo.\n" +
+				"- For multiple title or status updates, execute repeated update_todo calls with each todo id and new title/status.",
 			AvoidWhen: "Do not use for due date changes.",
 			ArgRules:  "Required: id. Optional: title, status. status must be OPEN or DONE.",
 		},

@@ -36,9 +36,11 @@ func (tct TodoCreatorAction) Definition() domain.AssistantActionDefinition {
 		Name:        "create_todo",
 		Description: "Create one todo item.",
 		Hints: domain.AssistantActionHints{
-			UseWhen:   "Use for creating one todo item.",
+			UseWhen: "Use for creating todo items. For planning requests or multi-task creation, create all planned tasks, not one generic task.\n" +
+				"- For multi-task creation with a title prefix, apply the prefix to every created task title.\n" +
+				"- For multi-task creation with a final target date/window, distribute due dates chronologically within that window and keep final milestone on the target date.",
 			AvoidWhen: "Do not use for updates or deletes.",
-			ArgRules:  "Required keys: title and due_date (YYYY-MM-DD). One call per task in batch create.",
+			ArgRules:  "Required keys: title and due_date (YYYY-MM-DD). One call per task in batch create. Never stop batch creation after the first success. If user gave a title prefix, include it in every created title.",
 		},
 		Input: domain.AssistantActionInput{
 			Type: "object",

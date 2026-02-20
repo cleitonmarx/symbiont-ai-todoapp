@@ -73,7 +73,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				expectNowCalls(timeProvider, fixedTime, 7)
+				expectNowCalls(timeProvider, fixedTime, 6)
 
 				assistant.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
@@ -167,7 +167,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
-				expectNowCalls(timeProvider, fixedTime, 7)
+				expectNowCalls(timeProvider, fixedTime, 6)
 
 				callCount := 0
 				assistant.EXPECT().
@@ -264,7 +264,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					StatusMessage("fetch_todos").
 					Return("calling fetch_todos...\n")
 
-				expectNowCalls(timeProvider, fixedTime, 5)
+				expectNowCalls(timeProvider, fixedTime, 4)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -352,7 +352,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					Return(domain.AssistantMessage{Role: domain.ChatRole_Tool, ActionCallID: common.Ptr("func-1"), Content: "action result"}).
 					Once()
 
-				expectNowCalls(timeProvider, fixedTime, 6)
+				expectNowCalls(timeProvider, fixedTime, 5)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -437,7 +437,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					ListRelevant(mock.Anything, "Keep calling actions").
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 19)
+				expectNowCalls(timeProvider, fixedTime, 18)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -540,7 +540,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					ListRelevant(mock.Anything, "Call the same action repeatedly").
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 15)
+				expectNowCalls(timeProvider, fixedTime, 14)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).

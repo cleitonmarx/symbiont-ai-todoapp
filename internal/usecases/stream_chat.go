@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
@@ -25,6 +26,8 @@ const (
 	// Keep action-calling deterministic to reduce malformed function arguments.
 	CHAT_TEMPERATURE = 0.2
 	CHAT_TOP_P       = 0.7
+
+	MAX_TOOL_SELECTION_CHARS = 400
 )
 
 //go:embed prompts/chat.yml
@@ -93,11 +96,6 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	params := &StreamChatParams{}
-	for _, opt := range opts {
-		opt(params)
-	}
-
 	if strings.TrimSpace(userMessage) == "" {
 		return domain.NewValidationErr("message cannot be empty")
 	}
@@ -106,32 +104,16 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return domain.NewValidationErr("model cannot be empty")
 	}
 
-	var (
-		conversation        domain.Conversation
-		conversationCreated bool
-	)
-
-	if params.ConversationID == nil {
-		// Create a new conversation for this chat interaction
-		title := domain.GenerateAutoConversationTitle(userMessage)
-		newConversation, err := sc.conversationRepo.CreateConversation(spanCtx, title, domain.ConversationTitleSource_Auto)
-		if telemetry.RecordErrorAndStatus(span, err) {
-			return err
-		}
-		conversation = newConversation
-		conversationCreated = true
-	} else {
-		c, found, err := sc.conversationRepo.GetConversation(spanCtx, *params.ConversationID)
-		if telemetry.RecordErrorAndStatus(span, err) {
-			return err
-		}
-		if !found {
-			return domain.NewValidationErr("conversation not found")
-		}
-		conversation = c
+	params := &StreamChatParams{}
+	for _, opt := range opts {
+		opt(params)
 	}
 
-	// Fetch chat history and append user message
+	conversation, conversationCreated, err := sc.createOrRetrieveConversation(spanCtx, params, userMessage)
+	if telemetry.RecordErrorAndStatus(span, err) {
+		return err
+	}
+
 	messages, err := sc.fetchChatHistory(spanCtx, conversation.ID)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
@@ -142,20 +124,16 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		Content: userMessage,
 	})
 
-	userInputs := []string{}
-	for _, msg := range messages {
-		if msg.Role == domain.ChatRole_User {
-			userInputs = append(userInputs, msg.Content)
-		}
-	}
-
 	req := domain.AssistantTurnRequest{
-		Model:            model,
-		Messages:         messages,
-		Stream:           true,
-		Temperature:      common.Ptr(CHAT_TEMPERATURE),
-		TopP:             common.Ptr(CHAT_TOP_P),
-		AvailableActions: sc.actionRegistry.ListRelevant(spanCtx, strings.Join(userInputs, "\n")),
+		Model:       model,
+		Messages:    messages,
+		Stream:      true,
+		Temperature: common.Ptr(CHAT_TEMPERATURE),
+		TopP:        common.Ptr(CHAT_TOP_P),
+		AvailableActions: sc.actionRegistry.ListRelevant(
+			spanCtx,
+			buildActionSelectionText(messages),
+		),
 	}
 
 	state := streamChatExecutionState{
@@ -216,7 +194,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		PromptTokens:     state.tokenUsage.PromptTokens,
 		CompletionTokens: state.tokenUsage.CompletionTokens,
 		TotalTokens:      state.tokenUsage.TotalTokens,
-		CreatedAt:        sc.timeProvider.Now().UTC(),
+		CreatedAt:        sc.timeProvider.Now(),
 	}
 	assistantMsg.UpdatedAt = assistantMsg.CreatedAt
 
@@ -242,12 +220,142 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	// Send done event
 	if err := onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 		AssistantMessageID: assistantMsg.ID.String(),
-		CompletedAt:        sc.timeProvider.Now().UTC().Format(time.RFC3339),
+		CompletedAt:        sc.timeProvider.Now().Format(time.RFC3339),
 		Usage:              state.tokenUsage,
 	}); err != nil {
 		return err
 	}
 	return nil
+}
+
+// createOrRetrieveConversation either creates a new conversation or
+// retrieves an existing one based on the provided parameters.
+func (sc StreamChatImpl) createOrRetrieveConversation(ctx context.Context, params *StreamChatParams, userMessage string) (domain.Conversation, bool, error) {
+	var (
+		conversation        domain.Conversation
+		conversationCreated bool
+	)
+
+	if params.ConversationID == nil {
+		title := domain.GenerateAutoConversationTitle(userMessage)
+		newConversation, err := sc.conversationRepo.CreateConversation(ctx, title, domain.ConversationTitleSource_Auto)
+		if err != nil {
+			return domain.Conversation{}, false, err
+		}
+		conversation = newConversation
+		conversationCreated = true
+	} else {
+		c, found, err := sc.conversationRepo.GetConversation(ctx, *params.ConversationID)
+		if err != nil {
+			return domain.Conversation{}, false, err
+		}
+		if !found {
+			return domain.Conversation{}, false, domain.NewValidationErr("conversation not found")
+		}
+		conversation = c
+	}
+	return conversation, conversationCreated, nil
+}
+
+// buildActionSelectionText constructs the text used for selecting relevant actions
+// based on the current user input and recent conversation history.
+func buildActionSelectionText(messages []domain.AssistantMessage) string {
+	if len(messages) == 0 {
+		return ""
+	}
+
+	lastMessage := messages[len(messages)-1]
+	if lastMessage.Role != domain.ChatRole_User {
+		return ""
+	}
+
+	currentInput := strings.TrimSpace(lastMessage.Content)
+	if currentInput == "" {
+		return ""
+	}
+
+	selectionText := currentInput
+	if isAmbiguousActionSelectionInput(currentInput) && len(messages) > 1 {
+		if previousInput, ok := previousUserInput(messages[:len(messages)-1]); ok {
+			selectionText = previousInput + "\n" + currentInput
+		}
+	}
+
+	return truncateToLastChars(selectionText, MAX_TOOL_SELECTION_CHARS)
+}
+
+// isAmbiguousActionSelectionInput checks if the user input contains phrases
+// or words that may ambiguously refer to previous actions or messages,
+// which can help determine if we should include previous user
+// input for better action relevance.
+func isAmbiguousActionSelectionInput(userInput string) bool {
+	lowered := strings.ToLower(strings.TrimSpace(userInput))
+	if lowered == "" {
+		return false
+	}
+
+	ambiguousPhrases := []string{
+		"same as before",
+		"as before",
+		"do it",
+		"do that",
+		"that one",
+		"this one",
+		"same thing",
+	}
+	for _, phrase := range ambiguousPhrases {
+		if strings.Contains(lowered, phrase) {
+			return true
+		}
+	}
+
+	ambiguousWords := map[string]struct{}{
+		"it": {}, "that": {}, "this": {}, "them": {}, "same": {}, "also": {}, "again": {}, "too": {}, "there": {},
+	}
+	words := strings.FieldsFunc(lowered, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	})
+	for _, word := range words {
+		if _, ok := ambiguousWords[word]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// previousUserInput scans the messages in reverse to find the most recent non-empty user message.
+func previousUserInput(messages []domain.AssistantMessage) (string, bool) {
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
+		if msg.Role != domain.ChatRole_User {
+			continue
+		}
+
+		content := strings.TrimSpace(msg.Content)
+		if content == "" {
+			continue
+		}
+
+		return content, true
+	}
+
+	return "", false
+}
+
+// truncateToLastChars truncates the input string to the last maxChars characters,
+// ensuring it does not cut off in the middle of a rune.
+func truncateToLastChars(input string, maxChars int) string {
+	trimmed := strings.TrimSpace(input)
+	if maxChars <= 0 {
+		return ""
+	}
+
+	runes := []rune(trimmed)
+	if len(runes) <= maxChars {
+		return trimmed
+	}
+
+	return string(runes[len(runes)-maxChars:])
 }
 
 // streamChatExecutionState holds mutable state during a stream-chat execution.
@@ -314,7 +422,7 @@ func (sc StreamChatImpl) handleMetaEvent(
 	meta.ConversationCreated = state.conversationCreated
 	state.assistantMsgID = meta.AssistantMessageID
 	state.userMsg.ID = meta.UserMessageID
-	state.userMsg.CreatedAt = sc.timeProvider.Now().UTC()
+	state.userMsg.CreatedAt = sc.timeProvider.Now()
 	state.userMsg.UpdatedAt = state.userMsg.CreatedAt
 	state.userMsgPersistTried = true
 	if err := sc.persistChatMessage(ctx, state.userMsg, state.conversation); err != nil {
@@ -347,7 +455,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 		ActionCalls:    []domain.AssistantActionCall{actionCall},
 		Model:          model,
 		MessageState:   domain.ChatMessageState_Completed,
-		CreatedAt:      sc.timeProvider.Now().UTC(),
+		CreatedAt:      sc.timeProvider.Now(),
 	}
 	assistantActionCallMsg.UpdatedAt = assistantActionCallMsg.CreatedAt
 	if err := sc.persistChatMessage(ctx, assistantActionCallMsg, state.conversation); err != nil {
@@ -366,7 +474,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 		Text:  actionCall.Text,
 	}, req.Messages)
 	actionSucceeded := actionMessage.IsActionCallSuccess()
-	now := sc.timeProvider.Now().UTC()
+	now := sc.timeProvider.Now()
 	actionChatMsg := domain.ChatMessage{
 		ID:             uuid.New(),
 		ConversationID: state.conversation.ID,
@@ -445,7 +553,7 @@ func (sc StreamChatImpl) persistUserMessageIfNeeded(ctx context.Context, state *
 
 	state.userMsg.ID = uuid.New()
 	state.userMsg.ConversationID = state.conversation.ID
-	state.userMsg.CreatedAt = sc.timeProvider.Now().UTC()
+	state.userMsg.CreatedAt = sc.timeProvider.Now()
 	state.userMsg.UpdatedAt = state.userMsg.CreatedAt
 	state.userMsgPersistTried = true
 	if err := sc.persistChatMessage(ctx, state.userMsg, state.conversation); err != nil {
@@ -470,7 +578,7 @@ func (sc StreamChatImpl) persistFailureMessages(
 		state.assistantMsgID = uuid.New()
 	}
 
-	failedAt := sc.timeProvider.Now().UTC()
+	failedAt := sc.timeProvider.Now()
 	errorMessage := streamErr.Error()
 	failedAssistantMsg := domain.ChatMessage{
 		ID:               state.assistantMsgID,
@@ -538,10 +646,10 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 	}
 	for i, msg := range messages {
 		if msg.Role == domain.ChatRole_Developer || msg.Role == domain.ChatRole_System {
+			now := sc.timeProvider.Now()
 			messages[i].Content = fmt.Sprintf(
 				msg.Content,
-				sc.timeProvider.Now().Format(time.DateOnly),
-				sc.timeProvider.Now().Unix(),
+				now.Format(time.DateOnly),
 			)
 		}
 	}

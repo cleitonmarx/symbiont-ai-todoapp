@@ -61,11 +61,11 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				actionRegistry.EXPECT().
 					ListRelevant(
 						mock.Anything,
-						"Previous message\nHello, how are you?",
+						"Hello, how are you?",
 					).
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 5)
+				expectNowCalls(timeProvider, fixedTime, 4)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -175,11 +175,11 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				actionRegistry.EXPECT().
 					ListRelevant(
 						mock.Anything,
-						"Previous message\nHello, how are you?",
+						"Hello, how are you?",
 					).
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 5)
+				expectNowCalls(timeProvider, fixedTime, 4)
 
 				// history: empty
 				chatRepo.EXPECT().
@@ -279,7 +279,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					).
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 5)
+				expectNowCalls(timeProvider, fixedTime, 4)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -359,7 +359,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 
-				expectNowCalls(timeProvider, fixedTime, 2)
+				expectNowCalls(timeProvider, fixedTime, 1)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -398,7 +398,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					).
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 4)
+				expectNowCalls(timeProvider, fixedTime, 3)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -467,7 +467,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					).
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 4)
+				expectNowCalls(timeProvider, fixedTime, 3)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -536,7 +536,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					ListRelevant(mock.Anything, "Test").
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 4)
+				expectNowCalls(timeProvider, fixedTime, 3)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -594,7 +594,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					ListRelevant(mock.Anything, "No meta").
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 5)
+				expectNowCalls(timeProvider, fixedTime, 4)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -657,7 +657,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					ListRelevant(mock.Anything, "Test").
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 4)
+				expectNowCalls(timeProvider, fixedTime, 3)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -733,7 +733,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					ListRelevant(mock.Anything, "Test").
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 4)
+				expectNowCalls(timeProvider, fixedTime, 3)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).

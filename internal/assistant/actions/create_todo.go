@@ -34,7 +34,14 @@ func (t TodoCreatorAction) StatusMessage() string {
 func (tct TodoCreatorAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "create_todo",
-		Description: "Create exactly one todo. Required keys: title (string) and due_date (YYYY-MM-DD). No extra keys. For batch creation requests, call this action once per task until all tasks are saved. Valid: {\"title\":\"Pay rent\",\"due_date\":\"2026-04-30\"}. Invalid: {\"title\":\"Pay rent\",\"due\":\"tomorrow\",\"priority\":\"high\"}.",
+		Description: "Create one todo item.",
+		Hints: domain.AssistantActionHints{
+			UseWhen: "Use for creating todo items. For planning requests or multi-task creation, create all planned tasks, not one generic task.\n" +
+				"- For multi-task creation with a title prefix, apply the prefix to every created task title.\n" +
+				"- For multi-task creation with a final target date/window, distribute due dates chronologically within that window and keep final milestone on the target date.",
+			AvoidWhen: "Do not use for updates or deletes.",
+			ArgRules:  "Required keys: title and due_date (YYYY-MM-DD). One call per task in batch create. Never stop batch creation after the first success. If user gave a title prefix, include it in every created title.",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{
@@ -59,15 +66,13 @@ func (tct TodoCreatorAction) Execute(ctx context.Context, call domain.AssistantA
 		Title   string `json:"title"`
 		DueDate string `json:"due_date"`
 	}{}
-
 	exampleArgs := `{"title":"Pay rent","due_date":"2026-04-30"}`
-
 	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"%s", "example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
 		}
 	}
 
@@ -77,7 +82,7 @@ func (tct TodoCreatorAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_due_date","details":"Due date cannot be empty. ISO 8601 string is required.", "example":%s}`, exampleArgs),
+			Content:      newActionError("invalid_due_date", "Due date cannot be empty. ISO 8601 string is required.", exampleArgs),
 		}
 	}
 
@@ -94,13 +99,13 @@ func (tct TodoCreatorAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"create_todo_error","details":"%s", "example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("create_todo_error", err.Error(), exampleArgs),
 		}
 	}
 
 	return domain.AssistantMessage{
 		Role:         domain.ChatRole_Tool,
 		ActionCallID: &call.ID,
-		Content:      fmt.Sprintf(`{"message":"Your todo was created successfully! todo: {"id":"%s", "title":"%s", "due_date":"%s", "status":"%s"}"}`, todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status),
+		Content:      fmt.Sprintf("todos[1]{id,title,due_date,status}\n%s,%s,%s,%s", todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status),
 	}
 }

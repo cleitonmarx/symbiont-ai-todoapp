@@ -2,12 +2,10 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestUIFiltersSetterAction(t *testing.T) {
@@ -22,16 +20,17 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				var output map[string]any
-				err := json.Unmarshal([]byte(resp.Content), &output)
-				require.NoError(t, err)
-				assert.Equal(t, "ui_filters_set", output["message"])
-				filters, ok := output["filters"].(map[string]any)
-				require.True(t, ok)
-				assert.Equal(t, "OPEN", filters["status"])
-				assert.Equal(t, "buy milk", filters["search_query"])
-				assert.Equal(t, "SIMILARITY", filters["search_type"])
-				assert.Equal(t, "similarityAsc", filters["sort_by"])
+				assert.Equal(t, "ok", resp.Content)
+			},
+		},
+		"set-ui-filters-success-one-search-empty-other-search-used": {
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `{"search_by_similarity":"   ","search_by_title":"buy milk","page":1,"page_size":10}`,
+			},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Equal(t, "ok", resp.Content)
 			},
 		},
 		"set-ui-filters-invalid-status": {
@@ -41,8 +40,8 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_arguments")
-				assert.Contains(t, resp.Content, "status must be OPEN or DONE")
+				assert.Contains(t, resp.Content, "invalid_status")
+				assert.Contains(t, resp.Content, "status must be either OPEN or DONE")
 			},
 		},
 		"set-ui-filters-invalid-both-search-modes": {
@@ -52,16 +51,99 @@ func TestUIFiltersSetterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Contains(t, resp.Content, "multiple_search_queries")
+				assert.Contains(t, resp.Content, "only one search query is allowed")
+			},
+		},
+		"set-ui-filters-invalid-unknown-field": {
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `{"status":"OPEN","unknown_field":"x"}`,
+			},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
-				assert.Contains(t, resp.Content, "either search_by_similarity or search_by_title")
+				assert.Contains(t, resp.Content, "unknown field")
+			},
+		},
+		"set-ui-filters-invalid-multiple-json-values": {
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `{"status":"OPEN"}{"page":1}`,
+			},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Contains(t, resp.Content, "invalid_arguments")
+				assert.Contains(t, resp.Content, "single JSON object")
+			},
+		},
+		"set-ui-filters-invalid-partial-due-range": {
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `{"due_after":"2026-02-01"}`,
+			},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Contains(t, resp.Content, "invalid_due_range")
+				assert.Contains(t, resp.Content, "due_after and due_before must be provided together")
+			},
+		},
+		"set-ui-filters-invalid-due-after-format": {
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `{"due_after":"2026/02/01","due_before":"2026-02-28"}`,
+			},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Contains(t, resp.Content, "invalid_due_after")
+				assert.Contains(t, resp.Content, "could not parse due_after date")
+			},
+		},
+		"set-ui-filters-invalid-due-before-format": {
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `{"due_after":"2026-02-01","due_before":"2026/02/28"}`,
+			},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Contains(t, resp.Content, "invalid_due_before")
+				assert.Contains(t, resp.Content, "could not parse due_before date")
+			},
+		},
+		"set-ui-filters-invalid-sort-by": {
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `{"sort_by":"dueDateASC"}`,
+			},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Contains(t, resp.Content, "invalid_sort_by")
+				assert.Contains(t, resp.Content, "sort_by is invalid")
+			},
+		},
+		"set-ui-filters-invalid-json": {
+			functionCall: domain.AssistantActionCall{
+				Name:  "set_ui_filters",
+				Input: `not-json`,
+			},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tool := NewUIFiltersSetterAction()
-			resp := tool.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
+			action := NewUIFiltersSetterAction()
+			assert.NotEmpty(t, action.StatusMessage())
+
+			definition := action.Definition()
+			assert.Equal(t, "set_ui_filters", definition.Name)
+			assert.NotEmpty(t, definition.Description)
+			assert.NotEmpty(t, definition.Input)
+
+			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
 			tt.validateResp(t, resp)
 		})
 	}

@@ -585,6 +585,115 @@ func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 	}
 }
 
+func TestNormalizeConversationSummary(t *testing.T) {
+	tests := map[string]struct {
+		previous   string
+		candidate  string
+		assertions func(t *testing.T, got string)
+	}{
+		"fills-missing-fields-from-previous-and-defaults": {
+			previous: strings.Join([]string{
+				"current_intent: plan sprint tasks",
+				"active_view: project AI open tasks",
+				"user_nuances: concise answers",
+				"tasks: task one|O|2026-02-20",
+				"last_action: fetch_todos -> success",
+				"recent_action_calls: fetch_todos; set_ui_filters",
+				"open_loops: fix wrong due date",
+				"output_format: list",
+			}, "\n"),
+			candidate: strings.Join([]string{
+				"current_intent: update due date for backend task",
+				"last_action: update_todo_due_date -> success",
+			}, "\n"),
+			assertions: func(t *testing.T, got string) {
+				assert.Equal(t, len(summaryOrderedFields), len(strings.Split(got, "\n")))
+				assert.Contains(t, got, "current_intent: update due date for backend task")
+				assert.Contains(t, got, "active_view: project AI open tasks")
+				assert.Contains(t, got, "open_loops: fix wrong due date")
+				assert.Contains(t, got, "output_format: list")
+			},
+		},
+		"handles-malformed-candidate-with-compact-defaults": {
+			previous:  "No current state.",
+			candidate: "Current state: user wants help",
+			assertions: func(t *testing.T, got string) {
+				assert.Equal(t, len(summaryOrderedFields), len(strings.Split(got, "\n")))
+				assert.Contains(t, got, "current_intent: none")
+				assert.Contains(t, got, "recent_action_calls: none")
+				assert.Contains(t, got, "open_loops: none")
+				assert.Contains(t, got, "output_format: concise text")
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := normalizeConversationSummary(tt.previous, tt.candidate)
+			tt.assertions(t, got)
+		})
+	}
+}
+
+func TestFormatMessageForSummary(t *testing.T) {
+	tests := map[string]struct {
+		message       domain.ChatMessage
+		expectContain []string
+		maxContentLen int
+	}{
+		"tool-message-is-compacted-and-keeps-action-signal": {
+			message: domain.ChatMessage{
+				ChatRole:     domain.ChatRole_Tool,
+				MessageState: domain.ChatMessageState_Completed,
+				Content:      strings.Repeat("long tool output ", 30),
+				ActionCalls: []domain.AssistantActionCall{
+					{Name: "fetch_todos"},
+					{Name: "set_ui_filters"},
+				},
+			},
+			expectContain: []string{
+				"- role: tool",
+				"action_calls: fetch_todos; set_ui_filters",
+				"action_success: false",
+			},
+			maxContentLen: MAX_SUMMARY_TOOL_CONTENT_CHARS + 3,
+		},
+		"empty-content-is-normalized-to-none": {
+			message: domain.ChatMessage{
+				ChatRole:     domain.ChatRole_User,
+				MessageState: domain.ChatMessageState_Completed,
+				Content:      "   ",
+			},
+			expectContain: []string{
+				"- role: user",
+				"content: none",
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := formatMessageForSummary(tt.message)
+			for _, expected := range tt.expectContain {
+				assert.Contains(t, got, expected)
+			}
+			if tt.maxContentLen > 0 {
+				lines := strings.Split(got, "\n")
+				contentLine := ""
+				for _, line := range lines {
+					if strings.HasPrefix(line, "  content: ") {
+						contentLine = strings.TrimPrefix(line, "  content: ")
+						break
+					}
+				}
+				if assert.NotEmpty(t, contentLine) {
+					assert.LessOrEqual(t, len([]rune(contentLine)), tt.maxContentLen)
+				}
+			}
+		})
+	}
+}
+
 func TestInitGenerateChatSummary_Initialize(t *testing.T) {
 	i := InitGenerateChatSummary{}
 

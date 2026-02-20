@@ -34,7 +34,13 @@ func (t TodoDueDateUpdaterAction) StatusMessage() string {
 func (tdut TodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "update_todo_due_date",
-		Description: "Update due date for exactly one existing todo. Required keys: id (UUID string) and due_date (YYYY-MM-DD). Use this tool only for due-date changes. No extra keys. Valid: {\"id\":\"<uuid>\",\"due_date\":\"2026-04-30\"}. Invalid: {\"id\":\"<uuid>\",\"status\":\"DONE\"}.",
+		Description: "Update due date for one todo.",
+		Hints: domain.AssistantActionHints{
+			UseWhen: "Use only for due date changes on one existing todo.\n" +
+				"- For multiple due date updates, execute repeated update_todo_due_date calls with each todo id and new due date.",
+			AvoidWhen: "Do not use for title/status changes.",
+			ArgRules:  "Required keys: id and due_date (YYYY-MM-DD).",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{
@@ -67,7 +73,7 @@ func (tdut TodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.As
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"%s", "example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
 		}
 	}
 
@@ -75,7 +81,7 @@ func (tdut TodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.As
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_todo_id","details":"Todo ID cannot be nil.", "example":%s}`, exampleArgs),
+			Content:      newActionError("invalid_todo_id", "Todo ID cannot be nil.", exampleArgs),
 		}
 	}
 
@@ -85,7 +91,7 @@ func (tdut TodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.As
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_due_date","details":"Due date cannot be empty. ISO 8601 string is required.", "example":%s}`, exampleArgs),
+			Content:      newActionError("invalid_due_date", "Due date cannot be empty. ISO 8601 string is required.", exampleArgs),
 		}
 	}
 
@@ -103,12 +109,12 @@ func (tdut TodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.As
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"update_due_date_error","details":"%s"}`, err.Error()),
+			Content:      newActionError("update_due_date_error", err.Error(), exampleArgs),
 		}
 	}
 	return domain.AssistantMessage{
 		Role:         domain.ChatRole_Tool,
 		ActionCallID: &call.ID,
-		Content:      fmt.Sprintf(`{"message":"Your todo was updated successfully! todo: {"id":"%s", "title":"%s", "due_date":"%s", "status":"%s"}"}`, todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status),
+		Content:      fmt.Sprintf("todos[1]{id,title,due_date,status}\n%s,%s,%s,%s", todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status),
 	}
 }

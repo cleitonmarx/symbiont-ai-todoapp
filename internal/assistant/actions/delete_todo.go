@@ -31,7 +31,13 @@ func (t TodoDeleterAction) StatusMessage() string {
 func (tdt TodoDeleterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "delete_todo",
-		Description: "Delete exactly one todo by id. Required key: id (UUID string). No extra keys. If id is unknown, call fetch_todos first. Valid: {\"id\":\"<uuid>\"}. Invalid: {\"id\":\"<uuid>\",\"confirm\":true}.",
+		Description: "Delete one todo by id.",
+		Hints: domain.AssistantActionHints{
+			UseWhen: "Use to delete one known todo by id.\n" +
+				"- For multiple deletes, execute repeated delete_todo calls with each todo id.",
+			AvoidWhen: "Do not use when id is missing or ambiguous; fetch first.",
+			ArgRules:  "Required key: id (UUID). No extra keys.",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{
@@ -58,7 +64,7 @@ func (tdt TodoDeleterAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"%s", "example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("invalid_arguments", fmt.Sprintf("Failed to parse action input: %s", err.Error()), exampleArgs),
 		}
 	}
 
@@ -69,13 +75,13 @@ func (tdt TodoDeleterAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"delete_todo_error","details":"%s"}`, err.Error()),
+			Content:      newActionError("delete_todo_error", fmt.Sprintf("Failed to delete todo: %s", err.Error()), exampleArgs),
 		}
 	}
 
 	return domain.AssistantMessage{
 		Role:         domain.ChatRole_Tool,
 		ActionCallID: &call.ID,
-		Content:      `{"message":"The todo was deleted successfully!"}`,
+		Content:      fmt.Sprintf("todos[1]{id,deleted}\n%s,true", params.ID),
 	}
 }

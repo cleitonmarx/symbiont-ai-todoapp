@@ -23,9 +23,6 @@ type todoSearchClause struct {
 // TodoSearchBuilder builds todo list options and centralizes validation plus
 // optional similarity embedding generation for usecases.
 type TodoSearchBuilder struct {
-	semanticEncoder domain.SemanticEncoder
-	embeddingModel  string
-
 	status       *domain.TodoStatus
 	dueAfter     *time.Time
 	dueBefore    *time.Time
@@ -34,11 +31,8 @@ type TodoSearchBuilder struct {
 }
 
 // NewTodoSearchBuilder creates a new TodoSearchBuilder.
-func NewTodoSearchBuilder(semanticEncoder domain.SemanticEncoder, embeddingModel string) *TodoSearchBuilder {
-	return &TodoSearchBuilder{
-		semanticEncoder: semanticEncoder,
-		embeddingModel:  embeddingModel,
-	}
+func NewTodoSearchBuilder() *TodoSearchBuilder {
+	return &TodoSearchBuilder{}
 }
 
 // WithStatus sets an optional status filter.
@@ -87,17 +81,61 @@ func (b *TodoSearchBuilder) WithSortBy(sortBy *string) *TodoSearchBuilder {
 	return b
 }
 
-// Build validates configured filters and returns repository options.
-func (b *TodoSearchBuilder) Build(ctx context.Context) (TodoSearchBuildResult, error) {
+func (b *TodoSearchBuilder) Validate() error {
 	if (b.dueAfter == nil) != (b.dueBefore == nil) {
-		return TodoSearchBuildResult{}, domain.NewValidationErr("due_after and due_before must be provided together")
+		return domain.NewValidationErr("due_after and due_before must be provided together")
 	}
 	if b.dueAfter != nil && b.dueBefore != nil && b.dueAfter.After(*b.dueBefore) {
-		return TodoSearchBuildResult{}, domain.NewValidationErr("due_after must be less than or equal to due_before")
+		return domain.NewValidationErr("due_after must be less than or equal to due_before")
 	}
 
 	if b.status != nil && *b.status != domain.TodoStatus_OPEN && *b.status != domain.TodoStatus_DONE {
-		return TodoSearchBuildResult{}, domain.NewValidationErr("status must be either OPEN or DONE")
+		return domain.NewValidationErr("status must be either OPEN or DONE")
+	}
+
+	resolvedSearchCount := 0
+	similarityQuery := ""
+	for _, clause := range b.searchClause {
+		if clause.query != nil && strings.TrimSpace(*clause.query) != "" {
+			resolvedSearchCount++
+			if clause.searchType == nil {
+				return domain.NewValidationErr("invalid search type")
+			}
+			switch *clause.searchType {
+			case SearchType_Similarity:
+				similarityQuery = strings.TrimSpace(*clause.query)
+			case SearchType_Title:
+			default:
+				return domain.NewValidationErr("invalid search type")
+			}
+		}
+	}
+
+	if resolvedSearchCount > 1 {
+		return domain.NewValidationErr("only one search query is allowed")
+	}
+
+	if b.sortBy != nil {
+		sortBy := strings.TrimSpace(*b.sortBy)
+		switch sortBy {
+		case "dueDateAsc", "dueDateDesc", "createdAtAsc", "createdAtDesc", "similarityAsc", "similarityDesc":
+			b.sortBy = &sortBy
+		default:
+			return domain.NewValidationErr("sort_by is invalid")
+		}
+	}
+
+	if b.sortBy != nil && strings.HasPrefix(strings.ToLower(strings.TrimSpace(*b.sortBy)), "similarity") && similarityQuery == "" {
+		return domain.NewValidationErr("search_by_similarity is required when using similarity sorting")
+	}
+
+	return nil
+}
+
+// Build validates configured filters and returns repository options.
+func (b *TodoSearchBuilder) Build(ctx context.Context, semanticEncoder domain.SemanticEncoder, embeddingModel string) (TodoSearchBuildResult, error) {
+	if err := b.Validate(); err != nil {
+		return TodoSearchBuildResult{}, err
 	}
 
 	opts := []domain.ListTodoOption{}
@@ -111,9 +149,10 @@ func (b *TodoSearchBuilder) Build(ctx context.Context) (TodoSearchBuildResult, e
 		opts = append(opts, domain.WithSortBy(*b.sortBy))
 	}
 
-	var titleSearch *string
-	similarityQuery := ""
-	resolvedSearchCount := 0
+	var (
+		titleSearch     *string
+		similarityQuery string
+	)
 	for _, clause := range b.searchClause {
 		if clause.query == nil {
 			continue
@@ -122,31 +161,17 @@ func (b *TodoSearchBuilder) Build(ctx context.Context) (TodoSearchBuildResult, e
 		if query == "" {
 			continue
 		}
-		if clause.searchType == nil {
-			return TodoSearchBuildResult{}, domain.NewValidationErr("invalid search type")
-		}
 
 		switch *clause.searchType {
 		case SearchType_Title:
 			titleSearch = &query
 		case SearchType_Similarity:
 			similarityQuery = query
-		default:
-			return TodoSearchBuildResult{}, domain.NewValidationErr("invalid search type")
 		}
-		resolvedSearchCount++
-	}
-
-	if resolvedSearchCount > 1 {
-		return TodoSearchBuildResult{}, domain.NewValidationErr("only one search query is allowed")
 	}
 
 	if titleSearch != nil {
 		opts = append(opts, domain.WithTitleContains(*titleSearch))
-	}
-
-	if b.sortBy != nil && strings.HasPrefix(strings.ToLower(strings.TrimSpace(*b.sortBy)), "similarity") && similarityQuery == "" {
-		return TodoSearchBuildResult{}, domain.NewValidationErr("search_by_similarity is required when using similarity sorting")
 	}
 
 	result := TodoSearchBuildResult{Options: opts}
@@ -155,14 +180,14 @@ func (b *TodoSearchBuilder) Build(ctx context.Context) (TodoSearchBuildResult, e
 		return result, nil
 	}
 
-	if b.semanticEncoder == nil {
+	if semanticEncoder == nil {
 		return TodoSearchBuildResult{}, domain.NewValidationErr("semantic encoder is required for similarity search")
 	}
-	if strings.TrimSpace(b.embeddingModel) == "" {
+	if strings.TrimSpace(embeddingModel) == "" {
 		return TodoSearchBuildResult{}, domain.NewValidationErr("embedding model cannot be empty for similarity search")
 	}
 
-	resp, err := b.semanticEncoder.VectorizeQuery(ctx, b.embeddingModel, similarityQuery)
+	resp, err := semanticEncoder.VectorizeQuery(ctx, embeddingModel, similarityQuery)
 	if err != nil {
 		return TodoSearchBuildResult{}, err
 	}

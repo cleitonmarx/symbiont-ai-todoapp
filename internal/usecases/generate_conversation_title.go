@@ -157,7 +157,7 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event doma
 		}
 		return nil
 	}
-	conversation.UpdatedAt = gct.timeProvider.Now().UTC()
+	conversation.UpdatedAt = gct.timeProvider.Now()
 
 	if err := gct.conversationRepo.UpdateConversation(spanCtx, conversation); telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to update conversation title: %w", err)
@@ -172,7 +172,6 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event doma
 func (gct GenerateConversationTitleImpl) queueTitleUpdate(conversation domain.Conversation) {
 	if gct.completedTitleCh != nil {
 		gct.completedTitleCh <- conversation
-		fmt.Printf("GenerateConversationTitleImpl: queued conversation %s for completed title update processing\n", conversation.ID)
 	}
 }
 

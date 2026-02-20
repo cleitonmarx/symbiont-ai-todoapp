@@ -33,7 +33,13 @@ func (t TodoUpdaterAction) StatusMessage() string {
 func (tut TodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "update_todo",
-		Description: "Update metadata for exactly one existing todo. Required key: id (UUID). Optional keys: title and status. Use this action only for title/status changes (never due date). status must be OPEN or DONE. No extra keys. Valid: {\"id\":\"<uuid>\",\"status\":\"DONE\"}. Invalid: {\"id\":\"<uuid>\",\"due_date\":\"2026-04-30\"}.",
+		Description: "Update title or status for one todo.",
+		Hints: domain.AssistantActionHints{
+			UseWhen: "Use for title/status changes on one existing todo.\n" +
+				"- For multiple title or status updates, execute repeated update_todo calls with each todo id and new title/status.",
+			AvoidWhen: "Do not use for due date changes.",
+			ArgRules:  "Required: id. Optional: title, status. status must be OPEN or DONE.",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{
@@ -72,7 +78,7 @@ func (tut TodoUpdaterAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"%s", "example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
 		}
 	}
 
@@ -81,7 +87,7 @@ func (tut TodoUpdaterAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_todo_id","details":"%s", "example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("invalid_todo_id", err.Error(), exampleArgs),
 		}
 	}
 
@@ -99,13 +105,13 @@ func (tut TodoUpdaterAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"update_todo_error","details":"%s", "example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("update_todo_error", err.Error(), exampleArgs),
 		}
 	}
 
 	return domain.AssistantMessage{
 		Role:         domain.ChatRole_Tool,
 		ActionCallID: &call.ID,
-		Content:      fmt.Sprintf(`{"message":"Your todo was updated successfully! todo: {"id":"%s", "title":"%s", "due_date":"%s", "status":"%s"}"}`, todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status),
+		Content:      fmt.Sprintf("todos[1]{id,title,due_date,status}\n%s,%s,%s,%s", todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status),
 	}
 }

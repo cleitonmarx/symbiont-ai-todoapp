@@ -86,6 +86,33 @@ type AssistantActionDefinition struct {
 	Name        string
 	Description string
 	Input       AssistantActionInput
+	Hints       AssistantActionHints
+}
+
+// ComposeHint composes the action hints into a single string for prompting.
+func (d AssistantActionDefinition) ComposeHint() string {
+	parts := make([]string, 0, 3)
+	if useWhen := strings.TrimSpace(d.Hints.UseWhen); useWhen != "" {
+		parts = append(parts, "Use: "+useWhen)
+	}
+	if avoidWhen := strings.TrimSpace(d.Hints.AvoidWhen); avoidWhen != "" {
+		parts = append(parts, "Avoid: "+avoidWhen)
+	}
+	if argRules := strings.TrimSpace(d.Hints.ArgRules); argRules != "" {
+		parts = append(parts, "Args: "+argRules)
+	}
+
+	if len(parts) == 0 {
+		return "Follow the tool schema and description."
+	}
+	return strings.Join(parts, " ")
+}
+
+// AssistantActionHints holds compact, runtime guidance for dynamic prompt injection.
+type AssistantActionHints struct {
+	UseWhen   string
+	AvoidWhen string
+	ArgRules  string
 }
 
 // AssistantActionField represents one action input field.
@@ -141,4 +168,5 @@ type AssistantActionRegistry interface {
 	Execute(context.Context, AssistantActionCall, []AssistantMessage) AssistantMessage
 	StatusMessage(actionName string) string
 	List() []AssistantActionDefinition
+	ListRelevant(ctx context.Context, userInput string) []AssistantActionDefinition
 }

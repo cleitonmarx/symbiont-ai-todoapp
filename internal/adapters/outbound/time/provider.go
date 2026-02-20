@@ -13,7 +13,7 @@ type CurrentTimeProvider struct{}
 
 // Now returns the current time.
 func (ts CurrentTimeProvider) Now() time.Time {
-	return time.Now()
+	return time.Now().UTC()
 }
 
 // InitCurrentTimeProvider initializes the CurrentTimeProvider and registers it in the dependency container.

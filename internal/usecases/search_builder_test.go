@@ -1,7 +1,6 @@
 package usecases
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -162,7 +161,7 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 				tt.setupMocks(t, semanticEncoder)
 			}
 
-			builder := NewTodoSearchBuilder(semanticEncoder, tt.model).
+			builder := NewTodoSearchBuilder().
 				WithStatus(tt.status).
 				WithDueDateRange(tt.dueAfter, tt.dueBefore).
 				WithSortBy(tt.sortBy)
@@ -170,7 +169,7 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 				builder.WithSearch(search.query, search.searchType)
 			}
 
-			res, err := builder.Build(context.Background())
+			res, err := builder.Build(t.Context(), semanticEncoder, tt.model)
 			if tt.wantErr != "" {
 				if assert.Error(t, err) {
 					assert.Equal(t, tt.wantErr, err.Error())

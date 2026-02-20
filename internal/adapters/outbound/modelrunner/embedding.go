@@ -14,6 +14,8 @@ type EmbeddingGenerator interface {
 	GenerateIndexingPrompt(todo domain.Todo) string
 	// GenerateSearchPrompt creates the prompt used for generating embeddings for a search query.
 	GenerateSearchPrompt(searchInput string) string
+	// GenerateAssistentActionDefinitionPrompt creates the prompt used for generating embeddings for an assistant action.
+	GenerateAssistentActionDefinitionPrompt(action domain.AssistantActionDefinition) string
 }
 
 // EmbeddingFactory provides a method to get an EmbeddingGenerator based on the model name.
@@ -37,12 +39,15 @@ func (f embeddingFactory) Get(model string) EmbeddingGenerator {
 type gemmaEmbedding struct{}
 
 func (a gemmaEmbedding) GenerateIndexingPrompt(todo domain.Todo) string {
-	//return fmt.Sprintf("title: none | text: %s\ndue:%s\nstatus:%s", todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status)
 	return fmt.Sprintf("title: none | text: %s", todo.Title)
 }
 
 func (a gemmaEmbedding) GenerateSearchPrompt(searchInput string) string {
 	return fmt.Sprintf("task: search result | query: %s", searchInput)
+}
+
+func (a gemmaEmbedding) GenerateAssistentActionDefinitionPrompt(action domain.AssistantActionDefinition) string {
+	return fmt.Sprintf("title: %s | text: %s", action.Name, action.Description)
 }
 
 // defaultEmbeddingGenerator is a fallback implementation of EmbeddingGenerator
@@ -55,4 +60,8 @@ func (a defaultEmbeddingGenerator) GenerateIndexingPrompt(todo domain.Todo) stri
 
 func (a defaultEmbeddingGenerator) GenerateSearchPrompt(searchInput string) string {
 	return searchInput
+}
+
+func (a defaultEmbeddingGenerator) GenerateAssistentActionDefinitionPrompt(action domain.AssistantActionDefinition) string {
+	return fmt.Sprintf("title:'%s'\ndescription:'%s'", action.Name, action.Description)
 }

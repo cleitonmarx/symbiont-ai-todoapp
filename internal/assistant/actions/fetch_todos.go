@@ -2,20 +2,18 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/toon-format/toon-go"
 )
 
 // NewTodoFetcherAction creates a new instance of TodoFetcherAction.
-func NewTodoFetcherAction(repo domain.TodoRepository, semanticEncoder domain.SemanticEncoder, timeProvider domain.CurrentTimeProvider, embeddingModel string) TodoFetcherAction {
+func NewTodoFetcherAction(repo domain.TodoRepository, semanticEncoder domain.SemanticEncoder, embeddingModel string) TodoFetcherAction {
 	return TodoFetcherAction{
 		repo:            repo,
-		timeProvider:    timeProvider,
 		semanticEncoder: semanticEncoder,
 		embeddingModel:  embeddingModel,
 	}
@@ -24,7 +22,6 @@ func NewTodoFetcherAction(repo domain.TodoRepository, semanticEncoder domain.Sem
 // TodoFetcherAction is an assistant action for fetching todos.
 type TodoFetcherAction struct {
 	repo            domain.TodoRepository
-	timeProvider    domain.CurrentTimeProvider
 	semanticEncoder domain.SemanticEncoder
 	embeddingModel  string
 }
@@ -38,7 +35,12 @@ func (t TodoFetcherAction) StatusMessage() string {
 func (lft TodoFetcherAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "fetch_todos",
-		Description: "List existing todos with pagination. Required keys: page (integer >= 1), page_size (integer >= 1). Optional keys: status, search_by_similarity, search_by_title, sort_by, due_after, due_before. Use strict JSON only (double quotes; booleans unquoted). status accepts exactly OPEN or DONE. Never use combined values such as OPEN,DONE; to include all statuses, omit status. sort_by accepts: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc (use similarity sort only with search_by_similarity). due_after and due_before must be provided together in YYYY-MM-DD format. Valid query template: {\"page\":1,\"page_size\":10,\"search_by_similarity\":\"buy milk\",\"sort_by\":\"similarityAsc\"}. Valid status template: {\"page\":1,\"page_size\":10,\"status\":\"OPEN\",\"sort_by\":\"dueDateAsc\"}. Invalid: {\"page\":1,\"page_size\":10,\"status\":\"OPEN,DONE\"}.",
+		Description: "Fetch todos with pagination and optional filters.",
+		Hints: domain.AssistantActionHints{
+			UseWhen:   "Use to list todos in chat or disambiguate target tasks before update/delete.",
+			AvoidWhen: "Do not use when only UI filtering is requested.",
+			ArgRules:  "Always send page and page_size. status must be OPEN or DONE when present. Use similarity sort only with search_by_similarity. due_after and due_before must come together.",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{
@@ -110,51 +112,34 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"invalid_arguments","details":"%s", "example":%s}`, err.Error(), exampleArgs),
+			Content:      newActionError("invalid_arguments", fmt.Sprintf("failed to parse action input: %s", err.Error()), exampleArgs),
 		}
 	}
 
 	var dueAfterTime *time.Time
 	var dueBeforeTime *time.Time
 	if params.DueAfter != nil || params.DueBefore != nil {
-		now := lft.timeProvider.Now()
-		if params.DueAfter != nil {
-			dueAfter, ok := domain.ExtractTimeFromText(*params.DueAfter, now, now.Location())
-			if !ok {
-				return domain.AssistantMessage{
-					Role:         domain.ChatRole_Tool,
-					ActionCallID: &call.ID,
-					Content:      `{"error":"invalid_due_after","details":"Could not parse due_after date."}`,
-				}
-			}
-			dueAfterTime = &dueAfter
-		}
-		if params.DueBefore != nil {
-			dueBefore, ok := domain.ExtractTimeFromText(*params.DueBefore, now, now.Location())
-			if !ok {
-				return domain.AssistantMessage{
-					Role:         domain.ChatRole_Tool,
-					ActionCallID: &call.ID,
-					Content:      `{"error":"invalid_due_before","details":"Could not parse due_before date."}`,
-				}
-			}
-			dueBeforeTime = &dueBefore
+		var errMsg *domain.AssistantMessage
+		dueAfterTime, dueBeforeTime, errMsg = parseDueDateParams(params.DueAfter, params.DueBefore, exampleArgs)
+		if errMsg != nil {
+			errMsg.ActionCallID = &call.ID
+			return *errMsg
 		}
 	}
 
-	buildResult, err := usecases.NewTodoSearchBuilder(lft.semanticEncoder, lft.embeddingModel).
+	buildResult, err := usecases.NewTodoSearchBuilder().
 		WithStatus((*domain.TodoStatus)(params.Status)).
 		WithDueDateRange(dueAfterTime, dueBeforeTime).
 		WithSortBy(params.SortBy).
 		WithTitleContains(params.SearchByTitle).
 		WithSimilaritySearch(params.SearchBySimilarity).
-		Build(ctx)
+		Build(ctx, lft.semanticEncoder, lft.embeddingModel)
 	if err != nil {
 		code := mapTodoFilterBuildErrCode(err)
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"%s","details":"%s"}`, code, err.Error()),
+			Content:      newActionError(code, err.Error(), exampleArgs),
 		}
 	}
 	if buildResult.EmbeddingTotalTokens > 0 {
@@ -166,7 +151,7 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"list_todos_error","details":"%s"}`, err.Error()),
+			Content:      newActionError("list_todos_error", fmt.Sprintf("failed to list todos:%s", err.Error()), exampleArgs),
 		}
 	}
 
@@ -175,10 +160,10 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 	}
 
 	type result struct {
-		ID      string `json:"id"`
-		Title   string `json:"title"`
-		DueDate string `json:"due_date"`
-		Status  string `json:"status"`
+		ID      string `toon:"id"`
+		Title   string `toon:"title"`
+		DueDate string `toon:"due_date"`
+		Status  string `toon:"status"`
 	}
 
 	todosResult := make([]result, len(todos))
@@ -201,12 +186,12 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 		"todos":     todosResult,
 		"next_page": nextPage,
 	}
-	content, err := json.Marshal(output)
+	content, err := toon.Marshal(output)
 	if err != nil {
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      fmt.Sprintf(`{"error":"marshal_error","details":"%s"}`, err.Error()),
+			Content:      newActionError("marshal_error", err.Error(), ""),
 		}
 	}
 
@@ -215,22 +200,4 @@ func (lft TodoFetcherAction) Execute(ctx context.Context, call domain.AssistantA
 		ActionCallID: &call.ID,
 		Content:      string(content),
 	}
-}
-
-// mapTodoFilterBuildErrCode maps errors from building todo search options to specific error codes for better client handling.
-func mapTodoFilterBuildErrCode(err error) string {
-	var validationErr *domain.ValidationErr
-	if errors.As(err, &validationErr) {
-		switch err.Error() {
-		case "due_after and due_before must be provided together":
-			return "invalid_due_range"
-		case "due_after must be less than or equal to due_before":
-			return "invalid_due_range"
-		case "search_by_similarity is required when using similarity sorting":
-			return "missing_search_by_similarity_for_similarity_sort"
-		default:
-			return "invalid_filters"
-		}
-	}
-	return "embedding_error"
 }

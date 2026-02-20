@@ -1076,6 +1076,13 @@
   flex-shrink: 0;
 }
 
+.ui-chat-conversation-confirm-btn {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.72rem;
+  border-radius: 999px;
+  line-height: 1.1;
+}
+
 .ui-icon-btn.danger {
   border-color: #efc2ba;
   color: var(--ui-danger);

@@ -34,7 +34,7 @@ func TestTodoCreatorAction(t *testing.T) {
 
 				creator.EXPECT().
 					Create(mock.Anything, uow, "New Todo", mock.Anything).
-					Return(domain.Todo{Title: "New Todo"}, nil).
+					Return(domain.Todo{Title: "New Todo", Status: domain.TodoStatus_OPEN}, nil).
 					Once()
 
 				uow.EXPECT().
@@ -51,7 +51,7 @@ func TestTodoCreatorAction(t *testing.T) {
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "created successfully")
+				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}")
 			},
 		},
 		"create-todo-empty-due-date-uses-history": {
@@ -82,7 +82,7 @@ func TestTodoCreatorAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "created successfully")
+				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}")
 			},
 		},
 		"create-todo-invalid-arguments": {
@@ -176,6 +176,12 @@ func TestTodoCreatorAction(t *testing.T) {
 			tt.setupMocks(uow, timeProvider, todoCreator)
 
 			action := NewTodoCreatorAction(uow, todoCreator, timeProvider)
+			assert.NotEmpty(t, action.StatusMessage())
+
+			definition := action.Definition()
+			assert.Equal(t, "create_todo", definition.Name)
+			assert.NotEmpty(t, definition.Description)
+			assert.NotEmpty(t, definition.Input)
 
 			resp := action.Execute(context.Background(), tt.functionCall, tt.history)
 			tt.validateResp(t, resp)

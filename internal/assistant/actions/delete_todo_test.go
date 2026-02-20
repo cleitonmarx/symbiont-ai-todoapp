@@ -43,7 +43,7 @@ func TestTodoDeleterAction(t *testing.T) {
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "deleted successfully")
+				assert.Contains(t, resp.Content, "todos[1]{id,deleted}")
 			},
 		},
 		"delete-todo-invalid-arguments": {
@@ -93,6 +93,12 @@ func TestTodoDeleterAction(t *testing.T) {
 			tt.setupMocks(uow, deleter)
 
 			action := NewTodoDeleterAction(uow, deleter)
+			assert.NotEmpty(t, action.StatusMessage())
+
+			definition := action.Definition()
+			assert.Equal(t, "delete_todo", definition.Name)
+			assert.NotEmpty(t, definition.Description)
+			assert.NotEmpty(t, definition.Input)
 
 			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
 			tt.validateResp(t, resp)

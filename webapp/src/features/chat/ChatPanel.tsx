@@ -81,6 +81,7 @@ export const ChatPanel = ({
   const [renderedMessages, setRenderedMessages] = useState<Record<string, string>>({});
   const [renameConversationId, setRenameConversationId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [pendingDeleteConversationId, setPendingDeleteConversationId] = useState<string | null>(null);
   const [conversationError, setConversationError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -172,12 +173,10 @@ export const ChatPanel = ({
   };
 
   const handleDeleteConversation = async (conversationId: string) => {
-    if (!window.confirm('Delete this conversation and all messages?')) {
-      return;
-    }
     try {
       setConversationError(null);
       await removeConversation(conversationId);
+      setPendingDeleteConversationId((current) => (current === conversationId ? null : current));
     } catch (err) {
       setConversationError(err instanceof Error ? err.message : 'Failed to delete conversation');
     }
@@ -274,6 +273,7 @@ export const ChatPanel = ({
                         className="ui-chat-conversation-main"
                         onClick={() => {
                           setConversationError(null);
+                          setPendingDeleteConversationId(null);
                           setRenameConversationId(null);
                           setRenameValue('');
                           void selectConversation(conversation.id);
@@ -295,30 +295,59 @@ export const ChatPanel = ({
                       </button>
 
                       <div className="ui-chat-conversation-actions">
-                        <button
-                          type="button"
-                          className="ui-icon-btn"
-                          title="Rename conversation"
-                          aria-label="Rename conversation"
-                          onClick={() => {
-                            setConversationError(null);
-                            setRenameConversationId(conversation.id);
-                            setRenameValue(conversation.title);
-                          }}
-                          disabled={sessionsLocked}
-                        >
-                          ✎
-                        </button>
-                        <button
-                          type="button"
-                          className="ui-icon-btn danger"
-                          title="Delete conversation"
-                          aria-label="Delete conversation"
-                          onClick={() => void handleDeleteConversation(conversation.id)}
-                          disabled={sessionsLocked}
-                        >
-                          🗑
-                        </button>
+                        {pendingDeleteConversationId === conversation.id ? (
+                          <>
+                            <button
+                              type="button"
+                              className="ui-btn ui-btn-secondary ui-chat-conversation-confirm-btn"
+                              onClick={() => setPendingDeleteConversationId(null)}
+                              disabled={sessionsLocked}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="ui-btn ui-btn-danger ui-chat-conversation-confirm-btn"
+                              onClick={() => void handleDeleteConversation(conversation.id)}
+                              disabled={sessionsLocked}
+                            >
+                              Delete
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="ui-icon-btn"
+                              title="Rename conversation"
+                              aria-label="Rename conversation"
+                              onClick={() => {
+                                setConversationError(null);
+                                setPendingDeleteConversationId(null);
+                                setRenameConversationId(conversation.id);
+                                setRenameValue(conversation.title);
+                              }}
+                              disabled={sessionsLocked}
+                            >
+                              ✎
+                            </button>
+                            <button
+                              type="button"
+                              className="ui-icon-btn danger"
+                              title="Delete conversation"
+                              aria-label="Delete conversation"
+                              onClick={() => {
+                                setConversationError(null);
+                                setRenameConversationId(null);
+                                setRenameValue('');
+                                setPendingDeleteConversationId(conversation.id);
+                              }}
+                              disabled={sessionsLocked}
+                            >
+                              🗑
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 

@@ -21,10 +21,10 @@ const (
 	MAX_CHAT_SUMMARY_MESSAGES_PER_RUN = 25
 
 	// Minimum number of unsummarized messages that triggers summary generation.
-	CHAT_SUMMARY_TRIGGER_MESSAGES = 10
+	CHAT_SUMMARY_TRIGGER_MESSAGES = 6
 
 	// Minimum persisted tokens from unsummarized messages that triggers summary generation.
-	CHAT_SUMMARY_TRIGGER_TOKENS = 2000
+	CHAT_SUMMARY_TRIGGER_TOKENS = 900
 
 	// Maximum output tokens for the summary model response.
 	CHAT_SUMMARY_MAX_TOKENS = 1024
@@ -41,6 +41,17 @@ const (
 
 	// Summary field used to persist rolling action-call history.
 	SUMMARY_RECENT_ACTION_CALLS_FIELD = "recent_action_calls"
+
+	// Summary field used to persist unresolved corrections/follow-ups.
+	SUMMARY_OPEN_LOOPS_FIELD = "open_loops"
+
+	// Defaults for normalized compact summary schema.
+	DEFAULT_SUMMARY_FIELD_VALUE       = "none"
+	DEFAULT_SUMMARY_OUTPUT_FORMAT     = "concise text"
+	MAX_SUMMARY_CONTENT_CHARS         = 320
+	MAX_SUMMARY_TOOL_CONTENT_CHARS    = 180
+	MAX_SUMMARY_ERROR_CONTENT_CHARS   = 180
+	MAX_SUMMARY_ACTION_CALLS_PER_LINE = 5
 )
 
 // CompletedConversationSummaryChannel is a channel type for sending processed domain.ConversationSummary items.
@@ -53,6 +64,17 @@ var stateChangingActions = map[string]struct{}{
 	"update_todo":          {},
 	"update_todo_due_date": {},
 	"delete_todo":          {},
+}
+
+var summaryOrderedFields = []string{
+	"current_intent",
+	"active_view",
+	"user_nuances",
+	"tasks",
+	"last_action",
+	SUMMARY_RECENT_ACTION_CALLS_FIELD,
+	SUMMARY_OPEN_LOOPS_FIELD,
+	"output_format",
 }
 
 //go:embed prompts/chat-summary.yml
@@ -159,7 +181,9 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	if summaryContent == "" {
 		return nil
 	}
+	summaryContent = normalizeConversationSummary(currentSummary, summaryContent)
 	summaryContent = mergeRecentActionCallsIntoSummary(currentSummary, summaryContent, unsummarizedMessages)
+	summaryContent = normalizeConversationSummary(currentSummary, summaryContent)
 
 	summaryID := uuid.New()
 	if found {
@@ -225,10 +249,20 @@ func formatMessagesForSummary(messages []domain.ChatMessage) string {
 // formatMessageForSummary formats a single chat message into a string representation,
 // including relevant details for summary generation.
 func formatMessageForSummary(message domain.ChatMessage) string {
+	contentMaxChars := MAX_SUMMARY_CONTENT_CHARS
+	if message.ChatRole == domain.ChatRole_Tool {
+		contentMaxChars = MAX_SUMMARY_TOOL_CONTENT_CHARS
+	}
+	content := compactSummaryText(message.Content, contentMaxChars)
+
 	parts := []string{
 		fmt.Sprintf("- role: %s", message.ChatRole),
 		fmt.Sprintf("  state: %s", message.MessageState),
-		fmt.Sprintf("  content: %s", strings.TrimSpace(message.Content)),
+		fmt.Sprintf("  content: %s", content),
+	}
+
+	if actionCalls := formatMessageActionCallsForSummary(message.ActionCalls); actionCalls != "" {
+		parts = append(parts, fmt.Sprintf("  action_calls: %s", actionCalls))
 	}
 
 	if message.ChatRole == domain.ChatRole_Tool {
@@ -236,10 +270,52 @@ func formatMessageForSummary(message domain.ChatMessage) string {
 	}
 
 	if message.ErrorMessage != nil && strings.TrimSpace(*message.ErrorMessage) != "" {
-		parts = append(parts, fmt.Sprintf("  error: %s", strings.TrimSpace(*message.ErrorMessage)))
+		parts = append(parts, fmt.Sprintf("  error: %s", compactSummaryText(*message.ErrorMessage, MAX_SUMMARY_ERROR_CONTENT_CHARS)))
 	}
 
 	return strings.Join(parts, "\n")
+}
+
+// normalizeConversationSummary repairs and normalizes summary content into a stable
+// compact schema so malformed or partial model outputs do not erase durable memory.
+func normalizeConversationSummary(previousSummary, candidateSummary string) string {
+	previousFields := parseConversationSummaryFields(previousSummary)
+	candidateFields := parseConversationSummaryFields(candidateSummary)
+
+	lines := make([]string, 0, len(summaryOrderedFields))
+	for _, field := range summaryOrderedFields {
+		value := strings.TrimSpace(candidateFields[field])
+		if value == "" {
+			value = strings.TrimSpace(previousFields[field])
+		}
+		if value == "" {
+			value = defaultSummaryFieldValue(field)
+		}
+		lines = append(lines, fmt.Sprintf("%s: %s", field, value))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// parseConversationSummaryFields parses summary field lines into a lower-cased key-value map.
+func parseConversationSummaryFields(summary string) map[string]string {
+	fields := make(map[string]string)
+	for line := range strings.SplitSeq(summary, "\n") {
+		key, value, ok := parseSummaryFieldLine(line)
+		if !ok {
+			continue
+		}
+		fields[key] = value
+	}
+	return fields
+}
+
+func defaultSummaryFieldValue(field string) string {
+	switch field {
+	case "output_format":
+		return DEFAULT_SUMMARY_OUTPUT_FORMAT
+	default:
+		return DEFAULT_SUMMARY_FIELD_VALUE
+	}
 }
 
 // shouldGenerateSummary determines whether a new conversation summary should be generated
@@ -426,6 +502,46 @@ func parseSummaryFieldLine(line string) (string, string, bool) {
 	}
 
 	return key, value, true
+}
+
+// compactSummaryText trims, collapses whitespace, and truncates content
+// so summarization input remains compact and stable.
+func compactSummaryText(text string, maxChars int) string {
+	normalized := strings.Join(strings.Fields(strings.TrimSpace(text)), " ")
+	if normalized == "" {
+		return "none"
+	}
+	if maxChars <= 0 {
+		return normalized
+	}
+	runes := []rune(normalized)
+	if len(runes) <= maxChars {
+		return normalized
+	}
+	return string(runes[:maxChars]) + "..."
+}
+
+func formatMessageActionCallsForSummary(actionCalls []domain.AssistantActionCall) string {
+	if len(actionCalls) == 0 {
+		return ""
+	}
+
+	names := make([]string, 0, min(len(actionCalls), MAX_SUMMARY_ACTION_CALLS_PER_LINE))
+	for _, actionCall := range actionCalls {
+		name := strings.TrimSpace(actionCall.Name)
+		if name == "" {
+			continue
+		}
+		names = append(names, name)
+		if len(names) >= MAX_SUMMARY_ACTION_CALLS_PER_LINE {
+			break
+		}
+	}
+
+	if len(names) == 0 {
+		return ""
+	}
+	return strings.Join(names, "; ")
 }
 
 // InitGenerateChatSummary initializes the GenerateChatSummary use case.

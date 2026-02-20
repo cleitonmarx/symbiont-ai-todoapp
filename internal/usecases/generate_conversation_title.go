@@ -157,7 +157,7 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event doma
 		}
 		return nil
 	}
-	conversation.UpdatedAt = gct.timeProvider.Now().UTC()
+	conversation.UpdatedAt = gct.timeProvider.Now()
 
 	if err := gct.conversationRepo.UpdateConversation(spanCtx, conversation); telemetry.RecordErrorAndStatus(span, err) {
 		return fmt.Errorf("failed to update conversation title: %w", err)

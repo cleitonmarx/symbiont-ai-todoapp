@@ -59,7 +59,7 @@ func (tui TodoUpdaterImpl) Update(ctx context.Context, uow domain.UnitOfWork, id
 	}
 
 	if dueDate != nil {
-		td.DueDate = *dueDate
+		td.DueDate = dueDate.UTC()
 	}
 
 	td.UpdatedAt = now

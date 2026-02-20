@@ -42,7 +42,7 @@ func (tci TodoCreatorImpl) Create(ctx context.Context, uow domain.UnitOfWork, ti
 		ID:        tci.createUUID(),
 		Title:     title,
 		Status:    domain.TodoStatus_OPEN,
-		DueDate:   dueDate,
+		DueDate:   dueDate.UTC(),
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

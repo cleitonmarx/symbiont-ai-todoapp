@@ -173,7 +173,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 		ConversationID:          event.ConversationID,
 		CurrentStateSummary:     summaryContent,
 		LastSummarizedMessageID: &lastMessage.ID,
-		UpdatedAt:               gcs.timeProvider.Now().UTC(),
+		UpdatedAt:               gcs.timeProvider.Now(),
 	}
 
 	err = gcs.conversationSummaryRepo.StoreConversationSummary(spanCtx, newSummary)

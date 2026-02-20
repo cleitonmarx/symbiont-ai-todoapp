@@ -45,7 +45,7 @@ func (uc *UpdateConversationImpl) Execute(ctx context.Context, conversationID uu
 			return err
 		}
 
-		conv.UpdatedAt = uc.timeProvider.Now().UTC()
+		conv.UpdatedAt = uc.timeProvider.Now()
 		if err := uow.Conversation().UpdateConversation(ctx, conv); err != nil {
 			return err
 		}

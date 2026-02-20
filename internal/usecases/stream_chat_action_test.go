@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -44,7 +43,10 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(
+						mock.Anything,
+						"Call an action",
+					).
 					Return([]domain.AssistantActionDefinition{})
 
 				actionRegistry.EXPECT().
@@ -135,7 +137,10 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(
+						mock.Anything,
+						"Call failing action",
+					).
 					Return([]domain.AssistantActionDefinition{})
 
 				actionRegistry.EXPECT().
@@ -252,7 +257,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(mock.Anything, "Call action").
 					Return([]domain.AssistantActionDefinition{})
 
 				actionRegistry.EXPECT().
@@ -335,7 +340,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(mock.Anything, "Call action").
 					Return([]domain.AssistantActionDefinition{})
 
 				actionRegistry.EXPECT().
@@ -429,7 +434,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(mock.Anything, "Keep calling actions").
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 19)
@@ -532,7 +537,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(mock.Anything, "Call the same action repeatedly").
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 15)
@@ -618,15 +623,4 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 			testStreamChatImpl(t, tt)
 		})
 	}
-}
-
-func Test(t *testing.T) {
-	b, _ := json.Marshal(domain.AssistantActionCall{
-		ID:    "func-123",
-		Name:  "list_todos",
-		Input: `{"page": 1, "page_size": 5, "search_term": "searchTerm"}`,
-		Text:  "calling list_todos",
-	})
-
-	fmt.Println(string(b))
 }

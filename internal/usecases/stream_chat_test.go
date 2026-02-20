@@ -59,12 +59,14 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(
+						mock.Anything,
+						"Previous message\nHello, how are you?",
+					).
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 5)
 
-				// history: empty
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
 					Return([]domain.ChatMessage{
@@ -171,7 +173,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(
+						mock.Anything,
+						"Previous message\nHello, how are you?",
+					).
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 5)
@@ -268,7 +273,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(
+						mock.Anything,
+						"Test",
+					).
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 5)
@@ -384,7 +392,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(
+						mock.Anything,
+						"Test",
+					).
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 4)
@@ -450,7 +461,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(
+						mock.Anything,
+						"Test",
+					).
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 4)
@@ -519,7 +533,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}, true, nil).
 					Once()
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(mock.Anything, "Test").
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 4)
@@ -577,7 +591,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(mock.Anything, "No meta").
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 5)
@@ -640,7 +654,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(mock.Anything, "Test").
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 4)
@@ -716,7 +730,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Once()
 
 				actionRegistry.EXPECT().
-					List().
+					ListRelevant(mock.Anything, "Test").
 					Return([]domain.AssistantActionDefinition{})
 
 				expectNowCalls(timeProvider, fixedTime, 4)

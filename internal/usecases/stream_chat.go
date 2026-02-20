@@ -136,10 +136,18 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
+
 	messages = append(messages, domain.AssistantMessage{
 		Role:    domain.ChatRole_User,
 		Content: userMessage,
 	})
+
+	userInputs := []string{}
+	for _, msg := range messages {
+		if msg.Role == domain.ChatRole_User {
+			userInputs = append(userInputs, msg.Content)
+		}
+	}
 
 	req := domain.AssistantTurnRequest{
 		Model:            model,
@@ -147,7 +155,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		Stream:           true,
 		Temperature:      common.Ptr(CHAT_TEMPERATURE),
 		TopP:             common.Ptr(CHAT_TOP_P),
-		AvailableActions: sc.actionRegistry.List(),
+		AvailableActions: sc.actionRegistry.ListRelevant(spanCtx, strings.Join(userInputs, "\n")),
 	}
 
 	state := streamChatExecutionState{

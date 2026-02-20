@@ -25,7 +25,12 @@ func (t UIFiltersSetterAction) StatusMessage() string {
 func (t UIFiltersSetterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "set_ui_filters",
-		Description: "Set filters in the main UI. Use for read/query intents (show/list/find/filter/search/overdue/refetch). Strict JSON object only. Allowed keys: status, search_by_similarity, search_by_title, sort_by, due_after, due_before, page, page_size. status must be OPEN or DONE when provided. If user asks for all statuses, omit status. Use either search_by_similarity or search_by_title, not both. due_after and due_before must be provided together as YYYY-MM-DD.",
+		Description: "Set UI filter state for read/query views.",
+		Hints: domain.AssistantActionHints{
+			UseWhen:   "Read/query intents: show, list, find, filter, search, overdue, refetch.",
+			AvoidWhen: "Do not use for create/update/delete operations.",
+			ArgRules:  "Use only allowed keys. status is OPEN or DONE. Use search_by_similarity OR search_by_title, not both. due_after and due_before must come together.",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{

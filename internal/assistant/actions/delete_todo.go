@@ -31,7 +31,12 @@ func (t TodoDeleterAction) StatusMessage() string {
 func (tdt TodoDeleterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "delete_todo",
-		Description: "Delete exactly one todo by id. Required key: id (UUID string). No extra keys. If id is unknown, call fetch_todos first. Valid: {\"id\":\"<uuid>\"}. Invalid: {\"id\":\"<uuid>\",\"confirm\":true}.",
+		Description: "Delete one todo by id.",
+		Hints: domain.AssistantActionHints{
+			UseWhen:   "Use to delete one known todo by id.",
+			AvoidWhen: "Do not use when id is missing or ambiguous; fetch first.",
+			ArgRules:  "Required key: id (UUID). No extra keys.",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{

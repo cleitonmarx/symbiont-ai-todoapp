@@ -35,7 +35,12 @@ func (t TodoFetcherAction) StatusMessage() string {
 func (lft TodoFetcherAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "fetch_todos",
-		Description: "List existing todos with pagination. Required keys: page (integer >= 1), page_size (integer >= 1). Optional keys: status, search_by_similarity, search_by_title, sort_by, due_after, due_before. Use strict JSON only (double quotes; booleans unquoted). status accepts exactly OPEN or DONE. Never use combined values such as OPEN,DONE; to include all statuses, omit status. sort_by accepts: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc (use similarity sort only with search_by_similarity). due_after and due_before must be provided together in YYYY-MM-DD format. Valid query template: {\"page\":1,\"page_size\":10,\"search_by_similarity\":\"buy milk\",\"sort_by\":\"similarityAsc\"}. Valid status template: {\"page\":1,\"page_size\":10,\"status\":\"OPEN\",\"sort_by\":\"dueDateAsc\"}. Invalid: {\"page\":1,\"page_size\":10,\"status\":\"OPEN,DONE\"}.",
+		Description: "Fetch todos with pagination and optional filters.",
+		Hints: domain.AssistantActionHints{
+			UseWhen:   "Use to list todos in chat or disambiguate target tasks before update/delete.",
+			AvoidWhen: "Do not use when only UI filtering is requested.",
+			ArgRules:  "Always send page and page_size. status must be OPEN or DONE when present. Use similarity sort only with search_by_similarity. due_after and due_before must come together.",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{

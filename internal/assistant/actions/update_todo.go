@@ -33,7 +33,12 @@ func (t TodoUpdaterAction) StatusMessage() string {
 func (tut TodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "update_todo",
-		Description: "Update metadata for exactly one existing todo. Required key: id (UUID). Optional keys: title and status. Use this action only for title/status changes (never due date). status must be OPEN or DONE. No extra keys. Valid: {\"id\":\"<uuid>\",\"status\":\"DONE\"}. Invalid: {\"id\":\"<uuid>\",\"due_date\":\"2026-04-30\"}.",
+		Description: "Update title or status for one todo.",
+		Hints: domain.AssistantActionHints{
+			UseWhen:   "Use for title/status changes on one existing todo.",
+			AvoidWhen: "Do not use for due date changes.",
+			ArgRules:  "Required: id. Optional: title, status. status must be OPEN or DONE.",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{

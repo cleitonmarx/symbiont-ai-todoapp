@@ -34,7 +34,12 @@ func (t TodoCreatorAction) StatusMessage() string {
 func (tct TodoCreatorAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "create_todo",
-		Description: "Create exactly one todo. Required keys: title (string) and due_date (YYYY-MM-DD). No extra keys. For batch creation requests, call this action once per task until all tasks are saved. Valid: {\"title\":\"Pay rent\",\"due_date\":\"2026-04-30\"}. Invalid: {\"title\":\"Pay rent\",\"due\":\"tomorrow\",\"priority\":\"high\"}.",
+		Description: "Create one todo item.",
+		Hints: domain.AssistantActionHints{
+			UseWhen:   "Use for creating one todo item.",
+			AvoidWhen: "Do not use for updates or deletes.",
+			ArgRules:  "Required keys: title and due_date (YYYY-MM-DD). One call per task in batch create.",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{

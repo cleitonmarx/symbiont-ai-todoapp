@@ -34,7 +34,12 @@ func (t TodoDueDateUpdaterAction) StatusMessage() string {
 func (tdut TodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "update_todo_due_date",
-		Description: "Update due date for exactly one existing todo. Required keys: id (UUID string) and due_date (YYYY-MM-DD). Use this tool only for due-date changes. No extra keys. Valid: {\"id\":\"<uuid>\",\"due_date\":\"2026-04-30\"}. Invalid: {\"id\":\"<uuid>\",\"status\":\"DONE\"}.",
+		Description: "Update due date for one todo.",
+		Hints: domain.AssistantActionHints{
+			UseWhen:   "Use only for due date changes on one existing todo.",
+			AvoidWhen: "Do not use for title/status changes.",
+			ArgRules:  "Required keys: id and due_date (YYYY-MM-DD).",
+		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{

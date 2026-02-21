@@ -108,6 +108,13 @@ func (d AssistantActionDefinition) ComposeHint() string {
 	return strings.Join(parts, " ")
 }
 
+// HasHints returns true if any of the hint fields are non-empty after trimming whitespace.
+func (d AssistantActionDefinition) HasHints() bool {
+	return strings.TrimSpace(d.Hints.UseWhen) != "" ||
+		strings.TrimSpace(d.Hints.AvoidWhen) != "" ||
+		strings.TrimSpace(d.Hints.ArgRules) != ""
+}
+
 // AssistantActionHints holds compact, runtime guidance for dynamic prompt injection.
 type AssistantActionHints struct {
 	UseWhen   string

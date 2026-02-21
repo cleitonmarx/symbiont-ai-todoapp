@@ -36,9 +36,8 @@ func (tdut TodoDueDateUpdaterAction) Definition() domain.AssistantActionDefiniti
 		Name:        "update_todo_due_date",
 		Description: "Update due date for one todo.",
 		Hints: domain.AssistantActionHints{
-			UseWhen: "Use only for due date changes on one existing todo.\n" +
-				"- For multiple due date updates, execute repeated update_todo_due_date calls with each todo id and new due date.",
-			AvoidWhen: "Do not use for title/status changes.",
+			UseWhen:   "Use only for due date changes on one existing todo.",
+			AvoidWhen: "Do not use for title/status changes or multi-item due date updates.",
 			ArgRules:  "Required keys: id and due_date (YYYY-MM-DD).",
 		},
 		Input: domain.AssistantActionInput{

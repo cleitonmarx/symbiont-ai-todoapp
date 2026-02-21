@@ -580,7 +580,7 @@ func TestAssistantClientAdapter_VectorizeAssistantActionDefinition(t *testing.T)
 			}`,
 			statusCode:         http.StatusOK,
 			model:              "ai/embeddinggemma",
-			expectRequestInput: "title: update_todo_due_date | text: Update due date for exactly one existing todo.",
+			expectRequestInput: "title: update_todo_due_date | text: action: update todo due date | description: Update due date for exactly one existing todo.",
 			expectedVec:        []float64{1.1, 2.2, 3.3},
 		},
 		"success-with-default-embedding-generator": {

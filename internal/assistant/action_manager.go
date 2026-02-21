@@ -151,7 +151,16 @@ func (i InitAssistantActionRegistry) Initialize(ctx context.Context) (context.Co
 			i.TodoCreator,
 			i.TimeProvider,
 		),
+		actions.NewBulkTodoCreatorAction(
+			i.Uow,
+			i.TodoCreator,
+			i.TimeProvider,
+		),
 		actions.NewTodoUpdaterAction(
+			i.Uow,
+			i.TodoUpdater,
+		),
+		actions.NewBulkTodoUpdaterAction(
 			i.Uow,
 			i.TodoUpdater,
 		),
@@ -160,7 +169,16 @@ func (i InitAssistantActionRegistry) Initialize(ctx context.Context) (context.Co
 			i.TodoUpdater,
 			i.TimeProvider,
 		),
+		actions.NewBulkTodoDueDateUpdaterAction(
+			i.Uow,
+			i.TodoUpdater,
+			i.TimeProvider,
+		),
 		actions.NewTodoDeleterAction(
+			i.Uow,
+			i.TodoDeleter,
+		),
+		actions.NewBulkTodoDeleterAction(
 			i.Uow,
 			i.TodoDeleter,
 		),

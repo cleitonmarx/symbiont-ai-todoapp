@@ -132,15 +132,19 @@ func TestAssistantActionManager_List_And_StatusMessages(t *testing.T) {
 		{Action: actions.NewUIFiltersSetterAction()},
 		{Action: actions.NewTodoFetcherAction(nil, nil, "")},
 		{Action: actions.NewTodoCreatorAction(nil, nil, nil)},
+		{Action: actions.NewBulkTodoCreatorAction(nil, nil, nil)},
 		{Action: actions.NewTodoUpdaterAction(nil, nil)},
+		{Action: actions.NewBulkTodoUpdaterAction(nil, nil)},
 		{Action: actions.NewTodoDueDateUpdaterAction(nil, nil, nil)},
+		{Action: actions.NewBulkTodoDueDateUpdaterAction(nil, nil, nil)},
 		{Action: actions.NewTodoDeleterAction(nil, nil)},
+		{Action: actions.NewBulkTodoDeleterAction(nil, nil)},
 	}
 
 	manager := NewAssistantActionManager(nil, "", actionDetails...)
 
 	actions := manager.List()
-	require.Len(t, actions, 6)
+	require.Len(t, actions, 10)
 
 	names := make([]string, 0, len(actions))
 	for _, action := range actions {
@@ -151,9 +155,13 @@ func TestAssistantActionManager_List_And_StatusMessages(t *testing.T) {
 		"set_ui_filters",
 		"fetch_todos",
 		"create_todo",
+		"create_todos",
 		"update_todo",
+		"update_todos",
 		"update_todo_due_date",
+		"update_todos_due_date",
 		"delete_todo",
+		"delete_todos",
 	}, names)
 
 	statusMessages := []string{}
@@ -165,9 +173,13 @@ func TestAssistantActionManager_List_And_StatusMessages(t *testing.T) {
 		"🎛️ Applying filters...",
 		"🔎 Fetching todos...",
 		"📝 Creating your todo...",
+		"📝 Creating your todos...",
 		"✏️ Updating your todo...",
+		"✏️ Updating your todos...",
 		"📅 Updating the due date...",
+		"📅 Updating due dates...",
 		"🗑️ Deleting the todo...",
+		"🗑️ Deleting todos...",
 	}, statusMessages)
 }
 
@@ -222,7 +234,7 @@ func TestInitAssistantActionRegistry_Initialize(t *testing.T) {
 					Return(domain.EmbeddingVector{
 						Vector:      []float64{0.1, 0.2, 0.3},
 						TotalTokens: 3,
-					}, nil).Times(6)
+					}, nil).Times(10)
 			},
 			expectError: false,
 			validateFunc: func(t *testing.T, ctx context.Context) {
@@ -355,6 +367,7 @@ func TestAssistantActionManager_ListRelevant(t *testing.T) {
 		names := []string{relevant[0].Name, relevant[1].Name}
 		assert.ElementsMatch(t, []string{"create_todo", "update_todo"}, names)
 	})
+
 }
 
 func mockAssistantActionDefinition(name string) domain.AssistantActionDefinition {

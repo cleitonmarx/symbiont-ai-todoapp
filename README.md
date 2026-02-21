@@ -62,7 +62,7 @@ Tunable settings:
 
 ## API Overview
 
-REST endpoints are primarily under `/api/v1/...`, including conversation endpoints under `/api/v1/conversations`.
+REST endpoints are primarily under `/api/v1/...`.
 GraphQL currently exposes todo operations (`listTodos`, `updateTodo`, `deleteTodo`) on `/v1/query`.
 
 - OpenAPI spec: `api/openapi/openapi.yml`

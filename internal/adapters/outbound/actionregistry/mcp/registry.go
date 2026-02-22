@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"maps"
 	"net/http"
-	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -43,18 +43,15 @@ type Config struct {
 	Endpoint       string
 	APIKey         string
 	APIKeyHeader   string
-	ToolOverrides  string
 	RequestTimeout time.Duration
 }
 
+// withDefaults applies safe defaults for header and timeouts.
 func (c Config) withDefaults() Config {
 	cfg := c
 	apiKeyHeader := strings.TrimSpace(cfg.APIKeyHeader)
 	if apiKeyHeader == "" || apiKeyHeader == "-" {
-		cfg.APIKeyHeader = "x-api-key"
-	}
-	if strings.TrimSpace(cfg.ToolOverrides) == "" {
-		cfg.ToolOverrides = "-"
+		cfg.APIKeyHeader = "Authorization"
 	}
 	if cfg.RequestTimeout <= 0 {
 		cfg.RequestTimeout = defaultRequestTimeout
@@ -82,10 +79,12 @@ type mcpToolAction struct {
 	execute    func(context.Context, domain.AssistantActionCall, []domain.AssistantMessage) domain.AssistantMessage
 }
 
+// Definition returns the static action definition associated with this MCP tool.
 func (a mcpToolAction) Definition() domain.AssistantActionDefinition {
 	return a.definition
 }
 
+// StatusMessage returns a per-tool execution status string for UI streaming updates.
 func (a mcpToolAction) StatusMessage() string {
 	name := strings.TrimSpace(a.definition.Name)
 	if name == "" {
@@ -94,6 +93,7 @@ func (a mcpToolAction) StatusMessage() string {
 	return "⏳ Running " + name + "..."
 }
 
+// Execute delegates execution to the registry callback bound at initialization time.
 func (a mcpToolAction) Execute(ctx context.Context, call domain.AssistantActionCall, history []domain.AssistantMessage) domain.AssistantMessage {
 	if a.execute == nil {
 		return domain.AssistantMessage{
@@ -105,6 +105,7 @@ func (a mcpToolAction) Execute(ctx context.Context, call domain.AssistantActionC
 	return a.execute(ctx, call, history)
 }
 
+// Connect builds an SDK client and opens a streamable-http MCP session.
 func (c streamableConnector) Connect(ctx context.Context) (mcpSession, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
@@ -152,6 +153,7 @@ func NewMCPRegistry(
 	}
 }
 
+// newMCPRegistryWithConnector allows injecting a fake connector in tests.
 func newMCPRegistryWithConnector(cfg Config, connector mcpConnector, semanticEncoder domain.SemanticEncoder, embeddingModel string) *MCPRegistry {
 	cfg = cfg.withDefaults()
 	return &MCPRegistry{
@@ -291,6 +293,7 @@ func (r *MCPRegistry) ListRelevant(ctx context.Context, userInput string) []doma
 	return relevant
 }
 
+// withTimeout applies request timeout defaults to MCP network calls.
 func (r *MCPRegistry) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	if r.cfg.RequestTimeout <= 0 {
 		return ctx, func() {}
@@ -298,6 +301,7 @@ func (r *MCPRegistry) withTimeout(ctx context.Context) (context.Context, context
 	return context.WithTimeout(ctx, r.cfg.RequestTimeout)
 }
 
+// connectSession opens one MCP client session through the configured connector.
 func (r *MCPRegistry) connectSession(ctx context.Context) (mcpSession, error) {
 	connectCtx, cancel := r.withTimeout(ctx)
 	defer cancel()
@@ -305,13 +309,14 @@ func (r *MCPRegistry) connectSession(ctx context.Context) (mcpSession, error) {
 	return r.connector.Connect(connectCtx)
 }
 
+// initializeActions loads tools once, applies YAML overrides, and precomputes embeddings.
 func (r *MCPRegistry) initializeActions(ctx context.Context) error {
 	session, err := r.connectSession(ctx)
 	if err != nil {
 		return err
 	}
 
-	overrideByToolName, err := loadToolDefinitionOverrides(r.cfg.ToolOverrides)
+	overrideByToolName, err := loadToolDefinitionOverrides()
 	if err != nil {
 		return fmt.Errorf("failed to load mcp tool definition overrides: %w", err)
 	}
@@ -355,6 +360,15 @@ func (r *MCPRegistry) initializeActions(ctx context.Context) error {
 	return nil
 }
 
+// Close terminates the MCP session and releases resources.
+func (r *MCPRegistry) Close() error {
+	if r.session != nil {
+		return r.session.Close()
+	}
+	return nil
+}
+
+// listAllTools paginates through MCP ListTools until no cursor is returned.
 func listAllTools(ctx context.Context, session mcpSession) ([]*mcp.Tool, error) {
 	tools := make([]*mcp.Tool, 0)
 	cursor := ""
@@ -377,6 +391,7 @@ func listAllTools(ctx context.Context, session mcpSession) ([]*mcp.Tool, error) 
 	}
 }
 
+// toolToActionDefinition converts an MCP tool schema into the domain action format.
 func toolToActionDefinition(tool *mcp.Tool) domain.AssistantActionDefinition {
 	if tool == nil {
 		return domain.AssistantActionDefinition{}
@@ -422,40 +437,15 @@ type assistantActionHintsConfig struct {
 	ArgRules  string `yaml:"arg_rules"`
 }
 
-func loadToolDefinitionOverrides(path string) (map[string]domain.AssistantActionDefinition, error) {
-	merged := map[string]domain.AssistantActionDefinition{}
-
+func loadToolDefinitionOverrides() (map[string]domain.AssistantActionDefinition, error) {
 	embeddedBytes, err := toolOverridesFS.ReadFile("tool_overrides.yaml")
 	if err != nil {
 		return nil, err
 	}
-	embeddedOverrides, err := parseToolOverrideDefinitions(embeddedBytes)
-	if err != nil {
-		return nil, err
-	}
-	for name, def := range embeddedOverrides {
-		merged[name] = def
-	}
-
-	path = strings.TrimSpace(path)
-	if path == "" || path == "-" {
-		return merged, nil
-	}
-
-	externalBytes, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	externalOverrides, err := parseToolOverrideDefinitions(externalBytes)
-	if err != nil {
-		return nil, err
-	}
-	for name, def := range externalOverrides {
-		merged[name] = def
-	}
-	return merged, nil
+	return parseToolOverrideDefinitions(embeddedBytes)
 }
 
+// parseToolOverrideDefinitions parses the embedded YAML override file into action definitions.
 func parseToolOverrideDefinitions(content []byte) (map[string]domain.AssistantActionDefinition, error) {
 	var cfg toolOverrideConfig
 	if err := yaml.Unmarshal(content, &cfg); err != nil {
@@ -496,6 +486,7 @@ func parseToolOverrideDefinitions(content []byte) (map[string]domain.AssistantAc
 	return byName, nil
 }
 
+// mergeAssistantActionDefinition overlays configured overrides on top of discovered tool metadata.
 func mergeAssistantActionDefinition(base, override domain.AssistantActionDefinition) domain.AssistantActionDefinition {
 	merged := base
 
@@ -520,6 +511,7 @@ func mergeAssistantActionDefinition(base, override domain.AssistantActionDefinit
 	return merged
 }
 
+// schemaToInput extracts a simplified action input definition from JSON Schema-like MCP input.
 func schemaToInput(schema any) domain.AssistantActionInput {
 	input := domain.AssistantActionInput{
 		Type:   "object",
@@ -553,6 +545,7 @@ func schemaToInput(schema any) domain.AssistantActionInput {
 	return input
 }
 
+// schemaFieldType resolves field type from direct or composed schema nodes (anyOf/oneOf/allOf).
 func schemaFieldType(fieldSchema map[string]any) string {
 	if len(fieldSchema) == 0 {
 		return ""
@@ -588,6 +581,7 @@ func schemaFieldType(fieldSchema map[string]any) string {
 	return strings.Join(typeCandidates, "|")
 }
 
+// parseTypeValue normalizes type declarations that may be a single value or an array of values.
 func parseTypeValue(raw any) string {
 	switch value := raw.(type) {
 	case string:
@@ -612,6 +606,7 @@ func parseTypeValue(raw any) string {
 	}
 }
 
+// requiredSet converts a JSON schema required array to a lookup set.
 func requiredSet(raw any) map[string]bool {
 	set := map[string]bool{}
 	values, ok := raw.([]any)
@@ -628,6 +623,7 @@ func requiredSet(raw any) map[string]bool {
 	return set
 }
 
+// parseActionCallArguments validates assistant tool input and guarantees a JSON object payload.
 func parseActionCallArguments(input string) (map[string]any, error) {
 	if strings.TrimSpace(input) == "" {
 		return map[string]any{}, nil
@@ -646,6 +642,7 @@ func parseActionCallArguments(input string) (map[string]any, error) {
 	return args, nil
 }
 
+// renderCallToolResult flattens MCP call output into plain text for tool messages.
 func renderCallToolResult(result *mcp.CallToolResult) string {
 	if result == nil {
 		return ""
@@ -672,6 +669,7 @@ func renderCallToolResult(result *mcp.CallToolResult) string {
 	return ""
 }
 
+// renderContent converts one MCP content variant to a user-facing string representation.
 func renderContent(content mcp.Content) string {
 	switch item := content.(type) {
 	case *mcp.TextContent:
@@ -702,6 +700,7 @@ func renderContent(content mcp.Content) string {
 	}
 }
 
+// actionErrorMessage formats a structured tool error payload consumed by the assistant loop.
 func actionErrorMessage(callID, code, details string) domain.AssistantMessage {
 	return domain.AssistantMessage{
 		Role:         domain.ChatRole_Tool,
@@ -710,6 +709,7 @@ func actionErrorMessage(callID, code, details string) domain.AssistantMessage {
 	}
 }
 
+// copySortedEmbeddings returns a stable name-ordered snapshot of action embeddings.
 func copySortedEmbeddings(actionsByName map[string]actionregistry.ActionEmbedding) []actionregistry.ActionEmbedding {
 	actions := make([]actionregistry.ActionEmbedding, 0, len(actionsByName))
 	for _, action := range actionsByName {
@@ -721,6 +721,7 @@ func copySortedEmbeddings(actionsByName map[string]actionregistry.ActionEmbeddin
 	return actions
 }
 
+// definitionsFromEmbeddings strips embedding vectors and returns only action definitions.
 func definitionsFromEmbeddings(actions []actionregistry.ActionEmbedding) []domain.AssistantActionDefinition {
 	definitions := make([]domain.AssistantActionDefinition, 0, len(actions))
 	for _, action := range actions {
@@ -729,6 +730,7 @@ func definitionsFromEmbeddings(actions []actionregistry.ActionEmbedding) []domai
 	return definitions
 }
 
+// withAPIKey injects one header into every request by wrapping the provided HTTP transport.
 func withAPIKey(httpClient *http.Client, headerName, apiKey string) *http.Client {
 	if strings.TrimSpace(apiKey) == "" {
 		if httpClient != nil {
@@ -761,12 +763,14 @@ type authRoundTripper struct {
 	headerVal  string
 }
 
+// RoundTrip clones the request and injects the configured auth header.
 func (t authRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	cloned := req.Clone(req.Context())
 	cloned.Header.Set(t.headerName, t.headerVal)
 	return t.base.RoundTrip(cloned)
 }
 
+// anyToMap best-effort normalizes unknown schema values to map[string]any.
 func anyToMap(v any) (map[string]any, bool) {
 	switch m := v.(type) {
 	case map[string]any:
@@ -786,6 +790,7 @@ func anyToMap(v any) (map[string]any, bool) {
 	}
 }
 
+// asString stringifies unknown values for permissive schema parsing.
 func asString(v any) string {
 	switch value := v.(type) {
 	case nil:
@@ -799,15 +804,16 @@ func asString(v any) string {
 
 // InitMCPActionRegistry registers the MCP-backed assistant action registry.
 type InitMCPActionRegistry struct {
+	Logger                *log.Logger            `resolve:""`
 	HttpClient            *http.Client           `resolve:""`
 	SemanticEncoder       domain.SemanticEncoder `resolve:""`
 	EmbeddingModel        string                 `config:"LLM_EMBEDDING_MODEL"`
 	Endpoint              string                 `config:"MCP_GATEWAY_ENDPOINT"`
 	APIKey                string                 `config:"MCP_GATEWAY_API_KEY" default:"-"`
 	APIKeyHeader          string                 `config:"MCP_GATEWAY_API_KEY_HEADER" default:"-"`
-	ToolOverrides         string                 `config:"MCP_GATEWAY_TOOL_OVERRIDES" default:"-"`
 	RequestTimeout        time.Duration          `config:"MCP_GATEWAY_REQUEST_TIMEOUT" default:"20s"`
 	TopActionsPerRegistry int                    `config:"MCP_GATEWAY_TOP_ACTIONS_PER_REGISTRY" default:"2"`
+	registry              *MCPRegistry
 }
 
 // Initialize registers this implementation as domain.AssistantActionRegistry.
@@ -820,7 +826,6 @@ func (i InitMCPActionRegistry) Initialize(ctx context.Context) (context.Context,
 			Endpoint:       i.Endpoint,
 			APIKey:         i.APIKey,
 			APIKeyHeader:   i.APIKeyHeader,
-			ToolOverrides:  i.ToolOverrides,
 			RequestTimeout: i.RequestTimeout,
 		},
 		i.HttpClient,
@@ -832,4 +837,14 @@ func (i InitMCPActionRegistry) Initialize(ctx context.Context) (context.Context,
 	}
 	depend.RegisterNamed[actionregistry.EmbeddingActionRegistry](registry, "mcp-gateway")
 	return ctx, nil
+}
+
+// Close terminates the MCP session and logs any errors encountered during shutdown.
+func (i InitMCPActionRegistry) Close() {
+	if i.registry == nil {
+		return
+	}
+	if err := i.registry.Close(); err != nil {
+		i.Logger.Printf("InitMCPActionRegistry: failed to close MCP registry: %v", err)
+	}
 }

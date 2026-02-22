@@ -436,52 +436,6 @@ func (_c *MockAssistantActionRegistry_Execute_Call) RunAndReturn(run func(contex
 	return _c
 }
 
-// List provides a mock function for the type MockAssistantActionRegistry
-func (_mock *MockAssistantActionRegistry) List() []AssistantActionDefinition {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for List")
-	}
-
-	var r0 []AssistantActionDefinition
-	if returnFunc, ok := ret.Get(0).(func() []AssistantActionDefinition); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]AssistantActionDefinition)
-		}
-	}
-	return r0
-}
-
-// MockAssistantActionRegistry_List_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'List'
-type MockAssistantActionRegistry_List_Call struct {
-	*mock.Call
-}
-
-// List is a helper method to define mock.On call
-func (_e *MockAssistantActionRegistry_Expecter) List() *MockAssistantActionRegistry_List_Call {
-	return &MockAssistantActionRegistry_List_Call{Call: _e.mock.On("List")}
-}
-
-func (_c *MockAssistantActionRegistry_List_Call) Run(run func()) *MockAssistantActionRegistry_List_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockAssistantActionRegistry_List_Call) Return(assistantActionDefinitions []AssistantActionDefinition) *MockAssistantActionRegistry_List_Call {
-	_c.Call.Return(assistantActionDefinitions)
-	return _c
-}
-
-func (_c *MockAssistantActionRegistry_List_Call) RunAndReturn(run func() []AssistantActionDefinition) *MockAssistantActionRegistry_List_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ListRelevant provides a mock function for the type MockAssistantActionRegistry
 func (_mock *MockAssistantActionRegistry) ListRelevant(ctx context.Context, userInput string) []AssistantActionDefinition {
 	ret := _mock.Called(ctx, userInput)

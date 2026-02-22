@@ -440,8 +440,8 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 	})
 }
 
-func TestTodoApp_McpGatewayIntegration(t *testing.T) {
-	t.Run("mcp-gateway-fetch-web-page", func(t *testing.T) {
+func TestTodoApp_MCPIntegration(t *testing.T) {
+	t.Run("mcp-fetch-web-page", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			Model:   "qwen3:14B-Q6_K",
 			Message: "Fetch the content of URL https://duckduckgo.com/ and summarize it.",

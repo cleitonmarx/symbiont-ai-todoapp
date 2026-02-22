@@ -5,7 +5,10 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 ## Features
 
 - 📝 **Todo Management**: Create, update, delete, filter, sort, and paginate todos
-- 🤖 **LLM Chat & Tools**: Streamed AI chat (SSE) with tool-calling for todo operations
+- 🤖 **LLM Chat & Tools**: Streamed AI chat (SSE) with tool-calling for local and external tools
+- 📦 **Batch Todo Actions**: Assistant-first bulk operations (`create_todos`, `update_todos`, `update_todos_due_date`, `delete_todos`)
+- 🔗 **MCP Gateway Integration**: MCP-based external tools via `docker/mcp-gateway` (default setup includes DuckDuckGo tools)
+- 🎛️ **Tool Definition Overrides**: MCP tool descriptions/inputs/hints can be overridden with YAML for tighter model behavior control
 - 💬 **Conversation Management**: Conversation history with rename/delete and auto/LLM title generation
 - 📌 **Board Summary**: AI-generated board summary from todo domain events
 - 🧠 **Chat Summary**: Conversation-aware AI summaries from chat-message events
@@ -28,6 +31,10 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - **PostgreSQL** (`internal/adapters/outbound/postgres`): Primary data store with migrations and vector extension support
 - **Vault Provider** (`internal/adapters/outbound/config/vault_provider.go`): Loads secret-backed config values (`DB_USER`, `DB_PASS`)
 - **LLM Client** (`internal/adapters/outbound/modelrunner`): OpenAI-compatible client for chat, summarization, embeddings, and model listing
+- **Assistant Action Registries** (`internal/adapters/outbound/actionregistry`):
+  - `local`: Built-in app actions (UI filters, fetch todos, and batch todo mutations)
+  - `mcp`: MCP gateway-backed tool registry using `github.com/modelcontextprotocol/go-sdk/mcp`
+  - `composite`: Aggregates local + MCP actions and ranks relevance with embeddings
 - **Telemetry** (`internal/telemetry`): Traces and metrics instrumentation for HTTP, DB, Pub/Sub, and use cases
 
 ### Generated Introspection Graph
@@ -126,6 +133,7 @@ LLM_SUMMARY_MODEL=qwen3:14B-Q6_K \
 LLM_CHAT_SUMMARY_MODEL=qwen3:14B-Q6_K \
 LLM_CHAT_TITLE_MODEL=qwen3:14B-Q6_K \
 LLM_EMBEDDING_MODEL=embeddinggemma:300M-Q8_0 \
+MCP_GATEWAY_ENDPOINT=http://localhost:8811 \
 go run ./cmd/todoapp
 ```
 
@@ -166,6 +174,11 @@ Required or commonly tuned variables:
 - `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_MOUNT_PATH`, `VAULT_SECRET_PATH`
 - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`
 - `LLM_MODEL_HOST`, `LLM_SUMMARY_MODEL`, `LLM_CHAT_SUMMARY_MODEL`, `LLM_CHAT_TITLE_MODEL`, `LLM_EMBEDDING_MODEL`
+- `MCP_GATEWAY_ENDPOINT` (e.g. `http://mcp-gateway:8811`)
+- `MCP_GATEWAY_API_KEY` (default: `-`)
+- `MCP_GATEWAY_API_KEY_HEADER` (default: `Authorization`)
+- `MCP_GATEWAY_REQUEST_TIMEOUT` (default: `20s`)
+- `MCP_GATEWAY_TOP_ACTIONS_PER_REGISTRY` (default: `2`)
 - `LLM_MAX_ACTION_CYCLES` (default: `50`)
 - `FETCH_OUTBOX_INTERVAL` (default: `500ms`)
 - `SUMMARY_BATCH_INTERVAL` (default: `3s`), `SUMMARY_BATCH_SIZE` (default: `20`)

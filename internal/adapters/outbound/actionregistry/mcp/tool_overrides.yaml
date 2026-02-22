@@ -1,0 +1,36 @@
+tools:
+  - name: search
+    description: Search the web with DuckDuckGo and return concise result snippets with source links.
+    input:
+      type: object
+      fields:
+        query:
+          type: string
+          description: Search query in natural language.
+          required: true
+        max_results:
+          type: integer
+          description: Maximum number of search results to return. Use a small number (e.g. 2-3) for focused queries, or a larger number (e.g. 10-20) for broad research.
+          required: false
+    hints:
+      use_when: Use to gather external information or references before deciding or answering.
+      avoid_when: Do not use for todo CRUD operations or when the user request is fully internal to the app.
+      arg_rules: Always send a specific query. Keep max_results small unless the user asks for broad research.
+
+  - name: fetch_content
+    description: Fetch and extract readable text content a web search result URL.
+    input:
+      type: object
+      fields:
+        url:
+          type: string
+          description: Fully qualified http or https URL to fetch.
+          required: true
+        max_length:
+          type: integer
+          description: Optional maximum number of characters to return from extracted content.
+          required: false
+    hints:
+      use_when: Use after search when you need full page details from one selected URL.
+      avoid_when: Do not use without a concrete URL or for actions that modify tasks.
+      arg_rules: Provide a valid public URL. Prefer fetch after search to avoid blind URL guessing.

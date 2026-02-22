@@ -1,4 +1,4 @@
-//go:build integration
+//--go:build integration
 
 package integration
 
@@ -61,6 +61,7 @@ func TestMain(m *testing.M) {
 				"LLM_CHAT_TITLE_MODEL":              "qwen3:14B-Q6_K",
 				"LLM_SUMMARY_MODEL":                 "qwen3:14B-Q6_K",
 				"LLM_EMBEDDING_MODEL":               "embeddinggemma:300M-Q8_0",
+				"MCP_GATEWAY_ENDPOINT":              "http://localhost:8811",
 			},
 		},
 		&InitDockerCompose{},
@@ -270,7 +271,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		deltaText, actionStartedText, actionCompletedCount, cID := readChatEventsText(t, chatResp.Body)
 		conversationID = cID
 
-		require.Contains(t, actionStartedText, "📝 Creating your todo...")
+		require.Contains(t, actionStartedText, "📝 Creating your todos...")
 		require.GreaterOrEqual(t, actionCompletedCount, 1)
 		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
 		fmt.Println("Chat response:", deltaText)
@@ -325,7 +326,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			ConversationId: &conversationID,
 			Model:          modelName,
-			Message:        "Mark it as DONE, and the current status: (Status: status) title duedate.",
+			Message:        "Mark Integration Test Todo as DONE.",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
@@ -333,7 +334,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 
 		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsText(t, chatResp.Body)
 
-		require.Contains(t, actionStartedText, "✏️ Updating your todo...")
+		require.Contains(t, actionStartedText, "✏️ Updating your todos...")
 		require.GreaterOrEqual(t, actionCompletedCount, 1)
 		require.Contains(t, deltaText, "Integration Test Todo", "expected chat response to contain created todo title")
 		require.Contains(t, deltaText, "DONE", "expected chat response to contain created todo status")
@@ -352,7 +353,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
 		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsText(t, chatResp.Body)
-		require.Contains(t, actionStartedText, "🗑️ Deleting the todo...")
+		require.Contains(t, actionStartedText, "🗑️ Deleting todos...")
 		require.GreaterOrEqual(t, actionCompletedCount, 1)
 		fmt.Println("Chat response:", deltaText)
 	})
@@ -436,6 +437,25 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 		require.NoError(t, err, "failed to call ListChatMessages endpoint after conversation deletion")
 		require.NotNil(t, messagesResp.JSON200, "expected non-nil response for ListChatMessages after conversation deletion")
 		require.Len(t, messagesResp.JSON200.Messages, 0, "expected 0 messages in the conversation after deletion")
+	})
+}
+
+func TestTodoApp_McpGatewayIntegration(t *testing.T) {
+	t.Run("mcp-gateway-fetch-web-page", func(t *testing.T) {
+		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
+			Model:   "qwen3:14B-Q6_K",
+			Message: "Fetch the content of URL https://duckduckgo.com/ and summarize it.",
+		})
+		require.NoError(t, err, "failed to call StreamChat endpoint")
+		defer chatResp.Body.Close() //nolint:errcheck
+		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
+
+		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsText(t, chatResp.Body)
+
+		require.Contains(t, actionStartedText, "⏳ Running fetch_content...")
+		require.GreaterOrEqual(t, actionCompletedCount, 1)
+		require.Contains(t, deltaText, "DuckDuckGo website", "expected chat response to contain content fetched from the web page")
+		fmt.Println("Chat response:", deltaText)
 	})
 }
 

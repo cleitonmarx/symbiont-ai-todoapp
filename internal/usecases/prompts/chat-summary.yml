@@ -19,7 +19,7 @@
 
     Rules:
     - Never invent IDs. Keep only IDs explicitly present in inputs.
-    - Keep at most 6 tasks when the user is planning a project timeline; otherwise keep at most 3.
+    - Keep at most 8 tasks when the user is planning a project timeline; otherwise keep at most 4.
     - Omit chatter, duplicated text, and reasoning.
     - If nothing meaningful changed, return a compressed version of existing memory.
     - Never output JSON, Markdown, code blocks, quotes, or nested structures.
@@ -32,16 +32,23 @@
     - Use concrete nouns and constraints from the conversation.
     - Preserve unresolved correction requests from the user (for example: "that was not what I asked", "update all matching tasks", "create missing tasks").
     - Keep unresolved requests in open_loops until explicitly resolved.
-    - Prioritize semantic memory over task list verbosity.
+    - Preserve critical details from the latest turns, especially:
+      - dates, date ranges, and deadlines
+      - quantities and scope words (all, every, only, first N)
+      - prefixes/naming constraints and formatting requests
+      - explicit corrections and negations (don't, not this, wrong, revert)
+    - If you must compress, never drop constraints. Drop low-value wording first.
+    - Prefer constraint retention and unresolved intent over verbose task lists.
+    - Latest valid user instruction takes precedence over older memory unless the user explicitly reverts.
 
     Return exactly 8 lines (single line each):
-    current_intent: <goal + desired outcome + timeframe, max 50 words>
-    active_view: <project/module + active filters/window, max 50 words, or none>
-    user_nuances: <preferences/constraints/style, max 50 words, or none>
-    tasks: <t1; t2; ...; t6 or none>, where each task is "<title>|<O/D>|<due>" and add "#<id>|" only if required next
-    last_action: <tool + meaningful result, max 50 words, or none>. Example: `create_task` -> Success -> Task ID UUID created
+    current_intent: <goal + desired outcome + timeframe + critical constraints from latest turns, max 70 words>
+    active_view: <project/module + active filters/window, max 70 words, or none>
+    user_nuances: <preferences/constraints/style + must-keep formatting rules, max 70 words, or none>
+    tasks: <t1; t2; ...; t8 or none>, where each task is "<title>|<O/D>|<due>" and add "#<id>|" only if required next
+    last_action: <tool + meaningful result + failure reason if any, max 70 words, or none>. Example: `create_task` -> Success -> Task ID UUID created
     recent_action_calls: <up to 5 tool names in chronological order separated by '; ', or none>
-    open_loops: <unresolved corrections/follow-ups to carry to next turn, or none>
+    open_loops: <unresolved corrections/follow-ups to carry to next turn, including any missing constraints or partial completion gaps, or none>
     output_format: list, summary with counters, or concise text.
 
     existing_memory:

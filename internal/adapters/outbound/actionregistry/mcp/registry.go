@@ -835,7 +835,7 @@ func (i InitMCPActionRegistry) Initialize(ctx context.Context) (context.Context,
 	if err := registry.initializeActions(ctx); err != nil {
 		return ctx, fmt.Errorf("failed to initialize mcp actions: %w", err)
 	}
-	depend.RegisterNamed[actionregistry.EmbeddingActionRegistry](registry, "mcp-gateway")
+	depend.RegisterNamed[actionregistry.EmbeddingActionRegistry](registry, "mcp")
 	return ctx, nil
 }
 

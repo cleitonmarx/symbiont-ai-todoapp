@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
@@ -47,6 +48,12 @@ func (a BulkTodoDeleterAction) Definition() domain.AssistantActionDefinition {
 					Required:    true,
 				},
 			},
+		},
+		Approval: domain.AssistantActionApproval{
+			Required:    true,
+			Title:       "Confirm bulk deletion",
+			Description: "Deleting todos is irreversible. Please confirm.",
+			Timeout:     2 * time.Minute,
 		},
 	}
 }

@@ -174,7 +174,6 @@ func (gct GenerateConversationTitleImpl) queueTitleUpdate(ctx context.Context, c
 		select {
 		case gct.completedTitleCh <- conversation:
 		case <-ctx.Done():
-		default:
 		}
 	}
 }

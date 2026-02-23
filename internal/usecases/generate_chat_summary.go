@@ -209,7 +209,6 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 		select {
 		case gcs.completedSummaryCh <- newSummary:
 		case <-ctx.Done():
-		default:
 		}
 	}
 

@@ -73,7 +73,6 @@ func (gs GenerateBoardSummaryImpl) Execute(ctx context.Context) error {
 		select {
 		case gs.completedSummaryCh <- summary:
 		case <-ctx.Done():
-		default:
 		}
 	}
 

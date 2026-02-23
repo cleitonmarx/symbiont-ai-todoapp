@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -64,6 +65,7 @@ type StreamChatImpl struct {
 	timeProvider            domain.CurrentTimeProvider
 	assistant               domain.Assistant
 	actionRegistry          domain.AssistantActionRegistry
+	approvalDispatcher      domain.AssistantActionApprovalDispatcher
 	embeddingModel          string
 	maxActionCycles         int
 }
@@ -76,6 +78,7 @@ func NewStreamChatImpl(
 	timeProvider domain.CurrentTimeProvider,
 	assistant domain.Assistant,
 	actionRegistry domain.AssistantActionRegistry,
+	approvalDispatcher domain.AssistantActionApprovalDispatcher,
 	uow domain.UnitOfWork,
 	embeddingModel string,
 	maxActionCycles int,
@@ -88,6 +91,7 @@ func NewStreamChatImpl(
 		timeProvider:            timeProvider,
 		assistant:               assistant,
 		actionRegistry:          actionRegistry,
+		approvalDispatcher:      approvalDispatcher,
 		embeddingModel:          embeddingModel,
 		maxActionCycles:         maxActionCycles,
 	}
@@ -350,6 +354,72 @@ func (sc StreamChatImpl) handleActionCallEvent(
 		return false, err
 	}
 
+	approvalDecision, blockedByApproval, approvalErr := sc.requestActionApprovalIfRequired(
+		ctx,
+		actionCall,
+		state,
+		onEvent,
+	)
+	if approvalErr != nil {
+		return false, approvalErr
+	}
+
+	if blockedByApproval {
+		reason := "action execution rejected"
+		if approvalDecision.Reason != nil && strings.TrimSpace(*approvalDecision.Reason) != "" {
+			reason = strings.TrimSpace(*approvalDecision.Reason)
+		}
+
+		actionMessage := domain.AssistantMessage{
+			Role:         domain.ChatRole_Tool,
+			ActionCallID: common.Ptr(actionCall.ID),
+			Content:      reason,
+		}
+		now := sc.timeProvider.Now()
+		actionChatMsg := domain.ChatMessage{
+			ID:                     uuid.New(),
+			ConversationID:         state.conversation.ID,
+			TurnID:                 state.turnID,
+			TurnSequence:           state.nextTurnSequence(),
+			ChatRole:               domain.ChatRole_Tool,
+			ActionCallID:           &actionCall.ID,
+			Content:                reason,
+			Model:                  model,
+			MessageState:           domain.ChatMessageState_Failed,
+			ErrorMessage:           &reason,
+			ApprovalStatus:         &approvalDecision.Status,
+			ApprovalDecisionReason: approvalDecision.Reason,
+			ApprovalDecidedAt:      common.Ptr(approvalDecision.DecidedAt),
+			CreatedAt:              now,
+			UpdatedAt:              now,
+		}
+
+		if err := sc.persistChatMessage(ctx, actionChatMsg, state.conversation); err != nil {
+			return false, err
+		}
+
+		actionCompleted := domain.AssistantActionCompleted{
+			ID:            actionCall.ID,
+			Name:          actionCall.Name,
+			Success:       false,
+			ShouldRefetch: false,
+			Error:         &reason,
+		}
+		if err := onEvent(domain.AssistantEventType_ActionCompleted, actionCompleted); err != nil {
+			return false, err
+		}
+
+		req.Messages = append(req.Messages,
+			domain.AssistantMessage{
+				Role:        domain.ChatRole_Assistant,
+				ActionCalls: []domain.AssistantActionCall{actionCall},
+			},
+			actionMessage,
+		)
+
+		return true, nil
+	}
+
 	actionCall.Text = sc.actionRegistry.StatusMessage(actionCall.Name)
 	if err := onEvent(domain.AssistantEventType_ActionStarted, actionCall); err != nil {
 		return false, err
@@ -374,6 +444,11 @@ func (sc StreamChatImpl) handleActionCallEvent(
 	if !actionSucceeded {
 		actionChatMsg.MessageState = domain.ChatMessageState_Failed
 		actionChatMsg.ErrorMessage = &actionMessage.Content
+	}
+	if approvalDecision.Status != "" {
+		actionChatMsg.ApprovalStatus = &approvalDecision.Status
+		actionChatMsg.ApprovalDecisionReason = approvalDecision.Reason
+		actionChatMsg.ApprovalDecidedAt = common.Ptr(approvalDecision.DecidedAt)
 	}
 
 	if err := sc.persistChatMessage(ctx, actionChatMsg, state.conversation); err != nil {
@@ -426,6 +501,137 @@ func (sc StreamChatImpl) handleDoneEvent(data any, state *streamChatExecutionSta
 	state.tokenUsage.CompletionTokens += done.Usage.CompletionTokens
 	state.tokenUsage.PromptTokens += done.Usage.PromptTokens
 	state.tokenUsage.TotalTokens += done.Usage.TotalTokens
+}
+
+// requestActionApprovalIfRequired checks if the action requires approval and, if so, emits the corresponding events and waits for the decision.
+func (sc StreamChatImpl) requestActionApprovalIfRequired(
+	ctx context.Context,
+	actionCall domain.AssistantActionCall,
+	state *streamChatExecutionState,
+	onEvent domain.AssistantEventCallback,
+) (domain.AssistantActionApprovalDecision, bool, error) {
+	if sc.approvalDispatcher == nil {
+		return domain.AssistantActionApprovalDecision{}, false, nil
+	}
+
+	definition, found := sc.actionRegistry.GetDefinition(actionCall.Name)
+	if !found || !definition.RequiresApproval() {
+		return domain.AssistantActionApprovalDecision{}, false, nil
+	}
+
+	approvalEvent := domain.AssistantActionApprovalRequired{
+		ConversationID: state.conversation.ID,
+		TurnID:         state.turnID,
+		ActionCallID:   actionCall.ID,
+		Name:           actionCall.Name,
+		Input:          actionCall.Input,
+		Title:          approvalTitle(definition),
+		Description:    approvalDescription(definition),
+		Timeout:        definition.Approval.Timeout,
+	}
+	if err := onEvent(domain.AssistantEventType_ActionApprovalRequired, approvalEvent); err != nil {
+		return domain.AssistantActionApprovalDecision{}, false, err
+	}
+
+	decision := sc.awaitActionApproval(
+		ctx,
+		state.conversation.ID,
+		state.turnID,
+		actionCall,
+		definition.Approval.Timeout,
+	)
+
+	resolved := domain.AssistantActionApprovalResolved{
+		ConversationID: state.conversation.ID,
+		TurnID:         state.turnID,
+		ActionCallID:   actionCall.ID,
+		Name:           actionCall.Name,
+		Status:         decision.Status,
+		Reason:         decision.Reason,
+	}
+	if err := onEvent(domain.AssistantEventType_ActionApprovalResolved, resolved); err != nil {
+		return domain.AssistantActionApprovalDecision{}, false, err
+	}
+
+	return decision, decision.Status != domain.ChatMessageApprovalStatus_Approved, nil
+}
+
+// awaitActionApproval registers a waiter for the given action call and blocks until a decision is received or context is canceled.
+func (sc StreamChatImpl) awaitActionApproval(
+	ctx context.Context,
+	conversationID uuid.UUID,
+	turnID uuid.UUID,
+	actionCall domain.AssistantActionCall,
+	timeout time.Duration,
+) domain.AssistantActionApprovalDecision {
+	key := domain.AssistantActionApprovalKey{
+		ConversationID: conversationID,
+		TurnID:         turnID,
+		ActionCallID:   actionCall.ID,
+	}
+
+	now := sc.timeProvider.Now()
+	if sc.approvalDispatcher == nil {
+		reason := "approval dispatcher is not configured"
+		return domain.AssistantActionApprovalDecision{
+			Key:        key,
+			ActionName: actionCall.Name,
+			Status:     domain.ChatMessageApprovalStatus_AutoRejected,
+			Reason:     &reason,
+			DecidedAt:  now,
+		}
+	}
+
+	waitCtx := ctx
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		waitCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	decision, err := sc.approvalDispatcher.Wait(waitCtx, key)
+	if err == nil {
+		if decision.DecidedAt.IsZero() {
+			decision.DecidedAt = sc.timeProvider.Now()
+		}
+		if strings.TrimSpace(decision.ActionName) == "" {
+			decision.ActionName = actionCall.Name
+		}
+		return decision
+	}
+
+	status := domain.ChatMessageApprovalStatus_AutoRejected
+	reason := "approval wait canceled"
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		status = domain.ChatMessageApprovalStatus_Expired
+		reason = "approval request expired"
+	case errors.Is(err, context.Canceled):
+		status = domain.ChatMessageApprovalStatus_AutoRejected
+		reason = "approval request canceled"
+	}
+
+	return domain.AssistantActionApprovalDecision{
+		Key:        key,
+		ActionName: actionCall.Name,
+		Status:     status,
+		Reason:     &reason,
+		DecidedAt:  sc.timeProvider.Now(),
+	}
+}
+
+func approvalTitle(action domain.AssistantActionDefinition) string {
+	if title := strings.TrimSpace(action.Approval.Title); title != "" {
+		return title
+	}
+	return "Approval required"
+}
+
+func approvalDescription(action domain.AssistantActionDefinition) string {
+	if description := strings.TrimSpace(action.Approval.Description); description != "" {
+		return description
+	}
+	return fmt.Sprintf("Approve action '%s' execution.", action.Name)
 }
 
 // persistUserMessageIfNeeded ensures the user message is persisted exactly once when no meta event was received.
@@ -800,14 +1006,15 @@ func truncateToFirstChars(input string, maxChars int) string {
 
 // InitStreamChat is the initializer for the StreamChat use case
 type InitStreamChat struct {
-	ChatMessageRepo         domain.ChatMessageRepository         `resolve:""`
-	ConversationSummaryRepo domain.ConversationSummaryRepository `resolve:""`
-	ConversationRepo        domain.ConversationRepository        `resolve:""`
-	Uow                     domain.UnitOfWork                    `resolve:""`
-	TimeProvider            domain.CurrentTimeProvider           `resolve:""`
-	AssistantActionRegistry domain.AssistantActionRegistry       `resolve:""`
-	Assistant               domain.Assistant                     `resolve:""`
-	EmbeddingModel          string                               `config:"LLM_EMBEDDING_MODEL"`
+	ChatMessageRepo         domain.ChatMessageRepository             `resolve:""`
+	ConversationSummaryRepo domain.ConversationSummaryRepository     `resolve:""`
+	ConversationRepo        domain.ConversationRepository            `resolve:""`
+	Uow                     domain.UnitOfWork                        `resolve:""`
+	TimeProvider            domain.CurrentTimeProvider               `resolve:""`
+	AssistantActionRegistry domain.AssistantActionRegistry           `resolve:""`
+	ApprovalDispatcher      domain.AssistantActionApprovalDispatcher `resolve:""`
+	Assistant               domain.Assistant                         `resolve:""`
+	EmbeddingModel          string                                   `config:"LLM_EMBEDDING_MODEL"`
 	// Maximum number of action cycles to prevent infinite loops
 	// It restricts how many times the Assistant can invoke actions in a single chat session
 	MaxActionCycles int `config:"LLM_MAX_ACTION_CYCLES" default:"50"`
@@ -822,6 +1029,7 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 		i.TimeProvider,
 		i.Assistant,
 		i.AssistantActionRegistry,
+		i.ApprovalDispatcher,
 		i.Uow,
 		i.EmbeddingModel,
 		i.MaxActionCycles,

@@ -69,6 +69,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 		timeProvider,
 		assistant,
 		actionRegistry,
+		nil,
 		uow,
 		"test-embedding-model",
 		7,
@@ -145,6 +146,9 @@ type persistCallExpectation struct {
 	ID               *uuid.UUID
 	MessageState     domain.ChatMessageState
 	ErrorMessage     *string
+	ApprovalStatus   *domain.ChatMessageApprovalStatus
+	ApprovalDecisionReason *string
+	ApprovalDecidedAt      *time.Time
 	PromptTokens     *int
 	CompletionTokens *int
 	TotalTokens      *int
@@ -251,6 +255,27 @@ func expectPersistSequence(
 				}
 			} else {
 				assert.Nil(t, msg.ErrorMessage)
+			}
+			if exp.ApprovalStatus != nil {
+				if assert.NotNil(t, msg.ApprovalStatus) {
+					assert.Equal(t, *exp.ApprovalStatus, *msg.ApprovalStatus)
+				}
+			} else {
+				assert.Nil(t, msg.ApprovalStatus)
+			}
+			if exp.ApprovalDecisionReason != nil {
+				if assert.NotNil(t, msg.ApprovalDecisionReason) {
+					assert.Equal(t, *exp.ApprovalDecisionReason, *msg.ApprovalDecisionReason)
+				}
+			} else {
+				assert.Nil(t, msg.ApprovalDecisionReason)
+			}
+			if exp.ApprovalDecidedAt != nil {
+				if assert.NotNil(t, msg.ApprovalDecidedAt) {
+					assert.Equal(t, *exp.ApprovalDecidedAt, *msg.ApprovalDecidedAt)
+				}
+			} else {
+				assert.Nil(t, msg.ApprovalDecidedAt)
 			}
 
 			if exp.CreateErr == nil {

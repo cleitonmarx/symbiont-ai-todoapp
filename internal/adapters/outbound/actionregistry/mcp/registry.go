@@ -423,10 +423,12 @@ type toolOverrideConfig struct {
 }
 
 type assistantActionDefinitionOverride struct {
-	Name        string                     `yaml:"name"`
-	Description string                     `yaml:"description"`
-	Input       assistantActionInputConfig `yaml:"input"`
-	Hints       assistantActionHintsConfig `yaml:"hints"`
+	Name        string                        `yaml:"name"`
+	Description string                        `yaml:"description"`
+	Input       assistantActionInputConfig    `yaml:"input"`
+	Hints       assistantActionHintsConfig    `yaml:"hints"`
+	Approval    assistantActionApprovalConfig `yaml:"approval"`
+	Approvals   assistantActionApprovalConfig `yaml:"approvals"`
 }
 
 type assistantActionInputConfig struct {
@@ -444,6 +446,49 @@ type assistantActionHintsConfig struct {
 	UseWhen   string `yaml:"use_when"`
 	AvoidWhen string `yaml:"avoid_when"`
 	ArgRules  string `yaml:"arg_rules"`
+}
+
+type assistantActionApprovalConfig struct {
+	Required    bool   `yaml:"required"`
+	Title       string `yaml:"title"`
+	Description string `yaml:"description"`
+	Timeout     string `yaml:"timeout"`
+}
+
+// toDomain converts one approval override block into a domain approval policy.
+func (c assistantActionApprovalConfig) toDomain() (domain.AssistantActionApproval, error) {
+	timeout, err := parseApprovalTimeout(c.Timeout)
+	if err != nil {
+		return domain.AssistantActionApproval{}, err
+	}
+
+	return domain.AssistantActionApproval{
+		Required:    c.Required,
+		Title:       strings.TrimSpace(c.Title),
+		Description: strings.TrimSpace(c.Description),
+		Timeout:     timeout,
+	}, nil
+}
+
+// hasValues returns true when at least one approval override field is set.
+func (c assistantActionApprovalConfig) hasValues() bool {
+	return c.Required ||
+		strings.TrimSpace(c.Title) != "" ||
+		strings.TrimSpace(c.Description) != "" ||
+		strings.TrimSpace(c.Timeout) != ""
+}
+
+// parseApprovalTimeout supports duration strings (e.g., "30s").
+func parseApprovalTimeout(timeout string) (time.Duration, error) {
+	trimmed := strings.TrimSpace(timeout)
+	if trimmed != "" {
+		parsed, err := time.ParseDuration(trimmed)
+		if err != nil {
+			return 0, fmt.Errorf("invalid approval timeout %q: %w", trimmed, err)
+		}
+		return parsed, nil
+	}
+	return 0, nil
 }
 
 func loadToolDefinitionOverrides() (map[string]domain.AssistantActionDefinition, error) {
@@ -490,6 +535,19 @@ func parseToolOverrideDefinitions(content []byte) (map[string]domain.AssistantAc
 				ArgRules:  strings.TrimSpace(override.Hints.ArgRules),
 			},
 		}
+
+		approvalCfg := override.Approval
+		if override.Approvals.hasValues() {
+			approvalCfg = override.Approvals
+		}
+		if approvalCfg.hasValues() {
+			approval, err := approvalCfg.toDomain()
+			if err != nil {
+				return nil, fmt.Errorf("tool %q approval override: %w", name, err)
+			}
+			def.Approval = approval
+		}
+
 		byName[name] = def
 	}
 	return byName, nil
@@ -509,13 +567,19 @@ func mergeAssistantActionDefinition(base, override domain.AssistantActionDefinit
 	if inputType := strings.TrimSpace(override.Input.Type); inputType != "" {
 		merged.Input.Type = inputType
 	}
-	if len(merged.Input.Fields) == 0 {
-		merged.Input.Fields = map[string]domain.AssistantActionField{}
+	baseFields := map[string]domain.AssistantActionField{}
+	if len(base.Input.Fields) > 0 {
+		baseFields = make(map[string]domain.AssistantActionField, len(base.Input.Fields))
+		maps.Copy(baseFields, base.Input.Fields)
 	}
+	merged.Input.Fields = baseFields
 	maps.Copy(merged.Input.Fields, override.Input.Fields)
 
 	if override.HasHints() {
 		merged.Hints = override.Hints
+	}
+	if override.Approval != (domain.AssistantActionApproval{}) {
+		merged.Approval = override.Approval
 	}
 	return merged
 }

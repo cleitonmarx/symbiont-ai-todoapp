@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -458,6 +459,40 @@ tools:
 			},
 		},
 		{
+			name: "valid-yaml-with-approvals-override",
+			content: `
+tools:
+  - name: delete_todos
+    approvals:
+      required: true
+      title: Confirm delete
+      description: Destructive action.
+      timeout: 45s
+`,
+			assert: func(t *testing.T, got map[string]domain.AssistantActionDefinition, err error) {
+				require.NoError(t, err)
+				require.Len(t, got, 1)
+				require.Contains(t, got, "delete_todos")
+				assert.True(t, got["delete_todos"].Approval.Required)
+				assert.Equal(t, "Confirm delete", got["delete_todos"].Approval.Title)
+				assert.Equal(t, "Destructive action.", got["delete_todos"].Approval.Description)
+				assert.Equal(t, 45*time.Second, got["delete_todos"].Approval.Timeout)
+			},
+		},
+		{
+			name: "invalid-yaml-with-approval-timeout-format",
+			content: `
+tools:
+  - name: delete_todos
+    approvals:
+      timeout: 45
+`,
+			assert: func(t *testing.T, _ map[string]domain.AssistantActionDefinition, err error) {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "invalid approval timeout")
+			},
+		},
+		{
 			name:    "invalid-yaml",
 			content: "tools: [",
 			assert: func(t *testing.T, _ map[string]domain.AssistantActionDefinition, err error) {
@@ -528,6 +563,21 @@ func TestMergeAssistantActionDefinition_Table(t *testing.T) {
 				assert.Equal(t, "new use", got.Hints.UseWhen)
 				assert.Empty(t, got.Hints.AvoidWhen)
 				assert.Empty(t, got.Hints.ArgRules)
+			},
+		},
+		{
+			name: "replace-approval-when-provided",
+			override: domain.AssistantActionDefinition{
+				Approval: domain.AssistantActionApproval{
+					Required: true,
+					Title:    "Approve action",
+					Timeout:  30 * time.Second,
+				},
+			},
+			assert: func(t *testing.T, got domain.AssistantActionDefinition) {
+				assert.True(t, got.Approval.Required)
+				assert.Equal(t, "Approve action", got.Approval.Title)
+				assert.Equal(t, 30*time.Second, got.Approval.Timeout)
 			},
 		},
 	}

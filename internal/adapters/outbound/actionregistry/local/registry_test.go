@@ -223,7 +223,7 @@ func TestInitActionRegistry_Initialize(t *testing.T) {
 					Return(domain.EmbeddingVector{
 						Vector:      []float64{0.1, 0.2, 0.3},
 						TotalTokens: 3,
-					}, nil).Times(10)
+					}, nil).Times(6)
 			},
 			expectError: false,
 			validateFunc: func(t *testing.T, ctx context.Context) {

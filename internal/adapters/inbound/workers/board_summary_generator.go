@@ -31,11 +31,13 @@ func (s BoardSummaryGenerator) Run(ctx context.Context) error {
 
 	// 1. Receive messages in background (blocking call)
 	go func() {
-		err := s.Client.Subscriber(s.SubscriptionID).Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+		err := s.Client.Subscriber(s.SubscriptionID).Receive(ctx, func(msgCtx context.Context, msg *pubsub.Message) {
 			select {
 			case eventCh <- msg:
 				// Ack later, after batching
 			case <-ctx.Done():
+				msg.Nack()
+			case <-msgCtx.Done():
 				msg.Nack()
 			}
 		})

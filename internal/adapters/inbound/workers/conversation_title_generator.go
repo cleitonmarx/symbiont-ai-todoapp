@@ -39,10 +39,12 @@ func (s ConversationTitleGenerator) Run(ctx context.Context) error {
 	subscriberInitErrCh := make(chan error, 1)
 
 	go func() {
-		err := s.Client.Subscriber(s.SubscriptionID).Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+		err := s.Client.Subscriber(s.SubscriptionID).Receive(ctx, func(msgCtx context.Context, msg *pubsub.Message) {
 			select {
 			case eventCh <- msg:
 			case <-ctx.Done():
+				msg.Nack()
+			case <-msgCtx.Done():
 				msg.Nack()
 			}
 		})

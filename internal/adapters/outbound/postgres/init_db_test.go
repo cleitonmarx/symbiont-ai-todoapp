@@ -17,6 +17,8 @@ import (
 )
 
 func TestInitDB_Initialize(t *testing.T) {
+	t.Parallel()
+
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 
 	dbInit := InitDB{
@@ -38,6 +40,8 @@ func TestInitDB_Initialize(t *testing.T) {
 }
 
 func TestInitDB_Close(t *testing.T) {
+	t.Parallel()
+
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 
 	tests := map[string]struct {
@@ -95,6 +99,8 @@ func TestInitDB_Close(t *testing.T) {
 }
 
 func Test_withQueryAttributes(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		query string
 		want  []attribute.KeyValue

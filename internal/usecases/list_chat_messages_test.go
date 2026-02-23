@@ -13,6 +13,8 @@ import (
 )
 
 func TestListChatMessagesImpl_Query(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	tests := map[string]struct {
 		setExpectations func(repo *domain.MockChatMessageRepository)
@@ -103,6 +105,8 @@ func createChatMessages(count int, role domain.ChatRole) []domain.ChatMessage {
 }
 
 func TestInitListChatMessages_Initialize(t *testing.T) {
+	t.Parallel()
+
 	idc := InitListChatMessages{}
 
 	_, err := idc.Initialize(context.Background())

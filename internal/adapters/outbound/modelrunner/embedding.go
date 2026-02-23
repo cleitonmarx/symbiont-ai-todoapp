@@ -2,9 +2,11 @@ package modelrunner
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 )
 
@@ -47,7 +49,54 @@ func (a gemmaEmbedding) GenerateSearchPrompt(searchInput string) string {
 }
 
 func (a gemmaEmbedding) GenerateAssistentActionDefinitionPrompt(action domain.AssistantActionDefinition) string {
-	return fmt.Sprintf("title: %s | text: %s", action.Name, action.Description)
+	title := common.NormalizeWhitespace(action.Name)
+	if title == "" {
+		title = "none"
+	}
+
+	parts := []string{
+		fmt.Sprintf("action: %s", common.NormalizeWhitespace(strings.ReplaceAll(action.Name, "_", " "))),
+		fmt.Sprintf("description: %s", common.NormalizeWhitespace(action.Description)),
+	}
+
+	if action.HasHints() {
+		parts = append(parts, fmt.Sprintf("hints: %s", common.NormalizeWhitespace(action.ComposeHint())))
+	}
+
+	if action.Input.Type != "" || len(action.Input.Fields) > 0 {
+		parts = append(parts, fmt.Sprintf("input_type: %s", common.NormalizeWhitespace(action.Input.Type)))
+	}
+
+	if len(action.Input.Fields) > 0 {
+		fieldNames := make([]string, 0, len(action.Input.Fields))
+		for name := range action.Input.Fields {
+			fieldNames = append(fieldNames, name)
+		}
+		sort.Strings(fieldNames)
+
+		fieldParts := make([]string, 0, len(fieldNames))
+		for _, name := range fieldNames {
+			field := action.Input.Fields[name]
+			required := "optional"
+			if field.Required {
+				required = "required"
+			}
+			fieldParts = append(
+				fieldParts,
+				fmt.Sprintf(
+					"%s(%s,%s): %s",
+					common.NormalizeWhitespace(name),
+					common.NormalizeWhitespace(field.Type),
+					required,
+					common.NormalizeWhitespace(field.Description),
+				),
+			)
+		}
+		parts = append(parts, fmt.Sprintf("fields: %s", strings.Join(fieldParts, "; ")))
+	}
+
+	text := strings.Join(parts, " | ")
+	return fmt.Sprintf("title: %s | text: %s", title, text)
 }
 
 // defaultEmbeddingGenerator is a fallback implementation of EmbeddingGenerator

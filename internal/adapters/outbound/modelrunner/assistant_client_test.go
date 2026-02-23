@@ -57,6 +57,8 @@ func collectStreamEvents(adapter AssistantClient, req domain.AssistantTurnReques
 }
 
 func TestAssistantClientAdapter_RunTurn(t *testing.T) {
+	t.Parallel()
+
 	req := domain.AssistantTurnRequest{
 		Stream: true,
 		Model:  "test-model",
@@ -184,6 +186,8 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 }
 
 func TestAssistantClientAdapter_RunTurn_ServerError(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}))
@@ -208,6 +212,8 @@ func TestAssistantClientAdapter_RunTurn_ServerError(t *testing.T) {
 }
 
 func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
+	t.Parallel()
+
 	temp := 0.5
 	topP := 0.9
 
@@ -324,6 +330,8 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 }
 
 func TestAssistantClientAdapter_RunTurnSync_ValidationErrors(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`)) //nolint:errcheck
 	}))
@@ -348,6 +356,8 @@ func TestAssistantClientAdapter_RunTurnSync_ValidationErrors(t *testing.T) {
 }
 
 func TestAssistantClientAdapter_VectorizeTodo(t *testing.T) {
+	t.Parallel()
+
 	todo := domain.Todo{Title: "Test", DueDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), Status: domain.TodoStatus_OPEN}
 	tests := map[string]struct {
 		response           string
@@ -450,6 +460,8 @@ func TestAssistantClientAdapter_VectorizeTodo(t *testing.T) {
 }
 
 func TestAssistantClientAdapter_VectorizeQuery(t *testing.T) {
+	t.Parallel()
+
 	searchInput := "Find todos about books"
 	tests := map[string]struct {
 		response           string
@@ -552,6 +564,8 @@ func TestAssistantClientAdapter_VectorizeQuery(t *testing.T) {
 }
 
 func TestAssistantClientAdapter_VectorizeAssistantActionDefinition(t *testing.T) {
+	t.Parallel()
+
 	action := domain.AssistantActionDefinition{
 		Name:        "update_todo_due_date",
 		Description: "Update due date for exactly one existing todo.",
@@ -580,7 +594,7 @@ func TestAssistantClientAdapter_VectorizeAssistantActionDefinition(t *testing.T)
 			}`,
 			statusCode:         http.StatusOK,
 			model:              "ai/embeddinggemma",
-			expectRequestInput: "title: update_todo_due_date | text: Update due date for exactly one existing todo.",
+			expectRequestInput: "title: update_todo_due_date | text: action: update todo due date | description: Update due date for exactly one existing todo.",
 			expectedVec:        []float64{1.1, 2.2, 3.3},
 		},
 		"success-with-default-embedding-generator": {
@@ -658,6 +672,8 @@ func TestAssistantClientAdapter_VectorizeAssistantActionDefinition(t *testing.T)
 }
 
 func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		response   string
 		statusCode int
@@ -723,6 +739,8 @@ func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
 }
 
 func TestInitAssistantClient_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := InitAssistantClient{}
 
 	_, err := i.Initialize(context.Background())

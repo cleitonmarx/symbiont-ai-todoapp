@@ -7,6 +7,8 @@ import (
 )
 
 func TestConversationSummary_CurrentStateOrDefault(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		summary ConversationSummary
 		want    string

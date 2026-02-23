@@ -14,6 +14,8 @@ import (
 )
 
 func TestRelayOutboxImpl_Execute(t *testing.T) {
+	t.Parallel()
+
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	eventID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	todoID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
@@ -253,6 +255,8 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 }
 
 func TestInitRelayOutbox_Initialize(t *testing.T) {
+	t.Parallel()
+
 	iro := InitRelayOutbox{}
 
 	ctx, err := iro.Initialize(context.Background())

@@ -261,7 +261,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResp"
 
-  /api/conversations:
+  /api/v1/conversations:
     get:
       summary: List conversations
       description: >
@@ -295,7 +295,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConversationListResp"
 
-  /api/conversations/{conversation_id}:
+  /api/v1/conversations/{conversation_id}:
     patch:
       summary: Update conversation
       description: >

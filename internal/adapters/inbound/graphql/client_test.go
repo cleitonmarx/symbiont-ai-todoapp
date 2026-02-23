@@ -24,14 +24,14 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	return m.handler(req), nil
 }
 
-// setTestHTTPClient replaces http.DefaultClient's Transport for testing.
-func setTestHTTPClient(handler func(*http.Request) *http.Response) func() {
-	orig := http.DefaultClient.Transport
-	http.DefaultClient.Transport = &mockRoundTripper{handler: handler}
-	return func() { http.DefaultClient.Transport = orig }
+// testHTTPClient returns an isolated HTTP client for testing requests.
+func testHTTPClient(handler func(*http.Request) *http.Response) *http.Client {
+	return &http.Client{Transport: &mockRoundTripper{handler: handler}}
 }
 
 func TestClient_UpdateTodos(t *testing.T) {
+	t.Parallel()
+
 	todoIDs := []uuid.UUID{uuid.New(), uuid.New()}
 	dueDate := time.Date(2024, 12, 31, 0, 0, 0, 0, time.UTC)
 	todos := []*gen.Todo{
@@ -80,9 +80,7 @@ func TestClient_UpdateTodos(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			restore := setTestHTTPClient(tt.mockHandler)
-			defer restore()
-			client := NewClient("http://fake")
+			client := NewClientWithHTTPClient("http://fake", testHTTPClient(tt.mockHandler))
 			out, err := client.UpdateTodos(context.Background(), tt.params)
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -96,6 +94,8 @@ func TestClient_UpdateTodos(t *testing.T) {
 }
 
 func TestClient_DeleteTodos(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		ids         []uuid.UUID
 		mockHandler func(*http.Request) *http.Response
@@ -135,9 +135,7 @@ func TestClient_DeleteTodos(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			restore := setTestHTTPClient(tt.mockHandler)
-			defer restore()
-			client := NewClient("http://fake")
+			client := NewClientWithHTTPClient("http://fake", testHTTPClient(tt.mockHandler))
 			out, err := client.DeleteTodos(context.Background(), tt.ids)
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -151,6 +149,8 @@ func TestClient_DeleteTodos(t *testing.T) {
 }
 
 func TestClient_ListTodos(t *testing.T) {
+	t.Parallel()
+
 	page := &gen.TodoPage{Page: 1}
 	tests := map[string]struct {
 		status      *gen.TodoStatus
@@ -197,9 +197,7 @@ func TestClient_ListTodos(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			restore := setTestHTTPClient(tt.mockHandler)
-			defer restore()
-			client := NewClient("http://fake")
+			client := NewClientWithHTTPClient("http://fake", testHTTPClient(tt.mockHandler))
 			out, err := client.ListTodos(context.Background(), tt.status, tt.page, tt.pageSize)
 			if tt.expectErr {
 				assert.Error(t, err)

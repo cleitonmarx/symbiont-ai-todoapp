@@ -15,6 +15,8 @@ import (
 )
 
 func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	summaryID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	messageID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
@@ -90,6 +92,8 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 }
 
 func TestConversationSummaryRepository_StoreConversationSummary(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	summaryID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	messageID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
@@ -146,6 +150,8 @@ func TestConversationSummaryRepository_StoreConversationSummary(t *testing.T) {
 }
 
 func TestConversationSummaryRepository_DeleteConversationSummary(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	tests := map[string]struct {
 		expect    func(sqlmock.Sqlmock)
@@ -190,6 +196,8 @@ func TestConversationSummaryRepository_DeleteConversationSummary(t *testing.T) {
 }
 
 func TestInitConversationSummaryRepository_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := &InitConversationSummaryRepository{
 		DB: &sql.DB{},
 	}

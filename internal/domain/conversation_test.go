@@ -10,6 +10,8 @@ import (
 )
 
 func TestConversation_Validate(t *testing.T) {
+	t.Parallel()
+
 	now := time.Now()
 	validID := uuid.New()
 
@@ -86,12 +88,16 @@ func TestConversation_Validate(t *testing.T) {
 }
 
 func TestConversation_CanBeLLMRetitled(t *testing.T) {
+	t.Parallel()
+
 	assert.True(t, Conversation{TitleSource: ConversationTitleSource_Auto}.CanBeLLMRetitled())
 	assert.False(t, Conversation{TitleSource: ConversationTitleSource_User}.CanBeLLMRetitled())
 	assert.False(t, Conversation{TitleSource: ConversationTitleSource_LLM}.CanBeLLMRetitled())
 }
 
 func TestConversation_ApplyUserTitle(t *testing.T) {
+	t.Parallel()
+
 	base := Conversation{
 		ID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 		Title:       "Auto title",
@@ -135,6 +141,8 @@ func TestConversation_ApplyUserTitle(t *testing.T) {
 }
 
 func TestConversation_ApplyLLMGeneratedTitle(t *testing.T) {
+	t.Parallel()
+
 	longText := strings.Repeat("a", 80)
 	base := Conversation{
 		ID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),

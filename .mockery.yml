@@ -17,3 +17,6 @@ packages:
   github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases:
     config:
       all: true
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry:
+    config:
+      all: true

@@ -14,9 +14,12 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoDueDateUpdaterAction(t *testing.T) {
+func TestBulkTodoDueDateUpdaterAction(t *testing.T) {
+	t.Parallel()
+
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
-	todoID := uuid.New()
+	todoID1 := uuid.New()
+	todoID2 := uuid.New()
 
 	tests := map[string]struct {
 		setupMocks   func(*domain.MockUnitOfWork, *domain.MockCurrentTimeProvider, *usecases.MockTodoUpdater)
@@ -24,7 +27,7 @@ func TestTodoDueDateUpdaterAction(t *testing.T) {
 		history      []domain.AssistantMessage
 		validateResp func(t *testing.T, resp domain.AssistantMessage)
 	}{
-		"update-due-date-success": {
+		"update-todos-due-date-success": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *usecases.MockTodoUpdater) {
 				timeProvider.EXPECT().
 					Now().
@@ -35,59 +38,40 @@ func TestTodoDueDateUpdaterAction(t *testing.T) {
 					Update(
 						mock.Anything,
 						uow,
-						todoID,
+						todoID1,
 						(*string)(nil),
 						(*domain.TodoStatus)(nil),
 						common.Ptr(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)),
 					).
 					Return(
 						domain.Todo{
-							ID:      todoID,
-							Title:   "Some Todo",
+							ID:      todoID1,
+							Title:   "Todo 1",
 							DueDate: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
+							Status:  domain.TodoStatus_OPEN,
 						},
 						nil,
-					)
-				uow.EXPECT().
-					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(domain.UnitOfWork) error) error {
-						return fn(uow)
-					}).
+					).
 					Once()
-			},
-			functionCall: domain.AssistantActionCall{
-				Name:  "update_todo_due_date",
-				Input: `{"id": "` + todoID.String() + `", "due_date": "2026-02-01"}`,
-			},
-			history: []domain.AssistantMessage{},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}")
-			},
-		},
-		"update-due-date-uses-history": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *usecases.MockTodoUpdater) {
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime).
-					Once()
-
 				updater.EXPECT().
 					Update(
 						mock.Anything,
 						uow,
-						todoID,
+						todoID2,
 						(*string)(nil),
 						(*domain.TodoStatus)(nil),
-						mock.Anything,
+						common.Ptr(time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC)),
 					).
 					Return(
 						domain.Todo{
-							ID:    todoID,
-							Title: "Some Todo",
+							ID:      todoID2,
+							Title:   "Todo 2",
+							DueDate: time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC),
+							Status:  domain.TodoStatus_OPEN,
 						},
 						nil,
-					)
+					).
+					Once()
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
@@ -97,44 +81,43 @@ func TestTodoDueDateUpdaterAction(t *testing.T) {
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "update_todo_due_date",
-				Input: `{"id": "` + todoID.String() + `", "due_date": ""}`,
+				Name:  "update_todos_due_date",
+				Input: `{"todos":[{"id":"` + todoID1.String() + `","due_date":"2026-02-01"},{"id":"` + todoID2.String() + `","due_date":"2026-02-02"}]}`,
 			},
-			history: []domain.AssistantMessage{
-				{Role: domain.ChatRole_User, Content: "Please set it to tomorrow"},
-			},
+			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}")
+				assert.Contains(t, resp.Content, "todos[2]{id,title,due_date,status}")
 			},
 		},
-		"update-due-date-invalid-arguments": {
+		"update-todos-due-date-invalid-arguments": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *usecases.MockTodoUpdater) {
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "update_todo_due_date",
+				Name:  "update_todos_due_date",
 				Input: `invalid json`,
 			},
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
-		"update-due-date-invalid-id": {
+		"update-todos-due-date-invalid-due-date": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *usecases.MockTodoUpdater) {
+				timeProvider.EXPECT().
+					Now().
+					Return(fixedTime).
+					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "update_todo_due_date",
-				Input: `{"id": "00000000-0000-0000-0000-000000000000", "due_date": "2026-02-01"}`,
+				Name:  "update_todos_due_date",
+				Input: `{"todos":[{"id":"` + todoID1.String() + `","due_date":"invalid"}]}`,
 			},
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_todo_id")
+				assert.Contains(t, resp.Content, "invalid_due_date")
 			},
 		},
-		"update-due-date-update-error": {
+		"update-todos-due-date-update-error": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, updater *usecases.MockTodoUpdater) {
 				timeProvider.EXPECT().
 					Now().
@@ -145,12 +128,13 @@ func TestTodoDueDateUpdaterAction(t *testing.T) {
 					Update(
 						mock.Anything,
 						uow,
-						todoID,
+						todoID1,
 						(*string)(nil),
 						(*domain.TodoStatus)(nil),
-						mock.Anything,
+						common.Ptr(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)),
 					).
-					Return(domain.Todo{}, errors.New("update error"))
+					Return(domain.Todo{}, errors.New("update error")).
+					Once()
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
@@ -160,13 +144,12 @@ func TestTodoDueDateUpdaterAction(t *testing.T) {
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "update_todo_due_date",
-				Input: `{"id": "` + todoID.String() + `", "due_date": "2026-02-01"}`,
+				Name:  "update_todos_due_date",
+				Input: `{"todos":[{"id":"` + todoID1.String() + `","due_date":"2026-02-01"}]}`,
 			},
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "update_due_date_error")
+				assert.Contains(t, resp.Content, "update_todos_due_date_error")
 			},
 		},
 	}
@@ -178,11 +161,11 @@ func TestTodoDueDateUpdaterAction(t *testing.T) {
 			updater := usecases.NewMockTodoUpdater(t)
 			tt.setupMocks(uow, timeProvider, updater)
 
-			action := NewTodoDueDateUpdaterAction(uow, updater, timeProvider)
+			action := NewBulkTodoDueDateUpdaterAction(uow, updater, timeProvider)
 			assert.NotEmpty(t, action.StatusMessage())
 
 			definition := action.Definition()
-			assert.Equal(t, "update_todo_due_date", definition.Name)
+			assert.Equal(t, "update_todos_due_date", definition.Name)
 			assert.NotEmpty(t, definition.Description)
 			assert.NotEmpty(t, definition.Input)
 

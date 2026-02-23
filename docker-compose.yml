@@ -32,6 +32,7 @@ services:
       - LLM_CHAT_SUMMARY_MODEL=qwen3:14B-Q6_K
       - LLM_CHAT_TITLE_MODEL=qwen3:14B-Q6_K
       - LLM_EMBEDDING_MODEL=embeddinggemma:300M-Q8_0
+      - MCP_GATEWAY_ENDPOINT=http://mcp-gateway:8811
       - SUMMARY_BATCH_INTERVAL=1s
     models:
       - qwen3
@@ -47,6 +48,8 @@ services:
         condition: service_healthy
       prometheus:
         condition: service_started
+      mcp-gateway:
+        condition: service_started
   
   jaeger:
     image: jaegertracing/all-in-one:1.76.0
@@ -54,6 +57,7 @@ services:
       - "6831:6831/udp"
       - "16686:16686"
       - "4318:4318"
+
 
   prometheus:
     image: prom/prometheus:v3.9.1
@@ -85,3 +89,5 @@ services:
     depends_on:
       prometheus:
         condition: service_started
+
+  

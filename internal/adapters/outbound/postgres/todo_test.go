@@ -16,6 +16,8 @@ import (
 )
 
 func TestTodoRepository_CreateTodo(t *testing.T) {
+	t.Parallel()
+
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	fixedDueDate := time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
@@ -86,6 +88,8 @@ func TestTodoRepository_CreateTodo(t *testing.T) {
 }
 
 func TestTodoRepository_GetTodo(t *testing.T) {
+	t.Parallel()
+
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	fixedDueDate := time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
@@ -168,6 +172,8 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 }
 
 func TestTodoRepository_UpdateTodo(t *testing.T) {
+	t.Parallel()
+
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	fixedDueDate := time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
@@ -236,6 +242,8 @@ func TestTodoRepository_UpdateTodo(t *testing.T) {
 }
 
 func TestTodoRepository_ListTodos(t *testing.T) {
+	t.Parallel()
+
 	fixedUUID1 := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedUUID2 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
 	fixedUUID3 := uuid.MustParse("323e4567-e89b-12d3-a456-426614174002")
@@ -616,6 +624,8 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 }
 
 func TestTodoRepository_DeleteTodo(t *testing.T) {
+	t.Parallel()
+
 	id := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 
 	tests := map[string]struct {
@@ -663,6 +673,8 @@ func TestTodoRepository_DeleteTodo(t *testing.T) {
 }
 
 func TestInitTodoRepository_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := &InitTodoRepository{
 		DB: &sql.DB{},
 	}

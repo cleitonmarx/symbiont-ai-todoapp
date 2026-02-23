@@ -5,13 +5,15 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/workers"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry/composite"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry/local"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry/mcp"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/config"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/log"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/modelrunner"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/postgres"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/pubsub"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/time"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 )
@@ -40,7 +42,9 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&usecases.InitTodoCreator{},
 			&usecases.InitTodoDeleter{},
 			&usecases.InitTodoUpdater{},
-			&assistant.InitAssistantActionRegistry{},
+			&local.InitLocalActionRegistry{},
+			&mcp.InitMCPActionRegistry{},
+			&composite.InitCompositeActionRegistry{},
 
 			&usecases.InitListTodos{},
 			&usecases.InitCreateTodo{},

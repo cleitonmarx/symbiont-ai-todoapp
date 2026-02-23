@@ -12,7 +12,7 @@ services:
       - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U todoapp"]
-      interval: 10s
+      interval: 3s
       timeout: 5s
       retries: 5
 
@@ -28,7 +28,7 @@ services:
       - IPC_LOCK
     healthcheck:
       test: ["CMD", "sh", "/vault-health.sh"]
-      interval: 10s
+      interval: 3s
       timeout: 5s
       retries: 5
       start_period: 20s
@@ -54,9 +54,28 @@ services:
       PUBSUB_PROJECT1: local-dev,Todo:todo_summary_generator,ChatMessages:chat_message_summary_generator:chat_message_title_generator
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8681"]
-      interval: 10s
+      interval: 3s
       timeout: 5s
       retries: 5
+
+  mcp-gateway:
+    image: docker/mcp-gateway:latest
+    command:
+      - --transport=streamable-http
+      - --port=8811
+      - --servers=duckduckgo
+      - --tools=duckduckgo:fetch_content
+      - --tools=duckduckgo:search
+    ports:
+      - "8811:8811"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "wget", "-O-", "http://localhost:8811/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
 
 
 models:
@@ -68,4 +87,9 @@ models:
       - "1024"
   embeddinggemma:
     model: embeddinggemma:300M-Q8_0
+    runtime_flags:
+      - "--embeddings"
+      - "--ubatch-size"
+      - "2048"
+
     

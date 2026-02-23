@@ -16,6 +16,8 @@ import (
 )
 
 func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	chatMessageID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2026, 2, 15, 10, 0, 0, 0, time.UTC)
@@ -478,6 +480,8 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 }
 
 func TestInitGenerateConversationTitle_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := InitGenerateConversationTitle{}
 
 	ctx, err := i.Initialize(context.Background())

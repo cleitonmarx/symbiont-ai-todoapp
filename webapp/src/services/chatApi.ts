@@ -33,19 +33,19 @@ export const fetchChatMessages = async (conversationId: string, page: number, pa
 };
 
 export const listConversations = async (page: number, pageSize: number): Promise<ConversationListResp> => {
-  const response = await apiClient.get('/api/conversations', {
+  const response = await apiClient.get('/api/v1/conversations', {
     params: { page, pageSize },
   });
   return response.data;
 };
 
 export const updateConversation = async (conversationId: string, title: string): Promise<Conversation> => {
-  const response = await apiClient.patch(`/api/conversations/${conversationId}`, { title });
+  const response = await apiClient.patch(`/api/v1/conversations/${conversationId}`, { title });
   return response.data;
 };
 
 export const deleteConversation = async (conversationId: string): Promise<void> => {
-  await apiClient.delete(`/api/conversations/${conversationId}`);
+  await apiClient.delete(`/api/v1/conversations/${conversationId}`);
 };
 
 export const clearChatMessages = async (conversationId: string): Promise<void> => {

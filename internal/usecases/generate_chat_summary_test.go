@@ -17,6 +17,8 @@ import (
 )
 
 func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	chatMessageID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	checkpointID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
@@ -506,6 +508,8 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 }
 
 func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		previousSummary string
 		newSummary      string
@@ -586,6 +590,8 @@ func TestMergeRecentActionCallsIntoSummary(t *testing.T) {
 }
 
 func TestNormalizeConversationSummary(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		previous   string
 		candidate  string
@@ -636,6 +642,8 @@ func TestNormalizeConversationSummary(t *testing.T) {
 }
 
 func TestFormatMessageForSummary(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		message       domain.ChatMessage
 		expectContain []string
@@ -695,6 +703,8 @@ func TestFormatMessageForSummary(t *testing.T) {
 }
 
 func TestInitGenerateChatSummary_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := InitGenerateChatSummary{}
 
 	ctx, err := i.Initialize(context.Background())

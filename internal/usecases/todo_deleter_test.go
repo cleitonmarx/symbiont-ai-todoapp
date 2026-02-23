@@ -13,6 +13,8 @@ import (
 )
 
 func TestTodoDeleter_Delete(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	todoID := uuid.New()
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
@@ -119,6 +121,8 @@ func TestTodoDeleter_Delete(t *testing.T) {
 }
 
 func TestInitTodoDeleter_Initialize(t *testing.T) {
+	t.Parallel()
+
 	id := InitTodoDeleter{
 		Uow:          domain.NewMockUnitOfWork(t),
 		TimeProvider: domain.NewMockCurrentTimeProvider(t),

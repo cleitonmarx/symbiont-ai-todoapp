@@ -8,6 +8,8 @@ import (
 )
 
 func TestExtractTimeFromText(t *testing.T) {
+	t.Parallel()
+
 	loc := time.UTC
 	ref := time.Date(2026, 1, 27, 10, 0, 0, 0, loc) // Tuesday
 
@@ -151,6 +153,8 @@ func TestExtractTimeFromText(t *testing.T) {
 }
 
 func TestResolveRelative(t *testing.T) {
+	t.Parallel()
+
 	loc := time.UTC
 	ref := time.Date(2026, 1, 27, 10, 0, 0, 0, loc) // Tuesday
 
@@ -224,6 +228,8 @@ func TestResolveRelative(t *testing.T) {
 }
 
 func TestParseWeekday(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		input    string
 		expected time.Weekday
@@ -293,6 +299,8 @@ func TestParseWeekday(t *testing.T) {
 }
 
 func TestNextWeekday(t *testing.T) {
+	t.Parallel()
+
 	ref := time.Date(2026, 1, 27, 0, 0, 0, 0, time.UTC) // Tuesday
 
 	tests := map[string]struct {
@@ -336,6 +344,8 @@ func TestNextWeekday(t *testing.T) {
 }
 
 func TestDateOnly(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		input    time.Time
 		expected time.Time

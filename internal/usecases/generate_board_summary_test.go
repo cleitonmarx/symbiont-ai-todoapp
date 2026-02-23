@@ -14,6 +14,8 @@ import (
 )
 
 func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
+	t.Parallel()
+
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	boardSummary := domain.BoardSummary{
 		ID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
@@ -159,6 +161,8 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 }
 
 func TestInitGenerateBoardSummary_Initialize(t *testing.T) {
+	t.Parallel()
+
 	igbs := InitGenerateBoardSummary{}
 
 	ctx, err := igbs.Initialize(context.Background())

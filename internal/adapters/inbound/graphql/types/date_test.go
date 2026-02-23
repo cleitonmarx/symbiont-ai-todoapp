@@ -10,6 +10,8 @@ import (
 )
 
 func TestDate_UnmarshalGQL(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		input   any
@@ -51,6 +53,8 @@ func TestDate_UnmarshalGQL(t *testing.T) {
 }
 
 func TestDate_MarshalGQL(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		input    Date
@@ -78,6 +82,8 @@ func TestDate_MarshalGQL(t *testing.T) {
 }
 
 func TestDate_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		input   string
@@ -119,6 +125,8 @@ func TestDate_UnmarshalJSON(t *testing.T) {
 }
 
 func TestDate_MarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		input    Date

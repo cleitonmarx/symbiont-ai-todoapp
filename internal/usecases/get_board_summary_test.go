@@ -13,6 +13,8 @@ import (
 )
 
 func TestGetBoardSummaryImpl_Query(t *testing.T) {
+	t.Parallel()
+
 	fixedUUID := func() uuid.UUID {
 		return uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
 	}
@@ -105,6 +107,8 @@ func TestGetBoardSummaryImpl_Query(t *testing.T) {
 }
 
 func TestInitGetBoardSummary_Initialize(t *testing.T) {
+	t.Parallel()
+
 	summaryRepo := domain.NewMockBoardSummaryRepository(t)
 
 	igbs := &InitGetBoardSummary{

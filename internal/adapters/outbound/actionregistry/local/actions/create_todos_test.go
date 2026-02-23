@@ -8,11 +8,14 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoCreatorAction(t *testing.T) {
+func TestBulkTodoCreatorAction(t *testing.T) {
+	t.Parallel()
+
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
 
 	tests := map[string]struct {
@@ -25,7 +28,7 @@ func TestTodoCreatorAction(t *testing.T) {
 		history      []domain.AssistantMessage
 		validateResp func(t *testing.T, resp domain.AssistantMessage)
 	}{
-		"create-todo-success": {
+		"create-todos-success": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
 				timeProvider.EXPECT().
 					Now().
@@ -33,8 +36,22 @@ func TestTodoCreatorAction(t *testing.T) {
 					Once()
 
 				creator.EXPECT().
-					Create(mock.Anything, uow, "New Todo", mock.Anything).
-					Return(domain.Todo{Title: "New Todo", Status: domain.TodoStatus_OPEN}, nil).
+					Create(mock.Anything, uow, "Todo 1", mock.Anything).
+					Return(domain.Todo{
+						ID:      uuid.New(),
+						Title:   "Todo 1",
+						DueDate: time.Date(2026, 1, 25, 0, 0, 0, 0, time.UTC),
+						Status:  domain.TodoStatus_OPEN,
+					}, nil).
+					Once()
+				creator.EXPECT().
+					Create(mock.Anything, uow, "Todo 2", mock.Anything).
+					Return(domain.Todo{
+						ID:      uuid.New(),
+						Title:   "Todo 2",
+						DueDate: time.Date(2026, 1, 26, 0, 0, 0, 0, time.UTC),
+						Status:  domain.TodoStatus_OPEN,
+					}, nil).
 					Once()
 
 				uow.EXPECT().
@@ -45,60 +62,28 @@ func TestTodoCreatorAction(t *testing.T) {
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "create_todo",
-				Input: `{"title": "New Todo", "due_date": "2026-01-25"}`,
+				Name:  "create_todos",
+				Input: `{"todos":[{"title":"Todo 1","due_date":"2026-01-25"},{"title":"Todo 2","due_date":"2026-01-26"}]}`,
 			},
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}")
+				assert.Contains(t, resp.Content, "todos[2]{id,title,due_date,status}")
 			},
 		},
-		"create-todo-empty-due-date-uses-history": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime).
-					Once()
-
-				creator.EXPECT().
-					Create(mock.Anything, uow, "New Todo", mock.Anything).
-					Return(domain.Todo{Title: "New Todo"}, nil).
-					Once()
-
-				uow.EXPECT().
-					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(domain.UnitOfWork) error) error {
-						return fn(uow)
-					}).
-					Once()
-			},
-			functionCall: domain.AssistantActionCall{
-				Name:  "create_todo",
-				Input: `{"title": "New Todo", "due_date": ""}`,
-			},
-			history: []domain.AssistantMessage{
-				{Role: domain.ChatRole_User, Content: "Please set it for tomorrow"},
-			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}")
-			},
-		},
-		"create-todo-invalid-arguments": {
+		"create-todos-invalid-arguments": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "create_todo",
+				Name:  "create_todos",
 				Input: `invalid json`,
 			},
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
-		"create-todo-invalid-due-date": {
+		"create-todos-invalid-due-date": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
 				timeProvider.EXPECT().
 					Now().
@@ -106,16 +91,15 @@ func TestTodoCreatorAction(t *testing.T) {
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "create_todo",
-				Input: `{"title": "New Todo", "due_date": "invalid"}`,
+				Name:  "create_todos",
+				Input: `{"todos":[{"title":"Todo 1","due_date":"invalid"}]}`,
 			},
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_due_date")
 			},
 		},
-		"create-todo-create-error": {
+		"create-todos-create-error": {
 			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
 				timeProvider.EXPECT().
 					Now().
@@ -123,7 +107,7 @@ func TestTodoCreatorAction(t *testing.T) {
 					Once()
 
 				creator.EXPECT().
-					Create(mock.Anything, uow, "New Todo", mock.Anything).
+					Create(mock.Anything, uow, "Todo 1", mock.Anything).
 					Return(domain.Todo{}, errors.New("create error")).
 					Once()
 
@@ -135,35 +119,12 @@ func TestTodoCreatorAction(t *testing.T) {
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "create_todo",
-				Input: `{"title": "New Todo", "due_date": "2026-01-25"}`,
+				Name:  "create_todos",
+				Input: `{"todos":[{"title":"Todo 1","due_date":"2026-01-25"}]}`,
 			},
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "create_todo_error")
-			},
-		},
-		"create-todo-uow-error": {
-			setupMocks: func(uow *domain.MockUnitOfWork, timeProvider *domain.MockCurrentTimeProvider, creator *usecases.MockTodoCreator) {
-				timeProvider.EXPECT().
-					Now().
-					Return(fixedTime).
-					Once()
-
-				uow.EXPECT().
-					Execute(mock.Anything, mock.Anything).
-					Return(errors.New("uow error")).
-					Once()
-			},
-			functionCall: domain.AssistantActionCall{
-				Name:  "create_todo",
-				Input: `{"title": "New Todo", "due_date": "2026-01-25"}`,
-			},
-			history: []domain.AssistantMessage{},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "create_todo_error")
+				assert.Contains(t, resp.Content, "create_todos_error")
 			},
 		},
 	}
@@ -175,11 +136,11 @@ func TestTodoCreatorAction(t *testing.T) {
 			todoCreator := usecases.NewMockTodoCreator(t)
 			tt.setupMocks(uow, timeProvider, todoCreator)
 
-			action := NewTodoCreatorAction(uow, todoCreator, timeProvider)
+			action := NewBulkTodoCreatorAction(uow, todoCreator, timeProvider)
 			assert.NotEmpty(t, action.StatusMessage())
 
 			definition := action.Definition()
-			assert.Equal(t, "create_todo", definition.Name)
+			assert.Equal(t, "create_todos", definition.Name)
 			assert.NotEmpty(t, definition.Description)
 			assert.NotEmpty(t, definition.Input)
 

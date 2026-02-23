@@ -14,6 +14,8 @@ import (
 )
 
 func TestInitClient_Initialize(t *testing.T) {
+	t.Parallel()
+
 	server := pstest.NewServer()
 	defer server.Close() //nolint:errcheck
 

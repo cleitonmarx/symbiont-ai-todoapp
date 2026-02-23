@@ -14,33 +14,55 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoUpdaterAction(t *testing.T) {
-	todoID := uuid.New()
+func TestBulkTodoUpdaterAction(t *testing.T) {
+	t.Parallel()
+
+	todoID1 := uuid.New()
+	todoID2 := uuid.New()
 
 	tests := map[string]struct {
 		setupMocks   func(*domain.MockUnitOfWork, *usecases.MockTodoUpdater)
 		functionCall domain.AssistantActionCall
 		validateResp func(t *testing.T, resp domain.AssistantMessage)
 	}{
-		"update-todo-success": {
+		"update-todos-success": {
 			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
 				updater.EXPECT().
 					Update(
 						mock.Anything,
 						uow,
-						todoID,
-						common.Ptr("Updated"),
+						todoID1,
+						common.Ptr("Updated 1"),
 						common.Ptr(domain.TodoStatus_DONE),
 						(*time.Time)(nil),
 					).
 					Return(
 						domain.Todo{
-							ID:     todoID,
-							Title:  "Updated",
+							ID:     todoID1,
+							Title:  "Updated 1",
 							Status: domain.TodoStatus_DONE,
 						},
 						nil,
-					)
+					).
+					Once()
+				updater.EXPECT().
+					Update(
+						mock.Anything,
+						uow,
+						todoID2,
+						common.Ptr("Updated 2"),
+						(*domain.TodoStatus)(nil),
+						(*time.Time)(nil),
+					).
+					Return(
+						domain.Todo{
+							ID:     todoID2,
+							Title:  "Updated 2",
+							Status: domain.TodoStatus_OPEN,
+						},
+						nil,
+					).
+					Once()
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
@@ -50,50 +72,48 @@ func TestTodoUpdaterAction(t *testing.T) {
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "update_todo",
-				Input: `{"id": "` + todoID.String() + `", "title": "Updated", "status": "DONE"}`,
+				Name:  "update_todos",
+				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Updated 1","status":"DONE"},{"id":"` + todoID2.String() + `","title":"Updated 2"}]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}")
+				assert.Contains(t, resp.Content, "todos[2]{id,title,due_date,status}")
 			},
 		},
-		"update-todo-invalid-arguments": {
+		"update-todos-invalid-arguments": {
 			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "update_todo",
+				Name:  "update_todos",
 				Input: `invalid json`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
-		"update-todo-invalid-id": {
+		"update-todos-invalid-status": {
 			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "update_todo",
-				Input: `{"id": "invalid-uuid", "title": "Updated"}`,
+				Name:  "update_todos",
+				Input: `{"todos":[{"id":"` + todoID1.String() + `","status":"INVALID"}]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "invalid_todo_id")
+				assert.Contains(t, resp.Content, "invalid_status")
 			},
 		},
-		"update-todo-update-error": {
+		"update-todos-update-error": {
 			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
 				updater.EXPECT().
 					Update(
 						mock.Anything,
 						uow,
-						todoID,
-						common.Ptr("Updated"),
+						todoID1,
+						common.Ptr("Updated 1"),
 						(*domain.TodoStatus)(nil),
 						(*time.Time)(nil),
 					).
-					Return(domain.Todo{}, errors.New("update error"))
+					Return(domain.Todo{}, errors.New("update error")).
+					Once()
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
@@ -103,12 +123,11 @@ func TestTodoUpdaterAction(t *testing.T) {
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "update_todo",
-				Input: `{"id": "` + todoID.String() + `", "title": "Updated"}`,
+				Name:  "update_todos",
+				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Updated 1"}]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "update_todo_error")
+				assert.Contains(t, resp.Content, "update_todos_error")
 			},
 		},
 	}
@@ -119,11 +138,11 @@ func TestTodoUpdaterAction(t *testing.T) {
 			updater := usecases.NewMockTodoUpdater(t)
 			tt.setupMocks(uow, updater)
 
-			action := NewTodoUpdaterAction(uow, updater)
+			action := NewBulkTodoUpdaterAction(uow, updater)
 			assert.NotEmpty(t, action.StatusMessage())
 
 			definition := action.Definition()
-			assert.Equal(t, "update_todo", definition.Name)
+			assert.Equal(t, "update_todos", definition.Name)
 			assert.NotEmpty(t, definition.Description)
 			assert.NotEmpty(t, definition.Input)
 

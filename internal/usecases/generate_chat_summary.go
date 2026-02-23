@@ -206,7 +206,10 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	}
 
 	if gcs.completedSummaryCh != nil {
-		gcs.completedSummaryCh <- newSummary
+		select {
+		case gcs.completedSummaryCh <- newSummary:
+		case <-ctx.Done():
+		}
 	}
 
 	return nil
@@ -507,7 +510,7 @@ func parseSummaryFieldLine(line string) (string, string, bool) {
 // compactSummaryText trims, collapses whitespace, and truncates content
 // so summarization input remains compact and stable.
 func compactSummaryText(text string, maxChars int) string {
-	normalized := strings.Join(strings.Fields(strings.TrimSpace(text)), " ")
+	normalized := common.NormalizeWhitespace(text)
 	if normalized == "" {
 		return "none"
 	}

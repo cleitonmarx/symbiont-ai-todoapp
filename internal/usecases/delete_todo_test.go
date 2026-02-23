@@ -13,6 +13,8 @@ import (
 )
 
 func TestDeleteTodoImpl_Execute(t *testing.T) {
+	t.Parallel()
+
 	todoID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 
 	tests := map[string]struct {
@@ -89,7 +91,8 @@ func TestDeleteTodoImpl_Execute(t *testing.T) {
 }
 
 func TestInitDeleteTodo_Initialize(t *testing.T) {
-	// Clean up previous registrations if any
+	t.Parallel()
+
 	idt := InitDeleteTodo{}
 
 	ctx, err := idt.Initialize(context.Background())

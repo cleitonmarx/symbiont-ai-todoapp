@@ -12,23 +12,27 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoDeleterAction(t *testing.T) {
-	todoID := uuid.New()
+func TestBulkTodoDeleterAction(t *testing.T) {
+	t.Parallel()
+
+	todoID1 := uuid.New()
+	todoID2 := uuid.New()
 
 	tests := map[string]struct {
 		setupMocks   func(*domain.MockUnitOfWork, *usecases.MockTodoDeleter)
 		functionCall domain.AssistantActionCall
 		validateResp func(t *testing.T, resp domain.AssistantMessage)
 	}{
-		"delete-todo-success": {
+		"delete-todos-success": {
 			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
 				deleter.EXPECT().
-					Delete(
-						mock.Anything,
-						uow,
-						todoID,
-					).
-					Return(nil)
+					Delete(mock.Anything, uow, todoID1).
+					Return(nil).
+					Once()
+				deleter.EXPECT().
+					Delete(mock.Anything, uow, todoID2).
+					Return(nil).
+					Once()
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
@@ -38,35 +42,41 @@ func TestTodoDeleterAction(t *testing.T) {
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "delete_todo",
-				Input: `{"id": "` + todoID.String() + `"}`,
+				Name:  "delete_todos",
+				Input: `{"ids":["` + todoID1.String() + `","` + todoID2.String() + `"]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "todos[1]{id,deleted}")
+				assert.Contains(t, resp.Content, "todos[2]{id,deleted}")
 			},
 		},
-		"delete-todo-invalid-arguments": {
+		"delete-todos-invalid-arguments": {
 			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "delete_todo",
+				Name:  "delete_todos",
 				Input: `invalid json`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
-		"delete-todo-delete-error": {
+		"delete-todos-invalid-id": {
+			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
+			},
+			functionCall: domain.AssistantActionCall{
+				Name:  "delete_todos",
+				Input: `{"ids":["invalid-uuid"]}`,
+			},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+				assert.Contains(t, resp.Content, "invalid_todo_id")
+			},
+		},
+		"delete-todos-delete-error": {
 			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
 				deleter.EXPECT().
-					Delete(
-						mock.Anything,
-						uow,
-						todoID,
-					).
-					Return(errors.New("delete error"))
+					Delete(mock.Anything, uow, todoID1).
+					Return(errors.New("delete error")).
+					Once()
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
@@ -76,12 +86,11 @@ func TestTodoDeleterAction(t *testing.T) {
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "delete_todo",
-				Input: `{"id": "` + todoID.String() + `"}`,
+				Name:  "delete_todos",
+				Input: `{"ids":["` + todoID1.String() + `"]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "delete_todo_error")
+				assert.Contains(t, resp.Content, "delete_todos_error")
 			},
 		},
 	}
@@ -92,11 +101,11 @@ func TestTodoDeleterAction(t *testing.T) {
 			deleter := usecases.NewMockTodoDeleter(t)
 			tt.setupMocks(uow, deleter)
 
-			action := NewTodoDeleterAction(uow, deleter)
+			action := NewBulkTodoDeleterAction(uow, deleter)
 			assert.NotEmpty(t, action.StatusMessage())
 
 			definition := action.Definition()
-			assert.Equal(t, "delete_todo", definition.Name)
+			assert.Equal(t, "delete_todos", definition.Name)
 			assert.NotEmpty(t, definition.Description)
 			assert.NotEmpty(t, definition.Input)
 

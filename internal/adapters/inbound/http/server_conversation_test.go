@@ -20,6 +20,8 @@ import (
 )
 
 func TestTodoAppServer_DeleteConversation(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	tests := map[string]struct {
 		setupUsecases  func(*usecases.MockDeleteConversation)
@@ -79,6 +81,8 @@ func TestTodoAppServer_DeleteConversation(t *testing.T) {
 }
 
 func TestTodoAppServer_UpdateConversation(t *testing.T) {
+	t.Parallel()
+
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	newTitle := "Updated Conversation Title"
@@ -179,6 +183,8 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 }
 
 func TestTodoAppServer_ListConversations(t *testing.T) {
+	t.Parallel()
+
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	tests := map[string]struct {

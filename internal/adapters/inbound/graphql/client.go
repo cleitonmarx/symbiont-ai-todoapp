@@ -43,13 +43,27 @@ type response[T any] struct {
 
 // Client is a GraphQL client for interacting with the todo app GraphQL API.
 type Client struct {
-	url string
+	url        string
+	httpClient *http.Client
 }
 
 // NewClient creates a new GraphQL client with the specified endpoint.
 func NewClient(endpoint string) *Client {
 	return &Client{
-		url: endpoint,
+		url:        endpoint,
+		httpClient: http.DefaultClient,
+	}
+}
+
+// NewClientWithHTTPClient creates a new GraphQL client with a custom HTTP client.
+func NewClientWithHTTPClient(endpoint string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+
+	return &Client{
+		url:        endpoint,
+		httpClient: httpClient,
 	}
 }
 
@@ -77,7 +91,7 @@ func (c *Client) UpdateTodos(ctx context.Context, params []gen.UpdateTodoParams)
 	req.Query = sb.String()
 	req.Variables = variables
 
-	resp, err := makeRequest[*gen.Todo](ctx, req)
+	resp, err := makeRequest[*gen.Todo](ctx, c.httpClient, req)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +128,7 @@ func (c *Client) DeleteTodos(ctx context.Context, ids []uuid.UUID) ([]bool, erro
 	req.Query = sb.String()
 	req.Variables = variables
 
-	resp, err := makeRequest[bool](ctx, req)
+	resp, err := makeRequest[bool](ctx, c.httpClient, req)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +149,7 @@ func (c *Client) ListTodos(ctx context.Context, status *gen.TodoStatus, page int
 		url:       c.url,
 	}
 
-	resp, err := makeRequest[*gen.TodoPage](ctx, req)
+	resp, err := makeRequest[*gen.TodoPage](ctx, c.httpClient, req)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +158,11 @@ func (c *Client) ListTodos(ctx context.Context, status *gen.TodoStatus, page int
 }
 
 // makeRequest sends a GraphQL request and decodes the response.
-func makeRequest[T any](ctx context.Context, req request) (response[T], error) {
+func makeRequest[T any](ctx context.Context, httpClient *http.Client, req request) (response[T], error) {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+
 	body, err := json.Marshal(req)
 	if err != nil {
 		return response[T]{}, err
@@ -156,7 +174,7 @@ func makeRequest[T any](ctx context.Context, req request) (response[T], error) {
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	httpResp, err := http.DefaultClient.Do(httpReq)
+	httpResp, err := httpClient.Do(httpReq)
 	if err != nil {
 		return response[T]{}, err
 	}

@@ -16,6 +16,8 @@ import (
 )
 
 func TestTodoGraphQLServer_ListTodos(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		page          int
 		pageSize      int

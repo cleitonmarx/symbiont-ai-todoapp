@@ -1,11 +1,12 @@
-package assistant
+package local
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/assistant/actions"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry/local/actions"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/depend"
@@ -14,14 +15,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAssistantActionManager(t *testing.T) {
+func TestActionRegistry(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
-		setupActions   func() []assistantActionVector
+		setupActions   func() []actionregistry.ActionEmbedding
 		embeddingModel string
-		testFunc       func(t *testing.T, manager AssistantActionManager)
+		testFunc       func(t *testing.T, manager LocalRegistry)
 	}{
 		"list-returns-all-actions": {
-			setupActions: func() []assistantActionVector {
+			setupActions: func() []actionregistry.ActionEmbedding {
 				action1 := domain.NewMockAssistantAction(t)
 				action1.EXPECT().
 					Definition().
@@ -32,44 +35,44 @@ func TestAssistantActionManager(t *testing.T) {
 					Definition().
 					Return(mockAssistantActionDefinition("create_todo"))
 
-				return []assistantActionVector{
+				return []actionregistry.ActionEmbedding{
 					{Action: action1},
 					{Action: action2},
 				}
 			},
-			testFunc: func(t *testing.T, manager AssistantActionManager) {
-				actions := manager.List()
+			testFunc: func(t *testing.T, manager LocalRegistry) {
+				actions := manager.ListEmbeddings(t.Context())
 				assert.Len(t, actions, 2)
 				names := []string{}
 				for _, action := range actions {
-					names = append(names, action.Name)
+					names = append(names, action.Action.Definition().Name)
 				}
 				assert.ElementsMatch(t, []string{"fetch_todos", "create_todo"}, names)
 			},
 		},
 		"status-message-returns-action-specific-message": {
-			setupActions: func() []assistantActionVector {
+			setupActions: func() []actionregistry.ActionEmbedding {
 				action := domain.NewMockAssistantAction(t)
 				action.EXPECT().
 					Definition().
 					Return(mockAssistantActionDefinition("fetch_todos"))
 				action.EXPECT().StatusMessage().Return("🔎 Fetching todos...")
-				return []assistantActionVector{{Action: action}}
+				return []actionregistry.ActionEmbedding{{Action: action}}
 			},
-			testFunc: func(t *testing.T, manager AssistantActionManager) {
+			testFunc: func(t *testing.T, manager LocalRegistry) {
 				msg := manager.StatusMessage("fetch_todos")
 				assert.Equal(t, "🔎 Fetching todos...", msg)
 			},
 		},
 		"status-message-returns-default-when-action-not-found": {
-			setupActions: func() []assistantActionVector { return []assistantActionVector{} },
-			testFunc: func(t *testing.T, manager AssistantActionManager) {
+			setupActions: func() []actionregistry.ActionEmbedding { return []actionregistry.ActionEmbedding{} },
+			testFunc: func(t *testing.T, manager LocalRegistry) {
 				msg := manager.StatusMessage("unknown_action")
 				assert.Equal(t, "⏳ Processing request...", msg)
 			},
 		},
 		"execute-calls-correct-action": {
-			setupActions: func() []assistantActionVector {
+			setupActions: func() []actionregistry.ActionEmbedding {
 				action := domain.NewMockAssistantAction(t)
 				action.EXPECT().
 					Definition().
@@ -85,9 +88,9 @@ func TestAssistantActionManager(t *testing.T) {
 						Content:      "todos found",
 						ActionCallID: common.Ptr("call-1"),
 					})
-				return []assistantActionVector{{Action: action}}
+				return []actionregistry.ActionEmbedding{{Action: action}}
 			},
-			testFunc: func(t *testing.T, manager AssistantActionManager) {
+			testFunc: func(t *testing.T, manager LocalRegistry) {
 				result := manager.Execute(
 					context.Background(),
 					domain.AssistantActionCall{
@@ -105,8 +108,8 @@ func TestAssistantActionManager(t *testing.T) {
 			},
 		},
 		"execute-returns-error-for-unknown-action": {
-			setupActions: func() []assistantActionVector { return []assistantActionVector{} },
-			testFunc: func(t *testing.T, manager AssistantActionManager) {
+			setupActions: func() []actionregistry.ActionEmbedding { return []actionregistry.ActionEmbedding{} },
+			testFunc: func(t *testing.T, manager LocalRegistry) {
 				result := manager.Execute(
 					context.Background(),
 					domain.AssistantActionCall{ID: "x", Name: "unknown_action", Input: ""},
@@ -121,39 +124,41 @@ func TestAssistantActionManager(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			manager := NewAssistantActionManager(nil, "", tt.setupActions()...)
+			manager := NewActionRegistry(nil, "", tt.setupActions()...)
 			tt.testFunc(t, manager)
 		})
 	}
 }
 
-func TestAssistantActionManager_List_And_StatusMessages(t *testing.T) {
-	actionDetails := []assistantActionVector{
+func TestActionRegistry_ListEmbeddings_And_StatusMessages(t *testing.T) {
+	t.Parallel()
+
+	vectorizedActions := []actionregistry.ActionEmbedding{
 		{Action: actions.NewUIFiltersSetterAction()},
 		{Action: actions.NewTodoFetcherAction(nil, nil, "")},
-		{Action: actions.NewTodoCreatorAction(nil, nil, nil)},
-		{Action: actions.NewTodoUpdaterAction(nil, nil)},
-		{Action: actions.NewTodoDueDateUpdaterAction(nil, nil, nil)},
-		{Action: actions.NewTodoDeleterAction(nil, nil)},
+		{Action: actions.NewBulkTodoCreatorAction(nil, nil, nil)},
+		{Action: actions.NewBulkTodoUpdaterAction(nil, nil)},
+		{Action: actions.NewBulkTodoDueDateUpdaterAction(nil, nil, nil)},
+		{Action: actions.NewBulkTodoDeleterAction(nil, nil)},
 	}
 
-	manager := NewAssistantActionManager(nil, "", actionDetails...)
+	manager := NewActionRegistry(nil, "", vectorizedActions...)
 
-	actions := manager.List()
+	actions := manager.ListEmbeddings(t.Context())
 	require.Len(t, actions, 6)
 
-	names := make([]string, 0, len(actions))
-	for _, action := range actions {
-		names = append(names, action.Name)
+	names := make([]string, 0, len(vectorizedActions))
+	for _, vectorizedAction := range vectorizedActions {
+		names = append(names, vectorizedAction.Action.Definition().Name)
 	}
 
 	assert.ElementsMatch(t, []string{
 		"set_ui_filters",
 		"fetch_todos",
-		"create_todo",
-		"update_todo",
-		"update_todo_due_date",
-		"delete_todo",
+		"create_todos",
+		"update_todos",
+		"update_todos_due_date",
+		"delete_todos",
 	}, names)
 
 	statusMessages := []string{}
@@ -164,14 +169,16 @@ func TestAssistantActionManager_List_And_StatusMessages(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"🎛️ Applying filters...",
 		"🔎 Fetching todos...",
-		"📝 Creating your todo...",
-		"✏️ Updating your todo...",
-		"📅 Updating the due date...",
-		"🗑️ Deleting the todo...",
+		"📝 Creating your todos...",
+		"✏️ Updating your todos...",
+		"📅 Updating due dates...",
+		"🗑️ Deleting todos...",
 	}, statusMessages)
 }
 
-func TestAssistantActionManager_List_IsSortedByName(t *testing.T) {
+func TestActionRegistry_List_IsSortedByName(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		actionNames   []string
 		expectedNames []string
@@ -184,20 +191,20 @@ func TestAssistantActionManager_List_IsSortedByName(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			actionVectors := make([]assistantActionVector, 0, len(tt.actionNames))
+			actionVectors := make([]actionregistry.ActionEmbedding, 0, len(tt.actionNames))
 			for _, actionName := range tt.actionNames {
-				actionVectors = append(actionVectors, assistantActionVector{
+				actionVectors = append(actionVectors, actionregistry.ActionEmbedding{
 					Action: newStaticAssistantAction(actionName),
 				})
 			}
 
-			manager := NewAssistantActionManager(nil, "", actionVectors...)
-			actions := manager.List()
-			require.Len(t, actions, len(tt.expectedNames))
+			manager := NewActionRegistry(nil, "", actionVectors...)
+			vectorizedActions := manager.ListEmbeddings(t.Context())
+			require.Len(t, vectorizedActions, len(tt.expectedNames))
 
-			names := make([]string, 0, len(actions))
-			for _, action := range actions {
-				names = append(names, action.Name)
+			names := make([]string, 0, len(vectorizedActions))
+			for _, action := range vectorizedActions {
+				names = append(names, action.Action.Definition().Name)
 			}
 
 			assert.Equal(t, tt.expectedNames, names)
@@ -205,7 +212,9 @@ func TestAssistantActionManager_List_IsSortedByName(t *testing.T) {
 	}
 }
 
-func TestInitAssistantActionRegistry_Initialize(t *testing.T) {
+func TestInitActionRegistry_Initialize(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		setupMock    func(*domain.MockSemanticEncoder)
 		expectError  bool
@@ -227,7 +236,7 @@ func TestInitAssistantActionRegistry_Initialize(t *testing.T) {
 			expectError: false,
 			validateFunc: func(t *testing.T, ctx context.Context) {
 				assert.NotNil(t, ctx)
-				r, err := depend.Resolve[domain.AssistantActionRegistry]()
+				r, err := depend.ResolveNamed[actionregistry.EmbeddingActionRegistry]("local")
 				require.NoError(t, err)
 				assert.NotNil(t, r)
 			},
@@ -254,7 +263,7 @@ func TestInitAssistantActionRegistry_Initialize(t *testing.T) {
 			mockEncoder := domain.NewMockSemanticEncoder(t)
 			tt.setupMock(mockEncoder)
 
-			i := InitAssistantActionRegistry{
+			i := InitLocalActionRegistry{
 				SemanticEncoder: mockEncoder,
 				EmbeddingModel:  "test-model",
 			}
@@ -274,7 +283,9 @@ func TestInitAssistantActionRegistry_Initialize(t *testing.T) {
 	}
 }
 
-func TestAssistantActionManager_ListRelevant(t *testing.T) {
+func TestActionRegistry_ListRelevant(t *testing.T) {
+	t.Parallel()
+
 	t.Run("returns-top-k-actions-by-similarity", func(t *testing.T) {
 		mockEncoder := domain.NewMockSemanticEncoder(t)
 		mockEncoder.EXPECT().
@@ -282,22 +293,22 @@ func TestAssistantActionManager_ListRelevant(t *testing.T) {
 			Return(domain.EmbeddingVector{Vector: []float64{1, 0}}, nil).
 			Once()
 
-		manager := NewAssistantActionManager(mockEncoder, "test-model",
-			assistantActionVector{
-				Action:  newStaticAssistantAction("update_todo"),
-				Vectors: []float64{1, 0},
+		manager := NewActionRegistry(mockEncoder, "test-model",
+			actionregistry.ActionEmbedding{
+				Action:    newStaticAssistantAction("update_todo"),
+				Embedding: []float64{1, 0},
 			},
-			assistantActionVector{
-				Action:  newStaticAssistantAction("update_todo_due_date"),
-				Vectors: []float64{0.95, 0.05},
+			actionregistry.ActionEmbedding{
+				Action:    newStaticAssistantAction("update_todo_due_date"),
+				Embedding: []float64{0.95, 0.05},
 			},
-			assistantActionVector{
-				Action:  newStaticAssistantAction("create_todo"),
-				Vectors: []float64{0.8, 0.2},
+			actionregistry.ActionEmbedding{
+				Action:    newStaticAssistantAction("create_todo"),
+				Embedding: []float64{0.8, 0.2},
 			},
-			assistantActionVector{
-				Action:  newStaticAssistantAction("fetch_todos"),
-				Vectors: []float64{0.6, 0.4},
+			actionregistry.ActionEmbedding{
+				Action:    newStaticAssistantAction("fetch_todos"),
+				Embedding: []float64{0.6, 0.4},
 			},
 		)
 
@@ -315,14 +326,14 @@ func TestAssistantActionManager_ListRelevant(t *testing.T) {
 			Return(domain.EmbeddingVector{}, errors.New("embedding unavailable")).
 			Once()
 
-		manager := NewAssistantActionManager(mockEncoder, "test-model",
-			assistantActionVector{
-				Action:  newStaticAssistantAction("fetch_todos"),
-				Vectors: []float64{1, 0},
+		manager := NewActionRegistry(mockEncoder, "test-model",
+			actionregistry.ActionEmbedding{
+				Action:    newStaticAssistantAction("fetch_todos"),
+				Embedding: []float64{1, 0},
 			},
-			assistantActionVector{
-				Action:  newStaticAssistantAction("set_ui_filters"),
-				Vectors: []float64{0.9, 0.1},
+			actionregistry.ActionEmbedding{
+				Action:    newStaticAssistantAction("set_ui_filters"),
+				Embedding: []float64{0.9, 0.1},
 			},
 		)
 
@@ -339,14 +350,14 @@ func TestAssistantActionManager_ListRelevant(t *testing.T) {
 			Return(domain.EmbeddingVector{Vector: []float64{0, 1}}, nil).
 			Once()
 
-		manager := NewAssistantActionManager(mockEncoder, "test-model",
-			assistantActionVector{
-				Action:  newStaticAssistantAction("create_todo"),
-				Vectors: []float64{1, 0},
+		manager := NewActionRegistry(mockEncoder, "test-model",
+			actionregistry.ActionEmbedding{
+				Action:    newStaticAssistantAction("create_todo"),
+				Embedding: []float64{1, 0},
 			},
-			assistantActionVector{
-				Action:  newStaticAssistantAction("update_todo"),
-				Vectors: []float64{1, 0},
+			actionregistry.ActionEmbedding{
+				Action:    newStaticAssistantAction("update_todo"),
+				Embedding: []float64{1, 0},
 			},
 		)
 
@@ -355,6 +366,7 @@ func TestAssistantActionManager_ListRelevant(t *testing.T) {
 		names := []string{relevant[0].Name, relevant[1].Name}
 		assert.ElementsMatch(t, []string{"create_todo", "update_todo"}, names)
 	})
+
 }
 
 func mockAssistantActionDefinition(name string) domain.AssistantActionDefinition {

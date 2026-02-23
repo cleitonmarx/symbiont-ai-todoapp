@@ -15,6 +15,8 @@ import (
 )
 
 func TestConversationRepository_CreateConversation(t *testing.T) {
+	t.Parallel()
+
 	fixedID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2026, 2, 16, 12, 0, 0, 0, time.UTC)
 
@@ -85,6 +87,8 @@ func TestConversationRepository_CreateConversation(t *testing.T) {
 }
 
 func TestConversationRepository_GetConversation(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	lastMessageAt := time.Date(2026, 2, 16, 13, 0, 0, 0, time.UTC)
 	fixedTime := time.Date(2026, 2, 16, 12, 0, 0, 0, time.UTC)
@@ -158,6 +162,8 @@ func TestConversationRepository_GetConversation(t *testing.T) {
 }
 
 func TestConversationRepository_UpdateConversation(t *testing.T) {
+	t.Parallel()
+
 	lastMessageAt := time.Date(2026, 2, 16, 13, 0, 0, 0, time.UTC)
 	updatedAt := time.Date(2026, 2, 16, 14, 0, 0, 0, time.UTC)
 	conversation := domain.Conversation{
@@ -224,6 +230,8 @@ func TestConversationRepository_UpdateConversation(t *testing.T) {
 }
 
 func TestConversationRepository_ListConversations(t *testing.T) {
+	t.Parallel()
+
 	c1 := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	c2 := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	c3 := uuid.MustParse("00000000-0000-0000-0000-000000000003")
@@ -311,6 +319,8 @@ func TestConversationRepository_ListConversations(t *testing.T) {
 }
 
 func TestConversationRepository_DeleteConversation(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	tests := map[string]struct {
 		expect    func(sqlmock.Sqlmock)
@@ -356,6 +366,8 @@ func TestConversationRepository_DeleteConversation(t *testing.T) {
 }
 
 func TestInitConversationRepository_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := &InitConversationRepository{
 		DB: &sql.DB{},
 	}

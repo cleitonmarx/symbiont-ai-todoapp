@@ -108,6 +108,13 @@ func (d AssistantActionDefinition) ComposeHint() string {
 	return strings.Join(parts, " ")
 }
 
+// HasHints returns true if any of the hint fields are non-empty after trimming whitespace.
+func (d AssistantActionDefinition) HasHints() bool {
+	return strings.TrimSpace(d.Hints.UseWhen) != "" ||
+		strings.TrimSpace(d.Hints.AvoidWhen) != "" ||
+		strings.TrimSpace(d.Hints.ArgRules) != ""
+}
+
 // AssistantActionHints holds compact, runtime guidance for dynamic prompt injection.
 type AssistantActionHints struct {
 	UseWhen   string
@@ -158,15 +165,20 @@ type Assistant interface {
 
 // AssistantAction represents one executable assistant action.
 type AssistantAction interface {
+	// Definition returns the action definition for this action.
 	Definition() AssistantActionDefinition
+	// StatusMessage returns a status message about the action execution, or a default message if not implemented.
 	StatusMessage() string
+	// Execute runs the action with the given input and returns the resulting assistant message.
 	Execute(context.Context, AssistantActionCall, []AssistantMessage) AssistantMessage
 }
 
 // AssistantActionRegistry resolves and executes assistant actions.
 type AssistantActionRegistry interface {
+	// Execute runs the given action call and returns the resulting assistant message.
 	Execute(context.Context, AssistantActionCall, []AssistantMessage) AssistantMessage
+	// StatusMessage returns a status message about the action execution, or a default message if not implemented.
 	StatusMessage(actionName string) string
-	List() []AssistantActionDefinition
+	// ListRelevant returns relevant assistant action definitions based on the user input.
 	ListRelevant(ctx context.Context, userInput string) []AssistantActionDefinition
 }

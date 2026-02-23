@@ -12,6 +12,8 @@ import (
 )
 
 func TestTodoSearchBuilder_Build(t *testing.T) {
+	t.Parallel()
+
 	dueAfter := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
 	dueBefore := time.Date(2026, 2, 28, 0, 0, 0, 0, time.UTC)
 	done := domain.TodoStatus_DONE

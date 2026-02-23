@@ -117,3 +117,23 @@ func mapTodoFilterBuildErrCode(err error) string {
 	}
 	return "embedding_error"
 }
+
+// formatTodosRows formats todos as a compact table-like payload consumed by the assistant.
+func formatTodosRows(todos []domain.Todo) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "todos[%d]{id,title,due_date,status}", len(todos))
+	for _, todo := range todos {
+		fmt.Fprintf(&b, "\n%s,%s,%s,%s", todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status)
+	}
+	return b.String()
+}
+
+// formatDeletedRows formats deleted todo ids as a compact table-like payload.
+func formatDeletedRows(ids []string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "todos[%d]{id,deleted}", len(ids))
+	for _, id := range ids {
+		fmt.Fprintf(&b, "\n%s,true", id)
+	}
+	return b.String()
+}

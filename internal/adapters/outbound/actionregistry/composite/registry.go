@@ -126,14 +126,14 @@ func (r CompositeActionRegistry) ListRelevant(ctx context.Context, userInput str
 // InitCompositeActionRegistry is the initializer for CompositeActionRegistry, composing local and MCP gateway registries.
 type InitCompositeActionRegistry struct {
 	Local           actionregistry.EmbeddingActionRegistry `resolve:"local"`
-	MCPGateway      actionregistry.EmbeddingActionRegistry `resolve:"mcp-gateway"`
+	MCP             actionregistry.EmbeddingActionRegistry `resolve:"mcp"`
 	SemanticEncoder domain.SemanticEncoder                 `resolve:""`
 	EmbeddingModel  string                                 `config:"LLM_EMBEDDING_MODEL"`
 }
 
 // Initialize creates a CompositeActionRegistry from the local and MCP gateway registries and registers it in the dependency container.
 func (i InitCompositeActionRegistry) Initialize(ctx context.Context) (context.Context, error) {
-	composite := NewCompositeActionRegistry(ctx, i.SemanticEncoder, i.EmbeddingModel, i.Local, i.MCPGateway)
+	composite := NewCompositeActionRegistry(ctx, i.SemanticEncoder, i.EmbeddingModel, i.Local, i.MCP)
 	depend.Register[domain.AssistantActionRegistry](composite)
 	return ctx, nil
 }

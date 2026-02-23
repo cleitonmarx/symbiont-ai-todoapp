@@ -128,7 +128,7 @@ func TestActionRegistry(t *testing.T) {
 	}
 }
 
-func TestActionRegistry_List_And_StatusMessages(t *testing.T) {
+func TestActionRegistry_ListEmbeddings_And_StatusMessages(t *testing.T) {
 	vectorizedActions := []actionregistry.ActionEmbedding{
 		{Action: actions.NewUIFiltersSetterAction()},
 		{Action: actions.NewTodoFetcherAction(nil, nil, "")},
@@ -141,7 +141,7 @@ func TestActionRegistry_List_And_StatusMessages(t *testing.T) {
 	manager := NewActionRegistry(nil, "", vectorizedActions...)
 
 	actions := manager.ListEmbeddings(t.Context())
-	require.Len(t, actions, 10)
+	require.Len(t, actions, 6)
 
 	names := make([]string, 0, len(vectorizedActions))
 	for _, vectorizedAction := range vectorizedActions {
@@ -167,7 +167,7 @@ func TestActionRegistry_List_And_StatusMessages(t *testing.T) {
 		"🔎 Fetching todos...",
 		"📝 Creating your todos...",
 		"✏️ Updating your todos...",
-		"📅 Updating the due date...",
+		"📅 Updating due dates...",
 		"🗑️ Deleting todos...",
 	}, statusMessages)
 }

@@ -30,7 +30,7 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - **Conversation Title Worker** (`internal/adapters/inbound/workers/conversation_title_generator.go`): Batches chat events by `ConversationID` and updates titles asynchronously
 - **PostgreSQL** (`internal/adapters/outbound/postgres`): Primary data store with migrations and vector extension support
 - **Vault Provider** (`internal/adapters/outbound/config/vault_provider.go`): Loads secret-backed config values (`DB_USER`, `DB_PASS`)
-- **LLM Client** (`internal/adapters/outbound/modelrunner`): OpenAI-compatible client for chat, summarization, embeddings, and model listing
+- **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI/DRM-compatible client for chat, summarization, embeddings, and model listing
 - **Assistant Action Registries** (`internal/adapters/outbound/actionregistry`):
   - `local`: Built-in app actions (UI filters, fetch todos, and batch todo mutations)
   - `mcp`: MCP gateway-backed tool registry using `github.com/modelcontextprotocol/go-sdk/mcp`

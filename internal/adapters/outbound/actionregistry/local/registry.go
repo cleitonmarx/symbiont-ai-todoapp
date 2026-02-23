@@ -162,38 +162,20 @@ func (i InitLocalActionRegistry) Initialize(ctx context.Context) (context.Contex
 			i.SemanticEncoder,
 			i.EmbeddingModel,
 		),
-		// actions.NewTodoCreatorAction(
-		// 	i.Uow,
-		// 	i.TodoCreator,
-		// 	i.TimeProvider,
-		// ),
 		actions.NewBulkTodoCreatorAction(
 			i.Uow,
 			i.TodoCreator,
 			i.TimeProvider,
 		),
-		// actions.NewTodoUpdaterAction(
-		// 	i.Uow,
-		// 	i.TodoUpdater,
-		// ),
 		actions.NewBulkTodoUpdaterAction(
 			i.Uow,
 			i.TodoUpdater,
 		),
-		// actions.NewTodoDueDateUpdaterAction(
-		// 	i.Uow,
-		// 	i.TodoUpdater,
-		// 	i.TimeProvider,
-		// ),
 		actions.NewBulkTodoDueDateUpdaterAction(
 			i.Uow,
 			i.TodoUpdater,
 			i.TimeProvider,
 		),
-		// actions.NewTodoDeleterAction(
-		// 	i.Uow,
-		// 	i.TodoDeleter,
-		// ),
 		actions.NewBulkTodoDeleterAction(
 			i.Uow,
 			i.TodoDeleter,

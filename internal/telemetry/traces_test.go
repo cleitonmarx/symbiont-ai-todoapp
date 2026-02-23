@@ -13,6 +13,8 @@ import (
 )
 
 func TestSpanNameFormatter(t *testing.T) {
+	t.Parallel()
+
 	req, _ := http.NewRequest("GET", "/foo/bar", nil)
 	req.Pattern = "/foo/:bar"
 	assert.Equal(t, "/foo/:bar", SpanNameFormatter("", req))
@@ -22,6 +24,8 @@ func TestSpanNameFormatter(t *testing.T) {
 }
 
 func TestRecordErrorAndStatus(t *testing.T) {
+	t.Parallel()
+
 	span := &mockSpan{}
 	err := errors.New("fail")
 	assert.True(t, RecordErrorAndStatus(span, err))
@@ -36,6 +40,8 @@ func TestRecordErrorAndStatus(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
+	t.Parallel()
+
 	// Create in-memory exporter
 	exporter := tracetest.NewInMemoryExporter()
 

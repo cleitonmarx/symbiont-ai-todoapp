@@ -8,6 +8,8 @@ import (
 )
 
 func TestGemmaEmbedding_GenerateAssistentActionDefinitionPrompt(t *testing.T) {
+	t.Parallel()
+
 	embedding := gemmaEmbedding{}
 
 	action := domain.AssistantActionDefinition{

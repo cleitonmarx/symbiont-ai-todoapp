@@ -12,6 +12,8 @@ import (
 )
 
 func TestListAvailableModelsImpl_Query(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		setExpectations func(*domain.MockAssistantModelCatalog)
 		expectedModels  []domain.ModelInfo
@@ -60,6 +62,8 @@ func TestListAvailableModelsImpl_Query(t *testing.T) {
 }
 
 func TestInitListAvailableModels_Initialize(t *testing.T) {
+	t.Parallel()
+
 	assistantCatalog := domain.NewMockAssistantModelCatalog(t)
 	init := InitListAvailableModels{
 		AssistantCatalog: assistantCatalog,

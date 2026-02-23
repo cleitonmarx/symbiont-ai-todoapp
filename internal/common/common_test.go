@@ -5,6 +5,8 @@ import (
 )
 
 func TestPtr(t *testing.T) {
+	t.Parallel()
+
 	type sample struct {
 		A int
 		B string

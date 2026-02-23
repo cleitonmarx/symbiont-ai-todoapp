@@ -15,6 +15,8 @@ import (
 )
 
 func TestOutboxRepository_CreateEvent(t *testing.T) {
+	t.Parallel()
+
 	event := domain.TodoEvent{
 		TodoID:    uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 		Type:      domain.EventType_TODO_CREATED,
@@ -95,6 +97,8 @@ func TestOutboxRepository_CreateEvent(t *testing.T) {
 }
 
 func TestOutboxRepository_CreateChatEvent(t *testing.T) {
+	t.Parallel()
+
 	event := domain.ChatMessageEvent{
 		Type:           domain.EventType_CHAT_MESSAGE_SENT,
 		ChatRole:       domain.ChatRole_Assistant,
@@ -175,6 +179,8 @@ func TestOutboxRepository_CreateChatEvent(t *testing.T) {
 }
 
 func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
+	t.Parallel()
+
 	id1 := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	t1 := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
 
@@ -287,6 +293,8 @@ func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
 }
 
 func TestOutboxRepository_UpdateEvent(t *testing.T) {
+	t.Parallel()
+
 	id := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 
 	tests := map[string]struct {
@@ -348,6 +356,8 @@ func TestOutboxRepository_UpdateEvent(t *testing.T) {
 }
 
 func TestOutboxRepository_DeleteEvent(t *testing.T) {
+	t.Parallel()
+
 	id := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 
 	tests := map[string]struct {

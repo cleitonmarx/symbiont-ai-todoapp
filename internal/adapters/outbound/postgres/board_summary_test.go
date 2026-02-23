@@ -16,6 +16,8 @@ import (
 )
 
 func TestBoardSummaryRepository_StoreSummary(t *testing.T) {
+	t.Parallel()
+
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	generatedAt := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
@@ -122,6 +124,8 @@ func TestBoardSummaryRepository_StoreSummary(t *testing.T) {
 }
 
 func TestBoardSummaryRepository_GetLatestSummary(t *testing.T) {
+	t.Parallel()
+
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	generatedAt := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
@@ -241,6 +245,8 @@ func TestBoardSummaryRepository_GetLatestSummary(t *testing.T) {
 }
 
 func TestBoardSummaryRepository_CalculateSummaryContent(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		setExpectations func(mock sqlmock.Sqlmock)
 		expectedSummary domain.BoardSummaryContent
@@ -313,6 +319,8 @@ func TestBoardSummaryRepository_CalculateSummaryContent(t *testing.T) {
 }
 
 func TestInitBoardSummaryRepository_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := &InitBoardSummaryRepository{
 		DB: &sql.DB{},
 	}

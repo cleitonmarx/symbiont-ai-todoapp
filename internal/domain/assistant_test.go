@@ -7,6 +7,8 @@ import (
 )
 
 func TestAssistantActionDefinition_ComposeHint(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		hints    AssistantActionHints
 		wantHint string

@@ -10,6 +10,8 @@ import (
 )
 
 func TestMermaidGraphIntrospector_Introspect(t *testing.T) {
+	t.Parallel()
+
 	introspector := MermaidGraphIntrospector{}
 
 	report := introspection.Report{

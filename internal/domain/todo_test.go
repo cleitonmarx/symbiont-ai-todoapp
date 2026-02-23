@@ -11,6 +11,8 @@ import (
 )
 
 func TestTodo_Validate(t *testing.T) {
+	t.Parallel()
+
 	now := time.Date(2024, 7, 15, 0, 0, 0, 0, time.UTC)
 
 	tests := map[string]struct {
@@ -83,6 +85,8 @@ func TestTodo_Validate(t *testing.T) {
 }
 
 func TestListTodoOptions_WithOptions(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		opts []ListTodoOption
 		want ListTodosParams
@@ -159,6 +163,8 @@ func TestListTodoOptions_WithOptions(t *testing.T) {
 }
 
 func TestTodoSortBy_Validate(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		sortField     string
 		wantField     string
@@ -215,6 +221,8 @@ func TestTodoSortBy_Validate(t *testing.T) {
 }
 
 func TestTodoStatus_Validate(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		status  TodoStatus
 		wantErr error

@@ -12,6 +12,8 @@ import (
 )
 
 func TestBoardSummaryGenerator_Run(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		batchSize       int
 		interval        time.Duration

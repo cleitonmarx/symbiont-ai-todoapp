@@ -14,6 +14,8 @@ import (
 )
 
 func TestBulkTodoCreatorAction(t *testing.T) {
+	t.Parallel()
+
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
 
 	tests := map[string]struct {

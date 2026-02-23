@@ -45,6 +45,8 @@ var (
 )
 
 func TestTodoAppServer_CreateTodo(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		requestBody    []byte
 		setupUsecases  func(*usecases.MockCreateTodo)
@@ -154,6 +156,8 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 }
 
 func TestTodoAppServer_ListTodos(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		page            int
 		pageSize        int
@@ -402,6 +406,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 }
 
 func TestTodoAppServer_UpdateTodo(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		todoID         string
 		requestBody    []byte
@@ -521,6 +527,8 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 }
 
 func TestTodoAppServer_DeleteTodo(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		todoID         string
 		setupMocks     func(*usecases.MockDeleteTodo)

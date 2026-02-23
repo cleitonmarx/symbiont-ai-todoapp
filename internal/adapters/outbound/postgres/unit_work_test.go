@@ -15,6 +15,8 @@ import (
 )
 
 func TestUnitOfWork_Execute(t *testing.T) {
+	t.Parallel()
+
 	todoID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 
 	tests := map[string]struct {
@@ -108,6 +110,8 @@ func TestUnitOfWork_Execute(t *testing.T) {
 }
 
 func TestUnitOfWork_Todo(t *testing.T) {
+	t.Parallel()
+
 	db, _, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close() //nolint:errcheck
@@ -120,6 +124,8 @@ func TestUnitOfWork_Todo(t *testing.T) {
 }
 
 func TestUnitOfWork_Outbox(t *testing.T) {
+	t.Parallel()
+
 	db, _, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close() //nolint:errcheck
@@ -132,6 +138,8 @@ func TestUnitOfWork_Outbox(t *testing.T) {
 }
 
 func TestUnitOfWork_Conversation(t *testing.T) {
+	t.Parallel()
+
 	db, _, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close() //nolint:errcheck
@@ -144,6 +152,8 @@ func TestUnitOfWork_Conversation(t *testing.T) {
 }
 
 func TestUnitOfWork_ChatMessage(t *testing.T) {
+	t.Parallel()
+
 	db, _, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close() //nolint:errcheck
@@ -156,6 +166,8 @@ func TestUnitOfWork_ChatMessage(t *testing.T) {
 }
 
 func TestUnitOfWork_ConversationSummary(t *testing.T) {
+	t.Parallel()
+
 	db, _, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close() //nolint:errcheck
@@ -168,6 +180,8 @@ func TestUnitOfWork_ConversationSummary(t *testing.T) {
 }
 
 func TestUnitOfWork_getBaseRunner(t *testing.T) {
+	t.Parallel()
+
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close() //nolint:errcheck
@@ -199,6 +213,8 @@ func TestUnitOfWork_getBaseRunner(t *testing.T) {
 }
 
 func TestUnitOfWork_TransactionIsolation(t *testing.T) {
+	t.Parallel()
+
 	todoID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
@@ -251,6 +267,8 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 }
 
 func TestInitUnitOfWork_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := &InitUnitOfWork{
 		DB: &sql.DB{},
 	}

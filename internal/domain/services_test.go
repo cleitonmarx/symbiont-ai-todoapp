@@ -7,6 +7,8 @@ import (
 )
 
 func TestGenerateAutoConversationTitle(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		userMessage string
 		want        string
@@ -46,6 +48,8 @@ func TestGenerateAutoConversationTitle(t *testing.T) {
 }
 
 func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
+	t.Parallel()
+
 	policy := ConversationSummaryGenerationPolicy{
 		TriggerMessageCount: 10,
 		TriggerTokenCount:   2000,

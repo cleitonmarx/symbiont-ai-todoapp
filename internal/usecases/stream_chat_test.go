@@ -15,6 +15,8 @@ import (
 )
 
 func TestStreamChatImpl_Execute(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userMsgID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	assistantMsgID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
@@ -789,6 +791,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 }
 
 func TestInitStreamChat_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := InitStreamChat{}
 
 	ctx, err := i.Initialize(context.Background())

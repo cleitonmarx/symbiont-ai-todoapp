@@ -11,6 +11,8 @@ import (
 )
 
 func TestIntrospectHandler(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		registerDependencies func(t *testing.T)
 		expectedCode         int

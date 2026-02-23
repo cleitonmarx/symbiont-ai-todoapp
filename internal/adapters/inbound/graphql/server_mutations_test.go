@@ -39,6 +39,8 @@ var (
 )
 
 func TestTodoGraphQLServer_UpdateTodo(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		params        gen.UpdateTodoParams
 		setupUsecases func(*usecases.MockUpdateTodo)
@@ -93,6 +95,8 @@ func TestTodoGraphQLServer_UpdateTodo(t *testing.T) {
 }
 
 func TestTodoGraphQLServer_DeleteTodo(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		setupUsecases func(*usecases.MockDeleteTodo)
 		expect        bool

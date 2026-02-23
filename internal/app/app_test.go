@@ -7,6 +7,8 @@ import (
 )
 
 func TestNewTodoApp_Initializers(t *testing.T) {
+	t.Parallel()
+
 	app := NewTodoApp()
 	require.NotNil(t, app, "NewTodoApp should not return nil")
 }

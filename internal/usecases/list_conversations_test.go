@@ -14,6 +14,8 @@ import (
 )
 
 func TestListConversationsImpl_Query(t *testing.T) {
+	t.Parallel()
+
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	tests := map[string]struct {
@@ -166,6 +168,8 @@ func TestListConversationsImpl_Query(t *testing.T) {
 }
 
 func TestInitListConversations_Initialize(t *testing.T) {
+	t.Parallel()
+
 	ilc := InitListConversations{}
 
 	ctx, err := ilc.Initialize(context.Background())

@@ -10,6 +10,8 @@ import (
 )
 
 func TestTodoGraphQLServer_Run(t *testing.T) {
+	t.Parallel()
+
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

@@ -13,6 +13,8 @@ import (
 )
 
 func TestDeleteConversationImpl_Execute(t *testing.T) {
+	t.Parallel()
+
 	fixedConversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	tests := map[string]struct {
@@ -149,6 +151,8 @@ func TestDeleteConversationImpl_Execute(t *testing.T) {
 }
 
 func TestInitDeleteConversation_Initialize(t *testing.T) {
+	t.Parallel()
+
 	idc := InitDeleteConversation{}
 
 	_, err := idc.Initialize(context.Background())

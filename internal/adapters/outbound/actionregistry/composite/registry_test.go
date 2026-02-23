@@ -14,6 +14,8 @@ import (
 )
 
 func TestCompositeActionRegistry_Execute(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		call          domain.AssistantActionCall
 		history       []domain.AssistantMessage
@@ -118,6 +120,8 @@ func TestCompositeActionRegistry_Execute(t *testing.T) {
 }
 
 func TestCompositeActionRegistry_StatusMessage(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		actionName    string
 		registriesLen int
@@ -174,6 +178,8 @@ func TestCompositeActionRegistry_StatusMessage(t *testing.T) {
 }
 
 func TestCompositeActionRegistry_ListRelevant(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		queryVector     domain.EmbeddingVector
 		queryErr        error
@@ -366,6 +372,8 @@ func definitionsNames(definitions []domain.AssistantActionDefinition) []string {
 }
 
 func TestInitCompositeActionRegistry_Initialize(t *testing.T) {
+	t.Parallel()
+
 	localMock := actionregistry.NewMockEmbeddingActionRegistry(t)
 	localMock.EXPECT().ListEmbeddings(mock.Anything).Return([]actionregistry.ActionEmbedding{}).Once()
 	mcpMock := actionregistry.NewMockEmbeddingActionRegistry(t)

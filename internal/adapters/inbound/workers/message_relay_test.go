@@ -11,6 +11,8 @@ import (
 )
 
 func TestMessageRelay_Run(t *testing.T) {
+	t.Parallel()
+
 	md := usecases.NewMockRelayOutbox(t)
 
 	md.EXPECT().Execute(mock.Anything).Return(assert.AnError).Once()

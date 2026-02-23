@@ -10,6 +10,8 @@ import (
 )
 
 func TestInitLogger_Initialize(t *testing.T) {
+	t.Parallel()
+
 	init := InitLogger{}
 
 	_, err := init.Initialize(context.Background())

@@ -9,6 +9,8 @@ import (
 )
 
 func TestUIFiltersSetterAction(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		functionCall domain.AssistantActionCall
 		validateResp func(t *testing.T, resp domain.AssistantMessage)

@@ -7,6 +7,8 @@ import (
 )
 
 func TestBoardSummaryContent_DiffersFrom(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		current  BoardSummaryContent
 		previous BoardSummaryContent
@@ -58,6 +60,8 @@ func TestBoardSummaryContent_DiffersFrom(t *testing.T) {
 }
 
 func TestBoardSummaryContent_BuildComparisonHints(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		current  BoardSummaryContent
 		previous BoardSummaryContent
@@ -117,6 +121,8 @@ func TestBoardSummaryContent_BuildComparisonHints(t *testing.T) {
 }
 
 func TestBoardSummaryContent_ApplySummary(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		content BoardSummaryContent
 		summary string

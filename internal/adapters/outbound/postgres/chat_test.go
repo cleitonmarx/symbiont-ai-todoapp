@@ -16,6 +16,8 @@ import (
 )
 
 func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	fixedID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	turnID := uuid.MustParse("323e4567-e89b-12d3-a456-426614174100")
@@ -115,6 +117,8 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 }
 
 func TestChatMessageRepository_ListChatMessages(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	fixedID1 := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedID2 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
@@ -262,6 +266,8 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 }
 
 func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testing.T) {
+	t.Parallel()
+
 	fixedID1 := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedID2 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
 	fixedID3 := uuid.MustParse("323e4567-e89b-12d3-a456-426614174002")
@@ -362,6 +368,8 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 }
 
 func TestChatMessageRepository_DeleteConversationMessages(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	tests := map[string]struct {
 		expect func(sqlmock.Sqlmock)
@@ -402,6 +410,8 @@ func TestChatMessageRepository_DeleteConversationMessages(t *testing.T) {
 }
 
 func TestInitChatMessageRepository_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := &InitChatMessageRepository{
 		DB: &sql.DB{},
 	}

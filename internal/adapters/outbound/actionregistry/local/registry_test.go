@@ -16,6 +16,8 @@ import (
 )
 
 func TestActionRegistry(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		setupActions   func() []actionregistry.ActionEmbedding
 		embeddingModel string
@@ -129,6 +131,8 @@ func TestActionRegistry(t *testing.T) {
 }
 
 func TestActionRegistry_ListEmbeddings_And_StatusMessages(t *testing.T) {
+	t.Parallel()
+
 	vectorizedActions := []actionregistry.ActionEmbedding{
 		{Action: actions.NewUIFiltersSetterAction()},
 		{Action: actions.NewTodoFetcherAction(nil, nil, "")},
@@ -173,6 +177,8 @@ func TestActionRegistry_ListEmbeddings_And_StatusMessages(t *testing.T) {
 }
 
 func TestActionRegistry_List_IsSortedByName(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		actionNames   []string
 		expectedNames []string
@@ -207,6 +213,8 @@ func TestActionRegistry_List_IsSortedByName(t *testing.T) {
 }
 
 func TestInitActionRegistry_Initialize(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		setupMock    func(*domain.MockSemanticEncoder)
 		expectError  bool
@@ -276,6 +284,8 @@ func TestInitActionRegistry_Initialize(t *testing.T) {
 }
 
 func TestActionRegistry_ListRelevant(t *testing.T) {
+	t.Parallel()
+
 	t.Run("returns-top-k-actions-by-similarity", func(t *testing.T) {
 		mockEncoder := domain.NewMockSemanticEncoder(t)
 		mockEncoder.EXPECT().

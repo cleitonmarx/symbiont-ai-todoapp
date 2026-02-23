@@ -10,6 +10,8 @@ import (
 )
 
 func TestBuildToolSelectionText(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		messages          []domain.AssistantMessage
 		expectedText      string
@@ -66,6 +68,8 @@ func TestBuildToolSelectionText(t *testing.T) {
 }
 
 func TestBuildToolingPrompt(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		actions      []domain.AssistantActionDefinition
 		expectEmpty  bool

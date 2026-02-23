@@ -18,6 +18,8 @@ import (
 )
 
 func TestPubSubEventPublisher_PublishEvent(t *testing.T) {
+	t.Parallel()
+
 	eventID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	todoID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -138,6 +140,8 @@ func TestPubSubEventPublisher_PublishEvent(t *testing.T) {
 }
 
 func TestInitPublisher_Initialize(t *testing.T) {
+	t.Parallel()
+
 	init := &InitPublisher{
 		Client: &pubsubV2.Client{},
 	}

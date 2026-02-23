@@ -14,6 +14,8 @@ import (
 )
 
 func TestListTodosImpl_Query(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		setExpectations func(repo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder)
 		page            int
@@ -218,6 +220,8 @@ func TestListTodosImpl_Query(t *testing.T) {
 }
 
 func TestInitListTodos_Initialize(t *testing.T) {
+	t.Parallel()
+
 	ilt := InitListTodos{}
 
 	ctx, err := ilt.Initialize(context.Background())

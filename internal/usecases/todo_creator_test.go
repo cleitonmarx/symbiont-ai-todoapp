@@ -14,6 +14,8 @@ import (
 )
 
 func TestTodoCreatorImpl_Create(t *testing.T) {
+	t.Parallel()
+
 	fixedUUID := func() uuid.UUID {
 		return uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	}
@@ -169,6 +171,8 @@ func TestTodoCreatorImpl_Create(t *testing.T) {
 }
 
 func TestInitTodoCreator_Initialize(t *testing.T) {
+	t.Parallel()
+
 	ict := InitTodoCreator{}
 
 	ctx, err := ict.Initialize(context.Background())

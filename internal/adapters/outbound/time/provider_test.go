@@ -11,6 +11,8 @@ import (
 )
 
 func TestInitCurrentTimeProvider_Initialize(t *testing.T) {
+	t.Parallel()
+
 	i := &InitCurrentTimeProvider{}
 
 	_, err := i.Initialize(context.Background())
@@ -21,6 +23,8 @@ func TestInitCurrentTimeProvider_Initialize(t *testing.T) {
 }
 
 func TestCurrentTimeProvider_Now(t *testing.T) {
+	t.Parallel()
+
 	p := CurrentTimeProvider{}
 	now := p.Now()
 	assert.WithinDuration(t, time.Now(), now, time.Second)

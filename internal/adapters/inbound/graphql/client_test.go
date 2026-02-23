@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,18 +21,26 @@ type mockRoundTripper struct {
 	handler func(*http.Request) *http.Response
 }
 
+var defaultHTTPClientMu sync.Mutex
+
 func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return m.handler(req), nil
 }
 
 // setTestHTTPClient replaces http.DefaultClient's Transport for testing.
 func setTestHTTPClient(handler func(*http.Request) *http.Response) func() {
+	defaultHTTPClientMu.Lock()
 	orig := http.DefaultClient.Transport
 	http.DefaultClient.Transport = &mockRoundTripper{handler: handler}
-	return func() { http.DefaultClient.Transport = orig }
+	return func() {
+		http.DefaultClient.Transport = orig
+		defaultHTTPClientMu.Unlock()
+	}
 }
 
 func TestClient_UpdateTodos(t *testing.T) {
+	t.Parallel()
+
 	todoIDs := []uuid.UUID{uuid.New(), uuid.New()}
 	dueDate := time.Date(2024, 12, 31, 0, 0, 0, 0, time.UTC)
 	todos := []*gen.Todo{
@@ -96,6 +105,8 @@ func TestClient_UpdateTodos(t *testing.T) {
 }
 
 func TestClient_DeleteTodos(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		ids         []uuid.UUID
 		mockHandler func(*http.Request) *http.Response
@@ -151,6 +162,8 @@ func TestClient_DeleteTodos(t *testing.T) {
 }
 
 func TestClient_ListTodos(t *testing.T) {
+	t.Parallel()
+
 	page := &gen.TodoPage{Page: 1}
 	tests := map[string]struct {
 		status      *gen.TodoStatus

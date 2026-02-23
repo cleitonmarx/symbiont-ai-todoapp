@@ -14,6 +14,8 @@ import (
 )
 
 func TestMCPRegistry_ListEmbeddings_MapsToolSchema(t *testing.T) {
+	t.Parallel()
+
 	session := &fakeSession{
 		listResults: []*mcp.ListToolsResult{
 			{
@@ -64,6 +66,8 @@ func TestMCPRegistry_ListEmbeddings_MapsToolSchema(t *testing.T) {
 }
 
 func TestMCPRegistry_Execute_CallsTool(t *testing.T) {
+	t.Parallel()
+
 	session := &fakeSession{
 		listResults: []*mcp.ListToolsResult{
 			{
@@ -111,6 +115,8 @@ func TestMCPRegistry_Execute_CallsTool(t *testing.T) {
 }
 
 func TestRegistry_Execute_InvalidArguments(t *testing.T) {
+	t.Parallel()
+
 	session := &fakeSession{
 		listResults: []*mcp.ListToolsResult{
 			{
@@ -143,6 +149,8 @@ func TestRegistry_Execute_InvalidArguments(t *testing.T) {
 }
 
 func TestRegistry_Execute_IsErrorPrefix(t *testing.T) {
+	t.Parallel()
+
 	session := &fakeSession{
 		listResults: []*mcp.ListToolsResult{
 			{
@@ -224,6 +232,8 @@ func (s *fakeSession) CallTool(_ context.Context, params *mcp.CallToolParams) (*
 func (s *fakeSession) Close() error { return nil }
 
 func TestRegistry_Execute_UnknownAction(t *testing.T) {
+	t.Parallel()
+
 	registry := newMCPRegistryWithConnector(
 		Config{Endpoint: "http://localhost:8811/mcp"},
 		&fakeConnector{session: &fakeSession{}},
@@ -241,6 +251,8 @@ func TestRegistry_Execute_UnknownAction(t *testing.T) {
 }
 
 func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
+	t.Parallel()
+
 	session := &fakeSession{
 		listResults: []*mcp.ListToolsResult{
 			{

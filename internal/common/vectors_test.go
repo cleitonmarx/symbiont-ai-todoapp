@@ -7,6 +7,8 @@ import (
 )
 
 func TestCosineSimilarity(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		vectorA     []float64
 		vectorB     []float64

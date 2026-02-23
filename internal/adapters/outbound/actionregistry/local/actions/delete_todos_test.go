@@ -13,6 +13,8 @@ import (
 )
 
 func TestBulkTodoDeleterAction(t *testing.T) {
+	t.Parallel()
+
 	todoID1 := uuid.New()
 	todoID2 := uuid.New()
 

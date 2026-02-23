@@ -24,6 +24,8 @@ import (
 )
 
 func TestTodoAppServer_ListChatMessages(t *testing.T) {
+	t.Parallel()
+
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	fixedTime := time.Date(2026, 1, 22, 10, 30, 0, 0, time.UTC)
 	fixedID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
@@ -159,6 +161,8 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 }
 
 func TestTodoAppServer_StreamChat(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		requestBody    any
 		setupUsecases  func(*usecases.MockStreamChat)
@@ -295,6 +299,8 @@ func newMockFlusherRecorder() *mockFlusherRecorder {
 func (m *mockFlusherRecorder) Flush() {}
 
 func TestTodoAppServer_ListAvailableModels(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		setupUsecase   func(*usecases.MockListAvailableModels)
 		expectedStatus int

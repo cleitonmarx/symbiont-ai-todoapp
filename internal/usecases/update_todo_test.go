@@ -14,6 +14,8 @@ import (
 )
 
 func TestUpdateTodoImpl_Execute(t *testing.T) {
+	t.Parallel()
+
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	newTitle := "Updated Todo"
@@ -215,7 +217,8 @@ func TestUpdateTodoImpl_Execute(t *testing.T) {
 }
 
 func TestInitUpdateTodo_Initialize(t *testing.T) {
-	// Clean up previous registrations if any
+	t.Parallel()
+
 	iut := InitUpdateTodo{}
 
 	ctx, err := iut.Initialize(context.Background())

@@ -37,6 +37,8 @@ const (
 	OutboxTopic_Todo OutboxTopic = "Todo"
 	// OutboxTopic_ChatMessages is the topic for chat message events.
 	OutboxTopic_ChatMessages OutboxTopic = "ChatMessages"
+	// OutboxTopic_ActionApprovals is the topic for action approval decision events.
+	OutboxTopic_ActionApprovals OutboxTopic = "ActionApprovals"
 )
 
 // OutboxEvent represents an event stored in the outbox.

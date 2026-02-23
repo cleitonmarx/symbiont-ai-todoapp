@@ -18,6 +18,8 @@ const (
 	EventType_TODO_DELETED EventType = "TODO.DELETED"
 	// EventType_CHAT_MESSAGE_SENT represents the event when a chat message is sent.
 	EventType_CHAT_MESSAGE_SENT EventType = "CHAT_MESSAGE.SENT"
+	// EventType_ACTION_APPROVAL_DECIDED represents a human approval decision for an assistant action call.
+	EventType_ACTION_APPROVAL_DECIDED EventType = "ACTION_APPROVAL.DECIDED"
 )
 
 // TodoEvent represents a domain event in the system.

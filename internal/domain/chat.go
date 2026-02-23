@@ -28,24 +28,43 @@ const (
 	ChatMessageState_Failed ChatMessageState = "FAILED"
 )
 
+// ChatMessageApprovalStatus represents the approval lifecycle status for a tool call message.
+type ChatMessageApprovalStatus string
+
+const (
+	// ChatMessageApprovalStatus_Pending indicates an approval is still awaiting a decision.
+	ChatMessageApprovalStatus_Pending ChatMessageApprovalStatus = "PENDING"
+	// ChatMessageApprovalStatus_Approved indicates an approval was accepted.
+	ChatMessageApprovalStatus_Approved ChatMessageApprovalStatus = "APPROVED"
+	// ChatMessageApprovalStatus_Rejected indicates an approval was rejected by the user.
+	ChatMessageApprovalStatus_Rejected ChatMessageApprovalStatus = "REJECTED"
+	// ChatMessageApprovalStatus_AutoRejected indicates an approval was automatically rejected by the system.
+	ChatMessageApprovalStatus_AutoRejected ChatMessageApprovalStatus = "AUTO_REJECTED"
+	// ChatMessageApprovalStatus_Expired indicates an approval request timed out.
+	ChatMessageApprovalStatus_Expired ChatMessageApprovalStatus = "EXPIRED"
+)
+
 // ChatMessage represents an AI chat message in a conversation
 type ChatMessage struct {
-	ID               uuid.UUID
-	ConversationID   uuid.UUID
-	TurnID           uuid.UUID
-	TurnSequence     int64
-	ChatRole         ChatRole
-	Content          string
-	ActionCallID     *string
-	ActionCalls      []AssistantActionCall
-	Model            string
-	MessageState     ChatMessageState
-	ErrorMessage     *string
-	PromptTokens     int
-	CompletionTokens int
-	TotalTokens      int
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                     uuid.UUID
+	ConversationID         uuid.UUID
+	TurnID                 uuid.UUID
+	TurnSequence           int64
+	ChatRole               ChatRole
+	Content                string
+	ActionCallID           *string
+	ActionCalls            []AssistantActionCall
+	Model                  string
+	MessageState           ChatMessageState
+	ErrorMessage           *string
+	ApprovalStatus         *ChatMessageApprovalStatus
+	ApprovalDecisionReason *string
+	ApprovalDecidedAt      *time.Time
+	PromptTokens           int
+	CompletionTokens       int
+	TotalTokens            int
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }
 
 // IsActionCallSuccess returns true if the message represents a successful action call result.
@@ -53,6 +72,11 @@ func (m ChatMessage) IsActionCallSuccess() bool {
 	return m.ChatRole == ChatRole_Tool &&
 		m.ActionCallID != nil &&
 		m.MessageState == ChatMessageState_Completed
+}
+
+// IsApprovalPending returns true when the message is waiting for a human approval decision.
+func (m ChatMessage) IsApprovalPending() bool {
+	return m.ApprovalStatus != nil && *m.ApprovalStatus == ChatMessageApprovalStatus_Pending
 }
 
 // ListChatMessagesParams defines optional filters for listing chat messages.

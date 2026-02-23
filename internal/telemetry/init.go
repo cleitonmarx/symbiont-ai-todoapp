@@ -138,7 +138,7 @@ func dontRetry500StatusPolicy(policy retryablehttp.CheckRetry) retryablehttp.Che
 			return false, ctx.Err()
 		}
 
-		if resp.StatusCode == http.StatusInternalServerError {
+		if resp != nil && resp.StatusCode == http.StatusInternalServerError {
 			return false, err
 		}
 		return policy(ctx, resp, err)

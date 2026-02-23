@@ -58,6 +58,15 @@ func (r CompositeActionRegistry) Execute(ctx context.Context, call domain.Assist
 	return actionEmbedding.Action.Execute(spanCtx, call, conversationHistory)
 }
 
+// GetDefinition returns one action definition by name.
+func (r CompositeActionRegistry) GetDefinition(actionName string) (domain.AssistantActionDefinition, bool) {
+	actionEmbedding, found := r.registriesActions[actionName]
+	if !found {
+		return domain.AssistantActionDefinition{}, false
+	}
+	return actionEmbedding.Action.Definition(), true
+}
+
 // StatusMessage iterates through the composed registries to get the status message for the given action, returning a default message if none found.
 func (r CompositeActionRegistry) StatusMessage(actionName string) string {
 	actionEmbedding, found := r.registriesActions[actionName]

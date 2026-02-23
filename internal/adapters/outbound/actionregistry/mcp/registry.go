@@ -213,6 +213,15 @@ func (r *MCPRegistry) Execute(ctx context.Context, call domain.AssistantActionCa
 	}
 }
 
+// GetDefinition returns one action definition by name.
+func (r *MCPRegistry) GetDefinition(actionName string) (domain.AssistantActionDefinition, bool) {
+	action, found := r.actionsByName[actionName]
+	if !found {
+		return domain.AssistantActionDefinition{}, false
+	}
+	return action.Action.Definition(), true
+}
+
 // StatusMessage returns a status message for one tool name.
 func (r *MCPRegistry) StatusMessage(actionName string) string {
 	if strings.TrimSpace(actionName) == "" {

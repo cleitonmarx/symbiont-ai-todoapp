@@ -163,15 +163,19 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event doma
 		return fmt.Errorf("failed to update conversation title: %w", err)
 	}
 
-	gct.queueTitleUpdate(conversation)
+	gct.queueTitleUpdate(ctx, conversation)
 
 	return nil
 }
 
 // queueTitleUpdate sends the updated conversation to the channel for any post-processing after title generation.
-func (gct GenerateConversationTitleImpl) queueTitleUpdate(conversation domain.Conversation) {
+func (gct GenerateConversationTitleImpl) queueTitleUpdate(ctx context.Context, conversation domain.Conversation) {
 	if gct.completedTitleCh != nil {
-		gct.completedTitleCh <- conversation
+		select {
+		case gct.completedTitleCh <- conversation:
+		case <-ctx.Done():
+		default:
+		}
 	}
 }
 

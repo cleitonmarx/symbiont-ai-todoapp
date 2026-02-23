@@ -206,7 +206,11 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event domain.Cha
 	}
 
 	if gcs.completedSummaryCh != nil {
-		gcs.completedSummaryCh <- newSummary
+		select {
+		case gcs.completedSummaryCh <- newSummary:
+		case <-ctx.Done():
+		default:
+		}
 	}
 
 	return nil

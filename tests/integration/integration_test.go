@@ -480,7 +480,7 @@ func TestTodoApp_MCPIntegration(t *testing.T) {
 
 		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsText(t, chatResp.Body)
 
-		require.Contains(t, actionStartedText, "⏳ Running fetch_content...")
+		require.Contains(t, actionStartedText, "📄 Fetching page content...")
 		require.GreaterOrEqual(t, actionCompletedCount, 1)
 		require.Contains(t, deltaText, "DuckDuckGo website", "expected chat response to contain content fetched from the web page")
 		fmt.Println("Chat response:", deltaText)

@@ -89,7 +89,7 @@ func TestActionApprovalDispatcher_Run(t *testing.T) {
 
 			if tc.expectDispatch {
 				dispatcher.EXPECT().
-					Dispatch(mock.MatchedBy(func(decision domain.AssistantActionApprovalDecision) bool {
+					Dispatch(mock.Anything, mock.MatchedBy(func(decision domain.AssistantActionApprovalDecision) bool {
 						if decision.Key.ConversationID != conversationID {
 							return false
 						}

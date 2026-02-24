@@ -71,7 +71,7 @@ func (w ActionApprovalDispatcher) Run(ctx context.Context) error {
 				return
 			}
 
-			dispatched := w.Dispatcher.Dispatch(decision)
+			dispatched := w.Dispatcher.Dispatch(msgCtx, decision)
 			if !dispatched {
 				w.Logger.Printf(
 					"ActionApprovalDispatcher: no active waiter for conversation_id=%s turn_id=%s action_call_id=%s",

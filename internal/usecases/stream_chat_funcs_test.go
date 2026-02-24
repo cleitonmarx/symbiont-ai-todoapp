@@ -76,7 +76,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	)
 
 	var capturedContent string
-	err := useCase.Execute(context.Background(), tt.userMessage, tt.model, func(eventType domain.AssistantEventType, data any) error {
+	err := useCase.Execute(context.Background(), tt.userMessage, tt.model, func(_ context.Context, eventType domain.AssistantEventType, data any) error {
 		if tt.onEventErrType != "" && eventType == tt.onEventErrType {
 			return errors.New("onEvent error")
 		}
@@ -106,7 +106,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 // action call interaction, including meta, delta, and done events.
 func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Time) func(_ context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 	return func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
-		if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+		if err := onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 			UserMessageID:      userMsgID,
 			AssistantMessageID: assistantMsgID,
 		}); err != nil {
@@ -115,7 +115,7 @@ func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.
 
 		lastMsg := req.Messages[len(req.Messages)-1]
 		if lastMsg.Content == "Call an action" {
-			err := onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+			err := onEvent(ctx, domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
 				ID:    "func-123",
 				Name:  "list_todos",
 				Input: `{"page": 1, "page_size": 5, "search_term": "searchTerm"}`,
@@ -124,12 +124,12 @@ func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.
 		}
 
 		if lastMsg.Role == domain.ChatRole_Tool {
-			if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Action called successfully."}); err != nil {
+			if err := onEvent(ctx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Action called successfully."}); err != nil {
 				return err
 			}
 		}
 
-		if err := onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
+		if err := onEvent(ctx, domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 			AssistantMessageID: assistantMsgID.String(),
 			CompletedAt:        fixedTime.Format(time.RFC3339),
 		}); err != nil {

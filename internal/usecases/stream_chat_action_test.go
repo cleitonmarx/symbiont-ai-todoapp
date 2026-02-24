@@ -177,23 +177,23 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 						if callCount == 0 {
 							callCount++
-							if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+							if err := onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 								UserMessageID:      userMsgID,
 								AssistantMessageID: assistantMsgID,
 							}); err != nil {
 								return err
 							}
-							return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+							return onEvent(ctx, domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
 								ID:    "func-error",
 								Name:  "failing_action",
 								Input: "{\"input\":\"x\"}",
 							})
 						}
 
-						if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "I could not complete that action call."}); err != nil {
+						if err := onEvent(ctx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "I could not complete that action call."}); err != nil {
 							return err
 						}
-						return onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
+						return onEvent(ctx, domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 							AssistantMessageID: assistantMsgID.String(),
 							CompletedAt:        fixedTime.Format(time.RFC3339),
 						})
@@ -276,13 +276,13 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				assistant.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
-						if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+						if err := onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						}); err != nil {
 							return err
 						}
-						return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+						return onEvent(ctx, domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
 							ID:    "func-1",
 							Name:  "fetch_todos",
 							Input: `{"page": 1}`,
@@ -364,13 +364,13 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				assistant.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
-						if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+						if err := onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						}); err != nil {
 							return err
 						}
-						return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+						return onEvent(ctx, domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
 							ID:    "func-1",
 							Name:  "fetch_todos",
 							Input: `{"page": 1}`,
@@ -461,7 +461,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 						if callCount == 0 {
-							if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+							if err := onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 								UserMessageID:      userMsgID,
 								AssistantMessageID: assistantMsgID,
 							}); err != nil {
@@ -470,7 +470,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						}
 
 						callCount++
-						return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+						return onEvent(ctx, domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
 							ID:    fmt.Sprintf("func-%d", callCount),
 							Name:  "fetch_todos",
 							Input: fmt.Sprintf(`{"page": %d}`, callCount),
@@ -564,7 +564,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 						if callCount == 0 {
-							if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+							if err := onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 								UserMessageID:      userMsgID,
 								AssistantMessageID: assistantMsgID,
 							}); err != nil {
@@ -573,7 +573,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						}
 
 						callCount++
-						return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+						return onEvent(ctx, domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
 							ID:    fmt.Sprintf("func-%d", callCount),
 							Name:  "fetch_todos",
 							Input: `{"page": 1}`,

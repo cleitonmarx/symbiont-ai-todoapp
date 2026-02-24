@@ -213,13 +213,13 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 					if assistantCallCount == 0 {
 						assistantCallCount++
-						if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+						if err := onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 							UserMessageID:      userMsgID,
 							AssistantMessageID: assistantMsgID,
 						}); err != nil {
 							return err
 						}
-						return onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+						return onEvent(ctx, domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
 							ID:    actionCallID,
 							Name:  actionName,
 							Input: actionInput,
@@ -231,10 +231,10 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 					assert.Equal(t, domain.ChatRole_Tool, last.Role)
 					assert.Equal(t, tc.expectedToolContent, last.Content)
 
-					if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: finalAssistantResponse}); err != nil {
+					if err := onEvent(ctx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: finalAssistantResponse}); err != nil {
 						return err
 					}
-					return onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
+					return onEvent(ctx, domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 						AssistantMessageID: assistantMsgID.String(),
 						CompletedAt:        fixedTime.Format(time.RFC3339),
 					})
@@ -296,7 +296,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				actionCompletedData  domain.AssistantActionCompleted
 				actionStartedSeen    bool
 			)
-			err := useCase.Execute(context.Background(), "Delete todo 1", "test-model", func(eventType domain.AssistantEventType, data any) error {
+			err := useCase.Execute(context.Background(), "Delete todo 1", "test-model", func(_ context.Context, eventType domain.AssistantEventType, data any) error {
 				eventSequence = append(eventSequence, eventType)
 				switch eventType {
 				case domain.AssistantEventType_ActionApprovalRequired:

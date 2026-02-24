@@ -175,8 +175,8 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	for continueChatStreaming := true; continueChatStreaming; {
 		continueChatStreaming = false
 
-		err = sc.assistant.RunTurn(spanCtx, req, func(eventType domain.AssistantEventType, data any) error {
-			shouldContinue, eventErr := sc.handleStreamEvent(spanCtx, eventType, data, model, &req, &state, onEvent)
+		err = sc.assistant.RunTurn(spanCtx, req, func(turnCtx context.Context, eventType domain.AssistantEventType, data any) error {
+			shouldContinue, eventErr := sc.handleStreamEvent(turnCtx, eventType, data, model, &req, &state, onEvent)
 			if shouldContinue {
 				continueChatStreaming = true
 			}
@@ -217,7 +217,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	// Append the final assistant message with the full content only if there is content
 	if assistantMsg.Content == "" {
 		assistantMsg.Content = "Sorry, I could not process your request. Please try again."
-		if err := onEvent(domain.AssistantEventType_MessageDelta,
+		if err := onEvent(ctx, domain.AssistantEventType_MessageDelta,
 			domain.AssistantMessageDelta{
 				Text: assistantMsg.Content + "\n",
 			},
@@ -234,7 +234,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	RecordLLMTokensUsed(spanCtx, state.tokenUsage.PromptTokens, state.tokenUsage.CompletionTokens)
 
 	// Send done event
-	if err := onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
+	if err := onEvent(ctx, domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 		AssistantMessageID: assistantMsg.ID.String(),
 		CompletedAt:        sc.timeProvider.Now().Format(time.RFC3339),
 		Usage:              state.tokenUsage,
@@ -289,7 +289,7 @@ func (sc StreamChatImpl) handleStreamEvent(
 	case domain.AssistantEventType_ActionRequested:
 		return sc.handleActionCallEvent(ctx, data, model, req, state, onEvent)
 	case domain.AssistantEventType_MessageDelta:
-		return false, sc.handleDeltaEvent(data, state, onEvent)
+		return false, sc.handleDeltaEvent(ctx, data, state, onEvent)
 	case domain.AssistantEventType_TurnCompleted:
 		sc.handleDoneEvent(data, state)
 		return false, nil
@@ -322,7 +322,7 @@ func (sc StreamChatImpl) handleMetaEvent(
 		return err
 	}
 	state.userMsgPersisted = true
-	return onEvent(domain.AssistantEventType_TurnStarted, meta)
+	return onEvent(ctx, domain.AssistantEventType_TurnStarted, meta)
 }
 
 // handleActionCallEvent persists assistant action-call and action-result messages, then updates request context.
@@ -404,7 +404,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 			ShouldRefetch: false,
 			Error:         &reason,
 		}
-		if err := onEvent(domain.AssistantEventType_ActionCompleted, actionCompleted); err != nil {
+		if err := onEvent(ctx, domain.AssistantEventType_ActionCompleted, actionCompleted); err != nil {
 			return false, err
 		}
 
@@ -420,7 +420,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 	}
 
 	actionCall.Text = sc.actionRegistry.StatusMessage(actionCall.Name)
-	if err := onEvent(domain.AssistantEventType_ActionStarted, actionCall); err != nil {
+	if err := onEvent(ctx, domain.AssistantEventType_ActionStarted, actionCall); err != nil {
 		return false, err
 	}
 
@@ -463,7 +463,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 	if !actionSucceeded {
 		actionCompleted.Error = &actionMessage.Content
 	}
-	if err := onEvent(domain.AssistantEventType_ActionCompleted, actionCompleted); err != nil {
+	if err := onEvent(ctx, domain.AssistantEventType_ActionCompleted, actionCompleted); err != nil {
 		return false, err
 	}
 
@@ -544,13 +544,14 @@ func approvalBlockedActionContent(
 
 // handleDeltaEvent appends assistant delta text and forwards the delta to the caller callback.
 func (sc StreamChatImpl) handleDeltaEvent(
+	ctx context.Context,
 	data any,
 	state *streamChatExecutionState,
 	onEvent domain.AssistantEventCallback,
 ) error {
 	delta := data.(domain.AssistantMessageDelta)
 	state.assistantMsgContent.WriteString(delta.Text)
-	return onEvent(domain.AssistantEventType_MessageDelta, data)
+	return onEvent(ctx, domain.AssistantEventType_MessageDelta, data)
 }
 
 // handleDoneEvent accumulates usage from one stream completion event.
@@ -588,7 +589,7 @@ func (sc StreamChatImpl) requestActionApprovalIfRequired(
 		PreviewFields:  definition.Approval.PreviewFields,
 		Timeout:        definition.Approval.Timeout,
 	}
-	if err := onEvent(domain.AssistantEventType_ActionApprovalRequired, approvalEvent); err != nil {
+	if err := onEvent(ctx, domain.AssistantEventType_ActionApprovalRequired, approvalEvent); err != nil {
 		return domain.AssistantActionApprovalDecision{}, false, err
 	}
 
@@ -608,7 +609,7 @@ func (sc StreamChatImpl) requestActionApprovalIfRequired(
 		Status:         decision.Status,
 		Reason:         decision.Reason,
 	}
-	if err := onEvent(domain.AssistantEventType_ActionApprovalResolved, resolved); err != nil {
+	if err := onEvent(ctx, domain.AssistantEventType_ActionApprovalResolved, resolved); err != nil {
 		return domain.AssistantActionApprovalDecision{}, false, err
 	}
 

@@ -33,8 +33,8 @@ func (dti DeleteTodoImpl) Execute(ctx context.Context, id uuid.UUID) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	return dti.uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
-		return dti.deleter.Delete(spanCtx, uow, id)
+	return dti.uow.Execute(spanCtx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
+		return dti.deleter.Delete(uowCtx, uow, id)
 	})
 }
 

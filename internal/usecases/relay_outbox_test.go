@@ -31,8 +31,8 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				uow.EXPECT().Outbox().Return(outbox)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					})
 
 				oe := domain.OutboxEvent{
@@ -71,8 +71,8 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				uow.EXPECT().Outbox().Return(outbox)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					})
 
 				eventID2 := uuid.MustParse("323e4567-e89b-12d3-a456-426614174000")
@@ -126,8 +126,8 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				uow.EXPECT().Outbox().Return(outbox)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					})
 
 				outbox.EXPECT().FetchPendingEvents(
@@ -166,8 +166,8 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				uow.EXPECT().Outbox().Return(outbox)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					})
 
 				outbox.EXPECT().FetchPendingEvents(
@@ -206,8 +206,8 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				uow.EXPECT().Outbox().Return(outbox)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					})
 
 				outbox.EXPECT().FetchPendingEvents(
@@ -224,8 +224,8 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				uow.EXPECT().Outbox().Return(outbox)
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					})
 
 				outbox.EXPECT().FetchPendingEvents(

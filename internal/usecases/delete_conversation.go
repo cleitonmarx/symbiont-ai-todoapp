@@ -32,8 +32,8 @@ func (uc *DeleteConversationImpl) Execute(ctx context.Context, conversationID uu
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	err := uc.uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
-		_, found, err := uow.Conversation().GetConversation(spanCtx, conversationID)
+	err := uc.uow.Execute(spanCtx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
+		_, found, err := uow.Conversation().GetConversation(uowCtx, conversationID)
 		if err != nil {
 			return err
 		}
@@ -41,13 +41,13 @@ func (uc *DeleteConversationImpl) Execute(ctx context.Context, conversationID uu
 			return domain.NewNotFoundErr(fmt.Sprintf("conversation with ID %s not found", conversationID))
 		}
 
-		if err := uow.ChatMessage().DeleteConversationMessages(spanCtx, conversationID); err != nil {
+		if err := uow.ChatMessage().DeleteConversationMessages(uowCtx, conversationID); err != nil {
 			return err
 		}
-		if err := uow.ConversationSummary().DeleteConversationSummary(spanCtx, conversationID); err != nil {
+		if err := uow.ConversationSummary().DeleteConversationSummary(uowCtx, conversationID); err != nil {
 			return err
 		}
-		if err := uow.Conversation().DeleteConversation(spanCtx, conversationID); err != nil {
+		if err := uow.Conversation().DeleteConversation(uowCtx, conversationID); err != nil {
 			return err
 		}
 		return nil

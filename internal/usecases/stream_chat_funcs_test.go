@@ -141,20 +141,20 @@ func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.
 
 // persistCallExpectation describes one expected CreateChatMessages call.
 type persistCallExpectation struct {
-	Role             domain.ChatRole
-	Content          string
-	ID               *uuid.UUID
-	MessageState     domain.ChatMessageState
-	ErrorMessage     *string
-	ApprovalStatus   *domain.ChatMessageApprovalStatus
+	Role                   domain.ChatRole
+	Content                string
+	ID                     *uuid.UUID
+	MessageState           domain.ChatMessageState
+	ErrorMessage           *string
+	ApprovalStatus         *domain.ChatMessageApprovalStatus
 	ApprovalDecisionReason *string
 	ApprovalDecidedAt      *time.Time
-	PromptTokens     *int
-	CompletionTokens *int
-	TotalTokens      *int
-	ActionCallsLen   int
-	HasActionCallID  bool
-	CreateErr        error
+	PromptTokens           *int
+	CompletionTokens       *int
+	TotalTokens            *int
+	ActionCallsLen         int
+	HasActionCallID        bool
+	CreateErr              error
 }
 
 // expectNowCalls enforces an exact number of current-time reads.
@@ -186,8 +186,8 @@ func expectPersistSequence(
 
 	uow.EXPECT().
 		Execute(mock.Anything, mock.Anything).
-		RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-			return fn(uow)
+		RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+			return fn(ctx, uow)
 		}).
 		Times(len(expectations))
 

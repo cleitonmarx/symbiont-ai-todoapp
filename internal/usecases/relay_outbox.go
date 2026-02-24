@@ -36,14 +36,14 @@ func (r RelayOutboxImpl) Execute(ctx context.Context) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	err := r.Uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
-		events, err := uow.Outbox().FetchPendingEvents(spanCtx, 100)
+	err := r.Uow.Execute(spanCtx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
+		events, err := uow.Outbox().FetchPendingEvents(uowCtx, 100)
 		if err != nil {
 			return err
 		}
 
 		for _, event := range events {
-			if err := r.relayEvent(spanCtx, uow, event); err != nil {
+			if err := r.relayEvent(uowCtx, uow, event); err != nil {
 				r.Logger.Printf("relay failed for event %s: %v", event.ID, err)
 			}
 		}

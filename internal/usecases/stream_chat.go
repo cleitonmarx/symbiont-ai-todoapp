@@ -749,12 +749,12 @@ func (sc StreamChatImpl) persistFailureMessages(
 
 // persistChatMessage persists a chat message and emits a corresponding domain event for outbox processing.
 func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.ChatMessage, conversation domain.Conversation) error {
-	return sc.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
-		if err := uow.ChatMessage().CreateChatMessages(ctx, []domain.ChatMessage{message}); err != nil {
+	return sc.uow.Execute(ctx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
+		if err := uow.ChatMessage().CreateChatMessages(uowCtx, []domain.ChatMessage{message}); err != nil {
 			return err
 		}
 
-		if err := uow.Outbox().CreateChatEvent(ctx, domain.ChatMessageEvent{
+		if err := uow.Outbox().CreateChatEvent(uowCtx, domain.ChatMessageEvent{
 			Type:           domain.EventType_CHAT_MESSAGE_SENT,
 			ChatRole:       message.ChatRole,
 			ChatMessageID:  message.ID,
@@ -771,7 +771,7 @@ func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.
 		if message.CreatedAt.After(conversation.UpdatedAt) {
 			conversation.UpdatedAt = message.CreatedAt
 		}
-		if err := uow.Conversation().UpdateConversation(ctx, conversation); err != nil {
+		if err := uow.Conversation().UpdateConversation(uowCtx, conversation); err != nil {
 			return err
 		}
 

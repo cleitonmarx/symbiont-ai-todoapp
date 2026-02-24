@@ -36,8 +36,8 @@ func TestDeleteTodoImpl_Execute(t *testing.T) {
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					})
 			},
 			expectedErr: nil,
@@ -54,8 +54,8 @@ func TestDeleteTodoImpl_Execute(t *testing.T) {
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					})
 			},
 			expectedErr: errors.New("deletion failed"),

@@ -35,7 +35,7 @@ func (a AssistantClient) RunTurn(ctx context.Context, req domain.AssistantTurnRe
 		UserMessageID:      uuid.New(),
 		AssistantMessageID: uuid.New(),
 	}
-	if err := onEvent(domain.AssistantEventType_TurnStarted, meta); err != nil {
+	if err := onEvent(spanCtx, domain.AssistantEventType_TurnStarted, meta); err != nil {
 		return err
 	}
 
@@ -47,7 +47,7 @@ func (a AssistantClient) RunTurn(ctx context.Context, req domain.AssistantTurnRe
 	err := a.client.ChatStream(spanCtx, adapterReq, func(chunk StreamChunk) error {
 		for _, choice := range chunk.Choices {
 			if choice.Delta.Content != "" {
-				if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: choice.Delta.Content}); err != nil {
+				if err := onEvent(spanCtx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: choice.Delta.Content}); err != nil {
 					return err
 				}
 			}
@@ -81,12 +81,12 @@ func (a AssistantClient) RunTurn(ctx context.Context, req domain.AssistantTurnRe
 	}
 
 	for _, call := range actionCalls {
-		if err := onEvent(domain.AssistantEventType_ActionRequested, *call); err != nil {
+		if err := onEvent(spanCtx, domain.AssistantEventType_ActionRequested, *call); err != nil {
 			return err
 		}
 	}
 
-	return onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
+	return onEvent(spanCtx, domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 		AssistantMessageID: meta.AssistantMessageID.String(),
 		CompletedAt:        time.Now().UTC().Format(time.RFC3339),
 		Usage:              usage,

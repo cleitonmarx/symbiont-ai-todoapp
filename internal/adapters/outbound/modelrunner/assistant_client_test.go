@@ -39,7 +39,7 @@ func collectStreamEvents(adapter AssistantClient, req domain.AssistantTurnReques
 	var deltaTexts []string
 	var doneEvent *domain.AssistantTurnCompleted
 
-	err := adapter.RunTurn(context.Background(), req, func(eventType domain.AssistantEventType, data any) error {
+	err := adapter.RunTurn(context.Background(), req, func(_ context.Context, eventType domain.AssistantEventType, data any) error {
 		eventTypes = append(eventTypes, eventType)
 
 		switch eventType {
@@ -203,7 +203,7 @@ func TestAssistantClientAdapter_RunTurn_ServerError(t *testing.T) {
 		},
 	}
 
-	err := adapter.RunTurn(context.Background(), req, func(eventType domain.AssistantEventType, data interface{}) error {
+	err := adapter.RunTurn(context.Background(), req, func(_ context.Context, eventType domain.AssistantEventType, data interface{}) error {
 		return nil
 	})
 

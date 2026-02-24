@@ -42,10 +42,6 @@ func (uc SubmitActionApprovalImpl) Execute(ctx context.Context, input SubmitActi
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	if err := validateSubmitActionApprovalInput(input); err != nil {
-		return err
-	}
-
 	payload := domain.AssistantActionApprovalDecision{
 		Key: domain.AssistantActionApprovalKey{
 			ConversationID: input.ConversationID,
@@ -57,6 +53,10 @@ func (uc SubmitActionApprovalImpl) Execute(ctx context.Context, input SubmitActi
 		Reason:     input.Reason,
 		DecidedAt:  time.Now().UTC(),
 	}
+	if err := payload.Validate(); err != nil {
+		return err
+	}
+
 	encodedPayload, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -70,25 +70,6 @@ func (uc SubmitActionApprovalImpl) Execute(ctx context.Context, input SubmitActi
 		EventType:  domain.EventType_ACTION_APPROVAL_DECIDED,
 		Payload:    encodedPayload,
 	})
-}
-
-func validateSubmitActionApprovalInput(input SubmitActionApprovalInput) error {
-	switch {
-	case input.ConversationID == uuid.Nil:
-		return domain.NewValidationErr("conversation_id is required")
-	case input.TurnID == uuid.Nil:
-		return domain.NewValidationErr("turn_id is required")
-	case strings.TrimSpace(input.ActionCallID) == "":
-		return domain.NewValidationErr("action_call_id is required")
-	}
-
-	switch input.Status {
-	case domain.ChatMessageApprovalStatus_Approved,
-		domain.ChatMessageApprovalStatus_Rejected:
-		return nil
-	default:
-		return domain.NewValidationErr("status must be APPROVED or REJECTED")
-	}
 }
 
 // InitSubmitActionApproval initializes and registers the SubmitActionApproval use case.

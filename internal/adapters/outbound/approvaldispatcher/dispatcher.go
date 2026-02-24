@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/depend"
 )
 
@@ -23,6 +24,9 @@ func NewDispatcher() *Dispatcher {
 
 // Wait blocks until a decision is dispatched for the given key, or context is canceled.
 func (d *Dispatcher) Wait(ctx context.Context, key domain.AssistantActionApprovalKey) (domain.AssistantActionApprovalDecision, error) {
+	_, span := telemetry.Start(ctx)
+	defer span.End()
+
 	ch := d.registerWaiter(key)
 	defer d.unregisterWaiter(key, ch)
 
@@ -35,7 +39,10 @@ func (d *Dispatcher) Wait(ctx context.Context, key domain.AssistantActionApprova
 }
 
 // Dispatch sends a decision to an active waiter. Returns false when no waiter exists.
-func (d *Dispatcher) Dispatch(decision domain.AssistantActionApprovalDecision) bool {
+func (d *Dispatcher) Dispatch(ctx context.Context, decision domain.AssistantActionApprovalDecision) bool {
+	_, span := telemetry.Start(ctx)
+	defer span.End()
+
 	ch := d.takeWaiter(decision.Key)
 	if ch == nil {
 		return false

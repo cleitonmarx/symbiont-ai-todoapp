@@ -33,13 +33,13 @@ func TestDispatcher_WaitAndDispatch(t *testing.T) {
 	waitErr := make(chan error, 1)
 
 	go func() {
-		decision, err := dispatcher.Wait(context.Background(), key)
+		decision, err := dispatcher.Wait(t.Context(), key)
 		waitResult <- decision
 		waitErr <- err
 	}()
 
 	time.Sleep(10 * time.Millisecond)
-	dispatched := dispatcher.Dispatch(expected)
+	dispatched := dispatcher.Dispatch(t.Context(), expected)
 	assert.True(t, dispatched)
 
 	gotDecision := <-waitResult
@@ -70,7 +70,7 @@ func TestDispatcher_DispatchWithoutWaiter(t *testing.T) {
 	t.Parallel()
 
 	dispatcher := NewDispatcher()
-	dispatched := dispatcher.Dispatch(domain.AssistantActionApprovalDecision{
+	dispatched := dispatcher.Dispatch(t.Context(), domain.AssistantActionApprovalDecision{
 		Key: domain.AssistantActionApprovalKey{
 			ConversationID: uuid.MustParse("00000000-0000-0000-0000-000000000003"),
 			TurnID:         uuid.MustParse("30000000-0000-0000-0000-000000000003"),

@@ -21,7 +21,7 @@ func TestUnitOfWork_Execute(t *testing.T) {
 
 	tests := map[string]struct {
 		setupMock func(sqlmock.Sqlmock)
-		fn        func(uow domain.UnitOfWork) error
+		fn        func(ctx context.Context, uow domain.UnitOfWork) error
 		expectErr bool
 	}{
 		"success-commit": {
@@ -32,8 +32,8 @@ func TestUnitOfWork_Execute(t *testing.T) {
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				m.ExpectCommit()
 			},
-			fn: func(uow domain.UnitOfWork) error {
-				return uow.Todo().DeleteTodo(context.Background(), todoID)
+			fn: func(ctx context.Context, uow domain.UnitOfWork) error {
+				return uow.Todo().DeleteTodo(ctx, todoID)
 			},
 			expectErr: false,
 		},
@@ -45,8 +45,8 @@ func TestUnitOfWork_Execute(t *testing.T) {
 					WillReturnError(errors.New("delete error"))
 				m.ExpectRollback()
 			},
-			fn: func(uow domain.UnitOfWork) error {
-				return uow.Todo().DeleteTodo(context.Background(), todoID)
+			fn: func(ctx context.Context, uow domain.UnitOfWork) error {
+				return uow.Todo().DeleteTodo(ctx, todoID)
 			},
 			expectErr: true,
 		},
@@ -54,7 +54,7 @@ func TestUnitOfWork_Execute(t *testing.T) {
 			setupMock: func(m sqlmock.Sqlmock) {
 				m.ExpectBegin().WillReturnError(errors.New("begin error"))
 			},
-			fn: func(uow domain.UnitOfWork) error {
+			fn: func(ctx context.Context, uow domain.UnitOfWork) error {
 				return nil
 			},
 			expectErr: true,
@@ -67,8 +67,8 @@ func TestUnitOfWork_Execute(t *testing.T) {
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				m.ExpectCommit().WillReturnError(errors.New("commit error"))
 			},
-			fn: func(uow domain.UnitOfWork) error {
-				return uow.Todo().DeleteTodo(context.Background(), todoID)
+			fn: func(ctx context.Context, uow domain.UnitOfWork) error {
+				return uow.Todo().DeleteTodo(ctx, todoID)
 			},
 			expectErr: true,
 		},
@@ -80,8 +80,8 @@ func TestUnitOfWork_Execute(t *testing.T) {
 					WillReturnError(errors.New("delete error"))
 				m.ExpectRollback().WillReturnError(errors.New("rollback error"))
 			},
-			fn: func(uow domain.UnitOfWork) error {
-				return uow.Todo().DeleteTodo(context.Background(), todoID)
+			fn: func(ctx context.Context, uow domain.UnitOfWork) error {
+				return uow.Todo().DeleteTodo(ctx, todoID)
 			},
 			expectErr: true,
 		},
@@ -247,9 +247,9 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 	mock.ExpectCommit()
 
 	uow := NewUnitOfWork(db)
-	err = uow.Execute(context.Background(), func(uow domain.UnitOfWork) error {
+	err = uow.Execute(context.Background(), func(ctx context.Context, uow domain.UnitOfWork) error {
 		// Delete todo
-		if err := uow.Todo().DeleteTodo(context.Background(), todoID); err != nil {
+		if err := uow.Todo().DeleteTodo(ctx, todoID); err != nil {
 			return err
 		}
 
@@ -259,7 +259,7 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 			Type:      domain.EventType_TODO_DELETED,
 			CreatedAt: time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC),
 		}
-		return uow.Outbox().CreateTodoEvent(context.Background(), event)
+		return uow.Outbox().CreateTodoEvent(ctx, event)
 	})
 
 	assert.NoError(t, err)

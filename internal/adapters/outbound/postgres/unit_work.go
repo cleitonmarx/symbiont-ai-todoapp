@@ -7,6 +7,7 @@ import (
 
 	"github.com/Masterminds/squirrel"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/depend"
 )
 
@@ -24,8 +25,11 @@ func NewUnitOfWork(db *sql.DB) *UnitOfWork {
 }
 
 // Execute runs the provided function within a database transaction.
-func (u *UnitOfWork) Execute(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-	tx, err := u.db.BeginTx(ctx, nil)
+func (u *UnitOfWork) Execute(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+	spanCtx, span := telemetry.Start(ctx)
+	defer span.End()
+
+	tx, err := u.db.BeginTx(spanCtx, nil)
 	if err != nil {
 		return err
 	}
@@ -35,7 +39,7 @@ func (u *UnitOfWork) Execute(ctx context.Context, fn func(uow domain.UnitOfWork)
 		tx: tx,
 	}
 
-	err = fn(uow)
+	err = fn(spanCtx, uow)
 	if err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
 			return fmt.Errorf("transaction rollback error: %v, original error: %w", rbErr, err)

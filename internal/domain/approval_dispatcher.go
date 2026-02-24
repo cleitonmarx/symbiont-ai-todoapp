@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,30 @@ type AssistantActionApprovalDecision struct {
 	Status     ChatMessageApprovalStatus
 	Reason     *string
 	DecidedAt  time.Time
+}
+
+// Validate checks the integrity of the approval decision fields.
+func (d AssistantActionApprovalDecision) Validate() error {
+	switch {
+	case d.Key.ConversationID == uuid.Nil:
+		return NewValidationErr("conversation_id is required")
+	case d.Key.TurnID == uuid.Nil:
+		return NewValidationErr("turn_id is required")
+	case strings.TrimSpace(d.Key.ActionCallID) == "":
+		return NewValidationErr("action_call_id is required")
+	case strings.TrimSpace(d.ActionName) == "":
+		return NewValidationErr("action_name is required")
+	case d.DecidedAt.IsZero():
+		return NewValidationErr("decided_at is required")
+	}
+
+	switch d.Status {
+	case ChatMessageApprovalStatus_Approved,
+		ChatMessageApprovalStatus_Rejected:
+		return nil
+	default:
+		return NewValidationErr("status must be APPROVED or REJECTED")
+	}
 }
 
 // AssistantActionApprovalDispatcher coordinates in-flight human approvals.

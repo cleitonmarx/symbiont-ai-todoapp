@@ -42,8 +42,8 @@ func TestBulkTodoDeleterAction(t *testing.T) {
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name:  "delete_todos",
-				Input: `{"ids":["` + todoID1.String() + `","` + todoID2.String() + `"]}`,
+				Name: "delete_todos",
+				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Task 1"},{"id":"` + todoID2.String() + `","title":"Task 2"}]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Contains(t, resp.Content, "todos[2]{id,deleted}")
@@ -65,10 +65,20 @@ func TestBulkTodoDeleterAction(t *testing.T) {
 			},
 			functionCall: domain.AssistantActionCall{
 				Name:  "delete_todos",
-				Input: `{"ids":["invalid-uuid"]}`,
+				Input: `{"todos":[{"id":"invalid-uuid","title":"Invalid Task"}]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Contains(t, resp.Content, "invalid_todo_id")
+			},
+		},
+		"delete-todos-missing-title": {
+			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {},
+			functionCall: domain.AssistantActionCall{
+				Name:  "delete_todos",
+				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"   "} ]}`,
+			},
+			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+				assert.Contains(t, resp.Content, "invalid_title")
 			},
 		},
 		"delete-todos-delete-error": {
@@ -87,7 +97,7 @@ func TestBulkTodoDeleterAction(t *testing.T) {
 			},
 			functionCall: domain.AssistantActionCall{
 				Name:  "delete_todos",
-				Input: `{"ids":["` + todoID1.String() + `"]}`,
+				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Task 1"}]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Contains(t, resp.Content, "delete_todos_error")

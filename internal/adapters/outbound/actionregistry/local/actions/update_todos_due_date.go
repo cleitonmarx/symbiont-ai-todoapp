@@ -39,7 +39,7 @@ func (a BulkTodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinit
 		Hints: domain.AssistantActionHints{
 			UseWhen:   "Use for batch due date/deadline changes across multiple todos (plural updates).",
 			AvoidWhen: "Do not use for title/status changes or single-item due date updates.",
-			ArgRules:  "Required key: todos. Each item requires id and due_date (YYYY-MM-DD).",
+			ArgRules:  "Required key: todos. Each item requires id <UUID> and due_date (YYYY-MM-DD). Never place title text in id.",
 		},
 		Input: domain.AssistantActionInput{
 			Type: "object",

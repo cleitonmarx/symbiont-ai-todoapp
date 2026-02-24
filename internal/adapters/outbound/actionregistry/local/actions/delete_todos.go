@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
@@ -33,18 +34,18 @@ func (a BulkTodoDeleterAction) StatusMessage() string {
 func (a BulkTodoDeleterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "delete_todos",
-		Description: "Delete multiple todos by id.",
+		Description: "Delete multiple todos.",
 		Hints: domain.AssistantActionHints{
-			UseWhen:   "Use for batch/multiple delete when ids are already known.",
-			AvoidWhen: "Do not use when ids are missing or ambiguous; fetch first.",
-			ArgRules:  "Required key: ids (array of UUID strings).",
+			UseWhen:   "Use for batch/multiple delete when todos are already known.",
+			AvoidWhen: "Do not use when todos that ids are missing or ambiguous; fetch first.",
+			ArgRules:  "Required key: todos. Each item requires id <UUID> and title <string>. Correct: {\"todos\":[{\"id\":\"<uuid>\",\"title\":\"Task\"}]}. Incorrect: {\"id\":\"Task title\"}.",
 		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{
-				"ids": {
+				"todos": {
 					Type:        "array",
-					Description: "List of todo UUIDs to delete. REQUIRED.",
+					Description: "List of todos to delete. Each item: {id,title}. REQUIRED.",
 					Required:    true,
 				},
 			},
@@ -53,17 +54,27 @@ func (a BulkTodoDeleterAction) Definition() domain.AssistantActionDefinition {
 			Required:    true,
 			Title:       "Confirm bulk deletion",
 			Description: "Deleting todos is irreversible. Please confirm.",
-			Timeout:     2 * time.Minute,
+			PreviewFields: []string{
+				"todos[].title",
+				"todos[].id",
+			},
+			Timeout: 2 * time.Minute,
 		},
 	}
 }
 
+type deleteTodoParams struct {
+	Todos []struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	} `json:"todos"`
+}
+
 // Execute executes BulkTodoDeleterAction.
 func (a BulkTodoDeleterAction) Execute(ctx context.Context, call domain.AssistantActionCall, _ []domain.AssistantMessage) domain.AssistantMessage {
-	params := struct {
-		IDs []string `json:"ids"`
-	}{}
-	exampleArgs := `{"ids":["<uuid>","<uuid>"]}`
+	params := deleteTodoParams{}
+
+	exampleArgs := `{"todos":[{"id":"<uuid>","title":"Sample Task"},{"id":"<uuid>","title":"Another Task"}]}`
 
 	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
@@ -73,17 +84,17 @@ func (a BulkTodoDeleterAction) Execute(ctx context.Context, call domain.Assistan
 			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
 		}
 	}
-	if len(params.IDs) == 0 {
+	if len(params.Todos) == 0 {
 		return domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", "ids must not be empty.", exampleArgs),
+			Content:      newActionError("invalid_arguments", "todos must not be empty.", exampleArgs),
 		}
 	}
 
-	ids := make([]uuid.UUID, 0, len(params.IDs))
-	for i, id := range params.IDs {
-		todoID, parseErr := uuid.Parse(id)
+	ids := make([]uuid.UUID, 0, len(params.Todos))
+	for i, todo := range params.Todos {
+		todoID, parseErr := uuid.Parse(todo.ID)
 		if parseErr != nil {
 			return domain.AssistantMessage{
 				Role:         domain.ChatRole_Tool,
@@ -91,6 +102,15 @@ func (a BulkTodoDeleterAction) Execute(ctx context.Context, call domain.Assistan
 				Content:      newActionError("invalid_todo_id", fmt.Sprintf("id at index %d is invalid: %s", i, parseErr.Error()), exampleArgs),
 			}
 		}
+
+		if strings.TrimSpace(todo.Title) == "" {
+			return domain.AssistantMessage{
+				Role:         domain.ChatRole_Tool,
+				ActionCallID: &call.ID,
+				Content:      newActionError("invalid_title", fmt.Sprintf("title at index %d must not be empty.", i), exampleArgs),
+			}
+		}
+
 		ids = append(ids, todoID)
 	}
 
@@ -114,6 +134,6 @@ func (a BulkTodoDeleterAction) Execute(ctx context.Context, call domain.Assistan
 	return domain.AssistantMessage{
 		Role:         domain.ChatRole_Tool,
 		ActionCallID: &call.ID,
-		Content:      formatDeletedRows(params.IDs),
+		Content:      formatDeletedRows(ids),
 	}
 }

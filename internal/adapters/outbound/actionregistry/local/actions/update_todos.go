@@ -36,7 +36,7 @@ func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 		Hints: domain.AssistantActionHints{
 			UseWhen:   "Use for batch updates across multiple existing todos (plural updates).",
 			AvoidWhen: "Do not use for due date-only changes or single-item updates.",
-			ArgRules:  "Required key: todos. Each item requires id and may include title and/or status (OPEN or DONE).",
+			ArgRules:  "Required key: todos. Each item requires id <UUID> and may include title and/or status (OPEN or DONE). Never place title text in id.",
 		},
 		Input: domain.AssistantActionInput{
 			Type: "object",

@@ -14,6 +14,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/google/uuid"
+	"github.com/toon-format/toon-go"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -135,10 +136,10 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		buildActionSelectionText(messagesHistory),
 	)
 
-	if toolingPrompt := buildActionsPrompt(relevantActions); toolingPrompt != "" {
+	if actionPrompt := buildActionsPrompt(relevantActions); actionPrompt != "" {
 		messagesHistory = append(messagesHistory, domain.AssistantMessage{
 			Role:    domain.ChatRole_System,
-			Content: toolingPrompt,
+			Content: actionPrompt,
 		})
 	}
 
@@ -365,15 +366,13 @@ func (sc StreamChatImpl) handleActionCallEvent(
 	}
 
 	if blockedByApproval {
-		reason := "action execution rejected"
-		if approvalDecision.Reason != nil && strings.TrimSpace(*approvalDecision.Reason) != "" {
-			reason = strings.TrimSpace(*approvalDecision.Reason)
-		}
+		reason := approvalDecisionReason(approvalDecision)
+		actionContent := approvalBlockedActionContent(actionCall, approvalDecision.Status, reason)
 
 		actionMessage := domain.AssistantMessage{
 			Role:         domain.ChatRole_Tool,
 			ActionCallID: common.Ptr(actionCall.ID),
-			Content:      reason,
+			Content:      actionContent,
 		}
 		now := sc.timeProvider.Now()
 		actionChatMsg := domain.ChatMessage{
@@ -383,7 +382,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 			TurnSequence:           state.nextTurnSequence(),
 			ChatRole:               domain.ChatRole_Tool,
 			ActionCallID:           &actionCall.ID,
-			Content:                reason,
+			Content:                actionContent,
 			Model:                  model,
 			MessageState:           domain.ChatMessageState_Failed,
 			ErrorMessage:           &reason,
@@ -484,6 +483,65 @@ func (sc StreamChatImpl) handleActionCallEvent(
 	return true, nil
 }
 
+// approvalDecisionReason derives a human-readable reason for an approval decision,
+// prioritizing explicit reasons from the decision and falling back to defaults based on status.
+func approvalDecisionReason(decision domain.AssistantActionApprovalDecision) string {
+	if decision.Reason != nil {
+		if reason := strings.TrimSpace(*decision.Reason); reason != "" {
+			return reason
+		}
+	}
+
+	switch decision.Status {
+	case domain.ChatMessageApprovalStatus_Expired:
+		return "approval request expired"
+	case domain.ChatMessageApprovalStatus_AutoRejected:
+		return "approval request canceled"
+	case domain.ChatMessageApprovalStatus_Rejected:
+		return "action execution rejected by user"
+	default:
+		return "action execution was not approved"
+	}
+}
+
+// approvalBlockedActionContent constructs the content for a tool message when an action execution is blocked by approval policies,
+// including structured details for potential downstream processing.
+func approvalBlockedActionContent(
+	actionCall domain.AssistantActionCall,
+	status domain.ChatMessageApprovalStatus,
+	reason string,
+) string {
+	type blockedPayload struct {
+		ApprovalStatus domain.ChatMessageApprovalStatus `json:"approval_status"`
+		ActionName     string                           `json:"action_name"`
+		ActionCallID   string                           `json:"action_call_id"`
+		Executed       bool                             `json:"executed"`
+		Reason         string                           `json:"reason"`
+		Message        string                           `json:"message"`
+	}
+
+	payload := blockedPayload{
+		ApprovalStatus: status,
+		ActionName:     actionCall.Name,
+		ActionCallID:   actionCall.ID,
+		Executed:       false,
+		Reason:         reason,
+		Message:        "Action execution blocked by approval policy. Do not assume this action was executed.",
+	}
+
+	data, err := toon.Marshal(payload)
+	if err != nil {
+		return fmt.Sprintf(
+			"Action execution blocked by approval policy. action=%s action_call_id=%s approval_status=%s reason=%s",
+			actionCall.Name,
+			actionCall.ID,
+			status,
+			reason,
+		)
+	}
+	return string(data)
+}
+
 // handleDeltaEvent appends assistant delta text and forwards the delta to the caller callback.
 func (sc StreamChatImpl) handleDeltaEvent(
 	data any,
@@ -527,6 +585,7 @@ func (sc StreamChatImpl) requestActionApprovalIfRequired(
 		Input:          actionCall.Input,
 		Title:          approvalTitle(definition),
 		Description:    approvalDescription(definition),
+		PreviewFields:  definition.Approval.PreviewFields,
 		Timeout:        definition.Approval.Timeout,
 	}
 	if err := onEvent(domain.AssistantEventType_ActionApprovalRequired, approvalEvent); err != nil {
@@ -901,6 +960,8 @@ func buildActionsPrompt(actions []domain.AssistantActionDefinition) string {
 	b.WriteString("Tooling rules for this turn:\n")
 	b.WriteString("- Use only tools listed below.\n")
 	b.WriteString("- Arguments must be strict JSON matching each tool schema.\n")
+	b.WriteString("- For fields named id, *_id, or ids: use UUID values only (never title text).\n")
+	b.WriteString("- If required UUIDs are missing, fetch/select items first, then call mutation tools.\n")
 	b.WriteString("Tools in scope:\n")
 
 	for _, action := range selected {

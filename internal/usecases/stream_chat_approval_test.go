@@ -34,7 +34,10 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			Required:    true,
 			Title:       "Approve destructive action",
 			Description: "This action deletes one todo item.",
-			Timeout:     30 * time.Second,
+			PreviewFields: []string{
+				"todos[].title",
+			},
+			Timeout: 30 * time.Second,
 		},
 	}
 
@@ -83,7 +86,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			},
 			expectedStatus:             domain.ChatMessageApprovalStatus_Rejected,
 			expectedReason:             common.Ptr("user denied"),
-			expectedToolContent:        "user denied",
+			expectedToolContent:        approvalBlockedActionContent(domain.AssistantActionCall{ID: actionCallID, Name: actionName}, domain.ChatMessageApprovalStatus_Rejected, "user denied"),
 			expectedToolMessageState:   domain.ChatMessageState_Failed,
 			expectedToolError:          common.Ptr("user denied"),
 			expectActionExecution:      false,
@@ -102,7 +105,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			waitErr:                    context.DeadlineExceeded,
 			expectedStatus:             domain.ChatMessageApprovalStatus_Expired,
 			expectedReason:             common.Ptr("approval request expired"),
-			expectedToolContent:        "approval request expired",
+			expectedToolContent:        approvalBlockedActionContent(domain.AssistantActionCall{ID: actionCallID, Name: actionName}, domain.ChatMessageApprovalStatus_Expired, "approval request expired"),
 			expectedToolMessageState:   domain.ChatMessageState_Failed,
 			expectedToolError:          common.Ptr("approval request expired"),
 			expectActionExecution:      false,
@@ -317,6 +320,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			assert.Equal(t, actionInput, approvalRequiredData.Input)
 			assert.Equal(t, actionDefinition.Approval.Title, approvalRequiredData.Title)
 			assert.Equal(t, actionDefinition.Approval.Description, approvalRequiredData.Description)
+			assert.Equal(t, actionDefinition.Approval.PreviewFields, approvalRequiredData.PreviewFields)
 			assert.Equal(t, actionDefinition.Approval.Timeout, approvalRequiredData.Timeout)
 
 			assert.Equal(t, conversationID, approvalResolvedData.ConversationID)

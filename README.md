@@ -6,6 +6,7 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 
 - 📝 **Todo Management**: Create, update, delete, filter, sort, and paginate todos
 - 🤖 **LLM Chat & Tools**: Streamed AI chat (SSE) with tool-calling for local and external tools
+- ✅ **Action Approval Flow**: Human approval for sensitive/destructive tool execution (local actions and MCP tools)
 - 📦 **Batch Todo Actions**: Assistant-first bulk operations (`create_todos`, `update_todos`, `update_todos_due_date`, `delete_todos`)
 - 🔗 **MCP Gateway Integration**: MCP-based external tools via `docker/mcp-gateway` (default setup includes DuckDuckGo tools)
 - 🎛️ **Tool Definition Overrides**: MCP tool descriptions/inputs/hints can be overridden with YAML for tighter model behavior control
@@ -78,57 +79,24 @@ GraphQL currently exposes todo operations (`listTodos`, `updateTodo`, `deleteTod
 
 ## Action Approval Flow
 
-Human approval can be required before destructive/sensitive tool execution (local actions and MCP tools).
+Action Approval adds a human-in-the-loop safety step before sensitive actions are executed.
 
-### End-to-end flow
+When an action is marked as requiring approval:
 
-1. Assistant requests a tool call.
-2. `StreamChat` checks the action policy (`AssistantActionDefinition.Approval`).
-3. If approval is required, stream emits SSE event `action_approval_required` with:
-   - `conversation_id`, `turn_id`, `action_call_id`, `name`
-   - `input` (raw tool arguments)
-   - `title`, `description`, `timeout`
-   - `preview_fields` (JSON paths to render user-friendly previews, e.g. `todos[].title`, `url`)
-4. UI blocks execution, shows approval prompt + timeout countdown.
-5. UI submits decision to `POST /api/v1/chat/approvals`.
-6. `SubmitActionApproval` publishes decision to outbox topic `ActionApprovals` (`ACTION_APPROVAL.DECIDED`).
-7. `ActionApprovalDispatcher` worker consumes from Pub/Sub and dispatches to in-memory channel dispatcher.
-8. Waiting stream resumes, emits `action_approval_resolved`, then:
-   - continues tool execution when approved, or
-   - skips execution and returns blocked/rejected tool result.
+- The assistant pauses before running that action.
+- The user sees a clear prompt with what is about to happen.
+- The user can approve or reject (optionally with a reason).
+- If approved, the assistant proceeds.
+- If rejected or timed out, the action is not executed.
 
-### Approval endpoint
+This is useful for destructive operations (for example, deleting todos) and external/network actions where explicit user confirmation is preferred.
 
-`POST /api/v1/chat/approvals` (returns `202 Accepted`)
+### Configuring approval
 
-Request body:
-
-```json
-{
-  "conversation_id": "UUID",
-  "turn_id": "UUID",
-  "action_call_id": "string",
-  "action_name": "optional-string",
-  "status": "APPROVED | REJECTED",
-  "reason": "optional-string"
-}
-```
-
-### Configuring approval policies
-
-Local actions:
-
-- Configure directly in action definition (`internal/adapters/outbound/actionregistry/local/actions/...`):
-  - `Approval.Required`
-  - `Approval.Title`
-  - `Approval.Description`
-  - `Approval.Timeout`
-  - `Approval.PreviewFields`
-
-MCP tools:
-
-- Configure via YAML overrides in `internal/adapters/outbound/actionregistry/mcp/tool_overrides.yaml`.
-- Supports both `approval` and `approvals` blocks.
+- You can enable approval per action.
+- You can customize the prompt title/description, preview fields, and timeout.
+- Local actions location: `internal/adapters/outbound/actionregistry/local/actions/`
+- MCP tools YAML location: `internal/adapters/outbound/actionregistry/mcp/tool_overrides.yaml`
 
 Example:
 
@@ -143,13 +111,6 @@ tools:
         - url
       timeout: 90s
 ```
-
-### Pub/Sub + worker notes
-
-- Approval decisions are published to topic `ActionApprovals`.
-- Worker base subscription comes from `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID`.
-- Effective subscription is server-unique (`<base>-<generated-server-id>`) for distributed processing.
-- Worker creates the subscription on startup and deletes it on shutdown.
 
 ## Quick Start (Docker Compose)
 

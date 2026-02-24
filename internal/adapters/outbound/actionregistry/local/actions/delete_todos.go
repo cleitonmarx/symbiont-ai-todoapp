@@ -52,11 +52,10 @@ func (a BulkTodoDeleterAction) Definition() domain.AssistantActionDefinition {
 		},
 		Approval: domain.AssistantActionApproval{
 			Required:    true,
-			Title:       "Confirm bulk deletion",
+			Title:       "Confirm deletion of todos",
 			Description: "Deleting todos is irreversible. Please confirm.",
 			PreviewFields: []string{
 				"todos[].title",
-				"todos[].id",
 			},
 			Timeout: 2 * time.Minute,
 		},
@@ -114,9 +113,9 @@ func (a BulkTodoDeleterAction) Execute(ctx context.Context, call domain.Assistan
 		ids = append(ids, todoID)
 	}
 
-	err = a.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
+	err = a.uow.Execute(ctx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
 		for i, id := range ids {
-			deleteErr := a.deleter.Delete(ctx, uow, id)
+			deleteErr := a.deleter.Delete(uowCtx, uow, id)
 			if deleteErr != nil {
 				return fmt.Errorf("id at index %d: %w", i, deleteErr)
 			}

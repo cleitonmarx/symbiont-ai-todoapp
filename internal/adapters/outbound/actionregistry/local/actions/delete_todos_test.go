@@ -36,13 +36,13 @@ func TestBulkTodoDeleterAction(t *testing.T) {
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					}).
 					Once()
 			},
 			functionCall: domain.AssistantActionCall{
-				Name: "delete_todos",
+				Name:  "delete_todos",
 				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Task 1"},{"id":"` + todoID2.String() + `","title":"Task 2"}]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
@@ -90,8 +90,8 @@ func TestBulkTodoDeleterAction(t *testing.T) {
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					}).
 					Once()
 			},

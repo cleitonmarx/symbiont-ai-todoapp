@@ -115,9 +115,9 @@ func (a BulkTodoUpdaterAction) Execute(ctx context.Context, call domain.Assistan
 	}
 
 	todos := make([]domain.Todo, 0, len(items))
-	err = a.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
+	err = a.uow.Execute(ctx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
 		for i, item := range items {
-			todo, updateErr := a.updater.Update(ctx, uow, item.ID, item.Title, item.Status, nil)
+			todo, updateErr := a.updater.Update(uowCtx, uow, item.ID, item.Title, item.Status, nil)
 			if updateErr != nil {
 				return fmt.Errorf("todo at index %d: %w", i, updateErr)
 			}

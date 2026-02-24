@@ -90,7 +90,7 @@ type AssistantTurnCompleted struct {
 }
 
 // AssistantEventCallback is called for each assistant turn event.
-type AssistantEventCallback func(eventType AssistantEventType, data any) error
+type AssistantEventCallback func(context.Context, AssistantEventType, any) error
 
 // AssistantMessage represents a message exchanged during assistant turns.
 type AssistantMessage struct {

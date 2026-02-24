@@ -469,7 +469,7 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 }
 
 func TestTodoApp_MCPIntegration(t *testing.T) {
-	t.Run("mcp-fetch-web-page", func(t *testing.T) {
+	t.Run("mcp-fetch-web-page-with-approval", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			Model:   "qwen3:14B-Q6_K",
 			Message: "Fetch the content of URL https://duckduckgo.com/ and summarize it.",
@@ -478,7 +478,26 @@ func TestTodoApp_MCPIntegration(t *testing.T) {
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsText(t, chatResp.Body)
+		scanner := newSSEScanner(chatResp.Body)
+
+		approvalRequest := readChatApprovalRequiredEvent(t, scanner)
+		require.Equal(t, "fetch_content", approvalRequest.Name, "expected action approval request for 'fetch_content' action")
+		fmt.Printf("\nReceived action approval request: %+v\n", approvalRequest)
+
+		approvalResp, err := restCli.SubmitActionApprovalWithResponse(t.Context(), rest.SubmitActionApprovalRequest{
+			ActionCallId:   approvalRequest.ActionCallID,
+			ActionName:     &approvalRequest.Name,
+			ConversationId: approvalRequest.ConversationID,
+			Reason:         common.Ptr("approved by integration test"),
+			Status:         rest.APPROVED,
+			TurnId:         approvalRequest.TurnID,
+		})
+
+		require.NoError(t, err, "failed to submit action approval")
+		require.NotNil(t, approvalResp, "expected non-nil response for SubmitActionApproval")
+		require.Equal(t, http.StatusAccepted, approvalResp.StatusCode(), "expected 202 Accepted for SubmitActionApproval")
+
+		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsTextFromScanner(t, scanner)
 
 		require.Contains(t, actionStartedText, "📄 Fetching page content...")
 		require.GreaterOrEqual(t, actionCompletedCount, 1)

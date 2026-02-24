@@ -19,6 +19,7 @@ interface ChatPanelProps {
 }
 
 const MINUTE_MS = 60 * 1000;
+const SECOND_MS = 1000;
 const HOUR_MINUTES = 60;
 const DAY_MINUTES = 24 * HOUR_MINUTES;
 
@@ -40,6 +41,237 @@ const formatConversationAge = (updatedAt: string): string => {
   return `${Math.max(1, Math.round(totalMinutes / DAY_MINUTES))}d`;
 };
 
+const formatCountdown = (remainingMs: number): string => {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / SECOND_MS));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const paddedMinutes = String(minutes).padStart(2, '0');
+  const paddedSeconds = String(seconds).padStart(2, '0');
+  if (hours > 0) {
+    return `${hours}:${paddedMinutes}:${paddedSeconds}`;
+  }
+  return `${paddedMinutes}:${paddedSeconds}`;
+};
+
+const formatApprovalInput = (rawInput: string): string => {
+  const trimmed = rawInput.trim();
+  if (!trimmed) {
+    return 'No arguments.';
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return rawInput;
+  }
+};
+
+const toPreviewValue = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return JSON.stringify(value);
+};
+
+const mergePreviewParts = (parts: string[]): string => {
+  if (parts.length === 0) {
+    return '';
+  }
+  if (parts.length === 1) {
+    return parts[0];
+  }
+  return `${parts[0]} (${parts.slice(1).join(' | ')})`;
+};
+
+const extractPathValues = (root: unknown, path: string): unknown[] => {
+  const trimmed = path.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const segments = trimmed.split('.').filter((segment) => segment.length > 0);
+  let current: unknown[] = [root];
+
+  for (const segment of segments) {
+    const next: unknown[] = [];
+    const isArraySegment = segment.endsWith('[]');
+    const key = isArraySegment ? segment.slice(0, -2) : segment;
+
+    for (const item of current) {
+      if (item === null || item === undefined) {
+        continue;
+      }
+
+      let value: unknown;
+      if (key === '') {
+        value = item;
+      } else if (typeof item === 'object' && !Array.isArray(item) && key in item) {
+        value = (item as Record<string, unknown>)[key];
+      } else {
+        continue;
+      }
+
+      if (isArraySegment) {
+        if (Array.isArray(value)) {
+          next.push(...value);
+        }
+        continue;
+      }
+
+      next.push(value);
+    }
+
+    current = next;
+    if (current.length === 0) {
+      break;
+    }
+  }
+
+  return current;
+};
+
+interface ArrayPreviewPath {
+  arrayPath: string;
+  itemPath: string;
+}
+
+const parseArrayPreviewPath = (path: string): ArrayPreviewPath | null => {
+  const trimmed = path.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const segments = trimmed.split('.').filter((segment) => segment.length > 0);
+  if (segments.length === 0) {
+    return null;
+  }
+
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    if (!segment.endsWith('[]')) {
+      continue;
+    }
+
+    const arraySegment = segment.slice(0, -2);
+    if (!arraySegment) {
+      return null;
+    }
+
+    const prefix = [...segments.slice(0, i), arraySegment].join('.');
+    const suffix = segments.slice(i + 1).join('.');
+    return {
+      arrayPath: prefix,
+      itemPath: suffix,
+    };
+  }
+
+  return null;
+};
+
+const buildGroupedArrayPreviewItems = (parsedInput: unknown, previewFields: string[]): string[] => {
+  const groupedByArrayPath = new Map<string, string[]>();
+  const arrayPathOrder: string[] = [];
+
+  for (const rawField of previewFields) {
+    const parsed = parseArrayPreviewPath(rawField);
+    if (!parsed) {
+      continue;
+    }
+    if (!groupedByArrayPath.has(parsed.arrayPath)) {
+      groupedByArrayPath.set(parsed.arrayPath, []);
+      arrayPathOrder.push(parsed.arrayPath);
+    }
+
+    const currentPaths = groupedByArrayPath.get(parsed.arrayPath) ?? [];
+    if (!currentPaths.includes(parsed.itemPath)) {
+      currentPaths.push(parsed.itemPath);
+      groupedByArrayPath.set(parsed.arrayPath, currentPaths);
+    }
+  }
+
+  if (groupedByArrayPath.size === 0) {
+    return [];
+  }
+
+  const rows: string[] = [];
+  for (const arrayPath of arrayPathOrder) {
+    const itemPaths = groupedByArrayPath.get(arrayPath) ?? [];
+    const containers = extractPathValues(parsedInput, arrayPath);
+
+    for (const container of containers) {
+      if (!Array.isArray(container)) {
+        continue;
+      }
+
+      for (const item of container) {
+        const parts: string[] = [];
+        for (const itemPath of itemPaths) {
+          const values = itemPath ? extractPathValues(item, itemPath) : [item];
+          const first = values.find((value) => value !== null && value !== undefined);
+          if (first === undefined) {
+            continue;
+          }
+
+          const normalized = toPreviewValue(first).trim();
+          if (!normalized) {
+            continue;
+          }
+          parts.push(normalized);
+        }
+
+        const merged = mergePreviewParts(parts);
+        if (merged && !rows.includes(merged)) {
+          rows.push(merged);
+        }
+      }
+    }
+  }
+
+  return rows;
+};
+
+const buildApprovalPreviewItems = (rawInput: string, previewFields: string[]): string[] => {
+  if (previewFields.length === 0) {
+    return [];
+  }
+
+  let parsedInput: unknown;
+  try {
+    parsedInput = JSON.parse(rawInput);
+  } catch {
+    return [];
+  }
+
+  const groupedRows = buildGroupedArrayPreviewItems(parsedInput, previewFields);
+  if (groupedRows.length > 0) {
+    return groupedRows;
+  }
+
+  const values: string[] = [];
+  for (const fieldPath of previewFields) {
+    const extracted = extractPathValues(parsedInput, fieldPath);
+    for (const value of extracted) {
+      if (value === null || value === undefined) {
+        continue;
+      }
+      const normalized = toPreviewValue(value).trim();
+      if (!normalized) {
+        continue;
+      }
+      if (!values.includes(normalized)) {
+        values.push(normalized);
+      }
+    }
+  }
+  return values;
+};
+
 export const ChatPanel = ({
   onChatDone,
   onToolExecuted,
@@ -58,6 +290,8 @@ export const ChatPanel = ({
     selectedModel,
     toolCallingStatus,
     toolCallingCount,
+    pendingApproval,
+    approvalSubmitting,
     loading,
     loadingModels,
     loadingConversations,
@@ -68,6 +302,7 @@ export const ChatPanel = ({
     setSelectedModel,
     sendMessage,
     stopStream,
+    submitApproval,
     startNewConversation,
     selectConversation,
     renameConversation,
@@ -83,6 +318,8 @@ export const ChatPanel = ({
   const [renameValue, setRenameValue] = useState('');
   const [pendingDeleteConversationId, setPendingDeleteConversationId] = useState<string | null>(null);
   const [conversationError, setConversationError] = useState<string | null>(null);
+  const [approvalReason, setApprovalReason] = useState('');
+  const [approvalNow, setApprovalNow] = useState(() => Date.now());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
@@ -97,6 +334,25 @@ export const ChatPanel = ({
       setActiveTab('chat');
     }
   }, [isCompact]);
+
+  useEffect(() => {
+    if (!pendingApproval?.expiresAt) {
+      return;
+    }
+
+    setApprovalNow(Date.now());
+    const timer = window.setInterval(() => {
+      setApprovalNow(Date.now());
+    }, SECOND_MS);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [pendingApproval?.expiresAt]);
+
+  useEffect(() => {
+    setApprovalReason('');
+  }, [pendingApproval?.actionCallId]);
 
   useEffect(() => {
     void loadConversations();
@@ -185,9 +441,23 @@ export const ChatPanel = ({
   const showSessionsPane = !isCompact || activeTab === 'sessions';
   const showChatPane = !isCompact || activeTab === 'chat';
   const sessionsLocked = loading || loadingMessages;
+  const approvalRemainingMs =
+    pendingApproval?.expiresAt != null ? Math.max(0, pendingApproval.expiresAt - approvalNow) : null;
+  const approvalExpired = approvalRemainingMs === 0 && pendingApproval?.expiresAt != null;
+  const approvalInputPreview = pendingApproval ? formatApprovalInput(pendingApproval.input) : '';
+  const approvalPreviewItems = pendingApproval
+    ? buildApprovalPreviewItems(pendingApproval.input, pendingApproval.previewFields)
+    : [];
   const chatGuideText = activeConversationId
     ? 'Break down work and I can apply filters, sort tasks, or run batch updates.'
     : "Tell me what you need to do and I'll turn it into todos, then help you find, sort, and batch-update them.";
+
+  const handleApprovalSubmit = async (status: 'APPROVED' | 'REJECTED') => {
+    if (!pendingApproval || approvalExpired) {
+      return;
+    }
+    await submitApproval(status, approvalReason);
+  };
 
   return (
     <section className={`ui-chat ${mode}`}>
@@ -446,6 +716,70 @@ export const ChatPanel = ({
                 <span>{toolCallingStatus}</span>
                 <span className="ui-chat-tool-count">x{toolCallingCount}</span>
               </div>
+            ) : null}
+
+            {pendingApproval ? (
+              <section className={`ui-chat-approval ${approvalExpired ? 'expired' : ''}`}>
+                <header className="ui-chat-approval-header">
+                  <h3>{pendingApproval.title}</h3>
+                  <span className={`ui-chat-approval-time ${approvalExpired ? 'expired' : ''}`}>
+                    {approvalRemainingMs !== null
+                      ? approvalExpired
+                        ? 'Expired'
+                        : `Expires in ${formatCountdown(approvalRemainingMs)}`
+                      : 'No timeout'}
+                  </span>
+                </header>
+
+                <p className="ui-chat-approval-description">{pendingApproval.description}</p>
+                <p className="ui-chat-approval-action">
+                  <strong>Action:</strong> {pendingApproval.actionName}
+                </p>
+
+                {approvalPreviewItems.length > 0 ? (
+                  <div className="ui-chat-approval-preview">
+                    <strong>Items awaiting approval ({approvalPreviewItems.length})</strong>
+                    <ul>
+                      {approvalPreviewItems.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <pre className="ui-chat-approval-input">{approvalInputPreview}</pre>
+                )}
+
+                <label className="ui-chat-approval-reason" htmlFor="approval-reason">
+                  Reason (optional)
+                </label>
+                <input
+                  id="approval-reason"
+                  className="ui-input"
+                  value={approvalReason}
+                  onChange={(event) => setApprovalReason(event.target.value)}
+                  placeholder="Add context for this decision"
+                  disabled={approvalSubmitting || approvalExpired}
+                />
+
+                <div className="ui-chat-approval-actions">
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn-primary"
+                    onClick={() => void handleApprovalSubmit('APPROVED')}
+                    disabled={approvalSubmitting || approvalExpired}
+                  >
+                    {approvalSubmitting ? 'Submitting...' : 'Approve'}
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn-danger"
+                    onClick={() => void handleApprovalSubmit('REJECTED')}
+                    disabled={approvalSubmitting || approvalExpired}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </section>
             ) : null}
 
             <footer className="ui-chat-composer">

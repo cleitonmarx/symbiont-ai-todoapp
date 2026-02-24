@@ -1300,6 +1300,115 @@
   font-weight: 700;
 }
 
+.ui-chat-approval {
+  margin: 0.6rem 0.75rem 0;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid #d9c6a4;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff9ee 0%, #fff4dd 100%);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ui-chat-approval.expired {
+  border-color: #efc2ba;
+  background: var(--ui-danger-bg);
+}
+
+.ui-chat-approval-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.ui-chat-approval-header h3 {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.ui-chat-approval-time {
+  flex-shrink: 0;
+  border: 1px solid #eac896;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #8d4a05;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.ui-chat-approval-time.expired {
+  border-color: #efc2ba;
+  color: var(--ui-danger);
+}
+
+.ui-chat-approval-description {
+  margin: 0;
+  color: #5f4f33;
+  font-size: 0.8rem;
+}
+
+.ui-chat-approval-action {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #3e3321;
+}
+
+.ui-chat-approval-input {
+  margin: 0;
+  max-height: 140px;
+  overflow: auto;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #ead8b4;
+  border-radius: 10px;
+  background: #fffef9;
+  color: #2d2a22;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ui-chat-approval-preview {
+  border: 1px solid #ead8b4;
+  border-radius: 10px;
+  background: #fffef9;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.78rem;
+  color: #2d2a22;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.ui-chat-approval-preview strong {
+  font-size: 0.76rem;
+}
+
+.ui-chat-approval-preview ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ui-chat-approval-preview li {
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.ui-chat-approval-reason {
+  font-size: 0.76rem;
+  color: #5f6c80;
+}
+
+.ui-chat-approval-actions {
+  display: flex;
+  gap: 0.45rem;
+  justify-content: flex-end;
+}
+
 .ui-chat-typing {
   display: inline-flex;
   gap: 0.3rem;

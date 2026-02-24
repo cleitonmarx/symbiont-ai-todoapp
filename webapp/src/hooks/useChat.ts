@@ -4,8 +4,10 @@ import {
   deleteConversation,
   fetchAvailableModels,
   listConversations,
+  submitActionApproval,
   streamChat,
   updateConversation,
+  type ActionApprovalStatus,
 } from '../services/chatApi';
 import type { AssistantTodoFilters, ChatMessage, Conversation } from '../types';
 
@@ -17,6 +19,8 @@ interface UseChatReturn {
   selectedModel: string;
   toolCallingStatus: string | null;
   toolCallingCount: number;
+  pendingApproval: ActionApprovalRequest | null;
+  approvalSubmitting: boolean;
   loading: boolean;
   loadingModels: boolean;
   loadingConversations: boolean;
@@ -29,6 +33,7 @@ interface UseChatReturn {
   sendMessage: (message: string) => Promise<void>;
   clearChat: () => Promise<void>;
   stopStream: () => void;
+  submitApproval: (status: ActionApprovalStatus, reason?: string) => Promise<void>;
   startNewConversation: () => void;
   selectConversation: (conversationId: string | null) => Promise<void>;
   renameConversation: (conversationId: string, title: string) => Promise<void>;
@@ -81,6 +86,27 @@ interface StreamActionCompletedEventData {
   should_refetch?: boolean;
 }
 
+interface StreamActionApprovalRequiredEventData {
+  conversation_id?: string;
+  turn_id?: string;
+  action_call_id?: string;
+  name?: string;
+  input?: string;
+  title?: string;
+  description?: string;
+  preview_fields?: unknown;
+  timeout?: unknown;
+}
+
+interface StreamActionApprovalResolvedEventData {
+  conversation_id?: string;
+  turn_id?: string;
+  action_call_id?: string;
+  name?: string;
+  status?: ActionApprovalStatus | 'EXPIRED' | 'AUTO_REJECTED' | string;
+  reason?: string;
+}
+
 interface StreamTurnCompletedEventData {
   assistant_message_id?: string;
   completed_at?: string;
@@ -99,6 +125,19 @@ interface SetUIFiltersArguments {
   due_before?: string;
   page?: number;
   page_size?: number;
+}
+
+export interface ActionApprovalRequest {
+  conversationId: string;
+  turnId: string;
+  actionCallId: string;
+  actionName: string;
+  input: string;
+  title: string;
+  description: string;
+  previewFields: string[];
+  timeoutMs: number | null;
+  expiresAt: number | null;
 }
 
 const loadPersistedModel = (): string => {
@@ -180,6 +219,81 @@ const parseAssistantFilters = (data: StreamActionStartedEventData): AssistantTod
   return filters;
 };
 
+const durationUnitToMs: Record<string, number> = {
+  ns: 1 / 1e6,
+  us: 1 / 1e3,
+  'µs': 1 / 1e3,
+  ms: 1,
+  s: 1e3,
+  m: 60 * 1e3,
+  h: 60 * 60 * 1e3,
+};
+
+const parseDurationStringToMs = (raw: string): number | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const re = /(-?\d+(?:\.\d+)?)(ns|us|µs|ms|s|m|h)/g;
+  let total = 0;
+  let consumed = 0;
+  for (const match of trimmed.matchAll(re)) {
+    const value = Number.parseFloat(match[1]);
+    const unit = match[2];
+    if (!Number.isFinite(value) || !(unit in durationUnitToMs)) {
+      return null;
+    }
+    total += value * durationUnitToMs[unit];
+    consumed += match[0].length;
+  }
+
+  if (consumed !== trimmed.length) {
+    return null;
+  }
+  return Math.max(0, Math.round(total));
+};
+
+const parseApprovalTimeoutMs = (raw: unknown): number | null => {
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    // Go time.Duration JSON value is an integer of nanoseconds.
+    if (raw <= 0) {
+      return null;
+    }
+    return Math.max(0, Math.round(raw / 1e6));
+  }
+
+  if (typeof raw === 'string') {
+    const ms = parseDurationStringToMs(raw);
+    if (ms !== null && ms > 0) {
+      return ms;
+    }
+  }
+
+  return null;
+};
+
+const normalizePreviewFields = (raw: unknown): string[] => {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const result: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'string') {
+      continue;
+    }
+    const trimmed = item.trim();
+    if (!trimmed) {
+      continue;
+    }
+    if (!result.includes(trimmed)) {
+      result.push(trimmed);
+    }
+  }
+  return result;
+};
+
 const wait = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -197,6 +311,8 @@ export const useChat = ({
   const [selectedModel, setSelectedModel] = useState(loadPersistedModel);
   const [toolCallingStatus, setToolCallingStatus] = useState<string | null>(null);
   const [toolCallingCount, setToolCallingCount] = useState(0);
+  const [pendingApproval, setPendingApproval] = useState<ActionApprovalRequest | null>(null);
+  const [approvalSubmitting, setApprovalSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [loadingConversations, setLoadingConversations] = useState(false);
@@ -230,6 +346,11 @@ export const useChat = ({
     clearToolCallingStatus();
   }, [clearToolCallingStatus]);
 
+  const clearPendingApproval = useCallback(() => {
+    setPendingApproval(null);
+    setApprovalSubmitting(false);
+  }, []);
+
   const updateToolCallingStatus = useCallback((text: string, fnName?: string) => {
     const normalizedText = text.trim();
     if (!normalizedText) {
@@ -254,6 +375,7 @@ export const useChat = ({
     async (conversationId: string) => {
       try {
         setLoadingMessages(true);
+        clearPendingApproval();
         const response = await fetchChatMessages(conversationId, 1, CHAT_MESSAGES_PAGE_SIZE);
         setMessages(response.messages || []);
         resetToolActivity();
@@ -264,7 +386,7 @@ export const useChat = ({
         setLoadingMessages(false);
       }
     },
-    [resetToolActivity],
+    [clearPendingApproval, resetToolActivity],
   );
 
   const loadConversations = useCallback(async () => {
@@ -359,9 +481,10 @@ export const useChat = ({
     }
 
     resetToolActivity();
+    clearPendingApproval();
     setLoading(false);
     setError('Stream stopped by user');
-  }, [resetToolActivity]);
+  }, [clearPendingApproval, resetToolActivity]);
 
   const startNewConversation = useCallback(() => {
     composingNewConversationRef.current = true;
@@ -369,8 +492,9 @@ export const useChat = ({
     setActiveConversationId(null);
     setMessages([]);
     resetToolActivity();
+    clearPendingApproval();
     setError(null);
-  }, [resetToolActivity]);
+  }, [clearPendingApproval, resetToolActivity]);
 
   const selectConversation = useCallback(
     async (conversationId: string | null) => {
@@ -435,6 +559,33 @@ export const useChat = ({
     }
   }, [removeConversation, resetToolActivity, startNewConversation]);
 
+  const submitApprovalDecision = useCallback(
+    async (status: ActionApprovalStatus, reason?: string) => {
+      const approval = pendingApproval;
+      if (!approval) {
+        return;
+      }
+
+      try {
+        setApprovalSubmitting(true);
+        await submitActionApproval({
+          conversation_id: approval.conversationId,
+          turn_id: approval.turnId,
+          action_call_id: approval.actionCallId,
+          action_name: approval.actionName || undefined,
+          status,
+          reason: reason?.trim() ? reason.trim() : undefined,
+        });
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to submit action approval');
+      } finally {
+        setApprovalSubmitting(false);
+      }
+    },
+    [pendingApproval],
+  );
+
   const sendMessage = useCallback(
     async (message: string) => {
       if (!message.trim()) {
@@ -448,6 +599,7 @@ export const useChat = ({
       try {
         setLoading(true);
         resetToolActivity();
+        clearPendingApproval();
         setError(null);
         abortControllerRef.current = new AbortController();
 
@@ -581,12 +733,58 @@ export const useChat = ({
               return;
             }
 
+            if (eventType === 'action_approval_required') {
+              const data = rawData as StreamActionApprovalRequiredEventData;
+              if (!data.conversation_id || !data.turn_id || !data.action_call_id || !data.name) {
+                return;
+              }
+
+              const timeoutMs = parseApprovalTimeoutMs(data.timeout);
+              setPendingApproval({
+                conversationId: data.conversation_id,
+                turnId: data.turn_id,
+                actionCallId: data.action_call_id,
+                actionName: data.name,
+                input: typeof data.input === 'string' ? data.input : '',
+                title: typeof data.title === 'string' && data.title.trim() ? data.title.trim() : 'Approval required',
+                description:
+                  typeof data.description === 'string' && data.description.trim()
+                    ? data.description.trim()
+                    : `Approve action '${data.name}' execution.`,
+                previewFields: normalizePreviewFields(data.preview_fields),
+                timeoutMs,
+                expiresAt: timeoutMs ? Date.now() + timeoutMs : null,
+              });
+              return;
+            }
+
+            if (eventType === 'action_approval_resolved') {
+              const data = rawData as StreamActionApprovalResolvedEventData;
+              const resolvedActionCallID =
+                typeof data.action_call_id === 'string' && data.action_call_id.trim()
+                  ? data.action_call_id.trim()
+                  : '';
+              if (!resolvedActionCallID) {
+                clearPendingApproval();
+                return;
+              }
+
+              setPendingApproval((current) => {
+                if (!current || current.actionCallId === resolvedActionCallID) {
+                  return null;
+                }
+                return current;
+              });
+              return;
+            }
+
             if (eventType === 'turn_completed') {
               const data = rawData as StreamTurnCompletedEventData;
               assistantCompleted = true;
               if (data.assistant_message_id) {
                 assistantMessageId = data.assistant_message_id;
               }
+              clearPendingApproval();
               resetToolActivity();
               setLoading(false);
               readerRef.current = null;
@@ -603,6 +801,7 @@ export const useChat = ({
                   : errorCode === 'client_closed'
                     ? 'Connection closed'
                     : 'Failed to get response from assistant';
+              clearPendingApproval();
               resetToolActivity();
               setError(errorMsg);
               setLoading(false);
@@ -620,6 +819,7 @@ export const useChat = ({
               void readerRef.current.cancel();
               readerRef.current = null;
             }
+            clearPendingApproval();
             resetToolActivity();
             setLoading(false);
             setError('Stream stopped by user');
@@ -666,6 +866,7 @@ export const useChat = ({
           await refreshConversationTitleIfAuto(streamConversationId);
           onChatDone?.();
         }
+        clearPendingApproval();
         resetToolActivity();
         readerRef.current = null;
       } catch (err) {
@@ -674,6 +875,7 @@ export const useChat = ({
         } else {
           setError(err instanceof Error ? err.message : 'Failed to send message');
         }
+        clearPendingApproval();
         resetToolActivity();
         setLoading(false);
         readerRef.current = null;
@@ -682,6 +884,7 @@ export const useChat = ({
     },
     [
       clearToolCallingStatus,
+      clearPendingApproval,
       loadConversations,
       onApplyAssistantFilters,
       onChatDone,
@@ -701,6 +904,8 @@ export const useChat = ({
     selectedModel,
     toolCallingStatus,
     toolCallingCount,
+    pendingApproval,
+    approvalSubmitting,
     loading,
     loadingModels,
     loadingConversations,
@@ -713,6 +918,7 @@ export const useChat = ({
     sendMessage,
     clearChat,
     stopStream,
+    submitApproval: submitApprovalDecision,
     startNewConversation,
     selectConversation,
     renameConversation,

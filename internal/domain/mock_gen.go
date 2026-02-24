@@ -40,16 +40,16 @@ func (_m *MockAssistantActionApprovalDispatcher) EXPECT() *MockAssistantActionAp
 }
 
 // Dispatch provides a mock function for the type MockAssistantActionApprovalDispatcher
-func (_mock *MockAssistantActionApprovalDispatcher) Dispatch(decision AssistantActionApprovalDecision) bool {
-	ret := _mock.Called(decision)
+func (_mock *MockAssistantActionApprovalDispatcher) Dispatch(ctx context.Context, decision AssistantActionApprovalDecision) bool {
+	ret := _mock.Called(ctx, decision)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Dispatch")
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(AssistantActionApprovalDecision) bool); ok {
-		r0 = returnFunc(decision)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, AssistantActionApprovalDecision) bool); ok {
+		r0 = returnFunc(ctx, decision)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -62,19 +62,25 @@ type MockAssistantActionApprovalDispatcher_Dispatch_Call struct {
 }
 
 // Dispatch is a helper method to define mock.On call
+//   - ctx context.Context
 //   - decision AssistantActionApprovalDecision
-func (_e *MockAssistantActionApprovalDispatcher_Expecter) Dispatch(decision interface{}) *MockAssistantActionApprovalDispatcher_Dispatch_Call {
-	return &MockAssistantActionApprovalDispatcher_Dispatch_Call{Call: _e.mock.On("Dispatch", decision)}
+func (_e *MockAssistantActionApprovalDispatcher_Expecter) Dispatch(ctx interface{}, decision interface{}) *MockAssistantActionApprovalDispatcher_Dispatch_Call {
+	return &MockAssistantActionApprovalDispatcher_Dispatch_Call{Call: _e.mock.On("Dispatch", ctx, decision)}
 }
 
-func (_c *MockAssistantActionApprovalDispatcher_Dispatch_Call) Run(run func(decision AssistantActionApprovalDecision)) *MockAssistantActionApprovalDispatcher_Dispatch_Call {
+func (_c *MockAssistantActionApprovalDispatcher_Dispatch_Call) Run(run func(ctx context.Context, decision AssistantActionApprovalDecision)) *MockAssistantActionApprovalDispatcher_Dispatch_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 AssistantActionApprovalDecision
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(AssistantActionApprovalDecision)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 AssistantActionApprovalDecision
+		if args[1] != nil {
+			arg1 = args[1].(AssistantActionApprovalDecision)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -85,7 +91,7 @@ func (_c *MockAssistantActionApprovalDispatcher_Dispatch_Call) Return(b bool) *M
 	return _c
 }
 
-func (_c *MockAssistantActionApprovalDispatcher_Dispatch_Call) RunAndReturn(run func(decision AssistantActionApprovalDecision) bool) *MockAssistantActionApprovalDispatcher_Dispatch_Call {
+func (_c *MockAssistantActionApprovalDispatcher_Dispatch_Call) RunAndReturn(run func(ctx context.Context, decision AssistantActionApprovalDecision) bool) *MockAssistantActionApprovalDispatcher_Dispatch_Call {
 	_c.Call.Return(run)
 	return _c
 }

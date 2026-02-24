@@ -53,5 +53,5 @@ type AssistantActionApprovalDispatcher interface {
 	// Wait blocks until a decision is available for the given key or the context is canceled.
 	Wait(ctx context.Context, key AssistantActionApprovalKey) (AssistantActionApprovalDecision, error)
 	// Dispatch pushes a final decision to a waiting stream. Returns false when no waiter exists.
-	Dispatch(decision AssistantActionApprovalDecision) bool
+	Dispatch(ctx context.Context, decision AssistantActionApprovalDecision) bool
 }

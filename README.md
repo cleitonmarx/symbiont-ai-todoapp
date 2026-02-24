@@ -28,6 +28,7 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - **Board Summary Worker** (`internal/adapters/inbound/workers/board_summary_generator.go`): Batches todo events and triggers board-summary generation
 - **Chat Summary Worker** (`internal/adapters/inbound/workers/chat_summary_generator.go`): Batches chat events by `ConversationID` and triggers one chat-summary generation per conversation window
 - **Conversation Title Worker** (`internal/adapters/inbound/workers/conversation_title_generator.go`): Batches chat events by `ConversationID` and updates titles asynchronously
+- **Action Approval Dispatcher Worker** (`internal/adapters/inbound/workers/action_approval_dispatcher.go`): Consumes approval decisions from Pub/Sub and forwards them to the in-memory action approval dispatcher, using a server-scoped subscription suffix for horizontal distribution
 - **PostgreSQL** (`internal/adapters/outbound/postgres`): Primary data store with migrations and vector extension support
 - **Vault Provider** (`internal/adapters/outbound/config/vault_provider.go`): Loads secret-backed config values (`DB_USER`, `DB_PASS`)
 - **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI/DRM-compatible client for chat, summarization, embeddings, and model listing
@@ -74,6 +75,81 @@ GraphQL currently exposes todo operations (`listTodos`, `updateTodo`, `deleteTod
 
 - OpenAPI spec: `api/openapi/openapi.yml`
 - GraphQL schema: `api/graphql/schema.graphql`
+
+## Action Approval Flow
+
+Human approval can be required before destructive/sensitive tool execution (local actions and MCP tools).
+
+### End-to-end flow
+
+1. Assistant requests a tool call.
+2. `StreamChat` checks the action policy (`AssistantActionDefinition.Approval`).
+3. If approval is required, stream emits SSE event `action_approval_required` with:
+   - `conversation_id`, `turn_id`, `action_call_id`, `name`
+   - `input` (raw tool arguments)
+   - `title`, `description`, `timeout`
+   - `preview_fields` (JSON paths to render user-friendly previews, e.g. `todos[].title`, `url`)
+4. UI blocks execution, shows approval prompt + timeout countdown.
+5. UI submits decision to `POST /api/v1/chat/approvals`.
+6. `SubmitActionApproval` publishes decision to outbox topic `ActionApprovals` (`ACTION_APPROVAL.DECIDED`).
+7. `ActionApprovalDispatcher` worker consumes from Pub/Sub and dispatches to in-memory channel dispatcher.
+8. Waiting stream resumes, emits `action_approval_resolved`, then:
+   - continues tool execution when approved, or
+   - skips execution and returns blocked/rejected tool result.
+
+### Approval endpoint
+
+`POST /api/v1/chat/approvals` (returns `202 Accepted`)
+
+Request body:
+
+```json
+{
+  "conversation_id": "UUID",
+  "turn_id": "UUID",
+  "action_call_id": "string",
+  "action_name": "optional-string",
+  "status": "APPROVED | REJECTED",
+  "reason": "optional-string"
+}
+```
+
+### Configuring approval policies
+
+Local actions:
+
+- Configure directly in action definition (`internal/adapters/outbound/actionregistry/local/actions/...`):
+  - `Approval.Required`
+  - `Approval.Title`
+  - `Approval.Description`
+  - `Approval.Timeout`
+  - `Approval.PreviewFields`
+
+MCP tools:
+
+- Configure via YAML overrides in `internal/adapters/outbound/actionregistry/mcp/tool_overrides.yaml`.
+- Supports both `approval` and `approvals` blocks.
+
+Example:
+
+```yaml
+tools:
+  - name: fetch_content
+    approval:
+      required: true
+      title: Confirm URL content fetch
+      description: This action fetches content from an external URL. Please confirm before proceeding.
+      preview_fields:
+        - url
+      timeout: 90s
+```
+
+### Pub/Sub + worker notes
+
+- Approval decisions are published to topic `ActionApprovals`.
+- Worker base subscription comes from `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID`.
+- Effective subscription is server-unique (`<base>-<generated-server-id>`) for distributed processing.
+- Worker creates the subscription on startup and deletes it on shutdown.
 
 ## Quick Start (Docker Compose)
 
@@ -128,6 +204,7 @@ PUBSUB_PROJECT_ID=local-dev \
 TODO_EVENTS_SUBSCRIPTION_ID=todo_summary_generator \
 CHAT_EVENTS_SUBSCRIPTION_ID=chat_message_summary_generator \
 CHAT_TITLE_EVENTS_SUBSCRIPTION_ID=chat_message_title_generator \
+ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID=action_approval_dispatcher \
 LLM_MODEL_HOST=http://localhost:12434 \
 LLM_SUMMARY_MODEL=qwen3:14B-Q6_K \
 LLM_CHAT_SUMMARY_MODEL=qwen3:14B-Q6_K \
@@ -172,7 +249,7 @@ Required or commonly tuned variables:
 - `DB_HOST`, `DB_PORT` (default: `5432`), `DB_NAME`
 - `DB_USER`, `DB_PASS` (can be sourced from Vault)
 - `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_MOUNT_PATH`, `VAULT_SECRET_PATH`
-- `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`
+- `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`, `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID`
 - `LLM_MODEL_HOST`, `LLM_SUMMARY_MODEL`, `LLM_CHAT_SUMMARY_MODEL`, `LLM_CHAT_TITLE_MODEL`, `LLM_EMBEDDING_MODEL`
 - `MCP_GATEWAY_ENDPOINT` (e.g. `http://mcp-gateway:8811`)
 - `MCP_GATEWAY_API_KEY` (default: `-`)

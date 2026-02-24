@@ -59,6 +59,7 @@ type AssistantActionApprovalRequired struct {
 	Input          string        `json:"input"`
 	Title          string        `json:"title"`
 	Description    string        `json:"description"`
+	PreviewFields  []string      `json:"preview_fields,omitempty"`
 	Timeout        time.Duration `json:"timeout"`
 }
 
@@ -122,6 +123,8 @@ type AssistantActionApproval struct {
 	Title string
 	// Description explains what the action will do and why approval is needed.
 	Description string
+	// PreviewFields are JSON paths (e.g. todos[].title) used by the UI to render a readable approval preview.
+	PreviewFields []string
 	// Timeout controls how long the system should wait for a decision.
 	Timeout time.Duration
 }

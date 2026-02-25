@@ -6,7 +6,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestBuildToolSelectionText(t *testing.T) {
@@ -58,7 +58,7 @@ func TestBuildToolSelectionText(t *testing.T) {
 				assert.Equal(t, tt.expectedText, selectionText)
 			}
 			if tt.expectedLen > 0 {
-				require.Len(t, []rune(selectionText), tt.expectedLen)
+				assert.Len(t, []rune(selectionText), tt.expectedLen)
 			}
 			if tt.expectedHasSuffix != "" {
 				assert.True(t, strings.HasSuffix(selectionText, tt.expectedHasSuffix))
@@ -126,15 +126,14 @@ func TestBuildToolingPrompt(t *testing.T) {
 				"Follow the tool schema and description.",
 			},
 		},
-		"limits-tools-in-scope": {
+		"includes-all-tools-in-scope": {
 			actions: []domain.AssistantActionDefinition{
 				{Name: "a", Hints: domain.AssistantActionHints{UseWhen: "u"}},
 				{Name: "b", Hints: domain.AssistantActionHints{UseWhen: "u"}},
 				{Name: "c", Hints: domain.AssistantActionHints{UseWhen: "u"}},
 				{Name: "d", Hints: domain.AssistantActionHints{UseWhen: "u"}},
 			},
-			expectedText: []string{"- a:", "- b:", "- c:"},
-			notContains:  []string{"- d:"},
+			expectedText: []string{"- a:", "- b:", "- c:", "- d:"},
 		},
 		"truncates-long-prompt": {
 			actions: []domain.AssistantActionDefinition{
@@ -165,7 +164,75 @@ func TestBuildToolingPrompt(t *testing.T) {
 				assert.NotContains(t, got, denied)
 			}
 			if tt.maxLen > 0 {
-				require.LessOrEqual(t, len([]rune(got)), tt.maxLen)
+				assert.LessOrEqual(t, len([]rune(got)), tt.maxLen)
+			}
+		})
+	}
+}
+
+func TestStreamChatImpl_withRecoveryActions(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		actions              []domain.AssistantActionDefinition
+		expectGetDefinition  bool
+		getDefinitionResult  domain.AssistantActionDefinition
+		getDefinitionFound   bool
+		expectedActionNames  []string
+		expectNoLookupCalled bool
+	}{
+		"injects-fetch-todos-before-first-mutation-action": {
+			actions: []domain.AssistantActionDefinition{
+				{Name: "search_web"},
+				{Name: updateTodosActionName},
+			},
+			expectGetDefinition: true,
+			getDefinitionResult: domain.AssistantActionDefinition{Name: fetchTodosActionName},
+			getDefinitionFound:  true,
+			expectedActionNames: []string{"search_web", fetchTodosActionName, updateTodosActionName},
+		},
+		"keeps-actions-unchanged-when-fetch-is-already-present": {
+			actions: []domain.AssistantActionDefinition{
+				{Name: fetchTodosActionName},
+				{Name: deleteTodosActionName},
+			},
+			expectedActionNames:  []string{fetchTodosActionName, deleteTodosActionName},
+			expectNoLookupCalled: true,
+		},
+		"keeps-actions-unchanged-when-fetch-definition-is-not-found": {
+			actions: []domain.AssistantActionDefinition{
+				{Name: deleteTodosActionName},
+			},
+			expectGetDefinition: true,
+			getDefinitionFound:  false,
+			expectedActionNames: []string{deleteTodosActionName},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			actionRegistry := domain.NewMockAssistantActionRegistry(t)
+			if tt.expectGetDefinition {
+				actionRegistry.EXPECT().
+					GetDefinition(fetchTodosActionName).
+					Return(tt.getDefinitionResult, tt.getDefinitionFound).
+					Once()
+			}
+
+			sc := StreamChatImpl{actionRegistry: actionRegistry}
+			got := sc.withRecoveryActions(tt.actions)
+			assert.Len(t, got, len(tt.expectedActionNames))
+
+			gotNames := make([]string, 0, len(got))
+			for _, action := range got {
+				gotNames = append(gotNames, action.Name)
+			}
+			assert.Equal(t, tt.expectedActionNames, gotNames)
+
+			if tt.expectNoLookupCalled {
+				actionRegistry.AssertNotCalled(t, "GetDefinition", mock.Anything)
 			}
 		})
 	}

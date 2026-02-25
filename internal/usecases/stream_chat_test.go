@@ -538,36 +538,65 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					ListRelevant(mock.Anything, "Test").
 					Return([]domain.AssistantActionDefinition{})
 
-				expectNowCalls(timeProvider, fixedTime, 3)
+				expectNowCalls(timeProvider, fixedTime, 4)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
 					Return([]domain.ChatMessage{}, false, nil).
 					Once()
 
+				callCount := 0
 				assistant.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
-					Return(errors.New("llm error"))
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+						if callCount == 0 {
+							callCount++
+							return errors.New("llm error")
+						}
 
-				llmErr := "llm error"
+						assert.Empty(t, req.AvailableActions)
+						assert.NotEmpty(t, req.Messages)
+						lastMsg := req.Messages[len(req.Messages)-1]
+						assert.Equal(t, domain.ChatRole_System, lastMsg.Role)
+						assert.Contains(t, lastMsg.Content, "The previous assistant turn failed due to an internal processing issue")
+
+						if err := onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+							UserMessageID:      userMsgID,
+							AssistantMessageID: assistantMsgID,
+						}); err != nil {
+							return err
+						}
+						if err := onEvent(ctx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{
+							Text: "I hit an internal error while processing your request. Please retry with a smaller scope.",
+						}); err != nil {
+							return err
+						}
+						return onEvent(ctx, domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
+							AssistantMessageID: assistantMsgID.String(),
+							CompletedAt:        fixedTime.Format(time.RFC3339),
+						})
+					}).
+					Times(2)
+
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
 						Role:            domain.ChatRole_User,
 						Content:         "Test",
+						ID:              &userMsgID,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
 					{
 						Role:            domain.ChatRole_Assistant,
-						Content:         "",
-						MessageState:    domain.ChatMessageState_Failed,
-						ErrorMessage:    &llmErr,
+						Content:         "I hit an internal error while processing your request. Please retry with a smaller scope.",
+						ID:              &assistantMsgID,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
 				})
 			},
-			expectErr: true,
+			expectErr:       false,
+			expectedContent: "I hit an internal error while processing your request. Please retry with a smaller scope.",
 		},
 		"chatstream-without-meta-persists-user-after-loop": {
 			userMessage: "No meta",

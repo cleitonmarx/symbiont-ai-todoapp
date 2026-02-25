@@ -30,8 +30,13 @@ const (
 	CHAT_TOP_P       = 0.7
 
 	MAX_ACTION_SELECTION_CHARS = 400
-	MAX_ACTION_HINT_ACTIONS    = 3
 	MAX_ACTION_PROMPT_CHARS    = 800
+	MAX_RECOVERY_MESSAGES      = 8
+
+	fetchTodosActionName         = "fetch_todos"
+	updateTodosActionName        = "update_todos"
+	updateTodosDueDateActionName = "update_todos_due_date"
+	deleteTodosActionName        = "delete_todos"
 )
 
 //go:embed prompts/chat.yml
@@ -135,6 +140,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		spanCtx,
 		buildActionSelectionText(messagesHistory),
 	)
+	relevantActions = sc.withRecoveryActions(relevantActions)
 
 	if actionPrompt := buildActionsPrompt(relevantActions); actionPrompt != "" {
 		messagesHistory = append(messagesHistory, domain.AssistantMessage{
@@ -174,15 +180,25 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 
 	for continueChatStreaming := true; continueChatStreaming; {
 		continueChatStreaming = false
+		var streamEventErr error
 
 		err = sc.assistant.RunTurn(spanCtx, req, func(turnCtx context.Context, eventType domain.AssistantEventType, data any) error {
 			shouldContinue, eventErr := sc.handleStreamEvent(turnCtx, eventType, data, model, &req, &state, onEvent)
 			if shouldContinue {
 				continueChatStreaming = true
 			}
+			if eventErr != nil && streamEventErr == nil {
+				streamEventErr = eventErr
+			}
 			return eventErr
 		})
-		if telemetry.RecordErrorAndStatus(span, err) {
+		if err != nil {
+			if streamEventErr == nil && sc.prepareRunTurnRecovery(err, &req, &state) {
+				continueChatStreaming = true
+				continue
+			}
+
+			telemetry.RecordErrorAndStatus(span, err)
 			if persistErr := sc.persistFailureMessages(spanCtx, err, model, &state); persistErr != nil {
 				return persistErr
 			}
@@ -479,6 +495,14 @@ func (sc StreamChatImpl) handleActionCallEvent(
 			ActionCalls:  actionMessage.ActionCalls,
 		},
 	)
+	if !actionSucceeded {
+		req.Messages = append(req.Messages, domain.AssistantMessage{
+			Role: domain.ChatRole_System,
+			Content: "Tool call failed. Read the tool error details/example, then retry with corrected arguments or another tool. " +
+				"If updating/deleting todos failed due to missing or unmatched IDs, fetch todos first to resolve UUIDs, then retry.",
+		})
+		req.AvailableActions = sc.withRecoveryActions(req.AvailableActions)
+	}
 
 	return true, nil
 }
@@ -865,17 +889,18 @@ func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uu
 
 // streamChatExecutionState holds mutable state during a stream-chat execution.
 type streamChatExecutionState struct {
-	conversation        domain.Conversation
-	conversationCreated bool
-	assistantMsgContent strings.Builder
-	assistantMsgID      uuid.UUID
-	tokenUsage          domain.AssistantUsage
-	turnID              uuid.UUID
-	turnSequence        int64
-	userMsg             domain.ChatMessage
-	userMsgPersisted    bool
-	userMsgPersistTried bool
-	tracker             *actionCycleTracker
+	conversation             domain.Conversation
+	conversationCreated      bool
+	assistantMsgContent      strings.Builder
+	assistantMsgID           uuid.UUID
+	tokenUsage               domain.AssistantUsage
+	turnID                   uuid.UUID
+	turnSequence             int64
+	userMsg                  domain.ChatMessage
+	userMsgPersisted         bool
+	userMsgPersistTried      bool
+	runTurnRecoveryAttempted bool
+	tracker                  *actionCycleTracker
 }
 
 // nextTurnSequence returns the current sequence value and advances the counter.
@@ -954,18 +979,16 @@ func buildActionsPrompt(actions []domain.AssistantActionDefinition) string {
 		return ""
 	}
 
-	limit := min(len(actions), MAX_ACTION_HINT_ACTIONS)
-	selected := actions[:limit]
-
 	var b strings.Builder
 	b.WriteString("Tooling rules for this turn:\n")
-	b.WriteString("- Use only tools listed below.\n")
+	b.WriteString("- Use only available tools for this turn.\n")
 	b.WriteString("- Arguments must be strict JSON matching each tool schema.\n")
 	b.WriteString("- For fields named id, *_id, or ids: use UUID values only (never title text).\n")
 	b.WriteString("- If required UUIDs are missing, fetch/select items first, then call mutation tools.\n")
-	b.WriteString("Tools in scope:\n")
+	b.WriteString("- If a tool call fails (for example `error` or `errors[...]`), correct the arguments or use another tool; do not stop after the first failure.\n")
+	b.WriteString("Tools in scope (priority order):\n")
 
-	for _, action := range selected {
+	for _, action := range actions {
 		b.WriteString("- ")
 		b.WriteString(action.Name)
 		b.WriteString(": ")
@@ -974,6 +997,84 @@ func buildActionsPrompt(actions []domain.AssistantActionDefinition) string {
 	}
 
 	return truncateToFirstChars(strings.TrimSpace(b.String()), MAX_ACTION_PROMPT_CHARS)
+}
+
+func (sc StreamChatImpl) withRecoveryActions(actions []domain.AssistantActionDefinition) []domain.AssistantActionDefinition {
+	if len(actions) == 0 {
+		return actions
+	}
+
+	needsTodoFetcher := false
+	hasTodoFetcher := false
+	insertAt := 0
+
+	for i, action := range actions {
+		switch action.Name {
+		case fetchTodosActionName:
+			hasTodoFetcher = true
+		case updateTodosActionName, updateTodosDueDateActionName, deleteTodosActionName:
+			if !needsTodoFetcher {
+				insertAt = i
+			}
+			needsTodoFetcher = true
+		}
+	}
+
+	if !needsTodoFetcher || hasTodoFetcher {
+		return actions
+	}
+
+	fetchTodosDefinition, found := sc.actionRegistry.GetDefinition(fetchTodosActionName)
+	if !found {
+		return actions
+	}
+
+	withRecovery := make([]domain.AssistantActionDefinition, 0, len(actions)+1)
+	withRecovery = append(withRecovery, actions[:insertAt]...)
+	withRecovery = append(withRecovery, fetchTodosDefinition)
+	withRecovery = append(withRecovery, actions[insertAt:]...)
+	return withRecovery
+}
+
+func (sc StreamChatImpl) prepareRunTurnRecovery(
+	runTurnErr error,
+	req *domain.AssistantTurnRequest,
+	state *streamChatExecutionState,
+) bool {
+	if state.runTurnRecoveryAttempted {
+		return false
+	}
+
+	state.runTurnRecoveryAttempted = true
+	req.AvailableActions = nil
+	req.Messages = compactToLastMessages(req.Messages, MAX_RECOVERY_MESSAGES)
+	req.Messages = append(req.Messages, domain.AssistantMessage{
+		Role: domain.ChatRole_System,
+		Content: "The previous assistant turn failed due to an internal processing issue " +
+			"(commonly tool execution failure or context size limit). " +
+			"Internal error: " + truncateToFirstChars(strings.TrimSpace(runTurnErr.Error()), 400) + ". " +
+			"Reply to the user with a short apology and explain that the request failed due to an internal error. " +
+			"Suggest retrying with a smaller scope. Do not claim actions succeeded.",
+	})
+
+	return true
+}
+
+func compactToLastMessages(messages []domain.AssistantMessage, maxMessages int) []domain.AssistantMessage {
+	if maxMessages <= 0 || len(messages) == 0 {
+		return nil
+	}
+
+	if len(messages) <= maxMessages {
+		out := make([]domain.AssistantMessage, len(messages))
+		copy(out, messages)
+		return out
+	}
+
+	start := len(messages) - maxMessages
+	out := make([]domain.AssistantMessage, maxMessages)
+	copy(out, messages[start:])
+	return out
 }
 
 // isAmbiguousActionSelectionInput checks if the user input contains phrases

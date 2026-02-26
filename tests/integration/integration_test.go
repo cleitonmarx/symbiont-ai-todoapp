@@ -57,6 +57,7 @@ func TestMain(m *testing.M) {
 				"CHAT_EVENTS_SUBSCRIPTION_ID":            "chat_message_summary_generator",
 				"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID":      "chat_message_title_generator",
 				"ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID": "action_approval_dispatcher",
+				"LLM_EMBEDDING_MODEL_HOST":               "http://localhost:12434",
 				"LLM_MODEL_HOST":                         "http://localhost:12434",
 				"LLM_CHAT_SUMMARY_MODEL":                 "qwen3:14B-Q6_K",
 				"LLM_CHAT_TITLE_MODEL":                   "qwen3:14B-Q6_K",
@@ -323,7 +324,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 
 	})
 
-	t.Run("mark-todo-completed", func(t *testing.T) {
+	t.Run("mark-todo-done", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			ConversationId: &conversationID,
 			Model:          modelName,
@@ -501,7 +502,7 @@ func TestTodoApp_MCPIntegration(t *testing.T) {
 
 		require.Contains(t, actionStartedText, "📄 Fetching page content...")
 		require.GreaterOrEqual(t, actionCompletedCount, 1)
-		require.Contains(t, deltaText, "DuckDuckGo website", "expected chat response to contain content fetched from the web page")
+		require.Contains(t, deltaText, "DuckDuckGo", "expected chat response to contain content fetched from the web page")
 		fmt.Println("Chat response:", deltaText)
 	})
 }

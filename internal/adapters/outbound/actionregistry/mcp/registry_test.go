@@ -301,8 +301,8 @@ func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 	assert.Equal(t, "Use to gather external information or references before deciding or answering.", def.Hints.UseWhen)
 	assert.Equal(t, "Do not use for todo CRUD operations or when the user request is fully internal to the app.", def.Hints.AvoidWhen)
 	assert.Equal(t, "Always send a specific query and include max_results. Default max_results=2. Never exceed 3 unless the user explicitly asks for broad research. Prefer one focused query per turn.", def.Hints.ArgRules)
-	assert.Equal(t, "🔎 Searching trusted sources...", defs[0].Action.StatusMessage())
-	assert.Equal(t, "🔎 Searching trusted sources...", registry.StatusMessage("search"))
+	assert.Equal(t, "🔎 Searching on the web...", defs[0].Action.StatusMessage())
+	assert.Equal(t, "🔎 Searching on the web...", registry.StatusMessage("search"))
 }
 
 func TestParseActionCallArguments_Table(t *testing.T) {
@@ -412,6 +412,46 @@ func TestSchemaToInput_Table(t *testing.T) {
 				assert.False(t, got.Fields["priority"].Required)
 			},
 		},
+		{
+			name: "nested-array-object-with-format-and-enum",
+			schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"todos": map[string]any{
+						"type": "array",
+						"items": map[string]any{
+							"type": "object",
+							"properties": map[string]any{
+								"id": map[string]any{
+									"type":        "string",
+									"description": "Todo id",
+								},
+								"status": map[string]any{
+									"type":   "string",
+									"enum":   []any{"OPEN", "DONE"},
+									"format": "enum",
+								},
+							},
+							"required": []any{"id"},
+						},
+					},
+				},
+				"required": []any{"todos"},
+			},
+			assert: func(t *testing.T, got domain.AssistantActionInput) {
+				require.Contains(t, got.Fields, "todos")
+				field := got.Fields["todos"]
+				assert.Equal(t, "array", field.Type)
+				assert.True(t, field.Required)
+				require.NotNil(t, field.Items)
+				assert.Equal(t, "object", field.Items.Type)
+				require.Contains(t, field.Items.Fields, "id")
+				assert.True(t, field.Items.Fields["id"].Required)
+				require.Contains(t, field.Items.Fields, "status")
+				assert.Equal(t, []any{"OPEN", "DONE"}, field.Items.Fields["status"].Enum)
+				assert.Equal(t, "enum", field.Items.Fields["status"].Format)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -484,6 +524,41 @@ tools:
 				assert.Equal(t, "Destructive action.", got["delete_todos"].Approval.Description)
 				assert.Equal(t, []string{"todos[].title", "todos[].id"}, got["delete_todos"].Approval.PreviewFields)
 				assert.Equal(t, 45*time.Second, got["delete_todos"].Approval.Timeout)
+			},
+		},
+		{
+			name: "valid-yaml-with-nested-input-fields",
+			content: `
+tools:
+  - name: update_todos
+    input:
+      type: object
+      fields:
+        todos:
+          type: array
+          required: true
+          items:
+            type: object
+            fields:
+              id:
+                type: string
+                required: true
+                format: uuid
+              status:
+                type: string
+                required: false
+                enum: [OPEN, DONE]
+`,
+			assert: func(t *testing.T, got map[string]domain.AssistantActionDefinition, err error) {
+				require.NoError(t, err)
+				require.Contains(t, got, "update_todos")
+				todosField := got["update_todos"].Input.Fields["todos"]
+				assert.Equal(t, "array", todosField.Type)
+				assert.True(t, todosField.Required)
+				require.NotNil(t, todosField.Items)
+				require.Contains(t, todosField.Items.Fields, "id")
+				assert.Equal(t, "uuid", todosField.Items.Fields["id"].Format)
+				assert.Equal(t, []any{"OPEN", "DONE"}, todosField.Items.Fields["status"].Enum)
 			},
 		},
 		{

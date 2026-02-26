@@ -459,9 +459,13 @@ type assistantActionInputConfig struct {
 
 // assistantActionFieldOverride represents the YAML structure for overriding individual input fields of an MCP tool.
 type assistantActionFieldOverride struct {
-	Type        string `yaml:"type"`
-	Description string `yaml:"description"`
-	Required    bool   `yaml:"required"`
+	Type        string                                  `yaml:"type"`
+	Description string                                  `yaml:"description"`
+	Required    bool                                    `yaml:"required"`
+	Format      string                                  `yaml:"format"`
+	Enum        []any                                   `yaml:"enum"`
+	Fields      map[string]assistantActionFieldOverride `yaml:"fields"`
+	Items       *assistantActionFieldOverride           `yaml:"items"`
 }
 
 // assistantActionHintsConfig allows configuring free-form usage hints for MCP tools,
@@ -592,11 +596,7 @@ func parseToolOverrides(content []byte) (toolOverrides, error) {
 
 		fields := map[string]domain.AssistantActionField{}
 		for fieldName, field := range override.Input.Fields {
-			fields[fieldName] = domain.AssistantActionField{
-				Type:        strings.TrimSpace(field.Type),
-				Description: strings.TrimSpace(field.Description),
-				Required:    field.Required,
-			}
+			fields[fieldName] = overrideFieldToDomain(field)
 		}
 
 		def := domain.AssistantActionDefinition{
@@ -696,14 +696,63 @@ func schemaToInput(schema any) domain.AssistantActionInput {
 
 	for fieldName, fieldSchemaRaw := range props {
 		fieldSchema, _ := anyToMap(fieldSchemaRaw)
-		input.Fields[fieldName] = domain.AssistantActionField{
-			Type:        schemaFieldType(fieldSchema),
-			Description: strings.TrimSpace(asString(fieldSchema["description"])),
-			Required:    required[fieldName],
-		}
+		input.Fields[fieldName] = schemaFieldToDomain(fieldSchema, required[fieldName])
 	}
 
 	return input
+}
+
+func overrideFieldToDomain(field assistantActionFieldOverride) domain.AssistantActionField {
+	result := domain.AssistantActionField{
+		Type:        strings.TrimSpace(field.Type),
+		Description: strings.TrimSpace(field.Description),
+		Required:    field.Required,
+		Format:      strings.TrimSpace(field.Format),
+		Enum:        field.Enum,
+	}
+
+	if len(field.Fields) > 0 {
+		result.Fields = make(map[string]domain.AssistantActionField, len(field.Fields))
+		for fieldName, child := range field.Fields {
+			result.Fields[fieldName] = overrideFieldToDomain(child)
+		}
+	}
+
+	if field.Items != nil {
+		items := overrideFieldToDomain(*field.Items)
+		result.Items = &items
+	}
+
+	return result
+}
+
+func schemaFieldToDomain(fieldSchema map[string]any, required bool) domain.AssistantActionField {
+	result := domain.AssistantActionField{
+		Type:        schemaFieldType(fieldSchema),
+		Description: strings.TrimSpace(asString(fieldSchema["description"])),
+		Required:    required,
+		Format:      strings.TrimSpace(asString(fieldSchema["format"])),
+	}
+
+	if enumValues, ok := fieldSchema["enum"].([]any); ok && len(enumValues) > 0 {
+		result.Enum = enumValues
+	}
+
+	if props, ok := anyToMap(fieldSchema["properties"]); ok && len(props) > 0 {
+		result.Fields = make(map[string]domain.AssistantActionField, len(props))
+		requiredFields := requiredSet(fieldSchema["required"])
+		for name, raw := range props {
+			childSchema, _ := anyToMap(raw)
+			result.Fields[name] = schemaFieldToDomain(childSchema, requiredFields[name])
+		}
+	}
+
+	if itemsSchema, ok := anyToMap(fieldSchema["items"]); ok && len(itemsSchema) > 0 {
+		items := schemaFieldToDomain(itemsSchema, false)
+		result.Items = &items
+	}
+
+	return result
 }
 
 // schemaFieldType resolves field type from direct or composed schema nodes (anyOf/oneOf/allOf).

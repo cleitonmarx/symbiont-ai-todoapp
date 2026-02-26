@@ -274,8 +274,8 @@ func toFloat32Truncated(input []float64) []float32 {
 	for i, v := range input {
 		f32[i] = float32(v)
 	}
-	if len(f32) > 1536 {
-		f32 = f32[:1536]
+	if len(f32) > 768 {
+		f32 = f32[:768]
 	}
 	return f32
 }

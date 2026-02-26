@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -11,12 +12,14 @@ import (
 type AssistantEventType string
 
 const (
-	AssistantEventType_TurnStarted     AssistantEventType = "turn_started"
-	AssistantEventType_MessageDelta    AssistantEventType = "message_delta"
-	AssistantEventType_ActionRequested AssistantEventType = "action_requested"
-	AssistantEventType_ActionStarted   AssistantEventType = "action_started"
-	AssistantEventType_ActionCompleted AssistantEventType = "action_completed"
-	AssistantEventType_TurnCompleted   AssistantEventType = "turn_completed"
+	AssistantEventType_TurnStarted            AssistantEventType = "turn_started"
+	AssistantEventType_MessageDelta           AssistantEventType = "message_delta"
+	AssistantEventType_ActionRequested        AssistantEventType = "action_requested"
+	AssistantEventType_ActionApprovalRequired AssistantEventType = "action_approval_required"
+	AssistantEventType_ActionApprovalResolved AssistantEventType = "action_approval_resolved"
+	AssistantEventType_ActionStarted          AssistantEventType = "action_started"
+	AssistantEventType_ActionCompleted        AssistantEventType = "action_completed"
+	AssistantEventType_TurnCompleted          AssistantEventType = "turn_completed"
 )
 
 // AssistantUsage contains token usage for one assistant turn.
@@ -47,6 +50,29 @@ type AssistantActionCall struct {
 	Text  string `json:"text"`
 }
 
+// AssistantActionApprovalRequired indicates an action is blocked waiting for human approval.
+type AssistantActionApprovalRequired struct {
+	ConversationID uuid.UUID     `json:"conversation_id"`
+	TurnID         uuid.UUID     `json:"turn_id"`
+	ActionCallID   string        `json:"action_call_id"`
+	Name           string        `json:"name"`
+	Input          string        `json:"input"`
+	Title          string        `json:"title"`
+	Description    string        `json:"description"`
+	PreviewFields  []string      `json:"preview_fields,omitempty"`
+	Timeout        time.Duration `json:"timeout"`
+}
+
+// AssistantActionApprovalResolved indicates the final approval decision for one action.
+type AssistantActionApprovalResolved struct {
+	ConversationID uuid.UUID                 `json:"conversation_id"`
+	TurnID         uuid.UUID                 `json:"turn_id"`
+	ActionCallID   string                    `json:"action_call_id"`
+	Name           string                    `json:"name"`
+	Status         ChatMessageApprovalStatus `json:"status"`
+	Reason         *string                   `json:"reason,omitempty"`
+}
+
 // AssistantActionCompleted indicates an action invocation has finished.
 type AssistantActionCompleted struct {
 	ID            string  `json:"id"`
@@ -64,7 +90,7 @@ type AssistantTurnCompleted struct {
 }
 
 // AssistantEventCallback is called for each assistant turn event.
-type AssistantEventCallback func(eventType AssistantEventType, data any) error
+type AssistantEventCallback func(context.Context, AssistantEventType, any) error
 
 // AssistantMessage represents a message exchanged during assistant turns.
 type AssistantMessage struct {
@@ -87,6 +113,20 @@ type AssistantActionDefinition struct {
 	Description string
 	Input       AssistantActionInput
 	Hints       AssistantActionHints
+	Approval    AssistantActionApproval
+}
+
+// AssistantActionApproval holds human approval policy metadata for one action.
+type AssistantActionApproval struct {
+	Required bool
+	// Title is a short approval title for UI prompts.
+	Title string
+	// Description explains what the action will do and why approval is needed.
+	Description string
+	// PreviewFields are JSON paths (e.g. todos[].title) used by the UI to render a readable approval preview.
+	PreviewFields []string
+	// Timeout controls how long the system should wait for a decision.
+	Timeout time.Duration
 }
 
 // ComposeHint composes the action hints into a single string for prompting.
@@ -115,6 +155,11 @@ func (d AssistantActionDefinition) HasHints() bool {
 		strings.TrimSpace(d.Hints.ArgRules) != ""
 }
 
+// RequiresApproval returns true when the action policy requires explicit human approval.
+func (d AssistantActionDefinition) RequiresApproval() bool {
+	return d.Approval.Required
+}
+
 // AssistantActionHints holds compact, runtime guidance for dynamic prompt injection.
 type AssistantActionHints struct {
 	UseWhen   string
@@ -127,6 +172,10 @@ type AssistantActionField struct {
 	Type        string
 	Description string
 	Required    bool
+	Fields      map[string]AssistantActionField
+	Items       *AssistantActionField
+	Format      string
+	Enum        []any
 }
 
 // AssistantActionInput describes the action input shape.
@@ -177,6 +226,8 @@ type AssistantAction interface {
 type AssistantActionRegistry interface {
 	// Execute runs the given action call and returns the resulting assistant message.
 	Execute(context.Context, AssistantActionCall, []AssistantMessage) AssistantMessage
+	// GetDefinition returns one action definition by name.
+	GetDefinition(actionName string) (AssistantActionDefinition, bool)
 	// StatusMessage returns a status message about the action execution, or a default message if not implemented.
 	StatusMessage(actionName string) string
 	// ListRelevant returns relevant assistant action definitions based on the user input.

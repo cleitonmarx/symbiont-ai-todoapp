@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/google/uuid"
 )
 
 // extractDateParam tries to extract a date from the provided parameter
@@ -129,11 +130,11 @@ func formatTodosRows(todos []domain.Todo) string {
 }
 
 // formatDeletedRows formats deleted todo ids as a compact table-like payload.
-func formatDeletedRows(ids []string) string {
+func formatDeletedRows(ids []uuid.UUID) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "todos[%d]{id,deleted}", len(ids))
 	for _, id := range ids {
-		fmt.Fprintf(&b, "\n%s,true", id)
+		fmt.Fprintf(&b, "\n%s,true", id.String())
 	}
 	return b.String()
 }

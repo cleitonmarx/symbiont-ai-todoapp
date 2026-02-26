@@ -177,8 +177,8 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 				m.EXPECT().
 					Execute(mock.Anything, "Hello", "qwen2.5:7B-Q4_0", mock.Anything, mock.Anything).
 					Run(func(ctx context.Context, userMessage string, model string, cb domain.AssistantEventCallback, opts ...usecases.StreamChatOption) {
-						_ = cb(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{})
-						_ = cb(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Hi!"})
+						_ = cb(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{})
+						_ = cb(ctx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Hi!"})
 					}).
 					Return(nil)
 			},
@@ -203,8 +203,8 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 						assert.NotNil(t, params.ConversationID)
 						assert.Equal(t, uuid.MustParse("00000000-0000-0000-0000-000000000001"), *params.ConversationID)
 
-						_ = cb(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{})
-						_ = cb(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Hi!"})
+						_ = cb(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{})
+						_ = cb(ctx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Hi!"})
 					}).
 					Return(nil)
 			},

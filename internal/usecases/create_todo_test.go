@@ -52,8 +52,8 @@ func TestCreateTodoImpl_Execute(t *testing.T) {
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(uowCtx context.Context, uow domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					})
 			},
 			expectedTodo: expectedTodo,
@@ -72,8 +72,8 @@ func TestCreateTodoImpl_Execute(t *testing.T) {
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(_ domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					})
 			},
 			expectedTodo: domain.Todo{},

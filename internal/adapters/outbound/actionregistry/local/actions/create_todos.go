@@ -50,6 +50,23 @@ func (a BulkTodoCreatorAction) Definition() domain.AssistantActionDefinition {
 					Type:        "array",
 					Description: "List of todos to create. Each item: {title, due_date}. REQUIRED.",
 					Required:    true,
+					Items: &domain.AssistantActionField{
+						Type:        "object",
+						Description: "Todo item to create.",
+						Fields: map[string]domain.AssistantActionField{
+							"title": {
+								Type:        "string",
+								Description: "Title of the todo. REQUIRED.",
+								Required:    true,
+							},
+							"due_date": {
+								Type:        "string",
+								Description: "Due date in YYYY-MM-DD format. REQUIRED.",
+								Required:    true,
+								Format:      "date",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -111,9 +128,9 @@ func (a BulkTodoCreatorAction) Execute(ctx context.Context, call domain.Assistan
 	}
 
 	todos := make([]domain.Todo, 0, len(items))
-	err = a.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
+	err = a.uow.Execute(ctx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
 		for i, item := range items {
-			todo, createErr := a.creator.Create(ctx, uow, item.Title, item.DueDate)
+			todo, createErr := a.creator.Create(uowCtx, uow, item.Title, item.DueDate)
 			if createErr != nil {
 				return fmt.Errorf("todo at index %d: %w", i, createErr)
 			}

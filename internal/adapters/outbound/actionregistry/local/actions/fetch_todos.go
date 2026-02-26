@@ -58,6 +58,7 @@ func (lft TodoFetcherAction) Definition() domain.AssistantActionDefinition {
 					Type:        "string",
 					Description: "Optional status filter. Allowed values: OPEN or DONE.",
 					Required:    false,
+					Enum:        []any{domain.TodoStatus_OPEN, domain.TodoStatus_DONE},
 				},
 				"search_by_similarity": {
 					Type:        "string",
@@ -73,6 +74,7 @@ func (lft TodoFetcherAction) Definition() domain.AssistantActionDefinition {
 					Type:        "string",
 					Description: "Optional sort. Allowed: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc. Use similarity sort only with search_by_similarity. similarityAsc returns most similar first.",
 					Required:    false,
+					Enum:        []any{"dueDateAsc", "dueDateDesc", "createdAtAsc", "createdAtDesc", "similarityAsc", "similarityDesc"},
 				},
 				"due_after": {
 					Type:        "string",

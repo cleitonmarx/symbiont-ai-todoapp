@@ -13,6 +13,9 @@ CREATE TABLE chat_messages (
     prompt_tokens INTEGER NOT NULL,
     completion_tokens INTEGER NOT NULL,
     total_tokens INTEGER NOT NULL,
+    approval_status TEXT,
+    approval_decision_reason TEXT,
+    approval_decided_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL
 );
@@ -21,3 +24,5 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_convo_created_at_id ON chat_message
 CREATE UNIQUE INDEX IF NOT EXISTS uidx_chat_messages_convo_turn_sequence ON chat_messages(conversation_id, turn_id, turn_sequence);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_convo_id ON chat_messages(conversation_id, id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_convo_incomplete ON chat_messages(conversation_id, created_at) WHERE message_state <> 'COMPLETED';
+CREATE INDEX IF NOT EXISTS idx_chat_messages_approval_lookup ON chat_messages(conversation_id, turn_id, action_call_id) WHERE action_call_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_chat_messages_approval_status ON chat_messages(conversation_id, approval_status, created_at) WHERE approval_status IS NOT NULL;

@@ -66,8 +66,8 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					}).
 					Once()
 			},
@@ -117,8 +117,8 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(domain.UnitOfWork) error) error {
-						return fn(uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+						return fn(ctx, uow)
 					}).
 					Once()
 			},

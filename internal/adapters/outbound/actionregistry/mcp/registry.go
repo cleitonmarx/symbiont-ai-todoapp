@@ -75,8 +75,9 @@ type streamableConnector struct {
 }
 
 type mcpToolAction struct {
-	definition domain.AssistantActionDefinition
-	execute    func(context.Context, domain.AssistantActionCall, []domain.AssistantMessage) domain.AssistantMessage
+	definition    domain.AssistantActionDefinition
+	statusMessage string
+	execute       func(context.Context, domain.AssistantActionCall, []domain.AssistantMessage) domain.AssistantMessage
 }
 
 // Definition returns the static action definition associated with this MCP tool.
@@ -86,6 +87,10 @@ func (a mcpToolAction) Definition() domain.AssistantActionDefinition {
 
 // StatusMessage returns a per-tool execution status string for UI streaming updates.
 func (a mcpToolAction) StatusMessage() string {
+	if msg := strings.TrimSpace(a.statusMessage); msg != "" {
+		return msg
+	}
+
 	name := strings.TrimSpace(a.definition.Name)
 	if name == "" {
 		return defaultStatusMessage
@@ -213,12 +218,27 @@ func (r *MCPRegistry) Execute(ctx context.Context, call domain.AssistantActionCa
 	}
 }
 
+// GetDefinition returns one action definition by name.
+func (r *MCPRegistry) GetDefinition(actionName string) (domain.AssistantActionDefinition, bool) {
+	action, found := r.actionsByName[actionName]
+	if !found {
+		return domain.AssistantActionDefinition{}, false
+	}
+	return action.Action.Definition(), true
+}
+
 // StatusMessage returns a status message for one tool name.
 func (r *MCPRegistry) StatusMessage(actionName string) string {
-	if strings.TrimSpace(actionName) == "" {
+	trimmedActionName := strings.TrimSpace(actionName)
+	if trimmedActionName == "" {
 		return defaultStatusMessage
 	}
-	return "⏳ Running " + strings.TrimSpace(actionName) + "..."
+
+	actionEmbedding, found := r.actionsByName[trimmedActionName]
+	if !found {
+		return defaultStatusMessage
+	}
+	return actionEmbedding.Action.StatusMessage()
 }
 
 // ListEmbeddings returns all tool definitions currently available from MCP.
@@ -316,7 +336,7 @@ func (r *MCPRegistry) initializeActions(ctx context.Context) error {
 		return err
 	}
 
-	overrideByToolName, err := loadToolDefinitionOverrides()
+	overrides, err := loadToolOverrides()
 	if err != nil {
 		return fmt.Errorf("failed to load mcp tool definition overrides: %w", err)
 	}
@@ -335,8 +355,12 @@ func (r *MCPRegistry) initializeActions(ctx context.Context) error {
 		if strings.TrimSpace(def.Name) == "" {
 			continue
 		}
-		if override, found := overrideByToolName[def.Name]; found {
+		statusMessage := ""
+		if override, found := overrides.Definitions[def.Name]; found {
 			def = mergeAssistantActionDefinition(def, override)
+		}
+		if overrideStatusMessage, found := overrides.StatusMessages[def.Name]; found {
+			statusMessage = overrideStatusMessage
 		}
 
 		var embedding []float64
@@ -350,7 +374,7 @@ func (r *MCPRegistry) initializeActions(ctx context.Context) error {
 		}
 
 		actions[def.Name] = actionregistry.ActionEmbedding{
-			Action:    mcpToolAction{definition: def, execute: r.Execute},
+			Action:    mcpToolAction{definition: def, statusMessage: statusMessage, execute: r.Execute},
 			Embedding: embedding,
 		}
 	}
@@ -409,63 +433,170 @@ func toolToActionDefinition(tool *mcp.Tool) domain.AssistantActionDefinition {
 	}
 }
 
+// toolOverrideConfig represents the structure of the YAML configuration for overriding tool definitions and status messages.
 type toolOverrideConfig struct {
 	Tools []assistantActionDefinitionOverride `yaml:"tools"`
 }
 
+// assistantActionDefinitionOverride allows partial overrides of discovered MCP tool metadata,
+// including input schema and approval policies.
 type assistantActionDefinitionOverride struct {
-	Name        string                     `yaml:"name"`
-	Description string                     `yaml:"description"`
-	Input       assistantActionInputConfig `yaml:"input"`
-	Hints       assistantActionHintsConfig `yaml:"hints"`
+	Name          string                        `yaml:"name"`
+	Description   string                        `yaml:"description"`
+	StatusMessage string                        `yaml:"status_message"`
+	Input         assistantActionInputConfig    `yaml:"input"`
+	Hints         assistantActionHintsConfig    `yaml:"hints"`
+	Approval      assistantActionApprovalConfig `yaml:"approval"`
+	Approvals     assistantActionApprovalConfig `yaml:"approvals"`
 }
 
+// assistantActionInputConfig allows overriding MCP tool input schema with a simplified format
+// supporting field-level type, description, and required flags.
 type assistantActionInputConfig struct {
 	Type   string                                  `yaml:"type"`
 	Fields map[string]assistantActionFieldOverride `yaml:"fields"`
 }
 
+// assistantActionFieldOverride represents the YAML structure for overriding individual input fields of an MCP tool.
 type assistantActionFieldOverride struct {
-	Type        string `yaml:"type"`
-	Description string `yaml:"description"`
-	Required    bool   `yaml:"required"`
+	Type        string                                  `yaml:"type"`
+	Description string                                  `yaml:"description"`
+	Required    bool                                    `yaml:"required"`
+	Format      string                                  `yaml:"format"`
+	Enum        []any                                   `yaml:"enum"`
+	Fields      map[string]assistantActionFieldOverride `yaml:"fields"`
+	Items       *assistantActionFieldOverride           `yaml:"items"`
 }
 
+// assistantActionHintsConfig allows configuring free-form usage hints for MCP tools,
+// which can be surfaced in the UI or used by the assistant loop for better tool selection and argument formatting.
 type assistantActionHintsConfig struct {
 	UseWhen   string `yaml:"use_when"`
 	AvoidWhen string `yaml:"avoid_when"`
 	ArgRules  string `yaml:"arg_rules"`
 }
 
-func loadToolDefinitionOverrides() (map[string]domain.AssistantActionDefinition, error) {
+// assistantActionApprovalConfig allows configuring human-in-the-loop approval policies for MCP tools,
+// including whether approval is required, custom messages, and timeouts.
+type assistantActionApprovalConfig struct {
+	Required      bool     `yaml:"required"`
+	Title         string   `yaml:"title"`
+	Description   string   `yaml:"description"`
+	PreviewFields []string `yaml:"preview_fields"`
+	Timeout       string   `yaml:"timeout"`
+}
+
+// toDomain converts one approval override block into a domain approval policy.
+func (c assistantActionApprovalConfig) toDomain() (domain.AssistantActionApproval, error) {
+	timeout, err := parseApprovalTimeout(c.Timeout)
+	if err != nil {
+		return domain.AssistantActionApproval{}, err
+	}
+
+	return domain.AssistantActionApproval{
+		Required:      c.Required,
+		Title:         strings.TrimSpace(c.Title),
+		Description:   strings.TrimSpace(c.Description),
+		PreviewFields: sanitizePreviewFields(c.PreviewFields),
+		Timeout:       timeout,
+	}, nil
+}
+
+// hasValues returns true when at least one approval override field is set.
+func (c assistantActionApprovalConfig) hasValues() bool {
+	return c.Required ||
+		strings.TrimSpace(c.Title) != "" ||
+		strings.TrimSpace(c.Description) != "" ||
+		len(sanitizePreviewFields(c.PreviewFields)) > 0 ||
+		strings.TrimSpace(c.Timeout) != ""
+}
+
+func sanitizePreviewFields(fields []string) []string {
+	if len(fields) == 0 {
+		return nil
+	}
+
+	next := make([]string, 0, len(fields))
+	for _, raw := range fields {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			continue
+		}
+		next = append(next, trimmed)
+	}
+	if len(next) == 0 {
+		return nil
+	}
+	return slices.Compact(next)
+}
+
+// parseApprovalTimeout supports duration strings (e.g., "30s").
+func parseApprovalTimeout(timeout string) (time.Duration, error) {
+	trimmed := strings.TrimSpace(timeout)
+	if trimmed != "" {
+		parsed, err := time.ParseDuration(trimmed)
+		if err != nil {
+			return 0, fmt.Errorf("invalid approval timeout %q: %w", trimmed, err)
+		}
+		return parsed, nil
+	}
+	return 0, nil
+}
+
+// toolOverrides bundles both definition and status message overrides loaded from YAML.
+type toolOverrides struct {
+	Definitions    map[string]domain.AssistantActionDefinition
+	StatusMessages map[string]string
+}
+
+func loadToolOverrides() (toolOverrides, error) {
 	embeddedBytes, err := toolOverridesFS.ReadFile("tool_overrides.yaml")
 	if err != nil {
-		return nil, err
+		return toolOverrides{}, err
 	}
-	return parseToolOverrideDefinitions(embeddedBytes)
+	return parseToolOverrides(embeddedBytes)
 }
 
 // parseToolOverrideDefinitions parses the embedded YAML override file into action definitions.
 func parseToolOverrideDefinitions(content []byte) (map[string]domain.AssistantActionDefinition, error) {
+	overrides, err := parseToolOverrides(content)
+	if err != nil {
+		return nil, err
+	}
+	return overrides.Definitions, nil
+}
+
+// parseToolOverrideStatusMessages parses the embedded YAML override file into status messages.
+func parseToolOverrideStatusMessages(content []byte) (map[string]string, error) {
+	overrides, err := parseToolOverrides(content)
+	if err != nil {
+		return nil, err
+	}
+	return overrides.StatusMessages, nil
+}
+
+// parseToolOverrides is a helper that unmarshals the YAML configuration and separates definition and status message overrides.
+func parseToolOverrides(content []byte) (toolOverrides, error) {
 	var cfg toolOverrideConfig
 	if err := yaml.Unmarshal(content, &cfg); err != nil {
-		return nil, err
+		return toolOverrides{}, err
 	}
 
 	byName := map[string]domain.AssistantActionDefinition{}
+	statusByName := map[string]string{}
 	for _, override := range cfg.Tools {
 		name := strings.TrimSpace(override.Name)
 		if name == "" {
 			continue
 		}
 
+		if statusMessage := strings.TrimSpace(override.StatusMessage); statusMessage != "" {
+			statusByName[name] = statusMessage
+		}
+
 		fields := map[string]domain.AssistantActionField{}
 		for fieldName, field := range override.Input.Fields {
-			fields[fieldName] = domain.AssistantActionField{
-				Type:        strings.TrimSpace(field.Type),
-				Description: strings.TrimSpace(field.Description),
-				Required:    field.Required,
-			}
+			fields[fieldName] = overrideFieldToDomain(field)
 		}
 
 		def := domain.AssistantActionDefinition{
@@ -481,9 +612,25 @@ func parseToolOverrideDefinitions(content []byte) (map[string]domain.AssistantAc
 				ArgRules:  strings.TrimSpace(override.Hints.ArgRules),
 			},
 		}
+
+		approvalCfg := override.Approval
+		if override.Approvals.hasValues() {
+			approvalCfg = override.Approvals
+		}
+		if approvalCfg.hasValues() {
+			approval, err := approvalCfg.toDomain()
+			if err != nil {
+				return toolOverrides{}, fmt.Errorf("tool %q approval override: %w", name, err)
+			}
+			def.Approval = approval
+		}
+
 		byName[name] = def
 	}
-	return byName, nil
+	return toolOverrides{
+		Definitions:    byName,
+		StatusMessages: statusByName,
+	}, nil
 }
 
 // mergeAssistantActionDefinition overlays configured overrides on top of discovered tool metadata.
@@ -500,15 +647,29 @@ func mergeAssistantActionDefinition(base, override domain.AssistantActionDefinit
 	if inputType := strings.TrimSpace(override.Input.Type); inputType != "" {
 		merged.Input.Type = inputType
 	}
-	if len(merged.Input.Fields) == 0 {
-		merged.Input.Fields = map[string]domain.AssistantActionField{}
+	baseFields := map[string]domain.AssistantActionField{}
+	if len(base.Input.Fields) > 0 {
+		baseFields = make(map[string]domain.AssistantActionField, len(base.Input.Fields))
+		maps.Copy(baseFields, base.Input.Fields)
 	}
+	merged.Input.Fields = baseFields
 	maps.Copy(merged.Input.Fields, override.Input.Fields)
 
 	if override.HasHints() {
 		merged.Hints = override.Hints
 	}
+	if hasApprovalOverride(override.Approval) {
+		merged.Approval = override.Approval
+	}
 	return merged
+}
+
+func hasApprovalOverride(approval domain.AssistantActionApproval) bool {
+	return approval.Required ||
+		strings.TrimSpace(approval.Title) != "" ||
+		strings.TrimSpace(approval.Description) != "" ||
+		len(approval.PreviewFields) > 0 ||
+		approval.Timeout > 0
 }
 
 // schemaToInput extracts a simplified action input definition from JSON Schema-like MCP input.
@@ -535,14 +696,63 @@ func schemaToInput(schema any) domain.AssistantActionInput {
 
 	for fieldName, fieldSchemaRaw := range props {
 		fieldSchema, _ := anyToMap(fieldSchemaRaw)
-		input.Fields[fieldName] = domain.AssistantActionField{
-			Type:        schemaFieldType(fieldSchema),
-			Description: strings.TrimSpace(asString(fieldSchema["description"])),
-			Required:    required[fieldName],
-		}
+		input.Fields[fieldName] = schemaFieldToDomain(fieldSchema, required[fieldName])
 	}
 
 	return input
+}
+
+func overrideFieldToDomain(field assistantActionFieldOverride) domain.AssistantActionField {
+	result := domain.AssistantActionField{
+		Type:        strings.TrimSpace(field.Type),
+		Description: strings.TrimSpace(field.Description),
+		Required:    field.Required,
+		Format:      strings.TrimSpace(field.Format),
+		Enum:        field.Enum,
+	}
+
+	if len(field.Fields) > 0 {
+		result.Fields = make(map[string]domain.AssistantActionField, len(field.Fields))
+		for fieldName, child := range field.Fields {
+			result.Fields[fieldName] = overrideFieldToDomain(child)
+		}
+	}
+
+	if field.Items != nil {
+		items := overrideFieldToDomain(*field.Items)
+		result.Items = &items
+	}
+
+	return result
+}
+
+func schemaFieldToDomain(fieldSchema map[string]any, required bool) domain.AssistantActionField {
+	result := domain.AssistantActionField{
+		Type:        schemaFieldType(fieldSchema),
+		Description: strings.TrimSpace(asString(fieldSchema["description"])),
+		Required:    required,
+		Format:      strings.TrimSpace(asString(fieldSchema["format"])),
+	}
+
+	if enumValues, ok := fieldSchema["enum"].([]any); ok && len(enumValues) > 0 {
+		result.Enum = enumValues
+	}
+
+	if props, ok := anyToMap(fieldSchema["properties"]); ok && len(props) > 0 {
+		result.Fields = make(map[string]domain.AssistantActionField, len(props))
+		requiredFields := requiredSet(fieldSchema["required"])
+		for name, raw := range props {
+			childSchema, _ := anyToMap(raw)
+			result.Fields[name] = schemaFieldToDomain(childSchema, requiredFields[name])
+		}
+	}
+
+	if itemsSchema, ok := anyToMap(fieldSchema["items"]); ok && len(itemsSchema) > 0 {
+		items := schemaFieldToDomain(itemsSchema, false)
+		result.Items = &items
+	}
+
+	return result
 }
 
 // schemaFieldType resolves field type from direct or composed schema nodes (anyOf/oneOf/allOf).

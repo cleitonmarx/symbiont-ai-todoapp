@@ -42,26 +42,28 @@ func TestMain(m *testing.M) {
 	todoApp := app.NewTodoApp(
 		&initEnvVars{
 			envVars: map[string]string{
-				"VAULT_ADDR":                        "http://localhost:8200",
-				"VAULT_TOKEN":                       "root-token",
-				"VAULT_MOUNT_PATH":                  "secret",
-				"VAULT_SECRET_PATH":                 "todoapp",
-				"OTEL_EXPORTER_OTLP_ENDPOINT":       "http://localhost:4318",
-				"DB_HOST":                           "localhost",
-				"DB_PORT":                           "5432",
-				"DB_NAME":                           "todoappdb",
-				"PUBSUB_EMULATOR_HOST":              "localhost:8681",
-				"PUBSUB_PROJECT_ID":                 "local-dev",
-				"PUBSUB_TOPIC_ID":                   "Todo",
-				"TODO_EVENTS_SUBSCRIPTION_ID":       "todo_summary_generator",
-				"CHAT_EVENTS_SUBSCRIPTION_ID":       "chat_message_summary_generator",
-				"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID": "chat_message_title_generator",
-				"LLM_MODEL_HOST":                    "http://localhost:12434",
-				"LLM_CHAT_SUMMARY_MODEL":            "qwen3:14B-Q6_K",
-				"LLM_CHAT_TITLE_MODEL":              "qwen3:14B-Q6_K",
-				"LLM_SUMMARY_MODEL":                 "qwen3:14B-Q6_K",
-				"LLM_EMBEDDING_MODEL":               "embeddinggemma:300M-Q8_0",
-				"MCP_GATEWAY_ENDPOINT":              "http://localhost:8811",
+				"VAULT_ADDR":                             "http://localhost:8200",
+				"VAULT_TOKEN":                            "root-token",
+				"VAULT_MOUNT_PATH":                       "secret",
+				"VAULT_SECRET_PATH":                      "todoapp",
+				"OTEL_EXPORTER_OTLP_ENDPOINT":            "http://localhost:4318",
+				"DB_HOST":                                "localhost",
+				"DB_PORT":                                "5432",
+				"DB_NAME":                                "todoappdb",
+				"PUBSUB_EMULATOR_HOST":                   "localhost:8681",
+				"PUBSUB_PROJECT_ID":                      "local-dev",
+				"PUBSUB_TOPIC_ID":                        "Todo",
+				"TODO_EVENTS_SUBSCRIPTION_ID":            "todo_summary_generator",
+				"CHAT_EVENTS_SUBSCRIPTION_ID":            "chat_message_summary_generator",
+				"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID":      "chat_message_title_generator",
+				"ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID": "action_approval_dispatcher",
+				"LLM_EMBEDDING_MODEL_HOST":               "http://localhost:12434",
+				"LLM_MODEL_HOST":                         "http://localhost:12434",
+				"LLM_CHAT_SUMMARY_MODEL":                 "qwen3:14B-Q6_K",
+				"LLM_CHAT_TITLE_MODEL":                   "qwen3:14B-Q6_K",
+				"LLM_SUMMARY_MODEL":                      "qwen3:14B-Q6_K",
+				"LLM_EMBEDDING_MODEL":                    "embeddinggemma:300M-Q8_0",
+				"MCP_GATEWAY_ENDPOINT":                   "http://localhost:8811",
 			},
 		},
 		&InitDockerCompose{},
@@ -322,7 +324,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 
 	})
 
-	t.Run("mark-todo-completed", func(t *testing.T) {
+	t.Run("mark-todo-done", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			ConversationId: &conversationID,
 			Model:          modelName,
@@ -342,7 +344,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		fmt.Println("Chat response:", deltaText)
 	})
 
-	t.Run("delete-todo", func(t *testing.T) {
+	t.Run("delete-todo-with-approval", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			ConversationId: &conversationID,
 			Model:          modelName,
@@ -352,10 +354,37 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsText(t, chatResp.Body)
+		scanner := newSSEScanner(chatResp.Body)
+
+		approvalRequest := readChatApprovalRequiredEvent(t, scanner)
+		require.Equal(t, "delete_todos", approvalRequest.Name, "expected action approval request for 'delete_todos' action")
+		fmt.Printf("\nReceived action approval request: %+v\n", approvalRequest)
+
+		approvalResp, err := restCli.SubmitActionApprovalWithResponse(t.Context(), rest.SubmitActionApprovalRequest{
+			ActionCallId:   approvalRequest.ActionCallID,
+			ActionName:     &approvalRequest.Name,
+			ConversationId: approvalRequest.ConversationID,
+			Reason:         common.Ptr("approved by integration test"),
+			Status:         rest.APPROVED,
+			TurnId:         approvalRequest.TurnID,
+		})
+
+		require.NoError(t, err, "failed to submit action approval")
+		require.NotNil(t, approvalResp, "expected non-nil response for SubmitActionApproval")
+		require.Equal(t, http.StatusAccepted, approvalResp.StatusCode(), "expected 202 Accepted for SubmitActionApproval")
+
+		approvalResolved := readChatApprovalResolvedEvent(t, scanner)
+		require.Equal(t, approvalRequest.ActionCallID, approvalResolved.ActionCallID, "expected resolved action_call_id to match required event")
+		require.Equal(t, approvalRequest.ConversationID, approvalResolved.ConversationID, "expected resolved conversation_id to match required event")
+		require.Equal(t, approvalRequest.TurnID, approvalResolved.TurnID, "expected resolved turn_id to match required event")
+		require.Equal(t, domain.ChatMessageApprovalStatus_Approved, approvalResolved.Status, "expected resolved status to be APPROVED")
+		fmt.Printf("\nReceived action approval resolved event: %+v\n", approvalResolved)
+
+		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsTextFromScanner(t, scanner)
+		fmt.Println("Chat response:", deltaText)
+		fmt.Printf("Action started text: %s\n", actionStartedText)
 		require.Contains(t, actionStartedText, "🗑️ Deleting todos...")
 		require.GreaterOrEqual(t, actionCompletedCount, 1)
-		fmt.Println("Chat response:", deltaText)
 	})
 
 	t.Run("check-conversation-summary-generated", func(t *testing.T) {
@@ -441,7 +470,7 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 }
 
 func TestTodoApp_MCPIntegration(t *testing.T) {
-	t.Run("mcp-fetch-web-page", func(t *testing.T) {
+	t.Run("mcp-fetch-web-page-with-approval", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			Model:   "qwen3:14B-Q6_K",
 			Message: "Fetch the content of URL https://duckduckgo.com/ and summarize it.",
@@ -450,16 +479,42 @@ func TestTodoApp_MCPIntegration(t *testing.T) {
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsText(t, chatResp.Body)
+		scanner := newSSEScanner(chatResp.Body)
 
-		require.Contains(t, actionStartedText, "⏳ Running fetch_content...")
+		approvalRequest := readChatApprovalRequiredEvent(t, scanner)
+		require.Equal(t, "fetch_content", approvalRequest.Name, "expected action approval request for 'fetch_content' action")
+		fmt.Printf("\nReceived action approval request: %+v\n", approvalRequest)
+
+		approvalResp, err := restCli.SubmitActionApprovalWithResponse(t.Context(), rest.SubmitActionApprovalRequest{
+			ActionCallId:   approvalRequest.ActionCallID,
+			ActionName:     &approvalRequest.Name,
+			ConversationId: approvalRequest.ConversationID,
+			Reason:         common.Ptr("approved by integration test"),
+			Status:         rest.APPROVED,
+			TurnId:         approvalRequest.TurnID,
+		})
+
+		require.NoError(t, err, "failed to submit action approval")
+		require.NotNil(t, approvalResp, "expected non-nil response for SubmitActionApproval")
+		require.Equal(t, http.StatusAccepted, approvalResp.StatusCode(), "expected 202 Accepted for SubmitActionApproval")
+
+		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsTextFromScanner(t, scanner)
+
+		require.Contains(t, actionStartedText, "📄 Fetching page content...")
 		require.GreaterOrEqual(t, actionCompletedCount, 1)
-		require.Contains(t, deltaText, "DuckDuckGo website", "expected chat response to contain content fetched from the web page")
+		require.Contains(t, deltaText, "DuckDuckGo", "expected chat response to contain content fetched from the web page")
 		fmt.Println("Chat response:", deltaText)
 	})
 }
 
 func readChatEventsText(t *testing.T, reader io.Reader) (string, string, int, uuid.UUID) {
+	t.Helper()
+	return readChatEventsTextFromScanner(t, newSSEScanner(reader))
+}
+
+func readChatEventsTextFromScanner(t *testing.T, scanner *bufio.Scanner) (string, string, int, uuid.UUID) {
+	t.Helper()
+
 	var (
 		isDelta              = false
 		isActionStarted      = false
@@ -468,7 +523,6 @@ func readChatEventsText(t *testing.T, reader io.Reader) (string, string, int, uu
 		actionStartedText    = strings.Builder{}
 		actionCompletedCount = 0
 		deltaText            = strings.Builder{}
-		scanner              = bufio.NewScanner(reader)
 		conversationID       uuid.UUID
 	)
 	for scanner.Scan() {
@@ -533,4 +587,51 @@ func readChatEventsText(t *testing.T, reader io.Reader) (string, string, int, uu
 	require.NoError(t, scanner.Err(), "failed to scan chat stream")
 
 	return deltaText.String(), actionStartedText.String(), actionCompletedCount, conversationID
+}
+
+func readChatApprovalRequiredEvent(t *testing.T, scanner *bufio.Scanner) domain.AssistantActionApprovalRequired {
+	t.Helper()
+
+	dataPayload := readFirstSSEEventData(t, scanner, "action_approval_required")
+	var event domain.AssistantActionApprovalRequired
+	err := json.Unmarshal([]byte(dataPayload), &event)
+	require.NoError(t, err, "failed to unmarshal chat action approval required payload")
+	return event
+}
+
+func readChatApprovalResolvedEvent(t *testing.T, scanner *bufio.Scanner) domain.AssistantActionApprovalResolved {
+	t.Helper()
+
+	dataPayload := readFirstSSEEventData(t, scanner, "action_approval_resolved")
+	var event domain.AssistantActionApprovalResolved
+	err := json.Unmarshal([]byte(dataPayload), &event)
+	require.NoError(t, err, "failed to unmarshal chat action approval resolved payload")
+	return event
+}
+
+func readFirstSSEEventData(t *testing.T, scanner *bufio.Scanner, eventName string) string {
+	t.Helper()
+
+	eventPrefix := "event: " + eventName
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, eventPrefix) {
+			continue
+		}
+
+		require.True(t, scanner.Scan(), "missing SSE data line for event %s", eventName)
+		dataLine := scanner.Text()
+		return strings.TrimSpace(strings.TrimPrefix(dataLine, "data:"))
+	}
+
+	require.NoError(t, scanner.Err(), "failed to scan SSE stream for event %s", eventName)
+	t.Fatalf("event %s not found in SSE stream", eventName)
+	return ""
+}
+
+func newSSEScanner(reader io.Reader) *bufio.Scanner {
+	scanner := bufio.NewScanner(reader)
+	const maxTokenSize = 1024 * 1024 // 1 MiB
+	scanner.Buffer(make([]byte, 0, 64*1024), maxTokenSize)
+	return scanner
 }

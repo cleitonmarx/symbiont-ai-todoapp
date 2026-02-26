@@ -33,9 +33,9 @@ func (cti CreateTodoImpl) Execute(ctx context.Context, title string, dueDate tim
 	defer span.End()
 
 	var todo domain.Todo
-	err := cti.uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
+	err := cti.uow.Execute(spanCtx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
 		var err error
-		todo, err = cti.creator.Create(spanCtx, uow, title, dueDate)
+		todo, err = cti.creator.Create(uowCtx, uow, title, dueDate)
 		return err
 	})
 	if telemetry.RecordErrorAndStatus(span, err) {

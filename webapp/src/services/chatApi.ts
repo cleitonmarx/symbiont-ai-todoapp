@@ -56,3 +56,18 @@ export const fetchAvailableModels = async (): Promise<string[]> => {
   const response = await apiClient.get('/api/v1/models');
   return response.data?.models ?? [];
 };
+
+export type ActionApprovalStatus = 'APPROVED' | 'REJECTED';
+
+export interface SubmitActionApprovalRequest {
+  conversation_id: string;
+  turn_id: string;
+  action_call_id: string;
+  action_name?: string;
+  status: ActionApprovalStatus;
+  reason?: string;
+}
+
+export const submitActionApproval = async (payload: SubmitActionApprovalRequest): Promise<void> => {
+  await apiClient.post('/api/v1/chat/approvals', payload);
+};

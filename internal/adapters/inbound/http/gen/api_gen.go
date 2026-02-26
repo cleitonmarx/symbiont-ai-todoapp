@@ -20,6 +20,12 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for ActionApprovalStatus.
+const (
+	APPROVED ActionApprovalStatus = "APPROVED"
+	REJECTED ActionApprovalStatus = "REJECTED"
+)
+
 // Defines values for ChatMessageRole.
 const (
 	ChatMessageRoleAssistant ChatMessageRole = "assistant"
@@ -62,6 +68,9 @@ const (
 	SimilarityAsc  ListTodosParamsSort = "similarityAsc"
 	SimilarityDesc ListTodosParamsSort = "similarityDesc"
 )
+
+// ActionApprovalStatus Human approval decision status for a requested action execution.
+type ActionApprovalStatus string
 
 // BoardSummary defines model for BoardSummary.
 type BoardSummary struct {
@@ -225,6 +234,23 @@ type NextUpTodoItem struct {
 	Title  string `json:"title"`
 }
 
+// SubmitActionApprovalRequest defines model for SubmitActionApprovalRequest.
+type SubmitActionApprovalRequest struct {
+	// ActionCallId Assistant action call identifier.
+	ActionCallId string `json:"action_call_id"`
+
+	// ActionName Optional action name for observability.
+	ActionName     *string            `json:"action_name,omitempty"`
+	ConversationId openapi_types.UUID `json:"conversation_id"`
+
+	// Reason Optional human-readable reason for the decision.
+	Reason *string `json:"reason"`
+
+	// Status Human approval decision status for a requested action execution.
+	Status ActionApprovalStatus `json:"status"`
+	TurnId openapi_types.UUID   `json:"turn_id"`
+}
+
 // Todo A todo item.
 type Todo struct {
 	// CreatedAt Timestamp when the todo was created.
@@ -343,6 +369,9 @@ type ListTodosParamsSort string
 
 // StreamChatJSONRequestBody defines body for StreamChat for application/json ContentType.
 type StreamChatJSONRequestBody = ChatStreamRequest
+
+// SubmitActionApprovalJSONRequestBody defines body for SubmitActionApproval for application/json ContentType.
+type SubmitActionApprovalJSONRequestBody = SubmitActionApprovalRequest
 
 // UpdateConversationJSONRequestBody defines body for UpdateConversation for application/json ContentType.
 type UpdateConversationJSONRequestBody = UpdateConversationRequest
@@ -694,6 +723,11 @@ type ClientInterface interface {
 
 	StreamChat(ctx context.Context, body StreamChatJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SubmitActionApprovalWithBody request with any body
+	SubmitActionApprovalWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SubmitActionApproval(ctx context.Context, body SubmitActionApprovalJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListChatMessages request
 	ListChatMessages(ctx context.Context, params *ListChatMessagesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -754,6 +788,30 @@ func (c *Client) StreamChatWithBody(ctx context.Context, contentType string, bod
 
 func (c *Client) StreamChat(ctx context.Context, body StreamChatJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewStreamChatRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SubmitActionApprovalWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitActionApprovalRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SubmitActionApproval(ctx context.Context, body SubmitActionApprovalJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitActionApprovalRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -956,6 +1014,46 @@ func NewStreamChatRequestWithBody(server string, contentType string, body io.Rea
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/chat")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSubmitActionApprovalRequest calls the generic SubmitActionApproval builder with application/json body
+func NewSubmitActionApprovalRequest(server string, body SubmitActionApprovalJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSubmitActionApprovalRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSubmitActionApprovalRequestWithBody generates requests for SubmitActionApproval with any type of body
+func NewSubmitActionApprovalRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/chat/approvals")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1518,6 +1616,11 @@ type ClientWithResponsesInterface interface {
 
 	StreamChatWithResponse(ctx context.Context, body StreamChatJSONRequestBody, reqEditors ...RequestEditorFn) (*StreamChatResponse, error)
 
+	// SubmitActionApprovalWithBodyWithResponse request with any body
+	SubmitActionApprovalWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SubmitActionApprovalResponse, error)
+
+	SubmitActionApprovalWithResponse(ctx context.Context, body SubmitActionApprovalJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitActionApprovalResponse, error)
+
 	// ListChatMessagesWithResponse request
 	ListChatMessagesWithResponse(ctx context.Context, params *ListChatMessagesParams, reqEditors ...RequestEditorFn) (*ListChatMessagesResponse, error)
 
@@ -1592,6 +1695,29 @@ func (r StreamChatResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r StreamChatResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SubmitActionApprovalResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *BadRequest
+	JSON500      *ErrorResp
+}
+
+// Status returns HTTPResponse.Status
+func (r SubmitActionApprovalResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SubmitActionApprovalResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1829,6 +1955,23 @@ func (c *ClientWithResponses) StreamChatWithResponse(ctx context.Context, body S
 	return ParseStreamChatResponse(rsp)
 }
 
+// SubmitActionApprovalWithBodyWithResponse request with arbitrary body returning *SubmitActionApprovalResponse
+func (c *ClientWithResponses) SubmitActionApprovalWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SubmitActionApprovalResponse, error) {
+	rsp, err := c.SubmitActionApprovalWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSubmitActionApprovalResponse(rsp)
+}
+
+func (c *ClientWithResponses) SubmitActionApprovalWithResponse(ctx context.Context, body SubmitActionApprovalJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitActionApprovalResponse, error) {
+	rsp, err := c.SubmitActionApproval(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSubmitActionApprovalResponse(rsp)
+}
+
 // ListChatMessagesWithResponse request returning *ListChatMessagesResponse
 func (c *ClientWithResponses) ListChatMessagesWithResponse(ctx context.Context, params *ListChatMessagesParams, reqEditors ...RequestEditorFn) (*ListChatMessagesResponse, error) {
 	rsp, err := c.ListChatMessages(ctx, params, reqEditors...)
@@ -1983,6 +2126,39 @@ func ParseStreamChatResponse(rsp *http.Response) (*StreamChatResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest ErrorResp
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResp
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSubmitActionApprovalResponse parses an HTTP response from a SubmitActionApprovalWithResponse call
+func ParseSubmitActionApprovalResponse(rsp *http.Response) (*SubmitActionApprovalResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SubmitActionApprovalResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2291,6 +2467,9 @@ type ServerInterface interface {
 	// Stream assistant response for a user message (single global chat)
 	// (POST /api/v1/chat)
 	StreamChat(w http.ResponseWriter, r *http.Request)
+	// Submit action approval decision
+	// (POST /api/v1/chat/approvals)
+	SubmitActionApproval(w http.ResponseWriter, r *http.Request)
 	// Fetch chat history (single global chat)
 	// (GET /api/v1/chat/messages)
 	ListChatMessages(w http.ResponseWriter, r *http.Request, params ListChatMessagesParams)
@@ -2348,6 +2527,20 @@ func (siw *ServerInterfaceWrapper) StreamChat(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.StreamChat(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitActionApproval operation middleware
+func (siw *ServerInterfaceWrapper) SubmitActionApproval(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitActionApproval(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2809,6 +3002,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/board/summary", wrapper.GetBoardSummary)
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/chat", wrapper.StreamChat)
+	m.HandleFunc("POST "+options.BaseURL+"/api/v1/chat/approvals", wrapper.SubmitActionApproval)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/chat/messages", wrapper.ListChatMessages)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/conversations", wrapper.ListConversations)
 	m.HandleFunc("DELETE "+options.BaseURL+"/api/v1/conversations/{conversation_id}", wrapper.DeleteConversation)

@@ -60,6 +60,15 @@ func (r LocalRegistry) Execute(ctx context.Context, call domain.AssistantActionC
 	return details.Action.Execute(spanCtx, call, conversationHistory)
 }
 
+// GetDefinition returns one action definition by name.
+func (r LocalRegistry) GetDefinition(actionName string) (domain.AssistantActionDefinition, bool) {
+	details, exists := r.embeddingByActionName[actionName]
+	if !exists {
+		return domain.AssistantActionDefinition{}, false
+	}
+	return details.Action.Definition(), true
+}
+
 // StatusMessage returns a status message about the action execution.
 func (r LocalRegistry) StatusMessage(actionName string) string {
 	if action, ok := r.embeddingByActionName[actionName]; ok {

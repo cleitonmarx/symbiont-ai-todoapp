@@ -15,5 +15,5 @@ type UnitOfWork interface {
 	// Outbox returns the repository for managing outbox events.
 	Outbox() OutboxRepository
 	// Execute runs a function within the context of a unit of work.
-	Execute(ctx context.Context, fn func(uow UnitOfWork) error) error
+	Execute(ctx context.Context, fn func(ctx context.Context, uow UnitOfWork) error) error
 }

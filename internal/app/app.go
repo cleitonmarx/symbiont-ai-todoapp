@@ -8,6 +8,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry/composite"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry/local"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry/mcp"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/approvaldispatcher"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/config"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/log"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/modelrunner"
@@ -35,6 +36,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&postgres.InitConversationRepository{},
 			&postgres.InitConversationSummaryRepository{},
 			&time.InitCurrentTimeProvider{},
+			&approvaldispatcher.InitDispatcher{},
 			&pubsub.InitClient{},
 			&pubsub.InitPublisher{},
 			&modelrunner.InitAssistantClient{},
@@ -57,6 +59,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&usecases.InitListConversations{},
 			&usecases.InitUpdateConversation{},
 			&usecases.InitListChatMessages{},
+			&usecases.InitSubmitActionApproval{},
 			&usecases.InitDeleteConversation{},
 			&usecases.InitStreamChat{},
 			&usecases.InitListAvailableModels{},
@@ -68,6 +71,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&workers.BoardSummaryGenerator{},
 			&workers.ChatSummaryGenerator{},
 			&workers.ConversationTitleGenerator{},
+			&workers.ActionApprovalDispatcher{},
 			&workers.MessageRelay{},
 		).
 		Introspect(&MermaidGraphIntrospector{})

@@ -110,7 +110,7 @@ func TestCompositeActionRegistry_Execute(t *testing.T) {
 				tt.setMocks(t, registryMocks)
 			}
 
-			registry := NewCompositeActionRegistry(t.Context(), nil, "", registries...)
+			registry := NewCompositeActionRegistry(t.Context(), nil, "", 3, registries...)
 			message := registry.Execute(t.Context(), tt.call, tt.history)
 			if tt.assertMessage != nil {
 				tt.assertMessage(t, message)
@@ -171,7 +171,7 @@ func TestCompositeActionRegistry_StatusMessage(t *testing.T) {
 				tt.setMocks(t, registryMocks)
 			}
 
-			registry := NewCompositeActionRegistry(t.Context(), nil, "", registries...)
+			registry := NewCompositeActionRegistry(t.Context(), nil, "", 3, registries...)
 			assert.Equal(t, tt.expected, registry.StatusMessage(tt.actionName))
 		})
 	}
@@ -313,7 +313,7 @@ func TestCompositeActionRegistry_ListRelevant(t *testing.T) {
 				Return(tt.queryVector, tt.queryErr).
 				Once()
 
-			registry := NewCompositeActionRegistry(t.Context(), semanticEncoder, "embedding-model", registries...)
+			registry := NewCompositeActionRegistry(t.Context(), semanticEncoder, "embedding-model", 3, registries...)
 			definitions := registry.ListRelevant(t.Context(), "user request")
 			gotNames := definitionsNames(definitions)
 

@@ -16,12 +16,13 @@ import (
 // AssistantClient adapts DRMAPIClient to domain assistant/model interfaces.
 type AssistantClient struct {
 	client           DRMAPIClient
+	embeddingClient  DRMAPIClient
 	embeddingFactory EmbeddingFactory
 }
 
 // NewAssistantClientAdapter creates a new adapter.
-func NewAssistantClientAdapter(client DRMAPIClient) AssistantClient {
-	return AssistantClient{client: client, embeddingFactory: embeddingFactory{}}
+func NewAssistantClientAdapter(client DRMAPIClient, embeddingClient DRMAPIClient) AssistantClient {
+	return AssistantClient{client: client, embeddingClient: embeddingClient, embeddingFactory: embeddingFactory{}}
 }
 
 // RunTurn implements domain.Assistant.
@@ -35,7 +36,7 @@ func (a AssistantClient) RunTurn(ctx context.Context, req domain.AssistantTurnRe
 		UserMessageID:      uuid.New(),
 		AssistantMessageID: uuid.New(),
 	}
-	if err := onEvent(domain.AssistantEventType_TurnStarted, meta); err != nil {
+	if err := onEvent(spanCtx, domain.AssistantEventType_TurnStarted, meta); err != nil {
 		return err
 	}
 
@@ -47,7 +48,7 @@ func (a AssistantClient) RunTurn(ctx context.Context, req domain.AssistantTurnRe
 	err := a.client.ChatStream(spanCtx, adapterReq, func(chunk StreamChunk) error {
 		for _, choice := range chunk.Choices {
 			if choice.Delta.Content != "" {
-				if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: choice.Delta.Content}); err != nil {
+				if err := onEvent(spanCtx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: choice.Delta.Content}); err != nil {
 					return err
 				}
 			}
@@ -81,12 +82,12 @@ func (a AssistantClient) RunTurn(ctx context.Context, req domain.AssistantTurnRe
 	}
 
 	for _, call := range actionCalls {
-		if err := onEvent(domain.AssistantEventType_ActionRequested, *call); err != nil {
+		if err := onEvent(spanCtx, domain.AssistantEventType_ActionRequested, *call); err != nil {
 			return err
 		}
 	}
 
-	return onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
+	return onEvent(spanCtx, domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 		AssistantMessageID: meta.AssistantMessageID.String(),
 		CompletedAt:        time.Now().UTC().Format(time.RFC3339),
 		Usage:              usage,
@@ -124,9 +125,10 @@ func (a AssistantClient) RunTurnSync(ctx context.Context, req domain.AssistantTu
 func (a AssistantClient) VectorizeTodo(ctx context.Context, model string, todo domain.Todo) (domain.EmbeddingVector, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
-
-	prompt := a.embeddingFactory.Get(model).GenerateIndexingPrompt(todo)
-	vec, err := a.embed(spanCtx, model, prompt)
+	gen := a.embeddingFactory.Get(model)
+	prompt := gen.GenerateIndexingPrompt(todo)
+	dimension := gen.Dimensions()
+	vec, err := a.embed(spanCtx, model, prompt, dimension)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return domain.EmbeddingVector{}, err
 	}
@@ -138,8 +140,10 @@ func (a AssistantClient) VectorizeQuery(ctx context.Context, model, query string
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	prompt := a.embeddingFactory.Get(model).GenerateSearchPrompt(query)
-	vec, err := a.embed(spanCtx, model, prompt)
+	gen := a.embeddingFactory.Get(model)
+	prompt := gen.GenerateSearchPrompt(query)
+	dimension := gen.Dimensions()
+	vec, err := a.embed(spanCtx, model, prompt, dimension)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return domain.EmbeddingVector{}, err
 	}
@@ -151,17 +155,19 @@ func (a AssistantClient) VectorizeAssistantActionDefinition(ctx context.Context,
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	prompt := a.embeddingFactory.Get(model).GenerateAssistentActionDefinitionPrompt(action)
-	vec, err := a.embed(spanCtx, model, prompt)
+	gen := a.embeddingFactory.Get(model)
+	prompt := gen.GenerateAssistentActionDefinitionPrompt(action)
+	dimension := gen.Dimensions()
+	vec, err := a.embed(spanCtx, model, prompt, dimension)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return domain.EmbeddingVector{}, err
 	}
 	return vec, nil
 }
 
-func (a AssistantClient) embed(ctx context.Context, model, input string) (domain.EmbeddingVector, error) {
-	req := EmbeddingsRequest{Model: model, Input: input}
-	resp, err := a.client.Embeddings(ctx, req)
+func (a AssistantClient) embed(ctx context.Context, model, input string, dimension *int) (domain.EmbeddingVector, error) {
+	req := EmbeddingsRequest{Model: model, Input: input, Dimensions: dimension}
+	resp, err := a.embeddingClient.Embeddings(ctx, req)
 	if err != nil {
 		return domain.EmbeddingVector{}, err
 	}
@@ -218,6 +224,7 @@ func (a AssistantClient) ListAssistantModels(ctx context.Context) ([]domain.Assi
 	return res, nil
 }
 
+// toChatRequest converts a domain.AssistantTurnRequest to a ChatRequest for the API client.
 func toChatRequest(req domain.AssistantTurnRequest) ChatRequest {
 	adapterReq := ChatRequest{
 		Model:            req.Model,
@@ -268,10 +275,7 @@ func toChatRequest(req domain.AssistantTurnRequest) ChatRequest {
 		}
 
 		for paramName, field := range action.Input.Fields {
-			tool.Function.Parameters.Properties[paramName] = ToolFuncParameterDetail{
-				Type:        field.Type,
-				Description: field.Description,
-			}
+			tool.Function.Parameters.Properties[paramName] = mapActionFieldToSchema(field)
 			if field.Required {
 				tool.Function.Parameters.Required = append(tool.Function.Parameters.Required, paramName)
 			}
@@ -282,15 +286,69 @@ func toChatRequest(req domain.AssistantTurnRequest) ChatRequest {
 	return adapterReq
 }
 
+// mapActionFieldToSchema recursively maps domain.AssistantActionField to ToolFuncParameterDetail,
+// handling nested fields for object types.
+func mapActionFieldToSchema(field domain.AssistantActionField) ToolFuncParameterDetail {
+	schema := ToolFuncParameterDetail{
+		Type:        field.Type,
+		Description: field.Description,
+		Format:      field.Format,
+		Enum:        field.Enum,
+	}
+	if field.Type == "object" {
+		schema.AdditionalProperties = false
+	}
+
+	if len(field.Fields) > 0 {
+		schema.Properties = make(map[string]ToolFuncParameterDetail, len(field.Fields))
+		required := make([]string, 0, len(field.Fields))
+		for name, child := range field.Fields {
+			schema.Properties[name] = mapActionFieldToSchema(child)
+			if child.Required {
+				required = append(required, name)
+			}
+		}
+		if len(required) > 0 {
+			schema.Required = required
+		}
+		schema.AdditionalProperties = false
+	}
+
+	if field.Items != nil {
+		itemSchema := mapActionFieldToSchema(*field.Items)
+		schema.Items = &itemSchema
+	} else if field.Type == "array" {
+		// safety fallback to avoid invalid schema
+		schema.Items = &ToolFuncParameterDetail{Type: "object"}
+	}
+
+	return schema
+}
+
 // InitAssistantClient initializes the assistant client dependency.
 type InitAssistantClient struct {
-	HttpClient *http.Client `resolve:""`
-	ModelHost  string       `config:"LLM_MODEL_HOST"`
+	HttpClient         *http.Client `resolve:""`
+	EmbeddingModelHost string       `config:"LLM_EMBEDDING_MODEL_HOST"`
+	ModelHost          string       `config:"LLM_MODEL_HOST"`
+	APIKey             string       `config:"LLM_API_KEY" default:"-"`
+	EmbeddingAPIKey    string       `config:"LLM_EMBEDDING_API_KEY" default:"-"`
 }
 
 // Initialize registers assistant/model interfaces.
 func (i InitAssistantClient) Initialize(ctx context.Context) (context.Context, error) {
-	adapter := NewAssistantClientAdapter(NewDRMAPIClient(i.ModelHost, "", i.HttpClient))
+	apiKey := ""
+	if i.APIKey != "-" {
+		apiKey = i.APIKey
+	}
+	embeddingAPIKey := ""
+	if i.EmbeddingAPIKey != "-" {
+		embeddingAPIKey = i.EmbeddingAPIKey
+	}
+
+	adapter := NewAssistantClientAdapter(
+		NewDRMAPIClient(i.ModelHost, apiKey, i.HttpClient),
+		NewDRMAPIClient(i.EmbeddingModelHost, embeddingAPIKey, i.HttpClient),
+	)
 	depend.Register[domain.Assistant](adapter)
 	depend.Register[domain.SemanticEncoder](adapter)
 	depend.Register[domain.AssistantModelCatalog](adapter)

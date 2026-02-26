@@ -39,7 +39,7 @@ func collectStreamEvents(adapter AssistantClient, req domain.AssistantTurnReques
 	var deltaTexts []string
 	var doneEvent *domain.AssistantTurnCompleted
 
-	err := adapter.RunTurn(context.Background(), req, func(eventType domain.AssistantEventType, data any) error {
+	err := adapter.RunTurn(context.Background(), req, func(_ context.Context, eventType domain.AssistantEventType, data any) error {
 		eventTypes = append(eventTypes, eventType)
 
 		switch eventType {
@@ -166,7 +166,10 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			adapter := NewAssistantClientAdapter(
+				client,
+				client,
+			)
 
 			eventTypes, deltaTexts, _, err := collectStreamEvents(adapter, tt.req)
 
@@ -194,7 +197,10 @@ func TestAssistantClientAdapter_RunTurn_ServerError(t *testing.T) {
 	defer server.Close()
 
 	client := NewDRMAPIClient(server.URL, "", server.Client())
-	adapter := NewAssistantClientAdapter(client)
+	adapter := NewAssistantClientAdapter(
+		client,
+		client,
+	)
 
 	req := domain.AssistantTurnRequest{
 		Model: "test-model",
@@ -203,7 +209,7 @@ func TestAssistantClientAdapter_RunTurn_ServerError(t *testing.T) {
 		},
 	}
 
-	err := adapter.RunTurn(context.Background(), req, func(eventType domain.AssistantEventType, data interface{}) error {
+	err := adapter.RunTurn(context.Background(), req, func(_ context.Context, eventType domain.AssistantEventType, data interface{}) error {
 		return nil
 	})
 
@@ -310,7 +316,7 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			adapter := NewAssistantClientAdapter(client, client)
 
 			resp, err := adapter.RunTurnSync(context.Background(), tt.req)
 
@@ -338,7 +344,7 @@ func TestAssistantClientAdapter_RunTurnSync_ValidationErrors(t *testing.T) {
 	defer server.Close()
 
 	client := NewDRMAPIClient(server.URL, "", server.Client())
-	adapter := NewAssistantClientAdapter(client)
+	adapter := NewAssistantClientAdapter(client, client)
 
 	tests := map[string]struct {
 		req domain.AssistantTurnRequest
@@ -400,7 +406,7 @@ func TestAssistantClientAdapter_VectorizeTodo(t *testing.T) {
             }`,
 			statusCode:         http.StatusOK,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "title:'Test'\ndue_date:'2024-01-01T00:00:00Z'\nstatus:'OPEN'",
+			expectRequestInput: "Item: Test. Due date: 2024-01-01. Current status: OPEN.",
 			expectedVec:        []float64{1.1, 2.2, 3.3},
 		},
 		"no-embedding-data": {
@@ -412,21 +418,21 @@ func TestAssistantClientAdapter_VectorizeTodo(t *testing.T) {
             }`,
 			statusCode:         http.StatusOK,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "title:'Test'\ndue_date:'2024-01-01T00:00:00Z'\nstatus:'OPEN'",
+			expectRequestInput: "Item: Test. Due date: 2024-01-01. Current status: OPEN.",
 			expectErr:          true,
 		},
 		"server-error": {
 			response:           `Internal Server Error`,
 			statusCode:         http.StatusInternalServerError,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "title:'Test'\ndue_date:'2024-01-01T00:00:00Z'\nstatus:'OPEN'",
+			expectRequestInput: "Item: Test. Due date: 2024-01-01. Current status: OPEN.",
 			expectErr:          true,
 		},
 		"invalid-json": {
 			response:           `{invalid json}`,
 			statusCode:         http.StatusOK,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "title:'Test'\ndue_date:'2024-01-01T00:00:00Z'\nstatus:'OPEN'",
+			expectRequestInput: "Item: Test. Due date: 2024-01-01. Current status: OPEN.",
 			expectErr:          true,
 		},
 	}
@@ -444,7 +450,7 @@ func TestAssistantClientAdapter_VectorizeTodo(t *testing.T) {
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			adapter := NewAssistantClientAdapter(client, client)
 
 			vec, err := adapter.VectorizeTodo(context.Background(), tt.model, todo)
 
@@ -548,7 +554,7 @@ func TestAssistantClientAdapter_VectorizeQuery(t *testing.T) {
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			adapter := NewAssistantClientAdapter(client, client)
 
 			vec, err := adapter.VectorizeQuery(context.Background(), tt.model, searchInput)
 
@@ -612,7 +618,7 @@ func TestAssistantClientAdapter_VectorizeAssistantActionDefinition(t *testing.T)
 			}`,
 			statusCode:         http.StatusOK,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "title:'update_todo_due_date'\ndescription:'Update due date for exactly one existing todo.'",
+			expectRequestInput: "Action Name: update_todo_due_date. Description: Update due date for exactly one existing todo..",
 			expectedVec:        []float64{1.1, 2.2, 3.3},
 		},
 		"no-embedding-data": {
@@ -624,21 +630,21 @@ func TestAssistantClientAdapter_VectorizeAssistantActionDefinition(t *testing.T)
 			}`,
 			statusCode:         http.StatusOK,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "title:'update_todo_due_date'\ndescription:'Update due date for exactly one existing todo.'",
+			expectRequestInput: "Action Name: update_todo_due_date. Description: Update due date for exactly one existing todo..",
 			expectErr:          true,
 		},
 		"server-error": {
 			response:           `Internal Server Error`,
 			statusCode:         http.StatusInternalServerError,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "title:'update_todo_due_date'\ndescription:'Update due date for exactly one existing todo.'",
+			expectRequestInput: "Action Name: update_todo_due_date. Description: Update due date for exactly one existing todo..",
 			expectErr:          true,
 		},
 		"invalid-json": {
 			response:           `{invalid json}`,
 			statusCode:         http.StatusOK,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "title:'update_todo_due_date'\ndescription:'Update due date for exactly one existing todo.'",
+			expectRequestInput: "Action Name: update_todo_due_date. Description: Update due date for exactly one existing todo..",
 			expectErr:          true,
 		},
 	}
@@ -656,7 +662,7 @@ func TestAssistantClientAdapter_VectorizeAssistantActionDefinition(t *testing.T)
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			adapter := NewAssistantClientAdapter(client, client)
 
 			vec, err := adapter.VectorizeAssistantActionDefinition(context.Background(), tt.model, action)
 
@@ -723,7 +729,7 @@ func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
 			defer server.Close()
 
 			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			adapter := NewAssistantClientAdapter(client, client)
 
 			models, err := adapter.ListAvailableModels(context.Background())
 

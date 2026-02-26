@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -300,6 +301,8 @@ func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 	assert.Equal(t, "Use to gather external information or references before deciding or answering.", def.Hints.UseWhen)
 	assert.Equal(t, "Do not use for todo CRUD operations or when the user request is fully internal to the app.", def.Hints.AvoidWhen)
 	assert.Equal(t, "Always send a specific query and include max_results. Default max_results=2. Never exceed 3 unless the user explicitly asks for broad research. Prefer one focused query per turn.", def.Hints.ArgRules)
+	assert.Equal(t, "🔎 Searching on the web...", defs[0].Action.StatusMessage())
+	assert.Equal(t, "🔎 Searching on the web...", registry.StatusMessage("search"))
 }
 
 func TestParseActionCallArguments_Table(t *testing.T) {
@@ -409,6 +412,46 @@ func TestSchemaToInput_Table(t *testing.T) {
 				assert.False(t, got.Fields["priority"].Required)
 			},
 		},
+		{
+			name: "nested-array-object-with-format-and-enum",
+			schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"todos": map[string]any{
+						"type": "array",
+						"items": map[string]any{
+							"type": "object",
+							"properties": map[string]any{
+								"id": map[string]any{
+									"type":        "string",
+									"description": "Todo id",
+								},
+								"status": map[string]any{
+									"type":   "string",
+									"enum":   []any{"OPEN", "DONE"},
+									"format": "enum",
+								},
+							},
+							"required": []any{"id"},
+						},
+					},
+				},
+				"required": []any{"todos"},
+			},
+			assert: func(t *testing.T, got domain.AssistantActionInput) {
+				require.Contains(t, got.Fields, "todos")
+				field := got.Fields["todos"]
+				assert.Equal(t, "array", field.Type)
+				assert.True(t, field.Required)
+				require.NotNil(t, field.Items)
+				assert.Equal(t, "object", field.Items.Type)
+				require.Contains(t, field.Items.Fields, "id")
+				assert.True(t, field.Items.Fields["id"].Required)
+				require.Contains(t, field.Items.Fields, "status")
+				assert.Equal(t, []any{"OPEN", "DONE"}, field.Items.Fields["status"].Enum)
+				assert.Equal(t, "enum", field.Items.Fields["status"].Format)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -434,6 +477,7 @@ func TestParseToolOverrideDefinitions_Table(t *testing.T) {
 tools:
   - name: search
     description: Search docs
+    status_message: Searching docs...
     input:
       type: object
       fields:
@@ -458,6 +502,79 @@ tools:
 			},
 		},
 		{
+			name: "valid-yaml-with-approvals-override",
+			content: `
+tools:
+  - name: delete_todos
+    approvals:
+      required: true
+      title: Confirm delete
+      description: Destructive action.
+      preview_fields:
+        - todos[].title
+        - todos[].id
+      timeout: 45s
+`,
+			assert: func(t *testing.T, got map[string]domain.AssistantActionDefinition, err error) {
+				require.NoError(t, err)
+				require.Len(t, got, 1)
+				require.Contains(t, got, "delete_todos")
+				assert.True(t, got["delete_todos"].Approval.Required)
+				assert.Equal(t, "Confirm delete", got["delete_todos"].Approval.Title)
+				assert.Equal(t, "Destructive action.", got["delete_todos"].Approval.Description)
+				assert.Equal(t, []string{"todos[].title", "todos[].id"}, got["delete_todos"].Approval.PreviewFields)
+				assert.Equal(t, 45*time.Second, got["delete_todos"].Approval.Timeout)
+			},
+		},
+		{
+			name: "valid-yaml-with-nested-input-fields",
+			content: `
+tools:
+  - name: update_todos
+    input:
+      type: object
+      fields:
+        todos:
+          type: array
+          required: true
+          items:
+            type: object
+            fields:
+              id:
+                type: string
+                required: true
+                format: uuid
+              status:
+                type: string
+                required: false
+                enum: [OPEN, DONE]
+`,
+			assert: func(t *testing.T, got map[string]domain.AssistantActionDefinition, err error) {
+				require.NoError(t, err)
+				require.Contains(t, got, "update_todos")
+				todosField := got["update_todos"].Input.Fields["todos"]
+				assert.Equal(t, "array", todosField.Type)
+				assert.True(t, todosField.Required)
+				require.NotNil(t, todosField.Items)
+				require.Contains(t, todosField.Items.Fields, "id")
+				assert.Equal(t, "uuid", todosField.Items.Fields["id"].Format)
+				assert.Equal(t, []any{"OPEN", "DONE"}, todosField.Items.Fields["status"].Enum)
+			},
+		},
+		{
+			name: "invalid-yaml-with-approval-timeout-format",
+			content: `
+tools:
+  - name: delete_todos
+    approvals:
+      timeout: 45
+`,
+			assert: func(t *testing.T, _ map[string]domain.AssistantActionDefinition, err error) {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "invalid approval timeout")
+			},
+		},
+		{
 			name:    "invalid-yaml",
 			content: "tools: [",
 			assert: func(t *testing.T, _ map[string]domain.AssistantActionDefinition, err error) {
@@ -471,6 +588,48 @@ tools:
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := parseToolOverrideDefinitions([]byte(tt.content))
+			tt.assert(t, got, err)
+		})
+	}
+}
+
+func TestParseToolOverrideStatusMessages_Table(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+		assert  func(*testing.T, map[string]string, error)
+	}{
+		{
+			name: "valid-yaml",
+			content: `
+tools:
+  - name: search
+    status_message: Searching docs...
+  - name: fetch_content
+    status_message: "  "
+`,
+			assert: func(t *testing.T, got map[string]string, err error) {
+				require.NoError(t, err)
+				require.Len(t, got, 1)
+				assert.Equal(t, "Searching docs...", got["search"])
+			},
+		},
+		{
+			name:    "invalid-yaml",
+			content: "tools: [",
+			assert: func(t *testing.T, _ map[string]string, err error) {
+				require.Error(t, err)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := parseToolOverrideStatusMessages([]byte(tt.content))
 			tt.assert(t, got, err)
 		})
 	}
@@ -528,6 +687,25 @@ func TestMergeAssistantActionDefinition_Table(t *testing.T) {
 				assert.Equal(t, "new use", got.Hints.UseWhen)
 				assert.Empty(t, got.Hints.AvoidWhen)
 				assert.Empty(t, got.Hints.ArgRules)
+			},
+		},
+		{
+			name: "replace-approval-when-provided",
+			override: domain.AssistantActionDefinition{
+				Approval: domain.AssistantActionApproval{
+					Required: true,
+					Title:    "Approve action",
+					PreviewFields: []string{
+						"todos[].title",
+					},
+					Timeout: 30 * time.Second,
+				},
+			},
+			assert: func(t *testing.T, got domain.AssistantActionDefinition) {
+				assert.True(t, got.Approval.Required)
+				assert.Equal(t, "Approve action", got.Approval.Title)
+				assert.Equal(t, []string{"todos[].title"}, got.Approval.PreviewFields)
+				assert.Equal(t, 30*time.Second, got.Approval.Timeout)
 			},
 		},
 	}

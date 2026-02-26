@@ -1,6 +1,7 @@
 tools:
   - name: search
     description: Search the web with DuckDuckGo and return concise result snippets with source links.
+    status_message: 🔎 Searching on the web...
     input:
       type: object
       fields:
@@ -18,7 +19,15 @@ tools:
       arg_rules: Always send a specific query and include max_results. Default max_results=2. Never exceed 3 unless the user explicitly asks for broad research. Prefer one focused query per turn.
 
   - name: fetch_content
+    status_message: 📄 Fetching page content...
     description: Fetch and extract readable text content a web search result URL.
+    approval:
+      required: true
+      title: Confirm URL content fetch
+      description: This action fetches content from an external URL. Please confirm.
+      preview_fields:
+        - url
+      timeout: 90s
     input:
       type: object
       fields:

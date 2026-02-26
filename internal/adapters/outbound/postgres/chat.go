@@ -30,6 +30,9 @@ var chatFields = []string{
 	"prompt_tokens",
 	"completion_tokens",
 	"total_tokens",
+	"approval_status",
+	"approval_decision_reason",
+	"approval_decided_at",
 	"created_at",
 	"updated_at",
 }
@@ -76,6 +79,9 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 			message.PromptTokens,
 			message.CompletionTokens,
 			message.TotalTokens,
+			message.ApprovalStatus,
+			message.ApprovalDecisionReason,
+			message.ApprovalDecidedAt,
 			message.CreatedAt,
 			message.UpdatedAt,
 		)
@@ -187,6 +193,9 @@ func (r ChatMessageRepository) ListChatMessages(
 			&m.PromptTokens,
 			&m.CompletionTokens,
 			&m.TotalTokens,
+			&m.ApprovalStatus,
+			&m.ApprovalDecisionReason,
+			&m.ApprovalDecidedAt,
 			&m.CreatedAt,
 			&m.UpdatedAt,
 		); telemetry.RecordErrorAndStatus(span, err) {

@@ -36,7 +36,7 @@ func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 		Hints: domain.AssistantActionHints{
 			UseWhen:   "Use for batch updates across multiple existing todos (plural updates).",
 			AvoidWhen: "Do not use for due date-only changes or single-item updates.",
-			ArgRules:  "Required key: todos. Each item requires id and may include title and/or status (OPEN or DONE).",
+			ArgRules:  "Required key: todos. Each item requires id <UUID> and may include title and/or status (OPEN or DONE). Never place title text in id.",
 		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
@@ -45,6 +45,29 @@ func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 					Type:        "array",
 					Description: "List of todo updates. Each item: {id,title?,status?}. REQUIRED.",
 					Required:    true,
+					Items: &domain.AssistantActionField{
+						Type:        "object",
+						Description: "Todo item to update.",
+						Required:    true,
+						Fields: map[string]domain.AssistantActionField{
+							"id": {
+								Type:        "string",
+								Description: "ID of the todo to update. REQUIRED.",
+								Required:    true,
+							},
+							"title": {
+								Type:        "string",
+								Description: "New title for the todo. Optional but at least one of title or status must be present.",
+								Required:    false,
+							},
+							"status": {
+								Type:        "string",
+								Description: "New status for the todo. Allowed values: OPEN or DONE. Optional but at least one of title or status must be present.",
+								Required:    false,
+								Enum:        []any{domain.TodoStatus_OPEN, domain.TodoStatus_DONE},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -115,9 +138,9 @@ func (a BulkTodoUpdaterAction) Execute(ctx context.Context, call domain.Assistan
 	}
 
 	todos := make([]domain.Todo, 0, len(items))
-	err = a.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
+	err = a.uow.Execute(ctx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
 		for i, item := range items {
-			todo, updateErr := a.updater.Update(ctx, uow, item.ID, item.Title, item.Status, nil)
+			todo, updateErr := a.updater.Update(uowCtx, uow, item.ID, item.Title, item.Status, nil)
 			if updateErr != nil {
 				return fmt.Errorf("todo at index %d: %w", i, updateErr)
 			}

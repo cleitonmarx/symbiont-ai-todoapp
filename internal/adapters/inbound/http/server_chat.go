@@ -81,7 +81,7 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 		options = append(options, usecases.WithConversationID(*req.ConversationId))
 	}
 
-	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(eventType domain.AssistantEventType, data any) error {
+	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(ctx context.Context, eventType domain.AssistantEventType, data any) error {
 		dataBytes, err := json.Marshal(data)
 		if err != nil {
 			return err

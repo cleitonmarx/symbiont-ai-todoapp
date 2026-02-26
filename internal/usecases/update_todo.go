@@ -35,8 +35,8 @@ func (uti UpdateTodoImpl) Execute(ctx context.Context, id uuid.UUID, title *stri
 	defer span.End()
 
 	var todo domain.Todo
-	err := uti.uow.Execute(spanCtx, func(uow domain.UnitOfWork) error {
-		td, err := uti.modifier.Update(spanCtx, uow, id, title, status, dueDate)
+	err := uti.uow.Execute(spanCtx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
+		td, err := uti.modifier.Update(uowCtx, uow, id, title, status, dueDate)
 		if err != nil {
 			return err
 		}

@@ -6,6 +6,7 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 
 - 📝 **Todo Management**: Create, update, delete, filter, sort, and paginate todos
 - 🤖 **LLM Chat & Tools**: Streamed AI chat (SSE) with tool-calling for local and external tools
+- ✅ **Action Approval Flow**: Human approval for sensitive/destructive tool execution (local actions and MCP tools)
 - 📦 **Batch Todo Actions**: Assistant-first bulk operations (`create_todos`, `update_todos`, `update_todos_due_date`, `delete_todos`)
 - 🔗 **MCP Gateway Integration**: MCP-based external tools via `docker/mcp-gateway` (default setup includes DuckDuckGo tools)
 - 🎛️ **Tool Definition Overrides**: MCP tool descriptions/inputs/hints can be overridden with YAML for tighter model behavior control
@@ -28,6 +29,7 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - **Board Summary Worker** (`internal/adapters/inbound/workers/board_summary_generator.go`): Batches todo events and triggers board-summary generation
 - **Chat Summary Worker** (`internal/adapters/inbound/workers/chat_summary_generator.go`): Batches chat events by `ConversationID` and triggers one chat-summary generation per conversation window
 - **Conversation Title Worker** (`internal/adapters/inbound/workers/conversation_title_generator.go`): Batches chat events by `ConversationID` and updates titles asynchronously
+- **Action Approval Dispatcher Worker** (`internal/adapters/inbound/workers/action_approval_dispatcher.go`): Consumes approval decisions from Pub/Sub and forwards them to the in-memory action approval dispatcher, using a server-scoped subscription suffix for horizontal distribution
 - **PostgreSQL** (`internal/adapters/outbound/postgres`): Primary data store with migrations and vector extension support
 - **Vault Provider** (`internal/adapters/outbound/config/vault_provider.go`): Loads secret-backed config values (`DB_USER`, `DB_PASS`)
 - **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI/DRM-compatible client for chat, summarization, embeddings, and model listing
@@ -74,6 +76,41 @@ GraphQL currently exposes todo operations (`listTodos`, `updateTodo`, `deleteTod
 
 - OpenAPI spec: `api/openapi/openapi.yml`
 - GraphQL schema: `api/graphql/schema.graphql`
+
+## Action Approval Flow
+
+Action Approval adds a human-in-the-loop safety step before sensitive actions are executed.
+
+When an action is marked as requiring approval:
+
+- The assistant pauses before running that action.
+- The user sees a clear prompt with what is about to happen.
+- The user can approve or reject (optionally with a reason).
+- If approved, the assistant proceeds.
+- If rejected or timed out, the action is not executed.
+
+This is useful for destructive operations (for example, deleting todos) and external/network actions where explicit user confirmation is preferred.
+
+### Configuring approval
+
+- You can enable approval per action.
+- You can customize the prompt title/description, preview fields, and timeout.
+- Local actions location: `internal/adapters/outbound/actionregistry/local/actions/`
+- MCP tools YAML location: `internal/adapters/outbound/actionregistry/mcp/tool_overrides.yaml`
+
+Example:
+
+```yaml
+tools:
+  - name: fetch_content
+    approval:
+      required: true
+      title: Confirm URL content fetch
+      description: This action fetches content from an external URL. Please confirm before proceeding.
+      preview_fields:
+        - url
+      timeout: 90s
+```
 
 ## Quick Start (Docker Compose)
 
@@ -128,6 +165,7 @@ PUBSUB_PROJECT_ID=local-dev \
 TODO_EVENTS_SUBSCRIPTION_ID=todo_summary_generator \
 CHAT_EVENTS_SUBSCRIPTION_ID=chat_message_summary_generator \
 CHAT_TITLE_EVENTS_SUBSCRIPTION_ID=chat_message_title_generator \
+ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID=action_approval_dispatcher \
 LLM_MODEL_HOST=http://localhost:12434 \
 LLM_SUMMARY_MODEL=qwen3:14B-Q6_K \
 LLM_CHAT_SUMMARY_MODEL=qwen3:14B-Q6_K \
@@ -172,7 +210,7 @@ Required or commonly tuned variables:
 - `DB_HOST`, `DB_PORT` (default: `5432`), `DB_NAME`
 - `DB_USER`, `DB_PASS` (can be sourced from Vault)
 - `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_MOUNT_PATH`, `VAULT_SECRET_PATH`
-- `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`
+- `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`, `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID`
 - `LLM_MODEL_HOST`, `LLM_SUMMARY_MODEL`, `LLM_CHAT_SUMMARY_MODEL`, `LLM_CHAT_TITLE_MODEL`, `LLM_EMBEDDING_MODEL`
 - `MCP_GATEWAY_ENDPOINT` (e.g. `http://mcp-gateway:8811`)
 - `MCP_GATEWAY_API_KEY` (default: `-`)

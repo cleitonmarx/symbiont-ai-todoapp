@@ -101,6 +101,66 @@ func (_c *MockEmbeddingActionRegistry_Execute_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// GetDefinition provides a mock function for the type MockEmbeddingActionRegistry
+func (_mock *MockEmbeddingActionRegistry) GetDefinition(actionName string) (domain.AssistantActionDefinition, bool) {
+	ret := _mock.Called(actionName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDefinition")
+	}
+
+	var r0 domain.AssistantActionDefinition
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func(string) (domain.AssistantActionDefinition, bool)); ok {
+		return returnFunc(actionName)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) domain.AssistantActionDefinition); ok {
+		r0 = returnFunc(actionName)
+	} else {
+		r0 = ret.Get(0).(domain.AssistantActionDefinition)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) bool); ok {
+		r1 = returnFunc(actionName)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
+}
+
+// MockEmbeddingActionRegistry_GetDefinition_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDefinition'
+type MockEmbeddingActionRegistry_GetDefinition_Call struct {
+	*mock.Call
+}
+
+// GetDefinition is a helper method to define mock.On call
+//   - actionName string
+func (_e *MockEmbeddingActionRegistry_Expecter) GetDefinition(actionName interface{}) *MockEmbeddingActionRegistry_GetDefinition_Call {
+	return &MockEmbeddingActionRegistry_GetDefinition_Call{Call: _e.mock.On("GetDefinition", actionName)}
+}
+
+func (_c *MockEmbeddingActionRegistry_GetDefinition_Call) Run(run func(actionName string)) *MockEmbeddingActionRegistry_GetDefinition_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockEmbeddingActionRegistry_GetDefinition_Call) Return(assistantActionDefinition domain.AssistantActionDefinition, b bool) *MockEmbeddingActionRegistry_GetDefinition_Call {
+	_c.Call.Return(assistantActionDefinition, b)
+	return _c
+}
+
+func (_c *MockEmbeddingActionRegistry_GetDefinition_Call) RunAndReturn(run func(actionName string) (domain.AssistantActionDefinition, bool)) *MockEmbeddingActionRegistry_GetDefinition_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListEmbeddings provides a mock function for the type MockEmbeddingActionRegistry
 func (_mock *MockEmbeddingActionRegistry) ListEmbeddings(ctx context.Context) []ActionEmbedding {
 	ret := _mock.Called(ctx)

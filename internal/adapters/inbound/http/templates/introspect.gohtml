@@ -1,4 +1,4 @@
-`<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -120,6 +120,23 @@
             const panY = ((containerHeight - heightPx) / 2) - topPx;
             panzoom.pan(panX, panY, { animate: false });
         }
+        
+        // This function attempts to extract a meaningful display label from a graph node element.
+        function extractNodeDisplayLabel(node) {
+            const labelContainer = node.querySelector('.label span') || node.querySelector('foreignObject') || node;
+            const rawHtml = labelContainer && typeof labelContainer.innerHTML === 'string'
+                ? labelContainer.innerHTML
+                : '';
+            const firstHtmlLine = rawHtml.split(/<br\s*\/?>/i)[0] || '';
+            const firstLineText = firstHtmlLine
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+            if (firstLineText) {
+                return firstLineText;
+            }
+            return (node.textContent || '').replace(/\s+/g, ' ').trim();
+        }
 
         // This function adds interactive hover effects to the edges in the graph. 
         // It creates invisible hitboxes over the edges to capture pointer events, 
@@ -127,19 +144,246 @@
         // It also manages selection state and ensures that interactions don't interfere with panning and zooming.
         function bindHoverEffects(container) {
             const edgePaths = container.querySelectorAll('.edgePath path, .flowchart-link, path.path, path[data-edge="true"]');
+            const nodeInfos = Array.from(container.querySelectorAll('.nodes .node'))
+                .map((node) => {
+                    const box = node.getBBox();
+                    if (!isFinite(box.x) || !isFinite(box.y) || !isFinite(box.width) || !isFinite(box.height)) {
+                        return null;
+                    }
+
+                    return {
+                        id: node.id || '',
+                        label: extractNodeDisplayLabel(node),
+                        element: node,
+                        x: box.x + (box.width / 2),
+                        y: box.y + (box.height / 2),
+                    };
+                })
+                .filter(Boolean);
+            const nodeInfosByID = new Map();
+            nodeInfos.forEach((nodeInfo) => {
+                if (nodeInfo && nodeInfo.id) {
+                    nodeInfosByID.set(nodeInfo.id, nodeInfo);
+                }
+            });
             let selectedEdge = null;
             let pointerDownInsideGraph = false;
             let pointerMovedSinceDown = false;
             let pointerDownX = 0;
             let pointerDownY = 0;
+            const edgeTooltip = document.createElement('div');
+            edgeTooltip.className = 'edge-hover-tooltip';
+            edgeTooltip.dataset.fitIgnore = 'true';
+            container.appendChild(edgeTooltip);
+            if (container.dataset.edgeTooltipsEnabled !== 'false') {
+                container.dataset.edgeTooltipsEnabled = 'true';
+            }
+
+            const escapeHtml = (value) => {
+                return String(value).replace(/[&<>"']/g, (char) => {
+                    if (char === '&') return '&amp;';
+                    if (char === '<') return '&lt;';
+                    if (char === '>') return '&gt;';
+                    if (char === '"') return '&quot;';
+                    return '&#39;';
+                });
+            };
+
+            const nearestNodeToPoint = (point, candidates = nodeInfos) => {
+                if (!point || !candidates.length) {
+                    return null;
+                }
+                let nearestNode = null;
+                let nearestDistanceSquared = Number.POSITIVE_INFINITY;
+                candidates.forEach((nodeInfo) => {
+                    const dx = nodeInfo.x - point.x;
+                    const dy = nodeInfo.y - point.y;
+                    const distanceSquared = (dx * dx) + (dy * dy);
+                    if (distanceSquared < nearestDistanceSquared) {
+                        nearestDistanceSquared = distanceSquared;
+                        nearestNode = nodeInfo;
+                    }
+                });
+                return nearestNode;
+            };
+
+            const toScreenPoint = (element, point) => {
+                if (!element || !point || typeof DOMPoint !== 'function') {
+                    return point;
+                }
+                const ctm = element.getScreenCTM ? element.getScreenCTM() : null;
+                if (!ctm) {
+                    return point;
+                }
+                try {
+                    const transformed = new DOMPoint(point.x, point.y).matrixTransform(ctm);
+                    return { x: transformed.x, y: transformed.y };
+                } catch (_err) {
+                    return point;
+                }
+            };
+
+            const parseEdgeNodeIDs = (path) => {
+                const edgeGroup = path.closest('.edgePath');
+                if (!edgeGroup) {
+                    return null;
+                }
+                const classNames = Array.from(edgeGroup.classList || []);
+                const sourceClass = classNames.find((cls) => cls.startsWith('LS-'));
+                const targetClass = classNames.find((cls) => cls.startsWith('LE-'));
+                if (!sourceClass && !targetClass) {
+                    return null;
+                }
+                return {
+                    sourceID: sourceClass ? sourceClass.slice(3) : '',
+                    targetID: targetClass ? targetClass.slice(3) : '',
+                };
+            };
+
+            const resolveEdgeEndpoints = (path) => {
+                const parsedIDs = parseEdgeNodeIDs(path);
+                if (parsedIDs) {
+                    const sourceFromClass = parsedIDs.sourceID ? nodeInfosByID.get(parsedIDs.sourceID) : null;
+                    const targetFromClass = parsedIDs.targetID ? nodeInfosByID.get(parsedIDs.targetID) : null;
+                    if (sourceFromClass || targetFromClass) {
+                        return { source: sourceFromClass, target: targetFromClass };
+                    }
+                }
+
+                try {
+                    const pathLength = path.getTotalLength();
+                    if (!isFinite(pathLength) || pathLength <= 0) {
+                        return null;
+                    }
+                    const startPoint = toScreenPoint(path, path.getPointAtLength(0));
+                    const endPoint = toScreenPoint(path, path.getPointAtLength(pathLength));
+                    const nodeInfosInScreenSpace = nodeInfos.map((nodeInfo) => {
+                        if (!nodeInfo.element) {
+                            return nodeInfo;
+                        }
+                        const screenCenter = toScreenPoint(nodeInfo.element, { x: nodeInfo.x, y: nodeInfo.y });
+                        return {
+                            ...nodeInfo,
+                            x: screenCenter.x,
+                            y: screenCenter.y,
+                        };
+                    });
+                    const source = nearestNodeToPoint(startPoint, nodeInfosInScreenSpace);
+                    const target = nearestNodeToPoint(endPoint, nodeInfosInScreenSpace);
+                    if (!source && !target) {
+                        return null;
+                    }
+                    return { source, target };
+                } catch (_err) {
+                    return null;
+                }
+            };
+
+            const formatNodeRef = (nodeRef) => {
+                if (!nodeRef) {
+                    return 'Unknown';
+                }
+                return nodeRef.label || 'Unknown';
+            };
+
+            const hideTooltip = () => {
+                edgeTooltip.classList.remove('visible');
+                edgeTooltip.style.transform = 'translate(-9999px, -9999px)';
+            };
+
+            const placeTooltip = (event) => {
+                if (!event || !edgeTooltip.classList.contains('visible')) {
+                    return;
+                }
+                const rect = container.getBoundingClientRect();
+                const tooltipWidth = edgeTooltip.offsetWidth || 240;
+                const tooltipHeight = edgeTooltip.offsetHeight || 40;
+                const horizontalPadding = 8;
+                const verticalPadding = 8;
+
+                let left = (event.clientX - rect.left) + 14;
+                let top = (event.clientY - rect.top) + 14;
+
+                const maxLeft = Math.max(horizontalPadding, rect.width - tooltipWidth - horizontalPadding);
+                const maxTop = Math.max(verticalPadding, rect.height - tooltipHeight - verticalPadding);
+                left = Math.min(Math.max(horizontalPadding, left), maxLeft);
+                top = Math.min(Math.max(verticalPadding, top), maxTop);
+
+                edgeTooltip.style.transform = `translate(${left}px, ${top}px)`;
+            };
+
+            const showTooltip = (event, edgeEndpoints) => {
+                if (container.dataset.edgeTooltipsEnabled === 'false') {
+                    hideTooltip();
+                    return;
+                }
+                const source = formatNodeRef(edgeEndpoints && edgeEndpoints.source);
+                const target = formatNodeRef(edgeEndpoints && edgeEndpoints.target);
+                const relationshipLabel = edgeEndpoints && edgeEndpoints.relationshipLabel
+                    ? edgeEndpoints.relationshipLabel
+                    : 'Dependency Injection';
+                edgeTooltip.innerHTML =
+                    `<div class="edge-hover-tooltip-label">Wiring Relationship</div>` +
+                    `<div class="edge-hover-tooltip-value">${escapeHtml(source)} ${escapeHtml(relationshipLabel)} ${escapeHtml(target)}</div>`
+                    ;
+                edgeTooltip.classList.add('visible');
+                placeTooltip(event);
+            };
+
+            const extractMarkerID = (value) => {
+                if (!value || value === 'none') {
+                    return '';
+                }
+                const match = String(value).match(/#([^)"]+)/);
+                return (match ? match[1] : String(value)).toLowerCase();
+            };
+
+            const resolveEdgeRelationship = (path) => {
+                const markerEndID = extractMarkerID(path.getAttribute('marker-end'));
+                if (markerEndID.includes('circle')) {
+                    return 'registers';
+                }
+                if (markerEndID.includes('pointend')) {
+                    return 'is injected into';
+                }
+                
+                return 'runs under';
+            };
+
+            const applyEdgeTrim = (targetPath, sourcePath, trimLength = 22) => {
+                try {
+                    const totalLength = sourcePath.getTotalLength();
+                    if (!isFinite(totalLength) || totalLength <= 0) {
+                        targetPath.style.strokeDasharray = 'none';
+                        return false;
+                    }
+
+                    const appliedTrim = Math.max(0, Math.min(trimLength, totalLength * 0.35));
+                    const visibleLength = totalLength - (appliedTrim * 2);
+                    if (visibleLength <= 0) {
+                        targetPath.style.strokeDasharray = 'none';
+                        return false;
+                    }
+
+                    // Keep original path geometry and trim only its visible/interactable segment.
+                    targetPath.style.strokeDasharray = `0.0001 ${appliedTrim} ${visibleLength} ${totalLength}`;
+                    targetPath.style.strokeDashoffset = '0';
+                    return true;
+                } catch (_err) {
+                    targetPath.style.strokeDasharray = 'none';
+                    return false;
+                }
+            };
 
             const clearSelectedEdge = () => {
                 if (!selectedEdge) {
+                    hideTooltip();
                     return;
                 }
                 selectedEdge.path.classList.remove('edge-selected');
                 selectedEdge.glowPath.style.opacity = '0';
                 selectedEdge = null;
+                hideTooltip();
             };
 
             const selectEdge = (path, glowPath) => {
@@ -157,6 +401,10 @@
                 if (path.closest('defs') || path.dataset.fitIgnore === 'true') {
                     return;
                 }
+                const edgeEndpoints = resolveEdgeEndpoints(path);
+                if (edgeEndpoints) {
+                    edgeEndpoints.relationshipLabel = resolveEdgeRelationship(path);
+                }
 
                 const glowPath = path.cloneNode();
                 glowPath.removeAttribute('id');
@@ -167,14 +415,16 @@
                 glowPath.classList.add('edge-hover-glow');
                 glowPath.style.fill = 'none';
                 glowPath.style.stroke = '#0042eb';
-                glowPath.style.strokeWidth = '2px';
+                glowPath.style.strokeWidth = '1px';
                 glowPath.style.strokeLinecap = 'round';
                 glowPath.style.strokeLinejoin = 'round';
                 glowPath.style.opacity = '0';
-                glowPath.style.filter = 'drop-shadow(0px 0px 2px #0042eb)';
+                glowPath.style.filter = 'drop-shadow(0px 0px 1px #0042eb)';
                 glowPath.style.pointerEvents = 'none';
                 glowPath.style.vectorEffect = 'non-scaling-stroke';
                 glowPath.style.transition = 'opacity 0.12s ease';
+                glowPath.style.strokeDasharray = 'none';
+                glowPath.style.strokeDashoffset = '0';
                 path.parentNode.insertBefore(glowPath, path);
 
                 const hitbox = path.cloneNode();
@@ -186,25 +436,35 @@
                 hitbox.classList.add('edge-hover-hitbox');
                 hitbox.style.fill = 'none';
                 hitbox.style.stroke = 'transparent';
-                const baseStrokeWidth = parseFloat(window.getComputedStyle(path).strokeWidth) || 2;
-                const preciseHitboxWidth = Math.max(6, Math.min(8, baseStrokeWidth + 2));
+                const baseStrokeWidth = parseFloat(window.getComputedStyle(path).strokeWidth) || 1;
+                const preciseHitboxWidth = Math.max(4, Math.min(6, baseStrokeWidth + 2));
                 hitbox.style.strokeWidth = preciseHitboxWidth + 'px';
                 hitbox.style.strokeLinecap = 'round';
                 hitbox.style.strokeLinejoin = 'round';
                 hitbox.style.pointerEvents = 'stroke';
                 hitbox.style.vectorEffect = 'non-scaling-stroke';
                 hitbox.style.cursor = 'pointer';
+                applyEdgeTrim(hitbox, path);
 
-                hitbox.addEventListener('pointerenter', () => {
+                hitbox.addEventListener('pointerenter', (event) => {
                     glowPath.style.opacity = selectedEdge && selectedEdge.path === path ? '0.35' : '0.5';
+                    showTooltip(event, edgeEndpoints);
+                });
+                hitbox.addEventListener('pointermove', (event) => {
+                    if (container.dataset.edgeTooltipsEnabled === 'false') {
+                        return;
+                    }
+                    placeTooltip(event);
                 });
                 hitbox.addEventListener('pointerleave', () => {
                     glowPath.style.opacity = selectedEdge && selectedEdge.path === path ? '0.35' : '0';
+                    hideTooltip();
                 });
                 hitbox.addEventListener('click', (event) => {
                     event.preventDefault();
                     event.stopPropagation();
                     selectEdge(path, glowPath);
+                    showTooltip(event, edgeEndpoints);
                 });
 
                 // Preserve Mermaid's original visuals; hover interaction uses only hitbox.
@@ -243,15 +503,37 @@
                 }
                 clearSelectedEdge();
             }, true);
+
+            container.addEventListener('edge-tooltips-state', (event) => {
+                if (event && event.detail && event.detail.enabled === false) {
+                    hideTooltip();
+                }
+            });
         }
 
         // This function creates on-screen controls for panning and zooming the graph. 
         // It adds buttons for panning in four directions, zooming in and out, and recentering the graph. 
         // The controls are designed to be intuitive and accessible, with appropriate icons and hover effects.
-        function createViewportControls(container, panzoom, recenterFn) {
+        function createViewportControls(container, svgElement, panzoom, recenterFn) {
             const controls = document.createElement('div');
             controls.className = 'graph-controls';
             controls.innerHTML =
+                '<div class="graph-controls-search">' +
+                    '<button type="button" data-action="toggle-search" title="Search node" aria-label="Open search filter" aria-expanded="false" class="icon-button icon-search graph-search-toggle">' +
+                        '<svg class="icon-search-open" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><line x1="15.5" y1="15.5" x2="20" y2="20"></line></svg>' +
+                        '<svg class="icon-search-close" viewBox="0 0 24 24" aria-hidden="true"><line x1="8" y1="8" x2="16" y2="16"></line><line x1="16" y1="8" x2="8" y2="16"></line></svg>' +
+                    '</button>' +
+                    '<button type="button" data-action="toggle-tooltips" title="Disable edge tooltips" aria-label="Disable edge tooltips" aria-pressed="true" class="icon-button icon-tooltip graph-tooltips-toggle">' +
+                        '<svg class="icon-tooltips-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6.2v8.1a1.8 1.8 0 0 1-1.8 1.8H10l-4.8 4.6v-4.6H5.8A1.8 1.8 0 0 1 4 14.3V6.2A1.8 1.8 0 0 1 5.8 4.4h12.4A1.8 1.8 0 0 1 20 6.2z"></path></svg>' +
+                        '<svg class="icon-tooltips-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6.2v8.1a1.8 1.8 0 0 1-1.8 1.8H10l-4.8 4.6v-4.6H5.8A1.8 1.8 0 0 1 4 14.3V6.2A1.8 1.8 0 0 1 5.8 4.4h12.4A1.8 1.8 0 0 1 20 6.2z"></path><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+                    '</button>' +
+                    '<form class="graph-search-form" novalidate>' +
+                        '<input type="search" class="graph-search-input" placeholder="Search node name" aria-label="Search node name"/>' +
+                        '<button type="submit" class="graph-search-submit">Go</button>' +
+                    '</form>' +
+                '</div>' +
+                '<div class="graph-search-results" role="listbox" aria-label="Matching nodes"></div>' +
+                '<div class="graph-search-feedback" aria-live="polite"></div>' +
                 '<div class="graph-controls-grid">' +
                     '<button type="button" data-action="pan-up" title="Pan up" class="icon-button icon-arrow">' +
                         '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="6,14 12,8 18,14"></polyline></svg>' +
@@ -278,6 +560,231 @@
 
             const panAmount = 120;
             const zoomStep = 0.2;
+            const searchForm = controls.querySelector('.graph-search-form');
+            const searchInput = controls.querySelector('.graph-search-input');
+            const searchFeedback = controls.querySelector('.graph-search-feedback');
+            const searchResults = controls.querySelector('.graph-search-results');
+            const searchToggleButton = controls.querySelector('.graph-search-toggle');
+            const searchOpenIcon = controls.querySelector('.icon-search-open');
+            const searchCloseIcon = controls.querySelector('.icon-search-close');
+            const tooltipsToggleButton = controls.querySelector('.graph-tooltips-toggle');
+            const tooltipsOnIcon = controls.querySelector('.icon-tooltips-on');
+            const tooltipsOffIcon = controls.querySelector('.icon-tooltips-off');
+            let highlightedNode = null;
+            let currentResults = [];
+            let selectedResultIndex = -1;
+
+            const clearSearchHighlight = () => {
+                if (!highlightedNode) {
+                    return;
+                }
+                highlightedNode.classList.remove('node-search-match');
+                highlightedNode = null;
+            };
+
+            const clearSearchResults = () => {
+                currentResults = [];
+                selectedResultIndex = -1;
+                searchResults.innerHTML = '';
+                searchResults.classList.remove('visible');
+            };
+
+            const setSearchOpenState = (isOpen) => {
+                controls.classList.toggle('search-open', isOpen);
+                searchToggleButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                searchToggleButton.setAttribute('aria-label', isOpen ? 'Close search filter' : 'Open search filter');
+                searchToggleButton.setAttribute('title', isOpen ? 'Close filter' : 'Search node');
+                searchOpenIcon.style.display = isOpen ? 'none' : 'block';
+                searchCloseIcon.style.display = isOpen ? 'block' : 'none';
+            };
+
+            const setTooltipsEnabled = (enabled) => {
+                container.dataset.edgeTooltipsEnabled = enabled ? 'true' : 'false';
+                controls.classList.toggle('tooltips-disabled', !enabled);
+                tooltipsToggleButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+                tooltipsToggleButton.setAttribute('aria-label', enabled ? 'Disable edge tooltips' : 'Enable edge tooltips');
+                tooltipsToggleButton.setAttribute('title', enabled ? 'Disable edge tooltips' : 'Enable edge tooltips');
+                tooltipsOnIcon.style.display = enabled ? 'block' : 'none';
+                tooltipsOffIcon.style.display = enabled ? 'none' : 'block';
+                container.dispatchEvent(new CustomEvent('edge-tooltips-state', { detail: { enabled } }));
+            };
+
+            const setSearchFeedback = (message, isError = false) => {
+                searchFeedback.textContent = message;
+                searchFeedback.classList.toggle('error', isError);
+            };
+
+            const collectNodeEntries = () => {
+                return Array.from(container.querySelectorAll('.nodes .node')).map((node) => {
+                    const label = extractNodeDisplayLabel(node);
+                    return {
+                        element: node,
+                        label,
+                        normalizedLabel: label.toLowerCase(),
+                    };
+                });
+            };
+
+            const sortableLabel = (label) => {
+                const trimmed = String(label || '').trim().toLowerCase();
+                const normalized = trimmed.replace(/^[^a-z0-9]+/i, '');
+                return normalized || trimmed;
+            };
+
+            const focusNode = (nodeElement) => {
+                if (!nodeElement) {
+                    return;
+                }
+                const containerRect = container.getBoundingClientRect();
+                if (!containerRect.width || !containerRect.height) {
+                    return;
+                }
+
+                const nodeRect = nodeElement.getBoundingClientRect();
+                if (!nodeRect.width || !nodeRect.height) {
+                    return;
+                }
+
+                const currentScale = panzoom.getScale ? panzoom.getScale() : 1;
+                const targetNodeWidth = Math.min(260, containerRect.width * 0.34);
+                const scaleByWidth = currentScale * (targetNodeWidth / Math.max(nodeRect.width, 1));
+                const targetScale = Math.min(10, Math.max(1.35, Math.max(currentScale * 1.2, scaleByWidth)));
+                const focalPoint = {
+                    x: (nodeRect.left - containerRect.left) + (nodeRect.width / 2),
+                    y: (nodeRect.top - containerRect.top) + (nodeRect.height / 2),
+                };
+                panzoom.zoom(targetScale, { animate: false, focal: focalPoint });
+
+                const centerNode = (animate) => {
+                    const nextNodeRect = nodeElement.getBoundingClientRect();
+                    if (!nextNodeRect.width || !nextNodeRect.height) {
+                        return;
+                    }
+
+                    const viewportCenterX = containerRect.left + (containerRect.width / 2);
+                    const viewportCenterY = containerRect.top + (containerRect.height / 2);
+                    const nodeCenterX = nextNodeRect.left + (nextNodeRect.width / 2);
+                    const nodeCenterY = nextNodeRect.top + (nextNodeRect.height / 2);
+                    const deltaX = viewportCenterX - nodeCenterX;
+                    const deltaY = viewportCenterY - nodeCenterY;
+                    const scale = panzoom.getScale ? panzoom.getScale() : 1;
+                    const currentPan = panzoom.getPan ? panzoom.getPan() : { x: 0, y: 0 };
+                    panzoom.pan(
+                        currentPan.x + (deltaX / Math.max(scale, 0.01)),
+                        currentPan.y + (deltaY / Math.max(scale, 0.01)),
+                        { animate },
+                    );
+                };
+
+                centerNode(false);
+                window.requestAnimationFrame(() => {
+                    centerNode(true);
+                });
+            };
+
+            const selectSearchResult = (index) => {
+                const nextResult = currentResults[index];
+                if (!nextResult) {
+                    return;
+                }
+                clearSearchHighlight();
+                highlightedNode = nextResult.element;
+                highlightedNode.classList.add('node-search-match');
+                selectedResultIndex = index;
+                focusNode(highlightedNode);
+
+                searchResults.querySelectorAll('.graph-search-result').forEach((item, itemIndex) => {
+                    item.classList.toggle('active', itemIndex === index);
+                    item.setAttribute('aria-selected', itemIndex === index ? 'true' : 'false');
+                });
+            };
+
+            const renderSearchResults = () => {
+                searchResults.innerHTML = '';
+                if (!currentResults.length) {
+                    searchResults.classList.remove('visible');
+                    return;
+                }
+
+                searchResults.classList.add('visible');
+                const header = document.createElement('div');
+                header.className = 'graph-search-results-header';
+                header.textContent = `Found ${currentResults.length} element${currentResults.length === 1 ? '' : 's'}`;
+                searchResults.appendChild(header);
+
+                const itemsContainer = document.createElement('div');
+                itemsContainer.className = 'graph-search-results-items';
+                searchResults.appendChild(itemsContainer);
+
+                currentResults.forEach((entry, index) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'graph-search-result';
+                    button.textContent = entry.label;
+                    button.setAttribute('role', 'option');
+                    button.setAttribute('aria-selected', index === selectedResultIndex ? 'true' : 'false');
+                    if (index === selectedResultIndex) {
+                        button.classList.add('active');
+                    }
+                    button.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        selectSearchResult(index);
+                    });
+                    itemsContainer.appendChild(button);
+                });
+            };
+
+            const runSearch = () => {
+                const query = (searchInput.value || '').trim().toLowerCase();
+                if (!query) {
+                    clearSearchHighlight();
+                    clearSearchResults();
+                    setSearchFeedback('Type a node name to search.');
+                    return;
+                }
+
+                const sortedMatches = collectNodeEntries()
+                    .filter((entry) => entry.normalizedLabel.includes(query))
+                    .sort((a, b) => {
+                        const primary = sortableLabel(a.label).localeCompare(
+                            sortableLabel(b.label),
+                            undefined,
+                            { sensitivity: 'base', numeric: true },
+                        );
+                        if (primary !== 0) {
+                            return primary;
+                        }
+                        return a.label.localeCompare(b.label, undefined, { sensitivity: 'base', numeric: true });
+                    });
+
+                if (!sortedMatches.length) {
+                    clearSearchHighlight();
+                    clearSearchResults();
+                    setSearchFeedback('No matching node found.', true);
+                    return;
+                }
+
+                currentResults = sortedMatches;
+                selectedResultIndex = 0;
+                renderSearchResults();
+                selectSearchResult(0);
+                setSearchFeedback(`Showing ${currentResults.length} result(s), ordered by name.`);
+            };
+
+            const toggleSearch = () => {
+                const isOpen = !controls.classList.contains('search-open');
+                setSearchOpenState(isOpen);
+                if (isOpen) {
+                    setSearchFeedback('');
+                    searchInput.focus();
+                    searchInput.select();
+                    return;
+                }
+                clearSearchHighlight();
+                clearSearchResults();
+                setSearchFeedback('');
+            };
 
             // This function handles the logic for each control action, including calculating the new pan 
             // and zoom values based on the current state of the graph.
@@ -297,6 +804,14 @@
                     recenterFn();
                     return;
                 }
+                if (action === 'toggle-search') {
+                    toggleSearch();
+                    return;
+                }
+                if (action === 'toggle-tooltips') {
+                    setTooltipsEnabled(container.dataset.edgeTooltipsEnabled !== 'true');
+                    return;
+                }
                 if (action === 'pan-up') {
                     panzoom.pan(currentPan.x, currentPan.y + panAmount);
                     return;
@@ -314,7 +829,7 @@
                 }
             };
 
-            controls.querySelectorAll('button').forEach((button) => {
+            controls.querySelectorAll('.graph-controls-grid button, .graph-controls-search > button').forEach((button) => {
                 button.addEventListener('click', (event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -322,7 +837,28 @@
                 });
             });
 
+            searchForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                runSearch();
+            });
+
+            searchInput.addEventListener('keydown', (event) => {
+                if (event.key !== 'Escape') {
+                    return;
+                }
+                setSearchOpenState(false);
+                clearSearchHighlight();
+                clearSearchResults();
+                setSearchFeedback('');
+            });
+
             controls.addEventListener('wheel', (event) => {
+                if (event.target && event.target.closest('.graph-search-results')) {
+                    // Allow normal scroll inside the results list without zooming the graph below.
+                    event.stopPropagation();
+                    return;
+                }
                 event.preventDefault();
                 event.stopPropagation();
             }, { passive: false });
@@ -331,6 +867,8 @@
             controls.addEventListener('mousedown', (event) => event.stopPropagation());
             controls.addEventListener('touchstart', (event) => event.stopPropagation(), { passive: true });
 
+            setSearchOpenState(false);
+            setTooltipsEnabled(false);
             container.appendChild(controls);
         }
 
@@ -354,7 +892,7 @@
 
             fitGraphToViewport(svgElement, container, panzoom);
             bindHoverEffects(container);
-            createViewportControls(container, panzoom, () => fitGraphToViewport(svgElement, container, panzoom));
+            createViewportControls(container, svgElement, panzoom, () => fitGraphToViewport(svgElement, container, panzoom));
 
 			container.addEventListener("wheel", (event) => {
                 event.preventDefault();
@@ -441,12 +979,295 @@
             opacity: 1 !important;
         }
 
+        #mermaid-svg-id .node.node-search-match rect,
+        #mermaid-svg-id .node.node-search-match circle,
+        #mermaid-svg-id .node.node-search-match polygon {
+            stroke: #0047ff !important;
+            stroke-width: 5px !important;
+            fill: #dce8ff !important;
+            filter: drop-shadow(0 0 1px #0033a3) drop-shadow(0 0 10px rgba(0, 71, 255, 0.5));
+            animation: node-search-glow 1.2s ease-in-out infinite;
+        }
+
+        @keyframes node-search-glow {
+            0%, 100% {
+                filter: drop-shadow(0 0 1px #0033a3) drop-shadow(0 0 8px rgba(0, 71, 255, 0.45));
+            }
+            50% {
+                filter: drop-shadow(0 0 1px #0033a3) drop-shadow(0 0 16px rgba(0, 71, 255, 0.8));
+            }
+        }
+
+        .edge-hover-tooltip {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 30;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transform: translate(-9999px, -9999px);
+            transition: opacity 0.1s ease;
+            max-width: min(560px, calc(100% - 16px));
+            padding: 8px 10px;
+            border: 1px solid #c7d2e0;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+            color: #0f172a;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .edge-hover-tooltip.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .edge-hover-tooltip-label {
+            font-size: 11px;
+            color: #475569;
+            margin-bottom: 3px;
+        }
+
+        .edge-hover-tooltip-value {
+            font-weight: 350;
+            word-break: break-word;
+        }
+
         .graph-controls {
             position: absolute;
             right: 14px;
             bottom: 14px;
             z-index: 20;
             pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
+
+        .graph-controls-search {
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-end;
+            gap: 7px;
+        }
+
+        .graph-controls .graph-search-form {
+            order: 1;
+        }
+
+        .graph-controls .graph-search-toggle {
+            order: 2;
+        }
+
+        .graph-controls .graph-tooltips-toggle {
+            order: 3;
+        }
+
+        .graph-controls .graph-search-toggle {
+            flex: 0 0 46px;
+            width: 46px;
+            height: 46px;
+            min-height: 46px;
+            align-self: flex-start;
+        }
+
+        .graph-controls .graph-tooltips-toggle {
+            flex: 0 0 46px;
+            width: 46px;
+            height: 46px;
+            min-height: 46px;
+            align-self: flex-start;
+        }
+
+        .graph-controls .graph-search-toggle .icon-search-close {
+            display: none;
+        }
+
+        .graph-controls .graph-tooltips-toggle .icon-tooltips-off {
+            display: none;
+        }
+
+        .graph-controls.search-open .graph-search-toggle .icon-search-open {
+            display: none;
+        }
+
+        .graph-controls.search-open .graph-search-toggle .icon-search-close {
+            display: block;
+        }
+
+        .graph-controls.tooltips-disabled .graph-tooltips-toggle .icon-tooltips-on {
+            display: none;
+        }
+
+        .graph-controls.tooltips-disabled .graph-tooltips-toggle .icon-tooltips-off {
+            display: block;
+        }
+
+        .graph-controls .graph-search-toggle .icon-search-open {
+            width: 21px;
+            height: 21px;
+        }
+
+        .graph-controls .graph-search-toggle .icon-search-close {
+            width: 16px;
+            height: 16px;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .graph-controls .graph-tooltips-toggle .icon-tooltips-on,
+        .graph-controls .graph-tooltips-toggle .icon-tooltips-off {
+            width: 19px;
+            height: 19px;
+            stroke-width: 1.9;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .graph-controls .graph-tooltips-toggle .icon-tooltips-on path,
+        .graph-controls .graph-tooltips-toggle .icon-tooltips-off path {
+            fill: none;
+        }
+
+        .graph-controls.tooltips-disabled .graph-tooltips-toggle {
+            border-color: #d0d8e3;
+            background: #f5f7fb;
+            color: #6b7280;
+        }
+
+        .graph-controls.search-open .graph-search-toggle {
+            border-color: #aebac8;
+            background: #eef2f8;
+            color: #111827;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+        }
+
+        .graph-search-form {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            padding: 6px;
+            border-radius: 12px;
+            border: 2px solid #c7d1dc;
+            background: #f7f9fc;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+            height: 46px;
+            min-height: 46px;
+            box-sizing: border-box;
+        }
+
+        .graph-controls.search-open .graph-search-form {
+            display: inline-flex;
+        }
+
+        .graph-search-input {
+            width: 220px;
+            border: 1px solid #c7d1dc;
+            border-radius: 8px;
+            padding: 7px 9px;
+            font-size: 13px;
+            line-height: 1.2;
+            outline: none;
+            color: #111827;
+            background: #ffffff;
+        }
+
+        .graph-search-input:focus {
+            border-color: #0f62fe;
+            box-shadow: 0 0 0 2px rgba(15, 98, 254, 0.14);
+        }
+
+        .graph-search-submit {
+            width: auto !important;
+            height: 32px !important;
+            min-width: 40px;
+            border-radius: 8px !important;
+            border-width: 1px !important;
+            padding: 0 10px !important;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .graph-search-feedback {
+            min-height: 0;
+            max-width: 330px;
+            font-size: 11px;
+            line-height: 1.2;
+            color: #334155;
+            text-align: right;
+        }
+
+        .graph-search-feedback.error {
+            color: #b42318;
+        }
+
+        .graph-search-results {
+            display: none;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 4px;
+            width: min(560px, calc(100vw - 48px));
+            max-height: 210px;
+            overflow: hidden;
+            padding: 6px;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+        }
+
+        .graph-search-results.visible {
+            display: flex;
+        }
+
+        .graph-search-results-header {
+            padding: 3px 4px 6px;
+            margin-bottom: 2px;
+            font-size: 11px;
+            line-height: 1.2;
+            font-weight: 600;
+            color: #475569;
+            background: rgba(255, 255, 255, 0.98);
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .graph-search-results-items {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 4px;
+            padding-right: 1px;
+        }
+
+        .graph-controls .graph-search-result {
+            width: 100% !important;
+            height: auto !important;
+            min-height: 32px;
+            border-radius: 8px !important;
+            border: 1px solid #dbe3ee !important;
+            border-width: 1px !important;
+            background: #ffffff !important;
+            padding: 7px 9px !important;
+            font-size: 12px;
+            line-height: 1.25;
+            font-weight: 500;
+            text-align: left;
+            justify-content: flex-start !important;
+            white-space: normal;
+            word-break: break-word;
+        }
+
+        .graph-controls .graph-search-result.active {
+            border-color: #0f62fe !important;
+            background: #eaf1ff !important;
+            color: #0a3f9f !important;
         }
 
         .graph-controls-grid {
@@ -470,6 +1291,7 @@
         .graph-controls button {
             width: 46px;
             height: 46px;
+            box-sizing: border-box;
             border: 2px solid #c7d1dc;
             border-radius: 12px;
             background: #f7f9fc;
@@ -522,6 +1344,38 @@
             .graph-controls .icon-button svg {
                 width: 18px;
                 height: 18px;
+            }
+
+            .graph-controls .graph-search-toggle {
+                flex-basis: 40px;
+                width: 40px;
+                height: 40px;
+                min-height: 40px;
+            }
+
+            .graph-controls .graph-tooltips-toggle {
+                flex-basis: 40px;
+                width: 40px;
+                height: 40px;
+                min-height: 40px;
+            }
+
+            .graph-search-form {
+                height: 40px;
+                min-height: 40px;
+            }
+
+            .graph-search-input {
+                width: 170px;
+            }
+
+            .graph-search-feedback {
+                max-width: 260px;
+            }
+
+            .graph-search-results {
+                width: min(420px, calc(100vw - 40px));
+                max-height: 180px;
             }
         }
     </style>

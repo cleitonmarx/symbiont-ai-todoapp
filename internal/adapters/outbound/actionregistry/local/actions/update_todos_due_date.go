@@ -39,7 +39,7 @@ func (a BulkTodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinit
 		Hints: domain.AssistantActionHints{
 			UseWhen:   "Use for batch due date/deadline changes across multiple todos (plural updates).",
 			AvoidWhen: "Do not use for title/status changes or single-item due date updates.",
-			ArgRules:  "Required key: todos. Each item requires id and due_date (YYYY-MM-DD).",
+			ArgRules:  "Required key: todos. Each item requires id <UUID> and due_date (YYYY-MM-DD). Never place title text in id.",
 		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
@@ -48,6 +48,23 @@ func (a BulkTodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinit
 					Type:        "array",
 					Description: "List of due date updates. Each item: {id,due_date}. REQUIRED.",
 					Required:    true,
+					Items: &domain.AssistantActionField{
+						Type:        "object",
+						Description: "Todo item to update due date.",
+						Fields: map[string]domain.AssistantActionField{
+							"id": {
+								Type:        "string",
+								Description: "ID of the todo to update. REQUIRED.",
+								Required:    true,
+							},
+							"due_date": {
+								Type:        "string",
+								Description: "New due date for the todo in YYYY-MM-DD format. REQUIRED.",
+								Required:    true,
+								Format:      "date",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -112,9 +129,9 @@ func (a BulkTodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.A
 	}
 
 	todos := make([]domain.Todo, 0, len(items))
-	err = a.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
+	err = a.uow.Execute(ctx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
 		for i, item := range items {
-			todo, updateErr := a.updater.Update(ctx, uow, item.ID, nil, nil, &item.DueDate)
+			todo, updateErr := a.updater.Update(uowCtx, uow, item.ID, nil, nil, &item.DueDate)
 			if updateErr != nil {
 				return fmt.Errorf("todo at index %d: %w", i, updateErr)
 			}

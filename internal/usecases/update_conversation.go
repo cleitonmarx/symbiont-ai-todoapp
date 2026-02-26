@@ -32,8 +32,8 @@ func NewUpdateConversationImpl(uow domain.UnitOfWork, timeProvider domain.Curren
 // Execute partially updates a conversation, such as the title.
 func (uc *UpdateConversationImpl) Execute(ctx context.Context, conversationID uuid.UUID, title string) (domain.Conversation, error) {
 	var updatedConv domain.Conversation
-	err := uc.uow.Execute(ctx, func(uow domain.UnitOfWork) error {
-		conv, found, err := uow.Conversation().GetConversation(ctx, conversationID)
+	err := uc.uow.Execute(ctx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
+		conv, found, err := uow.Conversation().GetConversation(uowCtx, conversationID)
 		if err != nil {
 			return err
 		}
@@ -46,7 +46,7 @@ func (uc *UpdateConversationImpl) Execute(ctx context.Context, conversationID uu
 		}
 
 		conv.UpdatedAt = uc.timeProvider.Now()
-		if err := uow.Conversation().UpdateConversation(ctx, conv); err != nil {
+		if err := uow.Conversation().UpdateConversation(uowCtx, conv); err != nil {
 			return err
 		}
 		updatedConv = conv

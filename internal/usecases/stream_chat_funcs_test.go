@@ -3,6 +3,8 @@ package usecases
 import (
 	"context"
 	"errors"
+	"io"
+	"log"
 	"strings"
 	"testing"
 	"time"
@@ -63,19 +65,21 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	}
 
 	useCase := NewStreamChatImpl(
+		log.New(io.Discard, "", 0),
 		chatRepo,
 		summaryRepo,
 		conversationRepo,
 		timeProvider,
 		assistant,
 		actionRegistry,
+		nil,
 		uow,
 		"test-embedding-model",
 		7,
 	)
 
 	var capturedContent string
-	err := useCase.Execute(context.Background(), tt.userMessage, tt.model, func(eventType domain.AssistantEventType, data any) error {
+	err := useCase.Execute(context.Background(), tt.userMessage, tt.model, func(_ context.Context, eventType domain.AssistantEventType, data any) error {
 		if tt.onEventErrType != "" && eventType == tt.onEventErrType {
 			return errors.New("onEvent error")
 		}
@@ -105,7 +109,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 // action call interaction, including meta, delta, and done events.
 func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Time) func(_ context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
 	return func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
-		if err := onEvent(domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+		if err := onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
 			UserMessageID:      userMsgID,
 			AssistantMessageID: assistantMsgID,
 		}); err != nil {
@@ -114,7 +118,7 @@ func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.
 
 		lastMsg := req.Messages[len(req.Messages)-1]
 		if lastMsg.Content == "Call an action" {
-			err := onEvent(domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+			err := onEvent(ctx, domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
 				ID:    "func-123",
 				Name:  "list_todos",
 				Input: `{"page": 1, "page_size": 5, "search_term": "searchTerm"}`,
@@ -123,12 +127,12 @@ func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.
 		}
 
 		if lastMsg.Role == domain.ChatRole_Tool {
-			if err := onEvent(domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Action called successfully."}); err != nil {
+			if err := onEvent(ctx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Action called successfully."}); err != nil {
 				return err
 			}
 		}
 
-		if err := onEvent(domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
+		if err := onEvent(ctx, domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
 			AssistantMessageID: assistantMsgID.String(),
 			CompletedAt:        fixedTime.Format(time.RFC3339),
 		}); err != nil {
@@ -140,17 +144,20 @@ func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.
 
 // persistCallExpectation describes one expected CreateChatMessages call.
 type persistCallExpectation struct {
-	Role             domain.ChatRole
-	Content          string
-	ID               *uuid.UUID
-	MessageState     domain.ChatMessageState
-	ErrorMessage     *string
-	PromptTokens     *int
-	CompletionTokens *int
-	TotalTokens      *int
-	ActionCallsLen   int
-	HasActionCallID  bool
-	CreateErr        error
+	Role                   domain.ChatRole
+	Content                string
+	ID                     *uuid.UUID
+	MessageState           domain.ChatMessageState
+	ErrorMessage           *string
+	ApprovalStatus         *domain.ChatMessageApprovalStatus
+	ApprovalDecisionReason *string
+	ApprovalDecidedAt      *time.Time
+	PromptTokens           *int
+	CompletionTokens       *int
+	TotalTokens            *int
+	ActionCallsLen         int
+	HasActionCallID        bool
+	CreateErr              error
 }
 
 // expectNowCalls enforces an exact number of current-time reads.
@@ -182,8 +189,8 @@ func expectPersistSequence(
 
 	uow.EXPECT().
 		Execute(mock.Anything, mock.Anything).
-		RunAndReturn(func(ctx context.Context, fn func(uow domain.UnitOfWork) error) error {
-			return fn(uow)
+		RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+			return fn(ctx, uow)
 		}).
 		Times(len(expectations))
 
@@ -251,6 +258,27 @@ func expectPersistSequence(
 				}
 			} else {
 				assert.Nil(t, msg.ErrorMessage)
+			}
+			if exp.ApprovalStatus != nil {
+				if assert.NotNil(t, msg.ApprovalStatus) {
+					assert.Equal(t, *exp.ApprovalStatus, *msg.ApprovalStatus)
+				}
+			} else {
+				assert.Nil(t, msg.ApprovalStatus)
+			}
+			if exp.ApprovalDecisionReason != nil {
+				if assert.NotNil(t, msg.ApprovalDecisionReason) {
+					assert.Equal(t, *exp.ApprovalDecisionReason, *msg.ApprovalDecisionReason)
+				}
+			} else {
+				assert.Nil(t, msg.ApprovalDecisionReason)
+			}
+			if exp.ApprovalDecidedAt != nil {
+				if assert.NotNil(t, msg.ApprovalDecidedAt) {
+					assert.Equal(t, *exp.ApprovalDecidedAt, *msg.ApprovalDecidedAt)
+				}
+			} else {
+				assert.Nil(t, msg.ApprovalDecidedAt)
 			}
 
 			if exp.CreateErr == nil {

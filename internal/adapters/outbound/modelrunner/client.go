@@ -41,7 +41,7 @@ func (c DRMAPIClient) Chat(ctx context.Context, req ChatRequest) (*ChatResponse,
 		return nil, errors.New("messages are required")
 	}
 
-	httpReq, err := c.newRequest(ctx, http.MethodPost, "/engines/v1/chat/completions", req)
+	httpReq, err := c.newRequest(ctx, http.MethodPost, "/v1/chat/completions", req)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (c DRMAPIClient) ChatStream(ctx context.Context, req ChatRequest, onChunk C
 		IncludeUsage: true,
 	}
 
-	httpReq, err := c.newRequest(ctx, http.MethodPost, "/engines/v1/chat/completions", req)
+	httpReq, err := c.newRequest(ctx, http.MethodPost, "/v1/chat/completions", req)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (c DRMAPIClient) ChatStream(ctx context.Context, req ChatRequest, onChunk C
 
 // Embeddings requests embeddings for the given input
 func (c DRMAPIClient) Embeddings(ctx context.Context, req EmbeddingsRequest) (*EmbeddingsResponse, error) {
-	httpReq, err := c.newRequest(ctx, http.MethodPost, "/engines/v1/embeddings", req)
+	httpReq, err := c.newRequest(ctx, http.MethodPost, "/v1/embeddings", req)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (c DRMAPIClient) Embeddings(ctx context.Context, req EmbeddingsRequest) (*E
 
 // AvailableModels retrieves the list of available models
 func (c DRMAPIClient) AvailableModels(ctx context.Context) (*ModelsResponse, error) {
-	httpReq, err := c.newRequest(ctx, http.MethodGet, "/engines/v1/models", nil)
+	httpReq, err := c.newRequest(ctx, http.MethodGet, "/v1/models", nil)
 	if err != nil {
 		return nil, err
 	}

@@ -28,21 +28,56 @@ type Tool struct {
 type ToolFunc struct {
 	Description string             `json:"description"`
 	Name        string             `json:"name"`
+	Strict      bool               `json:"strict,omitempty"`
 	Parameters  ToolFuncParameters `json:"parameters"`
 }
 
 // ToolFuncParameters represents the parameters schema for a function tool (OpenAI JSON Schema)
 type ToolFuncParameters struct {
-	Type                 string                             `json:"type"`
-	Properties           map[string]ToolFuncParameterDetail `json:"properties"`
-	Required             []string                           `json:"required,omitempty"`
-	AdditionalProperties bool                               `json:"additionalProperties"`
+	// Type accepts either a single type (e.g. "object") or a union (e.g. ["string","null"]).
+	Type any `json:"type,omitempty"`
+	// Description documents the schema node.
+	Description string `json:"description,omitempty"`
+	// Format constrains string values, e.g. "date", "date-time", "uuid", "email".
+	Format string `json:"format,omitempty"`
+	// Enum restricts allowed values.
+	Enum []any `json:"enum,omitempty"`
+	// Properties defines object fields.
+	Properties map[string]ToolFuncParameterDetail `json:"properties,omitempty"`
+	// Required lists required object fields.
+	Required []string `json:"required,omitempty"`
+	// Items defines item schema for arrays.
+	Items *ToolFuncParameterDetail `json:"items,omitempty"`
+	// AdditionalProperties accepts bool or a schema object.
+	AdditionalProperties any `json:"additionalProperties,omitempty"`
+	// Combinators.
+	AnyOf []ToolFuncParameterDetail `json:"anyOf,omitempty"`
+	OneOf []ToolFuncParameterDetail `json:"oneOf,omitempty"`
+	AllOf []ToolFuncParameterDetail `json:"allOf,omitempty"`
 }
 
 // ToolFuncParameterDetail represents a single parameter in the function tool schema
 type ToolFuncParameterDetail struct {
-	Type        string `json:"type"`
+	// Type accepts either a single type (e.g. "string") or a union (e.g. ["string","null"]).
+	Type any `json:"type,omitempty"`
+	// Description documents the schema node.
 	Description string `json:"description,omitempty"`
+	// Format constrains string values, e.g. "date", "date-time", "uuid", "email".
+	Format string `json:"format,omitempty"`
+	// Enum restricts allowed values.
+	Enum []any `json:"enum,omitempty"`
+	// Items defines item schema for arrays.
+	Items *ToolFuncParameterDetail `json:"items,omitempty"`
+	// Properties defines object fields.
+	Properties map[string]ToolFuncParameterDetail `json:"properties,omitempty"`
+	// Required lists required object fields.
+	Required []string `json:"required,omitempty"`
+	// AdditionalProperties accepts bool or a schema object.
+	AdditionalProperties any `json:"additionalProperties,omitempty"`
+	// Combinators.
+	AnyOf []ToolFuncParameterDetail `json:"anyOf,omitempty"`
+	OneOf []ToolFuncParameterDetail `json:"oneOf,omitempty"`
+	AllOf []ToolFuncParameterDetail `json:"allOf,omitempty"`
 }
 
 // ChatMessage is an OpenAI-compatible message
@@ -145,8 +180,9 @@ type Timings struct {
 
 // EmbeddingsRequest represents the request payload for the embeddings endpoint.
 type EmbeddingsRequest struct {
-	Model string `json:"model"`
-	Input any    `json:"input"` // string or []string
+	Model      string `json:"model"`
+	Input      any    `json:"input"`                // string or []string
+	Dimensions *int   `json:"dimensions,omitempty"` // Optional dimensions for models that support it
 }
 
 // EmbeddingsUsage represents the token usage for embeddings

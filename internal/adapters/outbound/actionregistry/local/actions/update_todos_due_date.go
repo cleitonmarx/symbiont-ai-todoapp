@@ -48,6 +48,23 @@ func (a BulkTodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinit
 					Type:        "array",
 					Description: "List of due date updates. Each item: {id,due_date}. REQUIRED.",
 					Required:    true,
+					Items: &domain.AssistantActionField{
+						Type:        "object",
+						Description: "Todo item to update due date.",
+						Fields: map[string]domain.AssistantActionField{
+							"id": {
+								Type:        "string",
+								Description: "ID of the todo to update. REQUIRED.",
+								Required:    true,
+							},
+							"due_date": {
+								Type:        "string",
+								Description: "New due date for the todo in YYYY-MM-DD format. REQUIRED.",
+								Required:    true,
+								Format:      "date",
+							},
+						},
+					},
 				},
 			},
 		},

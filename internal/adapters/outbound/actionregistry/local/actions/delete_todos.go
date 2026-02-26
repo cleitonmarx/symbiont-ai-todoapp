@@ -47,9 +47,26 @@ func (a BulkTodoDeleterAction) Definition() domain.AssistantActionDefinition {
 					Type:        "array",
 					Description: "List of todos to delete. Each item: {id,title}. REQUIRED.",
 					Required:    true,
+					Items: &domain.AssistantActionField{
+						Type:        "object",
+						Description: "Todo item to delete.",
+						Fields: map[string]domain.AssistantActionField{
+							"id": {
+								Type:        "string",
+								Description: "ID of the todo to delete. REQUIRED.",
+								Required:    true,
+							},
+							"title": {
+								Type:        "string",
+								Description: "Title of the todo to delete (for confirmation only). REQUIRED.",
+								Required:    true,
+							},
+						},
+					},
 				},
 			},
 		},
+
 		Approval: domain.AssistantActionApproval{
 			Required:    true,
 			Title:       "Confirm deletion of todos",

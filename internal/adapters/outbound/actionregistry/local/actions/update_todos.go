@@ -45,6 +45,29 @@ func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 					Type:        "array",
 					Description: "List of todo updates. Each item: {id,title?,status?}. REQUIRED.",
 					Required:    true,
+					Items: &domain.AssistantActionField{
+						Type:        "object",
+						Description: "Todo item to update.",
+						Required:    true,
+						Fields: map[string]domain.AssistantActionField{
+							"id": {
+								Type:        "string",
+								Description: "ID of the todo to update. REQUIRED.",
+								Required:    true,
+							},
+							"title": {
+								Type:        "string",
+								Description: "New title for the todo. Optional but at least one of title or status must be present.",
+								Required:    false,
+							},
+							"status": {
+								Type:        "string",
+								Description: "New status for the todo. Allowed values: OPEN or DONE. Optional but at least one of title or status must be present.",
+								Required:    false,
+								Enum:        []any{domain.TodoStatus_OPEN, domain.TodoStatus_DONE},
+							},
+						},
+					},
 				},
 			},
 		},

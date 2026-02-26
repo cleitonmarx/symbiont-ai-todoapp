@@ -172,6 +172,10 @@ type AssistantActionField struct {
 	Type        string
 	Description string
 	Required    bool
+	Fields      map[string]AssistantActionField
+	Items       *AssistantActionField
+	Format      string
+	Enum        []any
 }
 
 // AssistantActionInput describes the action input shape.

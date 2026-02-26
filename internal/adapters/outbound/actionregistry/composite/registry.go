@@ -13,20 +13,20 @@ import (
 )
 
 const (
-	defaultRelevantActionsTopK     = 3
 	defaultRelevantActionsMinScore = 0.35
 )
 
 // CompositeActionRegistry implements domain.AssistantActionRegistry interface.
 // It aggregates actions from multiple EmbeddingActionRegistry instances.
 type CompositeActionRegistry struct {
-	se                domain.SemanticEncoder
-	embeddingModel    string
-	registriesActions map[string]actionregistry.ActionEmbedding
+	se                  domain.SemanticEncoder
+	embeddingModel      string
+	registriesActions   map[string]actionregistry.ActionEmbedding
+	relevantActionsTopK int
 }
 
 // NewCompositeActionRegistry creates a new CompositeActionRegistry from the given embedding registries.
-func NewCompositeActionRegistry(ctx context.Context, se domain.SemanticEncoder, embeddingModel string, registries ...actionregistry.EmbeddingActionRegistry) CompositeActionRegistry {
+func NewCompositeActionRegistry(ctx context.Context, se domain.SemanticEncoder, embeddingModel string, relevantActionsTopK int, registries ...actionregistry.EmbeddingActionRegistry) CompositeActionRegistry {
 	registryMap := make(map[string]actionregistry.ActionEmbedding)
 	for _, registry := range registries {
 		actions := registry.ListEmbeddings(ctx)
@@ -36,9 +36,10 @@ func NewCompositeActionRegistry(ctx context.Context, se domain.SemanticEncoder, 
 	}
 
 	return CompositeActionRegistry{
-		se:                se,
-		embeddingModel:    embeddingModel,
-		registriesActions: registryMap,
+		se:                  se,
+		embeddingModel:      embeddingModel,
+		relevantActionsTopK: relevantActionsTopK,
+		registriesActions:   registryMap,
 	}
 }
 
@@ -123,7 +124,7 @@ func (r CompositeActionRegistry) ListRelevant(ctx context.Context, userInput str
 		return scoredActions[i].score > scoredActions[j].score
 	})
 
-	limit := min(len(scoredActions), defaultRelevantActionsTopK)
+	limit := min(len(scoredActions), r.relevantActionsTopK)
 
 	relevant := make([]domain.AssistantActionDefinition, 0, limit)
 	for i := range limit {
@@ -134,15 +135,16 @@ func (r CompositeActionRegistry) ListRelevant(ctx context.Context, userInput str
 
 // InitCompositeActionRegistry is the initializer for CompositeActionRegistry, composing local and MCP gateway registries.
 type InitCompositeActionRegistry struct {
-	Local           actionregistry.EmbeddingActionRegistry `resolve:"local"`
-	MCP             actionregistry.EmbeddingActionRegistry `resolve:"mcp"`
-	SemanticEncoder domain.SemanticEncoder                 `resolve:""`
-	EmbeddingModel  string                                 `config:"LLM_EMBEDDING_MODEL"`
+	Local               actionregistry.EmbeddingActionRegistry `resolve:"local"`
+	MCP                 actionregistry.EmbeddingActionRegistry `resolve:"mcp"`
+	SemanticEncoder     domain.SemanticEncoder                 `resolve:""`
+	EmbeddingModel      string                                 `config:"LLM_EMBEDDING_MODEL"`
+	RelevantActionsTopK int                                    `config:"COMPOSITE_ACTION_REGISTRY_RELEVANT_ACTIONS_TOP_K" default:"8"`
 }
 
 // Initialize creates a CompositeActionRegistry from the local and MCP gateway registries and registers it in the dependency container.
 func (i InitCompositeActionRegistry) Initialize(ctx context.Context) (context.Context, error) {
-	composite := NewCompositeActionRegistry(ctx, i.SemanticEncoder, i.EmbeddingModel, i.Local, i.MCP)
+	composite := NewCompositeActionRegistry(ctx, i.SemanticEncoder, i.EmbeddingModel, i.RelevantActionsTopK, i.Local, i.MCP)
 	depend.Register[domain.AssistantActionRegistry](composite)
 	return ctx, nil
 }

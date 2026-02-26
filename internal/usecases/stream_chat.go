@@ -5,6 +5,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 	"unicode"
@@ -64,6 +65,7 @@ type StreamChat interface {
 
 // StreamChatImpl is the implementation of the StreamChat use case
 type StreamChatImpl struct {
+	logger                  *log.Logger
 	chatMessageRepo         domain.ChatMessageRepository
 	conversationSummaryRepo domain.ConversationSummaryRepository
 	conversationRepo        domain.ConversationRepository
@@ -78,6 +80,7 @@ type StreamChatImpl struct {
 
 // NewStreamChatImpl creates a new instance of StreamChatImpl
 func NewStreamChatImpl(
+	logger *log.Logger,
 	chatMessageRepo domain.ChatMessageRepository,
 	conversationSummaryRepo domain.ConversationSummaryRepository,
 	conversationRepo domain.ConversationRepository,
@@ -90,6 +93,7 @@ func NewStreamChatImpl(
 	maxActionCycles int,
 ) StreamChatImpl {
 	return StreamChatImpl{
+		logger:                  logger,
 		chatMessageRepo:         chatMessageRepo,
 		conversationSummaryRepo: conversationSummaryRepo,
 		conversationRepo:        conversationRepo,
@@ -195,6 +199,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		if err != nil {
 			if streamEventErr == nil && sc.prepareRunTurnRecovery(err, &req, &state) {
 				continueChatStreaming = true
+				sc.logger.Printf("StreamChat: encountered error during RunTurn, but prepared recovery. err=%v", err)
 				continue
 			}
 
@@ -1169,6 +1174,7 @@ func truncateToFirstChars(input string, maxChars int) string {
 
 // InitStreamChat is the initializer for the StreamChat use case
 type InitStreamChat struct {
+	Logger                  *log.Logger                              `resolve:""`
 	ChatMessageRepo         domain.ChatMessageRepository             `resolve:""`
 	ConversationSummaryRepo domain.ConversationSummaryRepository     `resolve:""`
 	ConversationRepo        domain.ConversationRepository            `resolve:""`
@@ -1186,6 +1192,7 @@ type InitStreamChat struct {
 // Initialize registers the StreamChat use case in the dependency container
 func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error) {
 	depend.Register[StreamChat](NewStreamChatImpl(
+		i.Logger,
 		i.ChatMessageRepo,
 		i.ConversationSummaryRepo,
 		i.ConversationRepo,

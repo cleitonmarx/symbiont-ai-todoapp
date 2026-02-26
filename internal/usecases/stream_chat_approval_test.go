@@ -3,6 +3,8 @@ package usecases
 import (
 	"context"
 	"errors"
+	"io"
+	"log"
 	"testing"
 	"time"
 
@@ -277,6 +279,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			})
 
 			useCase := NewStreamChatImpl(
+				log.New(io.Discard, "", 0),
 				chatRepo,
 				summaryRepo,
 				conversationRepo,

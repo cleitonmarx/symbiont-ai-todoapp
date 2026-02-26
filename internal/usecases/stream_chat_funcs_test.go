@@ -3,6 +3,8 @@ package usecases
 import (
 	"context"
 	"errors"
+	"io"
+	"log"
 	"strings"
 	"testing"
 	"time"
@@ -63,6 +65,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	}
 
 	useCase := NewStreamChatImpl(
+		log.New(io.Discard, "", 0),
 		chatRepo,
 		summaryRepo,
 		conversationRepo,

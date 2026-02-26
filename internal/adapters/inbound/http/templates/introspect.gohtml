@@ -175,6 +175,9 @@
             edgeTooltip.className = 'edge-hover-tooltip';
             edgeTooltip.dataset.fitIgnore = 'true';
             container.appendChild(edgeTooltip);
+            if (container.dataset.edgeTooltipsEnabled !== 'false') {
+                container.dataset.edgeTooltipsEnabled = 'true';
+            }
 
             const escapeHtml = (value) => {
                 return String(value).replace(/[&<>"']/g, (char) => {
@@ -310,6 +313,10 @@
             };
 
             const showTooltip = (event, edgeEndpoints) => {
+                if (container.dataset.edgeTooltipsEnabled === 'false') {
+                    hideTooltip();
+                    return;
+                }
                 const source = formatNodeRef(edgeEndpoints && edgeEndpoints.source);
                 const target = formatNodeRef(edgeEndpoints && edgeEndpoints.target);
                 const relationshipLabel = edgeEndpoints && edgeEndpoints.relationshipLabel
@@ -317,7 +324,7 @@
                     : 'Dependency Injection';
                 edgeTooltip.innerHTML =
                     `<div class="edge-hover-tooltip-label">Wiring Relationship</div>` +
-                    `<div class="edge-hover-tooltip-value">${escapeHtml(source)} ${escapeHtml(relationshipLabel)} ${escapeHtml(target)}</i></div>`
+                    `<div class="edge-hover-tooltip-value">${escapeHtml(source)} ${escapeHtml(relationshipLabel)} ${escapeHtml(target)}</div>`
                     ;
                 edgeTooltip.classList.add('visible');
                 placeTooltip(event);
@@ -444,6 +451,9 @@
                     showTooltip(event, edgeEndpoints);
                 });
                 hitbox.addEventListener('pointermove', (event) => {
+                    if (container.dataset.edgeTooltipsEnabled === 'false') {
+                        return;
+                    }
                     placeTooltip(event);
                 });
                 hitbox.addEventListener('pointerleave', () => {
@@ -493,6 +503,12 @@
                 }
                 clearSelectedEdge();
             }, true);
+
+            container.addEventListener('edge-tooltips-state', (event) => {
+                if (event && event.detail && event.detail.enabled === false) {
+                    hideTooltip();
+                }
+            });
         }
 
         // This function creates on-screen controls for panning and zooming the graph. 
@@ -506,6 +522,10 @@
                     '<button type="button" data-action="toggle-search" title="Search node" aria-label="Open search filter" aria-expanded="false" class="icon-button icon-search graph-search-toggle">' +
                         '<svg class="icon-search-open" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><line x1="15.5" y1="15.5" x2="20" y2="20"></line></svg>' +
                         '<svg class="icon-search-close" viewBox="0 0 24 24" aria-hidden="true"><line x1="8" y1="8" x2="16" y2="16"></line><line x1="16" y1="8" x2="8" y2="16"></line></svg>' +
+                    '</button>' +
+                    '<button type="button" data-action="toggle-tooltips" title="Disable edge tooltips" aria-label="Disable edge tooltips" aria-pressed="true" class="icon-button icon-tooltip graph-tooltips-toggle">' +
+                        '<svg class="icon-tooltips-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6.2v8.1a1.8 1.8 0 0 1-1.8 1.8H10l-4.8 4.6v-4.6H5.8A1.8 1.8 0 0 1 4 14.3V6.2A1.8 1.8 0 0 1 5.8 4.4h12.4A1.8 1.8 0 0 1 20 6.2z"></path></svg>' +
+                        '<svg class="icon-tooltips-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6.2v8.1a1.8 1.8 0 0 1-1.8 1.8H10l-4.8 4.6v-4.6H5.8A1.8 1.8 0 0 1 4 14.3V6.2A1.8 1.8 0 0 1 5.8 4.4h12.4A1.8 1.8 0 0 1 20 6.2z"></path><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
                     '</button>' +
                     '<form class="graph-search-form" novalidate>' +
                         '<input type="search" class="graph-search-input" placeholder="Search node name" aria-label="Search node name"/>' +
@@ -547,6 +567,9 @@
             const searchToggleButton = controls.querySelector('.graph-search-toggle');
             const searchOpenIcon = controls.querySelector('.icon-search-open');
             const searchCloseIcon = controls.querySelector('.icon-search-close');
+            const tooltipsToggleButton = controls.querySelector('.graph-tooltips-toggle');
+            const tooltipsOnIcon = controls.querySelector('.icon-tooltips-on');
+            const tooltipsOffIcon = controls.querySelector('.icon-tooltips-off');
             let highlightedNode = null;
             let currentResults = [];
             let selectedResultIndex = -1;
@@ -573,6 +596,17 @@
                 searchToggleButton.setAttribute('title', isOpen ? 'Close filter' : 'Search node');
                 searchOpenIcon.style.display = isOpen ? 'none' : 'block';
                 searchCloseIcon.style.display = isOpen ? 'block' : 'none';
+            };
+
+            const setTooltipsEnabled = (enabled) => {
+                container.dataset.edgeTooltipsEnabled = enabled ? 'true' : 'false';
+                controls.classList.toggle('tooltips-disabled', !enabled);
+                tooltipsToggleButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+                tooltipsToggleButton.setAttribute('aria-label', enabled ? 'Disable edge tooltips' : 'Enable edge tooltips');
+                tooltipsToggleButton.setAttribute('title', enabled ? 'Disable edge tooltips' : 'Enable edge tooltips');
+                tooltipsOnIcon.style.display = enabled ? 'block' : 'none';
+                tooltipsOffIcon.style.display = enabled ? 'none' : 'block';
+                container.dispatchEvent(new CustomEvent('edge-tooltips-state', { detail: { enabled } }));
             };
 
             const setSearchFeedback = (message, isError = false) => {
@@ -774,6 +808,10 @@
                     toggleSearch();
                     return;
                 }
+                if (action === 'toggle-tooltips') {
+                    setTooltipsEnabled(container.dataset.edgeTooltipsEnabled !== 'true');
+                    return;
+                }
                 if (action === 'pan-up') {
                     panzoom.pan(currentPan.x, currentPan.y + panAmount);
                     return;
@@ -830,6 +868,7 @@
             controls.addEventListener('touchstart', (event) => event.stopPropagation(), { passive: true });
 
             setSearchOpenState(false);
+            setTooltipsEnabled(false);
             container.appendChild(controls);
         }
 
@@ -1015,7 +1054,27 @@
             gap: 7px;
         }
 
+        .graph-controls .graph-search-form {
+            order: 1;
+        }
+
         .graph-controls .graph-search-toggle {
+            order: 2;
+        }
+
+        .graph-controls .graph-tooltips-toggle {
+            order: 3;
+        }
+
+        .graph-controls .graph-search-toggle {
+            flex: 0 0 46px;
+            width: 46px;
+            height: 46px;
+            min-height: 46px;
+            align-self: flex-start;
+        }
+
+        .graph-controls .graph-tooltips-toggle {
             flex: 0 0 46px;
             width: 46px;
             height: 46px;
@@ -1027,11 +1086,23 @@
             display: none;
         }
 
+        .graph-controls .graph-tooltips-toggle .icon-tooltips-off {
+            display: none;
+        }
+
         .graph-controls.search-open .graph-search-toggle .icon-search-open {
             display: none;
         }
 
         .graph-controls.search-open .graph-search-toggle .icon-search-close {
+            display: block;
+        }
+
+        .graph-controls.tooltips-disabled .graph-tooltips-toggle .icon-tooltips-on {
+            display: none;
+        }
+
+        .graph-controls.tooltips-disabled .graph-tooltips-toggle .icon-tooltips-off {
             display: block;
         }
 
@@ -1046,6 +1117,26 @@
             stroke-width: 2;
             stroke-linecap: round;
             stroke-linejoin: round;
+        }
+
+        .graph-controls .graph-tooltips-toggle .icon-tooltips-on,
+        .graph-controls .graph-tooltips-toggle .icon-tooltips-off {
+            width: 19px;
+            height: 19px;
+            stroke-width: 1.9;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .graph-controls .graph-tooltips-toggle .icon-tooltips-on path,
+        .graph-controls .graph-tooltips-toggle .icon-tooltips-off path {
+            fill: none;
+        }
+
+        .graph-controls.tooltips-disabled .graph-tooltips-toggle {
+            border-color: #d0d8e3;
+            background: #f5f7fb;
+            color: #6b7280;
         }
 
         .graph-controls.search-open .graph-search-toggle {
@@ -1256,6 +1347,13 @@
             }
 
             .graph-controls .graph-search-toggle {
+                flex-basis: 40px;
+                width: 40px;
+                height: 40px;
+                min-height: 40px;
+            }
+
+            .graph-controls .graph-tooltips-toggle {
                 flex-basis: 40px;
                 width: 40px;
                 height: 40px;

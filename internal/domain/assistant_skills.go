@@ -14,8 +14,14 @@ type AssistantSkillDefinition struct {
 	Source    string
 }
 
+// AssistantSkillQueryContext carries turn context used for skill relevance scoring.
+type AssistantSkillQueryContext struct {
+	Messages            []AssistantMessage
+	ConversationSummary string
+}
+
 // AssistantSkillRegistry resolves relevant skills based on user input.
 type AssistantSkillRegistry interface {
 	// ListRelevant returns relevant skill definitions for the current turn.
-	ListRelevant(ctx context.Context, userInput string) []AssistantSkillDefinition
+	ListRelevant(ctx context.Context, query AssistantSkillQueryContext) []AssistantSkillDefinition
 }

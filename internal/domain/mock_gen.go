@@ -814,16 +814,16 @@ func (_m *MockAssistantSkillRegistry) EXPECT() *MockAssistantSkillRegistry_Expec
 }
 
 // ListRelevant provides a mock function for the type MockAssistantSkillRegistry
-func (_mock *MockAssistantSkillRegistry) ListRelevant(ctx context.Context, userInput string) []AssistantSkillDefinition {
-	ret := _mock.Called(ctx, userInput)
+func (_mock *MockAssistantSkillRegistry) ListRelevant(ctx context.Context, query AssistantSkillQueryContext) []AssistantSkillDefinition {
+	ret := _mock.Called(ctx, query)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListRelevant")
 	}
 
 	var r0 []AssistantSkillDefinition
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []AssistantSkillDefinition); ok {
-		r0 = returnFunc(ctx, userInput)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, AssistantSkillQueryContext) []AssistantSkillDefinition); ok {
+		r0 = returnFunc(ctx, query)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]AssistantSkillDefinition)
@@ -839,20 +839,20 @@ type MockAssistantSkillRegistry_ListRelevant_Call struct {
 
 // ListRelevant is a helper method to define mock.On call
 //   - ctx context.Context
-//   - userInput string
-func (_e *MockAssistantSkillRegistry_Expecter) ListRelevant(ctx interface{}, userInput interface{}) *MockAssistantSkillRegistry_ListRelevant_Call {
-	return &MockAssistantSkillRegistry_ListRelevant_Call{Call: _e.mock.On("ListRelevant", ctx, userInput)}
+//   - query AssistantSkillQueryContext
+func (_e *MockAssistantSkillRegistry_Expecter) ListRelevant(ctx interface{}, query interface{}) *MockAssistantSkillRegistry_ListRelevant_Call {
+	return &MockAssistantSkillRegistry_ListRelevant_Call{Call: _e.mock.On("ListRelevant", ctx, query)}
 }
 
-func (_c *MockAssistantSkillRegistry_ListRelevant_Call) Run(run func(ctx context.Context, userInput string)) *MockAssistantSkillRegistry_ListRelevant_Call {
+func (_c *MockAssistantSkillRegistry_ListRelevant_Call) Run(run func(ctx context.Context, query AssistantSkillQueryContext)) *MockAssistantSkillRegistry_ListRelevant_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 AssistantSkillQueryContext
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(AssistantSkillQueryContext)
 		}
 		run(
 			arg0,
@@ -867,7 +867,7 @@ func (_c *MockAssistantSkillRegistry_ListRelevant_Call) Return(assistantSkillDef
 	return _c
 }
 
-func (_c *MockAssistantSkillRegistry_ListRelevant_Call) RunAndReturn(run func(ctx context.Context, userInput string) []AssistantSkillDefinition) *MockAssistantSkillRegistry_ListRelevant_Call {
+func (_c *MockAssistantSkillRegistry_ListRelevant_Call) RunAndReturn(run func(ctx context.Context, query AssistantSkillQueryContext) []AssistantSkillDefinition) *MockAssistantSkillRegistry_ListRelevant_Call {
 	_c.Call.Return(run)
 	return _c
 }

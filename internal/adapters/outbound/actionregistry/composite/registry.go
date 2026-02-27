@@ -9,10 +9,6 @@ import (
 	"github.com/cleitonmarx/symbiont/depend"
 )
 
-const (
-	defaultRelevantActionsMinScore = 0.35
-)
-
 // CompositeActionRegistry implements domain.AssistantActionRegistry interface.
 // It aggregates actions from multiple EmbeddingActionRegistry instances.
 type CompositeActionRegistry struct {

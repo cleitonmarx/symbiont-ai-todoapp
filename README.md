@@ -5,14 +5,13 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 ## Features
 
 - 📝 **Todo Management**: Create, update, delete, filter, sort, and paginate todos
-- 🤖 **LLM Chat & Tools**: Streamed AI chat (SSE) with tool-calling for local and external tools
-- ✅ **Action Approval Flow**: Human approval for sensitive/destructive tool execution (local actions and MCP tools)
-- 📦 **Batch Todo Actions**: Assistant-first bulk operations (`create_todos`, `update_todos`, `update_todos_due_date`, `delete_todos`)
+- 🤖 **LLM Chat & Actions/Tools**: Streamed AI chat (SSE) with action/tool-calling for local and external actions/tools
+- 🧩 **Skill-Based Action/Tool Routing**: Markdown runbooks (`skills/*.md`) used to decide which actions/tools are injected each turn
+- ✅ **Action/Tools Approval Flow**: Human approval for sensitive/destructive action/tool execution (local actions and MCP tools)
 - 🔗 **MCP Gateway Integration**: MCP-based external tools via `docker/mcp-gateway` (default setup includes DuckDuckGo tools)
-- 🎛️ **Tool Definition Overrides**: MCP tool descriptions/inputs/hints can be overridden with YAML for tighter model behavior control
 - 💬 **Conversation Management**: Conversation history with rename/delete and auto/LLM title generation
 - 📌 **Board Summary**: AI-generated board summary from todo domain events
-- 🧠 **Chat Summary**: Conversation-aware AI summaries from chat-message events
+- 🧠 **Conversation/Context Compression**: Conversation-aware AI summaries from chat-message events
 - 🔔 **Event-Driven Workflow**: Outbox + Pub/Sub workers for asynchronous processing
 - 🧠 **Vector Search**: PostgreSQL `pgvector` + embeddings for semantic todo search
 - 🔌 **Dual APIs**: REST (OpenAPI) + GraphQL
@@ -33,10 +32,11 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - **PostgreSQL** (`internal/adapters/outbound/postgres`): Primary data store with migrations and vector extension support
 - **Vault Provider** (`internal/adapters/outbound/config/vault_provider.go`): Loads secret-backed config values (`DB_USER`, `DB_PASS`)
 - **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI/DRM-compatible client for chat, summarization, embeddings, and model listing
-- **Assistant Action Registries** (`internal/adapters/outbound/actionregistry`):
+- **Assistant Action/Tool Registries** (`internal/adapters/outbound/actionregistry`):
   - `local`: Built-in app actions (UI filters, fetch todos, and batch todo mutations)
-  - `mcp`: MCP gateway-backed tool registry using `github.com/modelcontextprotocol/go-sdk/mcp`
-  - `composite`: Aggregates local + MCP actions and ranks relevance with embeddings
+  - `mcp`: MCP gateway-backed action/tool registry using `github.com/modelcontextprotocol/go-sdk/mcp`
+  - `composite`: Aggregates local + MCP actions/tools
+- **Assistant Skill Registry** (`internal/adapters/outbound/skillregistry`): Loads markdown skills and selects skills using turn context (current input, recent user inputs, and optional conversation summary)
 - **Telemetry** (`internal/telemetry`): Traces and metrics instrumentation for HTTP, DB, Pub/Sub, and use cases
 
 ### Generated Introspection Graph
@@ -93,10 +93,10 @@ This is useful for destructive operations (for example, deleting todos) and exte
 
 ### Configuring approval
 
-- You can enable approval per action.
+- You can enable approval per action/tool.
 - You can customize the prompt title/description, preview fields, and timeout.
 - Local actions location: `internal/adapters/outbound/actionregistry/local/actions/`
-- MCP tools YAML location: `internal/adapters/outbound/actionregistry/mcp/tool_overrides.yaml`
+- MCP tool YAML location: `internal/adapters/outbound/actionregistry/mcp/tool_overrides.yaml`
 
 Example:
 
@@ -111,6 +111,101 @@ tools:
         - url
       timeout: 90s
 ```
+
+## Skill-Based Routing
+
+The assistant can use skills as lightweight runbooks to improve action/tool selection.
+
+- Skill files live in: `internal/adapters/outbound/skillregistry/skills/*.md`
+- Each skill has YAML frontmatter (`name`, `use_when`, `avoid_when`, `priority`, `tags`, `tools`) plus workflow instructions in markdown body
+- At runtime, selected skills are converted into:
+  - Action/tool allowlist for the turn (`tools` field)
+  - System guidance prompt for action/tool workflow
+
+Current selector uses weighted context:
+
+- Current user input (highest weight)
+- Recent user inputs
+- Conversation summary (optional, lower weight)
+
+## Prompt Examples
+
+Use prompts like these to trigger the intended skills and actions/tools.
+
+### Create Todos
+
+- "Create a todo: Renew passport by 2026-03-20."
+- "Add these todos: book dentist for next week, buy groceries for Saturday."
+- "Create a checklist for moving apartment next month."
+
+### Read/View Todos
+
+- "List my open todos due from March 1-7."
+- "In my current view, sort by due date in DESC order, show only DONE todos."
+- "Find todos related to tax documents."
+
+### Update Todos
+
+- "Mark my dentist appointment todo as done."
+- "Reschedule all 'Japan Trip:' todos to next month."
+- "Update the title of my 'Buy tickets' todo to 'Buy flight tickets to Tokyo'."
+
+### Delete Todos
+
+- "Delete the todo titled 'Job application follow-up'."
+- "Delete these todos: 'Job application - ACME' and 'Job application - Contoso'."
+- "Remove all completed todos from my list."
+
+### Summarize Todos
+
+- "Give me a concise summary of my medical appointments."
+- "Make a concise summary of open todos due from March 1-7, in one short paragraph."
+
+### Goal Planning
+
+- "Plan a trip to Tokyo from April 4-14. Research first, then create todos with the prefix 'Japan Trip:'."
+- "Build an end-to-end study plan for my Go interview in 6 weeks."
+
+### Web Research
+
+- "Search the web for current visa requirements for Japan and summarize key points."
+- "Find 3 sources comparing JR Pass options and fetch the best one."
+
+## Runtime Profiles and Minimum Machine
+
+You can run this app in two main modes:
+
+### 1) Local models (Docker Model Runner / compatible local endpoint)
+
+Recommended hardware profile for a smooth local experience:
+
+- CPU: 12 high-performance cores (or equivalent compute throughput)
+- GPU: 30+ cores
+- Memory: 32 GB unified/system RAM
+- Storage: 20+ GB free for models, caches, and containers
+
+### 2) OpenAI API (lighter local machine requirements)
+
+When using remote OpenAI models, local requirements are mostly for app services:
+
+- CPU: 4 vCPU
+- RAM: 8 GB
+- Disk: 10+ GB free
+
+Use this environment configuration:
+
+```yaml
+- LLM_MODEL_HOST=https://api.openai.com
+- LLM_API_KEY=$(OPENAI_API_KEY)
+- LLM_SUMMARY_MODEL=gpt-4.1-nano-2025-04-14
+- LLM_CHAT_SUMMARY_MODEL=gpt-4.1-nano-2025-04-14
+- LLM_CHAT_TITLE_MODEL=gpt-4.1-nano-2025-04-14
+```
+
+### Embedding Model
+
+`embeddinggemma:300M-Q8_0` is highly recommended for this project due to its speed/capacity tradeoff. You can still use another embedding model if needed by updating `LLM_EMBEDDING_MODEL`.
+
 
 ## Quick Start (Docker Compose)
 
@@ -162,11 +257,13 @@ DB_PORT=5432 \
 DB_NAME=todoappdb \
 PUBSUB_EMULATOR_HOST=localhost:8681 \
 PUBSUB_PROJECT_ID=local-dev \
+PUBSUB_TOPIC_ID=Todo \
 TODO_EVENTS_SUBSCRIPTION_ID=todo_summary_generator \
 CHAT_EVENTS_SUBSCRIPTION_ID=chat_message_summary_generator \
 CHAT_TITLE_EVENTS_SUBSCRIPTION_ID=chat_message_title_generator \
 ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID=action_approval_dispatcher \
 LLM_MODEL_HOST=http://localhost:12434 \
+LLM_EMBEDDING_MODEL_HOST=http://localhost:12434 \
 LLM_SUMMARY_MODEL=qwen3:14B-Q6_K \
 LLM_CHAT_SUMMARY_MODEL=qwen3:14B-Q6_K \
 LLM_CHAT_TITLE_MODEL=qwen3:14B-Q6_K \
@@ -210,8 +307,8 @@ Required or commonly tuned variables:
 - `DB_HOST`, `DB_PORT` (default: `5432`), `DB_NAME`
 - `DB_USER`, `DB_PASS` (can be sourced from Vault)
 - `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_MOUNT_PATH`, `VAULT_SECRET_PATH`
-- `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`, `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID`
-- `LLM_MODEL_HOST`, `LLM_SUMMARY_MODEL`, `LLM_CHAT_SUMMARY_MODEL`, `LLM_CHAT_TITLE_MODEL`, `LLM_EMBEDDING_MODEL`
+- `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `PUBSUB_TOPIC_ID`, `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`, `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID`
+- `LLM_MODEL_HOST`, `LLM_EMBEDDING_MODEL_HOST`, `LLM_API_KEY`, `LLM_EMBEDDING_API_KEY`, `LLM_SUMMARY_MODEL`, `LLM_CHAT_SUMMARY_MODEL`, `LLM_CHAT_TITLE_MODEL`, `LLM_EMBEDDING_MODEL`
 - `MCP_GATEWAY_ENDPOINT` (e.g. `http://mcp-gateway:8811`)
 - `MCP_GATEWAY_API_KEY` (default: `-`)
 - `MCP_GATEWAY_API_KEY_HEADER` (default: `Authorization`)

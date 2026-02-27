@@ -2,62 +2,31 @@ package local
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry/local/actions"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func TestActionRegistry(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		setupActions   func() []actionregistry.ActionEmbedding
+		setupActions   func() []domain.AssistantAction
 		embeddingModel string
 		testFunc       func(t *testing.T, manager LocalRegistry)
 	}{
-		"list-returns-all-actions": {
-			setupActions: func() []actionregistry.ActionEmbedding {
-				action1 := domain.NewMockAssistantAction(t)
-				action1.EXPECT().
-					Definition().
-					Return(mockAssistantActionDefinition("fetch_todos"))
-
-				action2 := domain.NewMockAssistantAction(t)
-				action2.EXPECT().
-					Definition().
-					Return(mockAssistantActionDefinition("create_todo"))
-
-				return []actionregistry.ActionEmbedding{
-					{Action: action1},
-					{Action: action2},
-				}
-			},
-			testFunc: func(t *testing.T, manager LocalRegistry) {
-				actions := manager.ListEmbeddings(t.Context())
-				assert.Len(t, actions, 2)
-				names := []string{}
-				for _, action := range actions {
-					names = append(names, action.Action.Definition().Name)
-				}
-				assert.ElementsMatch(t, []string{"fetch_todos", "create_todo"}, names)
-			},
-		},
 		"status-message-returns-action-specific-message": {
-			setupActions: func() []actionregistry.ActionEmbedding {
+			setupActions: func() []domain.AssistantAction {
 				action := domain.NewMockAssistantAction(t)
 				action.EXPECT().
 					Definition().
 					Return(mockAssistantActionDefinition("fetch_todos"))
 				action.EXPECT().StatusMessage().Return("🔎 Fetching todos...")
-				return []actionregistry.ActionEmbedding{{Action: action}}
+				return []domain.AssistantAction{action}
 			},
 			testFunc: func(t *testing.T, manager LocalRegistry) {
 				msg := manager.StatusMessage("fetch_todos")
@@ -65,14 +34,14 @@ func TestActionRegistry(t *testing.T) {
 			},
 		},
 		"status-message-returns-default-when-action-not-found": {
-			setupActions: func() []actionregistry.ActionEmbedding { return []actionregistry.ActionEmbedding{} },
+			setupActions: func() []domain.AssistantAction { return []domain.AssistantAction{} },
 			testFunc: func(t *testing.T, manager LocalRegistry) {
 				msg := manager.StatusMessage("unknown_action")
 				assert.Equal(t, "⏳ Processing request...", msg)
 			},
 		},
 		"execute-calls-correct-action": {
-			setupActions: func() []actionregistry.ActionEmbedding {
+			setupActions: func() []domain.AssistantAction {
 				action := domain.NewMockAssistantAction(t)
 				action.EXPECT().
 					Definition().
@@ -88,7 +57,7 @@ func TestActionRegistry(t *testing.T) {
 						Content:      "todos found",
 						ActionCallID: common.Ptr("call-1"),
 					})
-				return []actionregistry.ActionEmbedding{{Action: action}}
+				return []domain.AssistantAction{action}
 			},
 			testFunc: func(t *testing.T, manager LocalRegistry) {
 				result := manager.Execute(
@@ -108,7 +77,7 @@ func TestActionRegistry(t *testing.T) {
 			},
 		},
 		"execute-returns-error-for-unknown-action": {
-			setupActions: func() []actionregistry.ActionEmbedding { return []actionregistry.ActionEmbedding{} },
+			setupActions: func() []domain.AssistantAction { return []domain.AssistantAction{} },
 			testFunc: func(t *testing.T, manager LocalRegistry) {
 				result := manager.Execute(
 					context.Background(),
@@ -130,84 +99,59 @@ func TestActionRegistry(t *testing.T) {
 	}
 }
 
-func TestActionRegistry_ListEmbeddings_And_StatusMessages(t *testing.T) {
-	t.Parallel()
-
-	vectorizedActions := []actionregistry.ActionEmbedding{
-		{Action: actions.NewUIFiltersSetterAction()},
-		{Action: actions.NewTodoFetcherAction(nil, nil, "")},
-		{Action: actions.NewBulkTodoCreatorAction(nil, nil, nil)},
-		{Action: actions.NewBulkTodoUpdaterAction(nil, nil)},
-		{Action: actions.NewBulkTodoDueDateUpdaterAction(nil, nil, nil)},
-		{Action: actions.NewBulkTodoDeleterAction(nil, nil)},
-	}
-
-	manager := NewActionRegistry(nil, "", vectorizedActions...)
-
-	actions := manager.ListEmbeddings(t.Context())
-	require.Len(t, actions, 6)
-
-	names := make([]string, 0, len(vectorizedActions))
-	for _, vectorizedAction := range vectorizedActions {
-		names = append(names, vectorizedAction.Action.Definition().Name)
-	}
-
-	assert.ElementsMatch(t, []string{
-		"set_ui_filters",
-		"fetch_todos",
-		"create_todos",
-		"update_todos",
-		"update_todos_due_date",
-		"delete_todos",
-	}, names)
-
-	statusMessages := []string{}
-	for _, name := range names {
-		statusMessages = append(statusMessages, manager.StatusMessage(name))
-	}
-
-	assert.ElementsMatch(t, []string{
-		"🎛️ Applying filters...",
-		"🔎 Fetching todos...",
-		"📝 Creating your todos...",
-		"✏️ Updating your todos...",
-		"📅 Updating due dates...",
-		"🗑️ Deleting todos...",
-	}, statusMessages)
-}
-
-func TestActionRegistry_List_IsSortedByName(t *testing.T) {
+func TestActionRegistry_GetDefinition(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		actionNames   []string
-		expectedNames []string
+		actionName   string
+		setupActions func(t *testing.T) []domain.AssistantAction
+		assertResult func(t *testing.T, definition domain.AssistantActionDefinition, found bool)
 	}{
-		"sorts-actions-by-name": {
-			actionNames:   []string{"update_todo", "create_todo", "delete_todo"},
-			expectedNames: []string{"create_todo", "delete_todo", "update_todo"},
+		"returns-definition-when-action-exists": {
+			actionName: "fetch_todos",
+			setupActions: func(t *testing.T) []domain.AssistantAction {
+				action := domain.NewMockAssistantAction(t)
+				action.EXPECT().
+					Definition().
+					Return(domain.AssistantActionDefinition{
+						Name:        "fetch_todos",
+						Description: "Fetch todos from storage",
+						Input: domain.AssistantActionInput{
+							Type: "object",
+						},
+					}).
+					Maybe()
+				return []domain.AssistantAction{action}
+			},
+			assertResult: func(t *testing.T, definition domain.AssistantActionDefinition, found bool) {
+				assert.True(t, found)
+				assert.Equal(t, "fetch_todos", definition.Name)
+				assert.Equal(t, "Fetch todos from storage", definition.Description)
+				assert.Equal(t, "object", definition.Input.Type)
+			},
+		},
+		"returns-not-found-when-action-does-not-exist": {
+			actionName: "missing_action",
+			setupActions: func(t *testing.T) []domain.AssistantAction {
+				action := domain.NewMockAssistantAction(t)
+				action.EXPECT().
+					Definition().
+					Return(mockAssistantActionDefinition("fetch_todos")).
+					Maybe()
+				return []domain.AssistantAction{action}
+			},
+			assertResult: func(t *testing.T, definition domain.AssistantActionDefinition, found bool) {
+				assert.False(t, found)
+				assert.Equal(t, domain.AssistantActionDefinition{}, definition)
+			},
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			actionVectors := make([]actionregistry.ActionEmbedding, 0, len(tt.actionNames))
-			for _, actionName := range tt.actionNames {
-				actionVectors = append(actionVectors, actionregistry.ActionEmbedding{
-					Action: newStaticAssistantAction(actionName),
-				})
-			}
-
-			manager := NewActionRegistry(nil, "", actionVectors...)
-			vectorizedActions := manager.ListEmbeddings(t.Context())
-			require.Len(t, vectorizedActions, len(tt.expectedNames))
-
-			names := make([]string, 0, len(vectorizedActions))
-			for _, action := range vectorizedActions {
-				names = append(names, action.Action.Definition().Name)
-			}
-
-			assert.Equal(t, tt.expectedNames, names)
+			registry := NewActionRegistry(nil, "", tt.setupActions(t)...)
+			definition, found := registry.GetDefinition(tt.actionName)
+			tt.assertResult(t, definition, found)
 		})
 	}
 }
@@ -215,158 +159,14 @@ func TestActionRegistry_List_IsSortedByName(t *testing.T) {
 func TestInitActionRegistry_Initialize(t *testing.T) {
 	t.Parallel()
 
-	tests := map[string]struct {
-		setupMock    func(*domain.MockSemanticEncoder)
-		expectError  bool
-		validateFunc func(*testing.T, context.Context)
-	}{
-		"successfully-initializes-registry": {
-			setupMock: func(mockEncoder *domain.MockSemanticEncoder) {
-				mockEncoder.EXPECT().
-					VectorizeAssistantActionDefinition(
-						mock.Anything,
-						"test-model",
-						mock.AnythingOfType("domain.AssistantActionDefinition"),
-					).
-					Return(domain.EmbeddingVector{
-						Vector:      []float64{0.1, 0.2, 0.3},
-						TotalTokens: 3,
-					}, nil).Times(6)
-			},
-			expectError: false,
-			validateFunc: func(t *testing.T, ctx context.Context) {
-				assert.NotNil(t, ctx)
-				r, err := depend.ResolveNamed[actionregistry.EmbeddingActionRegistry]("local")
-				require.NoError(t, err)
-				assert.NotNil(t, r)
-			},
-		},
-		"embedding-error-during-initialization": {
-			setupMock: func(mockEncoder *domain.MockSemanticEncoder) {
-				mockEncoder.EXPECT().
-					VectorizeAssistantActionDefinition(
-						mock.Anything,
-						"test-model",
-						mock.AnythingOfType("domain.AssistantActionDefinition"),
-					).
-					Return(domain.EmbeddingVector{}, assert.AnError).Times(1)
-			},
-			expectError: true,
-			validateFunc: func(t *testing.T, ctx context.Context) {
-				assert.NotNil(t, ctx)
-			},
-		},
-	}
+	i := InitLocalActionRegistry{}
+	registry, err := i.Initialize(t.Context())
+	assert.NoError(t, err)
+	assert.NotNil(t, registry)
 
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			mockEncoder := domain.NewMockSemanticEncoder(t)
-			tt.setupMock(mockEncoder)
-
-			i := InitLocalActionRegistry{
-				SemanticEncoder: mockEncoder,
-				EmbeddingModel:  "test-model",
-			}
-
-			ctx, err := i.Initialize(t.Context())
-
-			if tt.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-
-			if tt.validateFunc != nil {
-				tt.validateFunc(t, ctx)
-			}
-		})
-	}
-}
-
-func TestActionRegistry_ListRelevant(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns-top-k-actions-by-similarity", func(t *testing.T) {
-		mockEncoder := domain.NewMockSemanticEncoder(t)
-		mockEncoder.EXPECT().
-			VectorizeQuery(mock.Anything, "test-model", "mark as done and update title").
-			Return(domain.EmbeddingVector{Vector: []float64{1, 0}}, nil).
-			Once()
-
-		manager := NewActionRegistry(mockEncoder, "test-model",
-			actionregistry.ActionEmbedding{
-				Action:    newStaticAssistantAction("update_todo"),
-				Embedding: []float64{1, 0},
-			},
-			actionregistry.ActionEmbedding{
-				Action:    newStaticAssistantAction("update_todo_due_date"),
-				Embedding: []float64{0.95, 0.05},
-			},
-			actionregistry.ActionEmbedding{
-				Action:    newStaticAssistantAction("create_todo"),
-				Embedding: []float64{0.8, 0.2},
-			},
-			actionregistry.ActionEmbedding{
-				Action:    newStaticAssistantAction("fetch_todos"),
-				Embedding: []float64{0.6, 0.4},
-			},
-		)
-
-		relevant := manager.ListRelevant(t.Context(), "mark as done and update title")
-		require.Len(t, relevant, 3)
-		assert.Equal(t, "update_todo", relevant[0].Name)
-		assert.Equal(t, "update_todo_due_date", relevant[1].Name)
-		assert.Equal(t, "create_todo", relevant[2].Name)
-	})
-
-	t.Run("falls-back-to-all-actions-when-vectorize-query-fails", func(t *testing.T) {
-		mockEncoder := domain.NewMockSemanticEncoder(t)
-		mockEncoder.EXPECT().
-			VectorizeQuery(mock.Anything, "test-model", "show overdue items").
-			Return(domain.EmbeddingVector{}, errors.New("embedding unavailable")).
-			Once()
-
-		manager := NewActionRegistry(mockEncoder, "test-model",
-			actionregistry.ActionEmbedding{
-				Action:    newStaticAssistantAction("fetch_todos"),
-				Embedding: []float64{1, 0},
-			},
-			actionregistry.ActionEmbedding{
-				Action:    newStaticAssistantAction("set_ui_filters"),
-				Embedding: []float64{0.9, 0.1},
-			},
-		)
-
-		relevant := manager.ListRelevant(t.Context(), "show overdue items")
-		require.Len(t, relevant, 2)
-		names := []string{relevant[0].Name, relevant[1].Name}
-		assert.ElementsMatch(t, []string{"fetch_todos", "set_ui_filters"}, names)
-	})
-
-	t.Run("falls-back-to-all-actions-when-no-action-meets-threshold", func(t *testing.T) {
-		mockEncoder := domain.NewMockSemanticEncoder(t)
-		mockEncoder.EXPECT().
-			VectorizeQuery(mock.Anything, "test-model", "delete everything").
-			Return(domain.EmbeddingVector{Vector: []float64{0, 1}}, nil).
-			Once()
-
-		manager := NewActionRegistry(mockEncoder, "test-model",
-			actionregistry.ActionEmbedding{
-				Action:    newStaticAssistantAction("create_todo"),
-				Embedding: []float64{1, 0},
-			},
-			actionregistry.ActionEmbedding{
-				Action:    newStaticAssistantAction("update_todo"),
-				Embedding: []float64{1, 0},
-			},
-		)
-
-		relevant := manager.ListRelevant(t.Context(), "delete everything")
-		require.Len(t, relevant, 2)
-		names := []string{relevant[0].Name, relevant[1].Name}
-		assert.ElementsMatch(t, []string{"create_todo", "update_todo"}, names)
-	})
-
+	dependency, err := depend.ResolveNamed[domain.AssistantActionRegistry]("local")
+	assert.NoError(t, err)
+	assert.IsType(t, LocalRegistry{}, dependency)
 }
 
 func mockAssistantActionDefinition(name string) domain.AssistantActionDefinition {
@@ -377,20 +177,4 @@ func mockAssistantActionDefinition(name string) domain.AssistantActionDefinition
 			Fields: map[string]domain.AssistantActionField{},
 		},
 	}
-}
-
-type staticAssistantAction struct {
-	definition domain.AssistantActionDefinition
-}
-
-func newStaticAssistantAction(name string) staticAssistantAction {
-	return staticAssistantAction{
-		definition: mockAssistantActionDefinition(name),
-	}
-}
-
-func (a staticAssistantAction) Definition() domain.AssistantActionDefinition { return a.definition }
-func (a staticAssistantAction) StatusMessage() string                        { return "" }
-func (a staticAssistantAction) Execute(context.Context, domain.AssistantActionCall, []domain.AssistantMessage) domain.AssistantMessage {
-	return domain.AssistantMessage{}
 }

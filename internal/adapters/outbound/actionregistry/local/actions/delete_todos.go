@@ -35,11 +35,6 @@ func (a BulkTodoDeleterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "delete_todos",
 		Description: "Delete multiple todos.",
-		Hints: domain.AssistantActionHints{
-			UseWhen:   "Use for batch/multiple delete when todos are already known.",
-			AvoidWhen: "Do not use when todos that ids are missing or ambiguous; fetch first.",
-			ArgRules:  "Required key: todos. Each item requires id <UUID> and title <string>. Correct: {\"todos\":[{\"id\":\"<uuid>\",\"title\":\"Task\"}]}. Incorrect: {\"id\":\"Task title\"}.",
-		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{

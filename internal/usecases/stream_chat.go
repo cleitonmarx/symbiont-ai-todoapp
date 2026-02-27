@@ -8,7 +8,6 @@ import (
 	"log"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
@@ -30,14 +29,8 @@ const (
 	CHAT_TEMPERATURE = 0.2
 	CHAT_TOP_P       = 0.7
 
-	MAX_ACTION_SELECTION_CHARS = 400
-	MAX_ACTION_PROMPT_CHARS    = 800
-	MAX_RECOVERY_MESSAGES      = 8
-
-	fetchTodosActionName         = "fetch_todos"
-	updateTodosActionName        = "update_todos"
-	updateTodosDueDateActionName = "update_todos_due_date"
-	deleteTodosActionName        = "delete_todos"
+	MAX_SKILLS_PROMPT_CHARS = 4000
+	MAX_RECOVERY_MESSAGES   = 8
 )
 
 //go:embed prompts/chat.yml
@@ -73,6 +66,7 @@ type StreamChatImpl struct {
 	timeProvider            domain.CurrentTimeProvider
 	assistant               domain.Assistant
 	actionRegistry          domain.AssistantActionRegistry
+	skillRegistry           domain.AssistantSkillRegistry
 	approvalDispatcher      domain.AssistantActionApprovalDispatcher
 	embeddingModel          string
 	maxActionCycles         int
@@ -87,6 +81,7 @@ func NewStreamChatImpl(
 	timeProvider domain.CurrentTimeProvider,
 	assistant domain.Assistant,
 	actionRegistry domain.AssistantActionRegistry,
+	assistantSkillRegistry domain.AssistantSkillRegistry,
 	approvalDispatcher domain.AssistantActionApprovalDispatcher,
 	uow domain.UnitOfWork,
 	embeddingModel string,
@@ -101,6 +96,7 @@ func NewStreamChatImpl(
 		timeProvider:            timeProvider,
 		assistant:               assistant,
 		actionRegistry:          actionRegistry,
+		skillRegistry:           assistantSkillRegistry,
 		approvalDispatcher:      approvalDispatcher,
 		embeddingModel:          embeddingModel,
 		maxActionCycles:         maxActionCycles,
@@ -130,7 +126,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return err
 	}
 
-	messagesHistory, err := sc.fetchChatHistory(spanCtx, conversation.ID)
+	messagesHistory, summaryContext, err := sc.fetchChatHistory(spanCtx, conversation.ID)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
@@ -140,16 +136,28 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		Content: userMessage,
 	})
 
-	relevantActions := sc.actionRegistry.ListRelevant(
-		spanCtx,
-		buildActionSelectionText(messagesHistory),
-	)
-	relevantActions = sc.withRecoveryActions(relevantActions)
+	skills := sc.skillRegistry.ListRelevant(spanCtx, domain.AssistantSkillQueryContext{
+		Messages:            messagesHistory,
+		ConversationSummary: summaryContext,
+	})
+	relevantActions := make([]domain.AssistantActionDefinition, 0, len(skills))
+	uniqueActionNames := make(map[string]struct{})
+	for _, s := range skills {
+		sc.logger.Printf("StreamChat: skill '%s' is relevant for the current conversation context", s.Name)
+		for _, tool := range s.Tools {
+			if action, ok := sc.actionRegistry.GetDefinition(tool); ok {
+				if _, exists := uniqueActionNames[action.Name]; !exists {
+					relevantActions = append(relevantActions, action)
+					uniqueActionNames[action.Name] = struct{}{}
+				}
+			}
+		}
+	}
 
-	if actionPrompt := buildActionsPrompt(relevantActions); actionPrompt != "" {
+	if skillsPrompt := buildSkillsPrompt(skills); skillsPrompt != "" {
 		messagesHistory = append(messagesHistory, domain.AssistantMessage{
 			Role:    domain.ChatRole_System,
-			Content: actionPrompt,
+			Content: skillsPrompt,
 		})
 	}
 
@@ -506,7 +514,6 @@ func (sc StreamChatImpl) handleActionCallEvent(
 			Content: "Tool call failed. Read the tool error details/example, then retry with corrected arguments or another tool. " +
 				"If updating/deleting todos failed due to missing or unmatched IDs, fetch todos first to resolve UUIDs, then retry.",
 		})
-		req.AvailableActions = sc.withRecoveryActions(req.AvailableActions)
 	}
 
 	return true, nil
@@ -810,17 +817,17 @@ func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.
 }
 
 // buildSystemPrompt creates the base chat prompt and injects the latest conversation summary context.
-func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID uuid.UUID) ([]domain.AssistantMessage, error) {
+func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID uuid.UUID) ([]domain.AssistantMessage, string, error) {
 	file, err := chatPrompt.Open("prompts/chat.yml")
 	if err != nil {
-		return nil, fmt.Errorf("failed to open chat prompt: %w", err)
+		return nil, "", fmt.Errorf("failed to open chat prompt: %w", err)
 	}
 	defer file.Close() //nolint:errcheck
 
 	messages := []domain.AssistantMessage{}
 	err = yaml.NewDecoder(file).Decode(&messages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode summary prompt: %w", err)
+		return nil, "", fmt.Errorf("failed to decode summary prompt: %w", err)
 	}
 	for i, msg := range messages {
 		if msg.Role == domain.ChatRole_Developer || msg.Role == domain.ChatRole_System {
@@ -834,7 +841,7 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 
 	latestSummary, found, err := sc.conversationSummaryRepo.GetConversationSummary(ctx, conversationID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load conversation summary: %w", err)
+		return nil, "", fmt.Errorf("failed to load conversation summary: %w", err)
 	}
 
 	summaryText := "No conversation summary available."
@@ -849,21 +856,26 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 		),
 	})
 
-	return messages, nil
+	summaryContext := ""
+	if summaryText != "No conversation summary available." {
+		summaryContext = summaryText
+	}
+
+	return messages, summaryContext, nil
 }
 
 // fetchChatHistory retrieves the chat history excluding old system messages
-func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uuid.UUID) ([]domain.AssistantMessage, error) {
+func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uuid.UUID) ([]domain.AssistantMessage, string, error) {
 	// Build system prompt with todo context
-	systemPrompt, err := sc.buildSystemPrompt(ctx, conversationID)
+	systemPrompt, summaryContext, err := sc.buildSystemPrompt(ctx, conversationID)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	// Load prior conversation to preserve context
 	history, _, err := sc.chatMessageRepo.ListChatMessages(ctx, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	// Build chat request: system + history (excluding old system messages) + current user turn
@@ -889,7 +901,7 @@ func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uu
 			})
 		}
 	}
-	return messages, nil
+	return messages, summaryContext, nil
 }
 
 // streamChatExecutionState holds mutable state during a stream-chat execution.
@@ -950,97 +962,83 @@ func (t *actionCycleTracker) hasExceededMaxActionCalls(functionName, arguments s
 	return false
 }
 
-// buildActionSelectionText constructs the text used for selecting relevant actions
-// based on the current user input and recent conversation history.
-func buildActionSelectionText(messages []domain.AssistantMessage) string {
-	if len(messages) == 0 {
+// buildSkillsPrompt constructs a prompt describing the assistant skills
+// to guide the model's tool selection and usage.
+func buildSkillsPrompt(skills []domain.AssistantSkillDefinition) string {
+	if len(skills) == 0 {
 		return ""
 	}
 
-	lastMessage := messages[len(messages)-1]
-	if lastMessage.Role != domain.ChatRole_User {
-		return ""
-	}
-
-	currentInput := strings.TrimSpace(lastMessage.Content)
-	if currentInput == "" {
-		return ""
-	}
-
-	selectionText := currentInput
-	if isAmbiguousActionSelectionInput(currentInput) && len(messages) > 1 {
-		if previousInput, ok := previousUserInput(messages[:len(messages)-1]); ok {
-			selectionText = previousInput + "\n" + currentInput
+	unique := func(values []string) []string {
+		out := make([]string, 0, len(values))
+		seen := map[string]struct{}{}
+		for _, raw := range values {
+			v := strings.TrimSpace(raw)
+			if v == "" {
+				continue
+			}
+			key := strings.ToLower(v)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, v)
 		}
-	}
-
-	return truncateToLastChars(selectionText, MAX_ACTION_SELECTION_CHARS)
-}
-
-// buildActionsPrompt creates a compact system prompt containing only the
-// relevant action guidance for this turn.
-func buildActionsPrompt(actions []domain.AssistantActionDefinition) string {
-	if len(actions) == 0 {
-		return ""
+		return out
 	}
 
 	var b strings.Builder
-	b.WriteString("Tooling rules for this turn:\n")
-	b.WriteString("- Use only available tools for this turn.\n")
-	b.WriteString("- Arguments must be strict JSON matching each tool schema.\n")
-	b.WriteString("- For fields named id, *_id, or ids: use UUID values only (never title text).\n")
-	b.WriteString("- If required UUIDs are missing, fetch/select items first, then call mutation tools.\n")
-	b.WriteString("- If a tool call fails (for example `error` or `errors[...]`), correct the arguments or use another tool; do not stop after the first failure.\n")
-	b.WriteString("Tools in scope (priority order):\n")
+	b.WriteString("Skill runbooks for this turn:\n")
+	b.WriteString("- Follow these workflows when deciding and calling tools.\n")
+	b.WriteString("- Use strict JSON for tool arguments and match tool schemas exactly.\n\n")
 
-	for _, action := range actions {
-		b.WriteString("- ")
-		b.WriteString(action.Name)
-		b.WriteString(": ")
-		b.WriteString(action.ComposeHint())
+	for _, skill := range skills {
+		name := strings.TrimSpace(skill.Name)
+		if name == "" {
+			continue
+		}
+
+		b.WriteString("Skill: ")
+		b.WriteString(name)
+		b.WriteString("\n")
+
+		if useWhen := strings.TrimSpace(skill.UseWhen); useWhen != "" {
+			b.WriteString("Use when: ")
+			b.WriteString(useWhen)
+			b.WriteString("\n")
+		}
+		if avoidWhen := strings.TrimSpace(skill.AvoidWhen); avoidWhen != "" {
+			b.WriteString("Avoid when: ")
+			b.WriteString(avoidWhen)
+			b.WriteString("\n")
+		}
+
+		tools := unique(skill.Tools)
+		if len(tools) > 0 {
+			b.WriteString("Tools: ")
+			b.WriteString(strings.Join(tools, ", "))
+			b.WriteString("\n")
+		}
+
+		if content := strings.TrimSpace(skill.Content); content != "" {
+			b.WriteString("Workflow:\n")
+			b.WriteString(content)
+			b.WriteString("\n")
+		}
+
 		b.WriteString("\n")
 	}
 
-	return truncateToFirstChars(strings.TrimSpace(b.String()), MAX_ACTION_PROMPT_CHARS)
+	prompt := strings.TrimSpace(b.String())
+	if prompt == "" {
+		return ""
+	}
+
+	return truncateToFirstChars(prompt, MAX_SKILLS_PROMPT_CHARS)
 }
 
-func (sc StreamChatImpl) withRecoveryActions(actions []domain.AssistantActionDefinition) []domain.AssistantActionDefinition {
-	if len(actions) == 0 {
-		return actions
-	}
-
-	needsTodoFetcher := false
-	hasTodoFetcher := false
-	insertAt := 0
-
-	for i, action := range actions {
-		switch action.Name {
-		case fetchTodosActionName:
-			hasTodoFetcher = true
-		case updateTodosActionName, updateTodosDueDateActionName, deleteTodosActionName:
-			if !needsTodoFetcher {
-				insertAt = i
-			}
-			needsTodoFetcher = true
-		}
-	}
-
-	if !needsTodoFetcher || hasTodoFetcher {
-		return actions
-	}
-
-	fetchTodosDefinition, found := sc.actionRegistry.GetDefinition(fetchTodosActionName)
-	if !found {
-		return actions
-	}
-
-	withRecovery := make([]domain.AssistantActionDefinition, 0, len(actions)+1)
-	withRecovery = append(withRecovery, actions[:insertAt]...)
-	withRecovery = append(withRecovery, fetchTodosDefinition)
-	withRecovery = append(withRecovery, actions[insertAt:]...)
-	return withRecovery
-}
-
+// prepareRunTurnRecovery modifies the request messages to include a system message
+// about the failure and compacts the history for a recovery attempt.
 func (sc StreamChatImpl) prepareRunTurnRecovery(
 	runTurnErr error,
 	req *domain.AssistantTurnRequest,
@@ -1065,6 +1063,8 @@ func (sc StreamChatImpl) prepareRunTurnRecovery(
 	return true
 }
 
+// compactToLastMessages returns the last maxMessages from the input slice,
+// or all messages if the total count is less than or equal to maxMessages.
 func compactToLastMessages(messages []domain.AssistantMessage, maxMessages int) []domain.AssistantMessage {
 	if maxMessages <= 0 || len(messages) == 0 {
 		return nil
@@ -1080,80 +1080,6 @@ func compactToLastMessages(messages []domain.AssistantMessage, maxMessages int) 
 	out := make([]domain.AssistantMessage, maxMessages)
 	copy(out, messages[start:])
 	return out
-}
-
-// isAmbiguousActionSelectionInput checks if the user input contains phrases
-// or words that may ambiguously refer to previous actions or messages,
-// which can help determine if we should include previous user
-// input for better action relevance.
-func isAmbiguousActionSelectionInput(userInput string) bool {
-	lowered := strings.ToLower(strings.TrimSpace(userInput))
-	if lowered == "" {
-		return false
-	}
-
-	ambiguousPhrases := []string{
-		"same as before",
-		"as before",
-		"do it",
-		"do that",
-		"that one",
-		"this one",
-		"same thing",
-	}
-	for _, phrase := range ambiguousPhrases {
-		if strings.Contains(lowered, phrase) {
-			return true
-		}
-	}
-
-	ambiguousWords := map[string]struct{}{
-		"it": {}, "that": {}, "this": {}, "them": {}, "same": {}, "also": {}, "again": {}, "too": {}, "there": {},
-	}
-	words := strings.FieldsFunc(lowered, func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
-	})
-	for _, word := range words {
-		if _, ok := ambiguousWords[word]; ok {
-			return true
-		}
-	}
-	return false
-}
-
-// previousUserInput scans the messages in reverse to find the most recent non-empty user message.
-func previousUserInput(messages []domain.AssistantMessage) (string, bool) {
-	for i := len(messages) - 1; i >= 0; i-- {
-		msg := messages[i]
-		if msg.Role != domain.ChatRole_User {
-			continue
-		}
-
-		content := strings.TrimSpace(msg.Content)
-		if content == "" {
-			continue
-		}
-
-		return content, true
-	}
-
-	return "", false
-}
-
-// truncateToLastChars truncates the input string to the last maxChars characters,
-// ensuring it does not cut off in the middle of a rune.
-func truncateToLastChars(input string, maxChars int) string {
-	trimmed := strings.TrimSpace(input)
-	if maxChars <= 0 {
-		return ""
-	}
-
-	runes := []rune(trimmed)
-	if len(runes) <= maxChars {
-		return trimmed
-	}
-
-	return string(runes[len(runes)-maxChars:])
 }
 
 // truncateToFirstChars truncates the input string to the first maxChars characters
@@ -1181,9 +1107,11 @@ type InitStreamChat struct {
 	Uow                     domain.UnitOfWork                        `resolve:""`
 	TimeProvider            domain.CurrentTimeProvider               `resolve:""`
 	AssistantActionRegistry domain.AssistantActionRegistry           `resolve:""`
+	AssistantSkillRegistry  domain.AssistantSkillRegistry            `resolve:""`
 	ApprovalDispatcher      domain.AssistantActionApprovalDispatcher `resolve:""`
 	Assistant               domain.Assistant                         `resolve:""`
 	EmbeddingModel          string                                   `config:"LLM_EMBEDDING_MODEL"`
+
 	// Maximum number of action cycles to prevent infinite loops
 	// It restricts how many times the Assistant can invoke actions in a single chat session
 	MaxActionCycles int `config:"LLM_MAX_ACTION_CYCLES" default:"50"`
@@ -1199,6 +1127,7 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 		i.TimeProvider,
 		i.Assistant,
 		i.AssistantActionRegistry,
+		i.AssistantSkillRegistry,
 		i.ApprovalDispatcher,
 		i.Uow,
 		i.EmbeddingModel,

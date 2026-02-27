@@ -14,58 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMCPRegistry_ListEmbeddings_MapsToolSchema(t *testing.T) {
-	t.Parallel()
-
-	session := &fakeSession{
-		listResults: []*mcp.ListToolsResult{
-			{
-				Tools: []*mcp.Tool{
-					{
-						Name:        "create_task",
-						Description: "Creates one task",
-						InputSchema: map[string]any{
-							"type": "object",
-							"properties": map[string]any{
-								"title": map[string]any{
-									"type":        "string",
-									"description": "Task title",
-								},
-								"priority": map[string]any{
-									"type": []any{"integer", "null"},
-								},
-							},
-							"required": []any{"title"},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	registry := newMCPRegistryWithConnector(
-		Config{
-			Endpoint: "http://localhost:8811/mcp",
-		},
-		&fakeConnector{session: session},
-		nil,
-		"",
-	)
-	require.NoError(t, registry.initializeActions(t.Context()))
-
-	embeddingsList := registry.ListEmbeddings(t.Context())
-	require.Len(t, embeddingsList, 1)
-
-	def := embeddingsList[0].Action.Definition()
-	assert.Equal(t, "create_task", def.Name)
-	assert.Equal(t, "Creates one task", def.Description)
-	assert.Equal(t, "object", def.Input.Type)
-	assert.Equal(t, "string", def.Input.Fields["title"].Type)
-	assert.True(t, def.Input.Fields["title"].Required)
-	assert.Equal(t, "Task title", def.Input.Fields["title"].Description)
-	assert.Equal(t, "integer|null", def.Input.Fields["priority"].Type)
-}
-
 func TestMCPRegistry_Execute_CallsTool(t *testing.T) {
 	t.Parallel()
 
@@ -93,8 +41,6 @@ func TestMCPRegistry_Execute_CallsTool(t *testing.T) {
 			Endpoint: "http://localhost:8811/mcp",
 		},
 		&fakeConnector{session: session},
-		nil,
-		"",
 	)
 	require.NoError(t, registry.initializeActions(t.Context()))
 
@@ -135,8 +81,6 @@ func TestRegistry_Execute_InvalidArguments(t *testing.T) {
 	registry := newMCPRegistryWithConnector(
 		Config{Endpoint: "http://localhost:8811/mcp"},
 		&fakeConnector{session: session},
-		nil,
-		"",
 	)
 	require.NoError(t, registry.initializeActions(t.Context()))
 
@@ -175,8 +119,6 @@ func TestRegistry_Execute_IsErrorPrefix(t *testing.T) {
 	registry := newMCPRegistryWithConnector(
 		Config{Endpoint: "http://localhost:8811/mcp"},
 		&fakeConnector{session: session},
-		nil,
-		"",
 	)
 	require.NoError(t, registry.initializeActions(t.Context()))
 
@@ -238,8 +180,6 @@ func TestRegistry_Execute_UnknownAction(t *testing.T) {
 	registry := newMCPRegistryWithConnector(
 		Config{Endpoint: "http://localhost:8811/mcp"},
 		&fakeConnector{session: &fakeSession{}},
-		nil,
-		"",
 	)
 
 	msg := registry.Execute(context.Background(), domain.AssistantActionCall{
@@ -282,15 +222,12 @@ func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 			Endpoint: "http://localhost:8811/mcp",
 		},
 		&fakeConnector{session: session},
-		nil,
-		"",
 	)
 
 	require.NoError(t, registry.initializeActions(context.Background()))
-	defs := registry.ListEmbeddings(context.Background())
-	require.Len(t, defs, 1)
+	def, found := registry.GetDefinition("search")
+	require.True(t, found)
 
-	def := defs[0].Action.Definition()
 	assert.Equal(t, "search", def.Name)
 	assert.Equal(t, "Search the web with DuckDuckGo and return concise result snippets with source links.", def.Description)
 	assert.Equal(t, "object", def.Input.Type)
@@ -298,10 +235,6 @@ func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 	assert.Equal(t, "Search query in natural language.", def.Input.Fields["query"].Description)
 	assert.True(t, def.Input.Fields["query"].Required)
 	assert.Equal(t, "integer", def.Input.Fields["max_results"].Type)
-	assert.Equal(t, "Use to gather external information or references before deciding or answering.", def.Hints.UseWhen)
-	assert.Equal(t, "Do not use for todo CRUD operations or when the user request is fully internal to the app.", def.Hints.AvoidWhen)
-	assert.Equal(t, "Always send a specific query and include max_results. Default max_results=2. Never exceed 3 unless the user explicitly asks for broad research. Prefer one focused query per turn.", def.Hints.ArgRules)
-	assert.Equal(t, "🔎 Searching on the web...", defs[0].Action.StatusMessage())
 	assert.Equal(t, "🔎 Searching on the web...", registry.StatusMessage("search"))
 }
 
@@ -485,10 +418,6 @@ tools:
           type: string
           description: Query
           required: true
-    hints:
-      use_when: When user asks
-      avoid_when: Never for writes
-      arg_rules: query is required
   - name: "   "
     description: ignored
 `,
@@ -498,7 +427,6 @@ tools:
 				require.Contains(t, got, "search")
 				assert.Equal(t, "Search docs", got["search"].Description)
 				assert.Equal(t, "string", got["search"].Input.Fields["query"].Type)
-				assert.Equal(t, "When user asks", got["search"].Hints.UseWhen)
 			},
 		},
 		{
@@ -647,11 +575,6 @@ func TestMergeAssistantActionDefinition_Table(t *testing.T) {
 				"query": {Type: "string", Description: "q", Required: true},
 			},
 		},
-		Hints: domain.AssistantActionHints{
-			UseWhen:   "base use",
-			AvoidWhen: "base avoid",
-			ArgRules:  "base args",
-		},
 	}
 
 	tests := []struct {
@@ -671,22 +594,8 @@ func TestMergeAssistantActionDefinition_Table(t *testing.T) {
 			},
 			assert: func(t *testing.T, got domain.AssistantActionDefinition) {
 				assert.Equal(t, "override description", got.Description)
-				assert.Equal(t, "base use", got.Hints.UseWhen)
 				assert.Contains(t, got.Input.Fields, "query")
 				assert.Contains(t, got.Input.Fields, "max_results")
-			},
-		},
-		{
-			name: "replace-hints-when-provided",
-			override: domain.AssistantActionDefinition{
-				Hints: domain.AssistantActionHints{
-					UseWhen: "new use",
-				},
-			},
-			assert: func(t *testing.T, got domain.AssistantActionDefinition) {
-				assert.Equal(t, "new use", got.Hints.UseWhen)
-				assert.Empty(t, got.Hints.AvoidWhen)
-				assert.Empty(t, got.Hints.ArgRules)
 			},
 		},
 		{

@@ -34,23 +34,21 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				assistant *domain.MockAssistant,
 				actionRegistry *domain.MockAssistantActionRegistry,
+				skillRegistry *domain.MockAssistantSkillRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				skillRegistry.EXPECT().
+					ListRelevant(mock.Anything, mock.Anything).
+					Return([]domain.AssistantSkillDefinition{}).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(domain.Conversation{
 						ID: conversationID,
 					}, true, nil).
 					Once()
-
-				actionRegistry.EXPECT().
-					ListRelevant(
-						mock.Anything,
-						"Call an action",
-					).
-					Return([]domain.AssistantActionDefinition{})
-
 				actionRegistry.EXPECT().
 					StatusMessage("list_todos").
 					Return("calling list_todos")
@@ -128,23 +126,21 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				assistant *domain.MockAssistant,
 				actionRegistry *domain.MockAssistantActionRegistry,
+				skillRegistry *domain.MockAssistantSkillRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				skillRegistry.EXPECT().
+					ListRelevant(mock.Anything, mock.Anything).
+					Return([]domain.AssistantSkillDefinition{}).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(domain.Conversation{
 						ID: conversationID,
 					}, true, nil).
 					Once()
-
-				actionRegistry.EXPECT().
-					ListRelevant(
-						mock.Anything,
-						"Call failing action",
-					).
-					Return([]domain.AssistantActionDefinition{})
-
 				actionRegistry.EXPECT().
 					StatusMessage("failing_action").
 					Return("calling failing_action...\n")
@@ -248,20 +244,21 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				assistant *domain.MockAssistant,
 				actionRegistry *domain.MockAssistantActionRegistry,
+				skillRegistry *domain.MockAssistantSkillRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				skillRegistry.EXPECT().
+					ListRelevant(mock.Anything, mock.Anything).
+					Return([]domain.AssistantSkillDefinition{}).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(domain.Conversation{
 						ID: conversationID,
 					}, true, nil).
 					Once()
-
-				actionRegistry.EXPECT().
-					ListRelevant(mock.Anything, "Call action").
-					Return([]domain.AssistantActionDefinition{})
-
 				actionRegistry.EXPECT().
 					StatusMessage("fetch_todos").
 					Return("calling fetch_todos...\n")
@@ -331,20 +328,21 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				assistant *domain.MockAssistant,
 				actionRegistry *domain.MockAssistantActionRegistry,
+				skillRegistry *domain.MockAssistantSkillRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				skillRegistry.EXPECT().
+					ListRelevant(mock.Anything, mock.Anything).
+					Return([]domain.AssistantSkillDefinition{}).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(domain.Conversation{
 						ID: conversationID,
 					}, true, nil).
 					Once()
-
-				actionRegistry.EXPECT().
-					ListRelevant(mock.Anything, "Call action").
-					Return([]domain.AssistantActionDefinition{})
-
 				actionRegistry.EXPECT().
 					StatusMessage("fetch_todos").
 					Return("calling fetch_todos...\n")
@@ -425,20 +423,21 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				assistant *domain.MockAssistant,
 				actionRegistry *domain.MockAssistantActionRegistry,
+				skillRegistry *domain.MockAssistantSkillRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				skillRegistry.EXPECT().
+					ListRelevant(mock.Anything, mock.Anything).
+					Return([]domain.AssistantSkillDefinition{}).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(domain.Conversation{
 						ID: conversationID,
 					}, true, nil).
 					Once()
-
-				actionRegistry.EXPECT().
-					ListRelevant(mock.Anything, "Keep calling actions").
-					Return([]domain.AssistantActionDefinition{})
-
 				expectNowCalls(timeProvider, fixedTime, 18)
 
 				chatRepo.EXPECT().
@@ -528,20 +527,21 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				timeProvider *domain.MockCurrentTimeProvider,
 				assistant *domain.MockAssistant,
 				actionRegistry *domain.MockAssistantActionRegistry,
+				skillRegistry *domain.MockAssistantSkillRegistry,
 				uow *domain.MockUnitOfWork,
 				outbox *domain.MockOutboxRepository,
 			) {
+				skillRegistry.EXPECT().
+					ListRelevant(mock.Anything, mock.Anything).
+					Return([]domain.AssistantSkillDefinition{}).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(domain.Conversation{
 						ID: conversationID,
 					}, true, nil).
 					Once()
-
-				actionRegistry.EXPECT().
-					ListRelevant(mock.Anything, "Call the same action repeatedly").
-					Return([]domain.AssistantActionDefinition{})
-
 				expectNowCalls(timeProvider, fixedTime, 14)
 
 				chatRepo.EXPECT().

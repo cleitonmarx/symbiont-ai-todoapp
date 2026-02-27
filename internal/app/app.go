@@ -14,6 +14,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/modelrunner"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/postgres"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/pubsub"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/skillregistry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/time"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
@@ -40,6 +41,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&pubsub.InitClient{},
 			&pubsub.InitPublisher{},
 			&modelrunner.InitAssistantClient{},
+			&skillregistry.InitLocalSkillRegistry{},
 
 			&usecases.InitTodoCreator{},
 			&usecases.InitTodoDeleter{},

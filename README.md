@@ -128,6 +128,49 @@ Current selector uses weighted context:
 - Recent user inputs
 - Conversation summary (optional, lower weight)
 
+## Prompt Examples
+
+Use prompts like these to trigger the intended skills and actions/tools.
+
+### Create Todos
+
+- "Create a todo: Renew passport by 2026-03-20."
+- "Add these todos: book dentist for next week, buy groceries for Saturday."
+- "Create a checklist for moving apartment next month."
+
+### Read/View Todos
+
+- "List my open todos due from March 1-7."
+- "In my current view, sort by due date in DESC order, show only DONE todos."
+- "Find todos related to tax documents."
+
+### Update Todos
+
+- "Mark my dentist appointment todo as done."
+- "Reschedule all 'Japan Trip:' todos to next month."
+- "Update the title of my 'Buy tickets' todo to 'Buy flight tickets to Tokyo'."
+
+### Delete Todos
+
+- "Delete the todo titled 'Job application follow-up'."
+- "Delete these todos: 'Job application - ACME' and 'Job application - Contoso'."
+- "Remove all completed todos from my list."
+
+### Summarize Todos
+
+- "Give me a concise summary of my medical appointments."
+- "Make a concise summary of open todos due from March 1-7, in one short paragraph."
+
+### Goal Planning
+
+- "Plan a trip to Tokyo from April 4-14. Research first, then create todos with the prefix 'Japan Trip:'."
+- "Build an end-to-end study plan for my Go interview in 6 weeks."
+
+### Web Research
+
+- "Search the web for current visa requirements for Japan and summarize key points."
+- "Find 3 sources comparing JR Pass options and fetch the best one."
+
 ## Runtime Profiles and Minimum Machine
 
 You can run this app in two main modes:

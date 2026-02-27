@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
@@ -33,7 +32,6 @@ const (
 )
 
 var _ domain.AssistantActionRegistry = (*MCPRegistry)(nil)
-var _ actionregistry.EmbeddingActionRegistry = (*MCPRegistry)(nil)
 
 //go:embed tool_overrides.yaml
 var toolOverridesFS embed.FS
@@ -129,44 +127,35 @@ func (c streamableConnector) Connect(ctx context.Context) (mcpSession, error) {
 
 // MCPRegistry implements domain.AssistantActionRegistry using a remote MCP gateway.
 type MCPRegistry struct {
-	cfg             Config
-	connector       mcpConnector
-	semanticEncoder domain.SemanticEncoder
-	embeddingModel  string
-
+	cfg           Config
+	connector     mcpConnector
 	session       mcpSession
-	actionsByName map[string]actionregistry.ActionEmbedding
+	actionsByName map[string]domain.AssistantAction
 }
 
 // NewMCPRegistry creates an MCP-backed assistant action registry.
 func NewMCPRegistry(
 	cfg Config,
 	httpClient *http.Client,
-	semanticEncoder domain.SemanticEncoder,
-	embeddingModel string,
 ) *MCPRegistry {
 	cfg = cfg.withDefaults()
 	if cfg.APIKey != "-" {
 		httpClient = withAPIKey(httpClient, cfg.APIKeyHeader, cfg.APIKey)
 	}
 	return &MCPRegistry{
-		cfg:             cfg,
-		connector:       streamableConnector{endpoint: cfg.Endpoint, httpClient: httpClient},
-		semanticEncoder: semanticEncoder,
-		embeddingModel:  embeddingModel,
-		actionsByName:   map[string]actionregistry.ActionEmbedding{},
+		cfg:           cfg,
+		connector:     streamableConnector{endpoint: cfg.Endpoint, httpClient: httpClient},
+		actionsByName: map[string]domain.AssistantAction{},
 	}
 }
 
 // newMCPRegistryWithConnector allows injecting a fake connector in tests.
-func newMCPRegistryWithConnector(cfg Config, connector mcpConnector, semanticEncoder domain.SemanticEncoder, embeddingModel string) *MCPRegistry {
+func newMCPRegistryWithConnector(cfg Config, connector mcpConnector) *MCPRegistry {
 	cfg = cfg.withDefaults()
 	return &MCPRegistry{
-		cfg:             cfg,
-		connector:       connector,
-		semanticEncoder: semanticEncoder,
-		embeddingModel:  embeddingModel,
-		actionsByName:   map[string]actionregistry.ActionEmbedding{},
+		cfg:           cfg,
+		connector:     connector,
+		actionsByName: map[string]domain.AssistantAction{},
 	}
 }
 
@@ -224,7 +213,7 @@ func (r *MCPRegistry) GetDefinition(actionName string) (domain.AssistantActionDe
 	if !found {
 		return domain.AssistantActionDefinition{}, false
 	}
-	return action.Action.Definition(), true
+	return action.Definition(), true
 }
 
 // StatusMessage returns a status message for one tool name.
@@ -234,84 +223,84 @@ func (r *MCPRegistry) StatusMessage(actionName string) string {
 		return defaultStatusMessage
 	}
 
-	actionEmbedding, found := r.actionsByName[trimmedActionName]
+	action, found := r.actionsByName[trimmedActionName]
 	if !found {
 		return defaultStatusMessage
 	}
-	return actionEmbedding.Action.StatusMessage()
+	return action.StatusMessage()
 }
 
 // ListEmbeddings returns all tool definitions currently available from MCP.
-func (r *MCPRegistry) ListEmbeddings(ctx context.Context) []actionregistry.ActionEmbedding {
-	_, span := telemetry.Start(ctx)
-	defer span.End()
+// func (r *MCPRegistry) ListEmbeddings(ctx context.Context) []actionregistry.ActionEmbedding {
+// 	_, span := telemetry.Start(ctx)
+// 	defer span.End()
 
-	return copySortedEmbeddings(r.actionsByName)
-}
+// 	return copySortedEmbeddings(r.actionsByName)
+// }
 
 // ListRelevant returns semantically relevant tools for user input.
 // Falls back to all tools when embeddings are unavailable.
-func (r *MCPRegistry) ListRelevant(ctx context.Context, userInput string) []domain.AssistantActionDefinition {
-	spanCtx, span := telemetry.Start(ctx)
-	defer span.End()
+// func (r *MCPRegistry) ListRelevant(ctx context.Context, userInput string) []domain.AssistantActionDefinition {
+// 	spanCtx, span := telemetry.Start(ctx)
+// 	defer span.End()
 
-	allActions := r.ListEmbeddings(spanCtx)
-	if len(allActions) == 0 {
-		return nil
-	}
+// 	allActions := r.ListEmbeddings(spanCtx)
+// 	if len(allActions) == 0 {
+// 		return nil
+// 	}
 
-	if r.semanticEncoder == nil || strings.TrimSpace(r.embeddingModel) == "" {
-		return definitionsFromEmbeddings(allActions)
-	}
+// 	if r.semanticEncoder == nil || strings.TrimSpace(r.embeddingModel) == "" {
+// 		return definitionsFromEmbeddings(allActions)
+// 	}
 
-	queryCtx, cancel := r.withTimeout(spanCtx)
-	defer cancel()
+// 	queryCtx, cancel := r.withTimeout(spanCtx)
+// 	defer cancel()
 
-	queryVector, err := r.semanticEncoder.VectorizeQuery(queryCtx, r.embeddingModel, userInput)
-	if err != nil || len(queryVector.Vector) == 0 {
-		return definitionsFromEmbeddings(allActions)
-	}
+// 	queryVector, err := r.semanticEncoder.VectorizeQuery(queryCtx, r.embeddingModel, userInput)
+// 	if err != nil || len(queryVector.Vector) == 0 {
+// 		return definitionsFromEmbeddings(allActions)
+// 	}
 
-	type scoredAction struct {
-		definition domain.AssistantActionDefinition
-		score      float64
-	}
+// 	type scoredAction struct {
+// 		definition domain.AssistantActionDefinition
+// 		score      float64
+// 	}
 
-	scored := make([]scoredAction, 0, len(allActions))
-	for _, action := range allActions {
-		if len(action.Embedding) == 0 {
-			continue
-		}
+// 	scored := make([]scoredAction, 0, len(allActions))
+// 	for _, action := range allActions {
+// 		if len(action.Embedding) == 0 {
+// 			continue
+// 		}
 
-		def := action.Action.Definition()
-		score, ok := common.CosineSimilarity(queryVector.Vector, action.Embedding)
-		if !ok || score < defaultRelevantActionsMinScore {
-			continue
-		}
-		scored = append(scored, scoredAction{
-			definition: def,
-			score:      score,
-		})
-	}
+// 		def := action.Action.Definition()
+// 		score, ok := common.CosineSimilarity(queryVector.Vector, action.Embedding)
+// 		if !ok || score < defaultRelevantActionsMinScore {
+// 			continue
+// 		}
+// 		scored = append(scored, scoredAction{
+// 			definition: def,
+// 			score:      score,
+// 		})
+// 	}
 
-	if len(scored) == 0 {
-		return definitionsFromEmbeddings(allActions)
-	}
+// 	if len(scored) == 0 {
+// 		return definitionsFromEmbeddings(allActions)
+// 	}
 
-	sort.Slice(scored, func(i, j int) bool {
-		if scored[i].score == scored[j].score {
-			return scored[i].definition.Name < scored[j].definition.Name
-		}
-		return scored[i].score > scored[j].score
-	})
+// 	sort.Slice(scored, func(i, j int) bool {
+// 		if scored[i].score == scored[j].score {
+// 			return scored[i].definition.Name < scored[j].definition.Name
+// 		}
+// 		return scored[i].score > scored[j].score
+// 	})
 
-	limit := min(len(scored), defaultRelevantActionsTopK)
-	relevant := make([]domain.AssistantActionDefinition, 0, limit)
-	for i := range limit {
-		relevant = append(relevant, scored[i].definition)
-	}
-	return relevant
-}
+// 	limit := min(len(scored), defaultRelevantActionsTopK)
+// 	relevant := make([]domain.AssistantActionDefinition, 0, limit)
+// 	for i := range limit {
+// 		relevant = append(relevant, scored[i].definition)
+// 	}
+// 	return relevant
+// }
 
 // withTimeout applies request timeout defaults to MCP network calls.
 func (r *MCPRegistry) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -349,7 +338,7 @@ func (r *MCPRegistry) initializeActions(ctx context.Context) error {
 		return err
 	}
 
-	actions := make(map[string]actionregistry.ActionEmbedding, len(tools))
+	actions := make(map[string]domain.AssistantAction, len(tools))
 	for _, tool := range tools {
 		def := toolToActionDefinition(tool)
 		if strings.TrimSpace(def.Name) == "" {
@@ -363,20 +352,17 @@ func (r *MCPRegistry) initializeActions(ctx context.Context) error {
 			statusMessage = overrideStatusMessage
 		}
 
-		var embedding []float64
-		if r.semanticEncoder != nil && strings.TrimSpace(r.embeddingModel) != "" {
-			vectorCtx, cancel := r.withTimeout(ctx)
-			vector, err := r.semanticEncoder.VectorizeAssistantActionDefinition(vectorCtx, r.embeddingModel, def)
-			cancel()
-			if err == nil {
-				embedding = vector.Vector
-			}
-		}
+		// var embedding []float64
+		// if r.semanticEncoder != nil && strings.TrimSpace(r.embeddingModel) != "" {
+		// 	vectorCtx, cancel := r.withTimeout(ctx)
+		// 	vector, err := r.semanticEncoder.VectorizeAssistantActionDefinition(vectorCtx, r.embeddingModel, def)
+		// 	cancel()
+		// 	if err == nil {
+		// 		embedding = vector.Vector
+		// 	}
+		// }
 
-		actions[def.Name] = actionregistry.ActionEmbedding{
-			Action:    mcpToolAction{definition: def, statusMessage: statusMessage, execute: r.Execute},
-			Embedding: embedding,
-		}
+		actions[def.Name] = mcpToolAction{definition: def, statusMessage: statusMessage, execute: r.Execute}
 	}
 
 	r.session = session
@@ -606,11 +592,11 @@ func parseToolOverrides(content []byte) (toolOverrides, error) {
 				Type:   strings.TrimSpace(override.Input.Type),
 				Fields: fields,
 			},
-			Hints: domain.AssistantActionHints{
-				UseWhen:   strings.TrimSpace(override.Hints.UseWhen),
-				AvoidWhen: strings.TrimSpace(override.Hints.AvoidWhen),
-				ArgRules:  strings.TrimSpace(override.Hints.ArgRules),
-			},
+			// Hints: domain.AssistantActionHints{
+			// 	UseWhen:   strings.TrimSpace(override.Hints.UseWhen),
+			// 	AvoidWhen: strings.TrimSpace(override.Hints.AvoidWhen),
+			// 	ArgRules:  strings.TrimSpace(override.Hints.ArgRules),
+			// },
 		}
 
 		approvalCfg := override.Approval
@@ -655,9 +641,9 @@ func mergeAssistantActionDefinition(base, override domain.AssistantActionDefinit
 	merged.Input.Fields = baseFields
 	maps.Copy(merged.Input.Fields, override.Input.Fields)
 
-	if override.HasHints() {
-		merged.Hints = override.Hints
-	}
+	// if override.HasHints() {
+	// 	merged.Hints = override.Hints
+	// }
 	if hasApprovalOverride(override.Approval) {
 		merged.Approval = override.Approval
 	}
@@ -920,25 +906,25 @@ func actionErrorMessage(callID, code, details string) domain.AssistantMessage {
 }
 
 // copySortedEmbeddings returns a stable name-ordered snapshot of action embeddings.
-func copySortedEmbeddings(actionsByName map[string]actionregistry.ActionEmbedding) []actionregistry.ActionEmbedding {
-	actions := make([]actionregistry.ActionEmbedding, 0, len(actionsByName))
-	for _, action := range actionsByName {
-		actions = append(actions, action)
-	}
-	sort.Slice(actions, func(i, j int) bool {
-		return actions[i].Action.Definition().Name < actions[j].Action.Definition().Name
-	})
-	return actions
-}
+// func copySortedEmbeddings(actionsByName map[string]actionregistry.ActionEmbedding) []actionregistry.ActionEmbedding {
+// 	actions := make([]actionregistry.ActionEmbedding, 0, len(actionsByName))
+// 	for _, action := range actionsByName {
+// 		actions = append(actions, action)
+// 	}
+// 	sort.Slice(actions, func(i, j int) bool {
+// 		return actions[i].Action.Definition().Name < actions[j].Action.Definition().Name
+// 	})
+// 	return actions
+// }
 
 // definitionsFromEmbeddings strips embedding vectors and returns only action definitions.
-func definitionsFromEmbeddings(actions []actionregistry.ActionEmbedding) []domain.AssistantActionDefinition {
-	definitions := make([]domain.AssistantActionDefinition, 0, len(actions))
-	for _, action := range actions {
-		definitions = append(definitions, action.Action.Definition())
-	}
-	return definitions
-}
+// func definitionsFromEmbeddings(actions []actionregistry.ActionEmbedding) []domain.AssistantActionDefinition {
+// 	definitions := make([]domain.AssistantActionDefinition, 0, len(actions))
+// 	for _, action := range actions {
+// 		definitions = append(definitions, action.Action.Definition())
+// 	}
+// 	return definitions
+// }
 
 // withAPIKey injects one header into every request by wrapping the provided HTTP transport.
 func withAPIKey(httpClient *http.Client, headerName, apiKey string) *http.Client {
@@ -1014,16 +1000,13 @@ func asString(v any) string {
 
 // InitMCPActionRegistry registers the MCP-backed assistant action registry.
 type InitMCPActionRegistry struct {
-	Logger                *log.Logger            `resolve:""`
-	HttpClient            *http.Client           `resolve:""`
-	SemanticEncoder       domain.SemanticEncoder `resolve:""`
-	EmbeddingModel        string                 `config:"LLM_EMBEDDING_MODEL"`
-	Endpoint              string                 `config:"MCP_GATEWAY_ENDPOINT"`
-	APIKey                string                 `config:"MCP_GATEWAY_API_KEY" default:"-"`
-	APIKeyHeader          string                 `config:"MCP_GATEWAY_API_KEY_HEADER" default:"-"`
-	RequestTimeout        time.Duration          `config:"MCP_GATEWAY_REQUEST_TIMEOUT" default:"20s"`
-	TopActionsPerRegistry int                    `config:"MCP_GATEWAY_TOP_ACTIONS_PER_REGISTRY" default:"2"`
-	registry              *MCPRegistry
+	Logger         *log.Logger   `resolve:""`
+	HttpClient     *http.Client  `resolve:""`
+	Endpoint       string        `config:"MCP_GATEWAY_ENDPOINT"`
+	APIKey         string        `config:"MCP_GATEWAY_API_KEY" default:"-"`
+	APIKeyHeader   string        `config:"MCP_GATEWAY_API_KEY_HEADER" default:"-"`
+	RequestTimeout time.Duration `config:"MCP_GATEWAY_REQUEST_TIMEOUT" default:"20s"`
+	registry       *MCPRegistry
 }
 
 // Initialize registers this implementation as domain.AssistantActionRegistry.
@@ -1039,13 +1022,11 @@ func (i InitMCPActionRegistry) Initialize(ctx context.Context) (context.Context,
 			RequestTimeout: i.RequestTimeout,
 		},
 		i.HttpClient,
-		i.SemanticEncoder,
-		i.EmbeddingModel,
 	)
 	if err := registry.initializeActions(ctx); err != nil {
 		return ctx, fmt.Errorf("failed to initialize mcp actions: %w", err)
 	}
-	depend.RegisterNamed[actionregistry.EmbeddingActionRegistry](registry, "mcp")
+	depend.RegisterNamed[domain.AssistantActionRegistry](registry, "mcp")
 	return ctx, nil
 }
 

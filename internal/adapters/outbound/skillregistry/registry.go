@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	defaultRelevantSkillsTopK     = 3
+	defaultRelevantSkillsTopK     = 2
 	defaultRelevantSkillsMinScore = 0.20
-	defaultAvoidPenaltyWeight     = 0.80
+	defaultAvoidPenaltyWeight     = 0.85
 	defaultAvoidBlockThreshold    = 0.45
 	defaultStrongUseWhenScore     = 0.55
 	defaultCurrentInputWeight     = 0.65

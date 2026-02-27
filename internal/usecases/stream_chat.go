@@ -8,7 +8,6 @@ import (
 	"log"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
@@ -30,9 +29,8 @@ const (
 	CHAT_TEMPERATURE = 0.2
 	CHAT_TOP_P       = 0.7
 
-	MAX_SKILLS_SELECTION_CHARS = 400
-	MAX_SKILLS_PROMPT_CHARS    = 4000
-	MAX_RECOVERY_MESSAGES      = 8
+	MAX_SKILLS_PROMPT_CHARS = 4000
+	MAX_RECOVERY_MESSAGES   = 8
 )
 
 //go:embed prompts/chat.yml
@@ -128,7 +126,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return err
 	}
 
-	messagesHistory, err := sc.fetchChatHistory(spanCtx, conversation.ID)
+	messagesHistory, summaryContext, err := sc.fetchChatHistory(spanCtx, conversation.ID)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return err
 	}
@@ -138,7 +136,10 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		Content: userMessage,
 	})
 
-	skills := sc.skillRegistry.ListRelevant(spanCtx, buildActionSelectionText(messagesHistory))
+	skills := sc.skillRegistry.ListRelevant(spanCtx, domain.AssistantSkillQueryContext{
+		Messages:            messagesHistory,
+		ConversationSummary: summaryContext,
+	})
 	relevantActions := make([]domain.AssistantActionDefinition, 0, len(skills))
 	uniqueActionNames := make(map[string]struct{})
 	for _, s := range skills {
@@ -816,17 +817,17 @@ func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message domain.
 }
 
 // buildSystemPrompt creates the base chat prompt and injects the latest conversation summary context.
-func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID uuid.UUID) ([]domain.AssistantMessage, error) {
+func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID uuid.UUID) ([]domain.AssistantMessage, string, error) {
 	file, err := chatPrompt.Open("prompts/chat.yml")
 	if err != nil {
-		return nil, fmt.Errorf("failed to open chat prompt: %w", err)
+		return nil, "", fmt.Errorf("failed to open chat prompt: %w", err)
 	}
 	defer file.Close() //nolint:errcheck
 
 	messages := []domain.AssistantMessage{}
 	err = yaml.NewDecoder(file).Decode(&messages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode summary prompt: %w", err)
+		return nil, "", fmt.Errorf("failed to decode summary prompt: %w", err)
 	}
 	for i, msg := range messages {
 		if msg.Role == domain.ChatRole_Developer || msg.Role == domain.ChatRole_System {
@@ -840,7 +841,7 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 
 	latestSummary, found, err := sc.conversationSummaryRepo.GetConversationSummary(ctx, conversationID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load conversation summary: %w", err)
+		return nil, "", fmt.Errorf("failed to load conversation summary: %w", err)
 	}
 
 	summaryText := "No conversation summary available."
@@ -855,21 +856,26 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 		),
 	})
 
-	return messages, nil
+	summaryContext := ""
+	if summaryText != "No conversation summary available." {
+		summaryContext = summaryText
+	}
+
+	return messages, summaryContext, nil
 }
 
 // fetchChatHistory retrieves the chat history excluding old system messages
-func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uuid.UUID) ([]domain.AssistantMessage, error) {
+func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uuid.UUID) ([]domain.AssistantMessage, string, error) {
 	// Build system prompt with todo context
-	systemPrompt, err := sc.buildSystemPrompt(ctx, conversationID)
+	systemPrompt, summaryContext, err := sc.buildSystemPrompt(ctx, conversationID)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	// Load prior conversation to preserve context
 	history, _, err := sc.chatMessageRepo.ListChatMessages(ctx, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	// Build chat request: system + history (excluding old system messages) + current user turn
@@ -895,7 +901,7 @@ func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uu
 			})
 		}
 	}
-	return messages, nil
+	return messages, summaryContext, nil
 }
 
 // streamChatExecutionState holds mutable state during a stream-chat execution.
@@ -954,33 +960,6 @@ func (t *actionCycleTracker) hasExceededMaxActionCalls(functionName, arguments s
 	t.lastActionCallSignature = signature
 	t.repeatActionCallCount = 0
 	return false
-}
-
-// buildActionSelectionText constructs the text used for selecting relevant actions
-// based on the current user input and recent conversation history.
-func buildActionSelectionText(messages []domain.AssistantMessage) string {
-	if len(messages) == 0 {
-		return ""
-	}
-
-	lastMessage := messages[len(messages)-1]
-	if lastMessage.Role != domain.ChatRole_User {
-		return ""
-	}
-
-	currentInput := strings.TrimSpace(lastMessage.Content)
-	if currentInput == "" {
-		return ""
-	}
-
-	selectionText := currentInput
-	if isAmbiguousActionSelectionInput(currentInput) && len(messages) > 1 {
-		if previousInput, ok := previousUserInput(messages[:len(messages)-1]); ok {
-			selectionText = previousInput + "\n" + currentInput
-		}
-	}
-
-	return truncateToLastChars(selectionText, MAX_SKILLS_SELECTION_CHARS)
 }
 
 // buildSkillsPrompt constructs a prompt describing the assistant skills
@@ -1101,80 +1080,6 @@ func compactToLastMessages(messages []domain.AssistantMessage, maxMessages int) 
 	out := make([]domain.AssistantMessage, maxMessages)
 	copy(out, messages[start:])
 	return out
-}
-
-// isAmbiguousActionSelectionInput checks if the user input contains phrases
-// or words that may ambiguously refer to previous actions or messages,
-// which can help determine if we should include previous user
-// input for better action relevance.
-func isAmbiguousActionSelectionInput(userInput string) bool {
-	lowered := strings.ToLower(strings.TrimSpace(userInput))
-	if lowered == "" {
-		return false
-	}
-
-	ambiguousPhrases := []string{
-		"same as before",
-		"as before",
-		"do it",
-		"do that",
-		"that one",
-		"this one",
-		"same thing",
-	}
-	for _, phrase := range ambiguousPhrases {
-		if strings.Contains(lowered, phrase) {
-			return true
-		}
-	}
-
-	ambiguousWords := map[string]struct{}{
-		"it": {}, "that": {}, "this": {}, "them": {}, "same": {}, "also": {}, "again": {}, "too": {}, "there": {},
-	}
-	words := strings.FieldsFunc(lowered, func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
-	})
-	for _, word := range words {
-		if _, ok := ambiguousWords[word]; ok {
-			return true
-		}
-	}
-	return false
-}
-
-// previousUserInput scans the messages in reverse to find the most recent non-empty user message.
-func previousUserInput(messages []domain.AssistantMessage) (string, bool) {
-	for i := len(messages) - 1; i >= 0; i-- {
-		msg := messages[i]
-		if msg.Role != domain.ChatRole_User {
-			continue
-		}
-
-		content := strings.TrimSpace(msg.Content)
-		if content == "" {
-			continue
-		}
-
-		return content, true
-	}
-
-	return "", false
-}
-
-// truncateToLastChars truncates the input string to the last maxChars characters,
-// ensuring it does not cut off in the middle of a rune.
-func truncateToLastChars(input string, maxChars int) string {
-	trimmed := strings.TrimSpace(input)
-	if maxChars <= 0 {
-		return ""
-	}
-
-	runes := []rune(trimmed)
-	if len(runes) <= maxChars {
-		return trimmed
-	}
-
-	return string(runes[len(runes)-maxChars:])
 }
 
 // truncateToFirstChars truncates the input string to the first maxChars characters

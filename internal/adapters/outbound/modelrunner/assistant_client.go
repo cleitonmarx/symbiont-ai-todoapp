@@ -126,7 +126,7 @@ func (a AssistantClient) VectorizeTodo(ctx context.Context, model string, todo d
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 	gen := a.embeddingFactory.Get(model)
-	prompt := gen.GenerateIndexingPrompt(todo)
+	prompt := gen.GenerateIndexingPrompt(todo.Title)
 	dimension := gen.Dimensions()
 	vec, err := a.embed(spanCtx, model, prompt, dimension)
 	if telemetry.RecordErrorAndStatus(span, err) {
@@ -156,17 +156,16 @@ func (a AssistantClient) VectorizeSkillDefinition(
 	model string,
 	skill domain.AssistantSkillDefinition,
 ) (domain.EmbeddingVector, domain.EmbeddingVector, error) {
-	useVector, err := a.VectorizeQuery(ctx, model, buildSkillUseEmbeddingText(skill))
+	gen := a.embeddingFactory.Get(model)
+	dimension := gen.Dimensions()
+	useText := gen.GenerateIndexingPrompt(buildSkillUseEmbeddingText(skill))
+	useVector, err := a.embed(ctx, model, useText, dimension)
 	if err != nil {
 		return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
 	}
 
-	avoidText := buildSkillAvoidEmbeddingText(skill)
-	if avoidText == "" {
-		return useVector, domain.EmbeddingVector{}, nil
-	}
-
-	avoidVector, err := a.VectorizeQuery(ctx, model, avoidText)
+	avoidText := gen.GenerateIndexingPrompt(buildSkillAvoidEmbeddingText(skill))
+	avoidVector, err := a.embed(ctx, model, avoidText, dimension)
 	if err != nil {
 		return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
 	}

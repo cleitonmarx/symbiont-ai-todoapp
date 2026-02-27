@@ -3,20 +3,16 @@ package modelrunner
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 )
 
 // EmbeddingGenerator defines the interface for generating embeddings for todos and search inputs.
 type EmbeddingGenerator interface {
 	// GenerateIndexingPrompt creates the prompt used for generating embeddings for a todo item.
-	GenerateIndexingPrompt(todo domain.Todo) string
+	GenerateIndexingPrompt(document string) string
 	// GenerateSearchPrompt creates the prompt used for generating embeddings for a search query.
 	GenerateSearchPrompt(searchInput string) string
-	// GenerateAssistentActionDefinitionPrompt creates the prompt used for generating embeddings for an assistant action.
-	//GenerateAssistentActionDefinitionPrompt(action domain.AssistantActionDefinition) string
 	// Dimension returns the dimension used by the embedding generator, if applicable.
 	Dimensions() *int
 }
@@ -41,8 +37,8 @@ func (f embeddingFactory) Get(model string) EmbeddingGenerator {
 // gemmaEmbedding implements the EmbeddingGenerator interface for the Gemma embedding model.
 type gemmaEmbedding struct{}
 
-func (a gemmaEmbedding) GenerateIndexingPrompt(todo domain.Todo) string {
-	return fmt.Sprintf("title: none | text: %s", todo.Title)
+func (a gemmaEmbedding) GenerateIndexingPrompt(document string) string {
+	return fmt.Sprintf("title: none | text: %s", document)
 }
 
 func (a gemmaEmbedding) GenerateSearchPrompt(searchInput string) string {
@@ -57,8 +53,8 @@ func (a gemmaEmbedding) Dimensions() *int {
 // that generates simple prompts without model-specific formatting.
 type defaultEmbeddingGenerator struct{}
 
-func (a defaultEmbeddingGenerator) GenerateIndexingPrompt(todo domain.Todo) string {
-	return fmt.Sprintf("Item: %s. Due date: %s. Current status: %s.", todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status)
+func (a defaultEmbeddingGenerator) GenerateIndexingPrompt(document string) string {
+	return fmt.Sprintf("Item: %s.", document)
 }
 
 func (a defaultEmbeddingGenerator) GenerateSearchPrompt(searchInput string) string {

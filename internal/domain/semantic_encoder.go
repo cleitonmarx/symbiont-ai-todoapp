@@ -14,6 +14,6 @@ type SemanticEncoder interface {
 	VectorizeTodo(ctx context.Context, model string, todo Todo) (EmbeddingVector, error)
 	// VectorizeQuery generates a semantic vector for one user query/search input.
 	VectorizeQuery(ctx context.Context, model, query string) (EmbeddingVector, error)
-	// VectorizeAssistantActionDefinition generates a semantic vector for one assistant action definition.
-	VectorizeAssistantActionDefinition(ctx context.Context, model string, action AssistantActionDefinition) (EmbeddingVector, error)
+	// VectorizeSkillDefinition generates a semantic vector for one assistant skill definition.
+	VectorizeSkillDefinition(ctx context.Context, model string, skill AssistantSkillDefinition) (EmbeddingVector, EmbeddingVector, error)
 }

@@ -112,7 +112,6 @@ type AssistantActionDefinition struct {
 	Name        string
 	Description string
 	Input       AssistantActionInput
-	Hints       AssistantActionHints
 	Approval    AssistantActionApproval
 }
 
@@ -129,42 +128,9 @@ type AssistantActionApproval struct {
 	Timeout time.Duration
 }
 
-// ComposeHint composes the action hints into a single string for prompting.
-func (d AssistantActionDefinition) ComposeHint() string {
-	parts := make([]string, 0, 3)
-	if useWhen := strings.TrimSpace(d.Hints.UseWhen); useWhen != "" {
-		parts = append(parts, "Use: "+useWhen)
-	}
-	if avoidWhen := strings.TrimSpace(d.Hints.AvoidWhen); avoidWhen != "" {
-		parts = append(parts, "Avoid: "+avoidWhen)
-	}
-	if argRules := strings.TrimSpace(d.Hints.ArgRules); argRules != "" {
-		parts = append(parts, "Args: "+argRules)
-	}
-
-	if len(parts) == 0 {
-		return "Follow the tool schema and description."
-	}
-	return strings.Join(parts, " ")
-}
-
-// HasHints returns true if any of the hint fields are non-empty after trimming whitespace.
-func (d AssistantActionDefinition) HasHints() bool {
-	return strings.TrimSpace(d.Hints.UseWhen) != "" ||
-		strings.TrimSpace(d.Hints.AvoidWhen) != "" ||
-		strings.TrimSpace(d.Hints.ArgRules) != ""
-}
-
 // RequiresApproval returns true when the action policy requires explicit human approval.
 func (d AssistantActionDefinition) RequiresApproval() bool {
 	return d.Approval.Required
-}
-
-// AssistantActionHints holds compact, runtime guidance for dynamic prompt injection.
-type AssistantActionHints struct {
-	UseWhen   string
-	AvoidWhen string
-	ArgRules  string
 }
 
 // AssistantActionField represents one action input field.
@@ -230,6 +196,4 @@ type AssistantActionRegistry interface {
 	GetDefinition(actionName string) (AssistantActionDefinition, bool)
 	// StatusMessage returns a status message about the action execution, or a default message if not implemented.
 	StatusMessage(actionName string) string
-	// ListRelevant returns relevant assistant action definitions based on the user input.
-	ListRelevant(ctx context.Context, userInput string) []AssistantActionDefinition
 }

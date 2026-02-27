@@ -158,16 +158,25 @@ func (a AssistantClient) VectorizeSkillDefinition(
 ) (domain.EmbeddingVector, domain.EmbeddingVector, error) {
 	gen := a.embeddingFactory.Get(model)
 	dimension := gen.Dimensions()
-	useText := gen.GenerateIndexingPrompt(buildSkillUseEmbeddingText(skill))
-	useVector, err := a.embed(ctx, model, useText, dimension)
-	if err != nil {
-		return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
+	var (
+		useVector domain.EmbeddingVector
+		err       error
+	)
+	if strings.TrimSpace(skill.UseWhen) != "" {
+		useText := gen.GenerateIndexingPrompt(buildSkillUseEmbeddingText(skill))
+		useVector, err = a.embed(ctx, model, useText, dimension)
+		if err != nil {
+			return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
+		}
 	}
 
-	avoidText := gen.GenerateIndexingPrompt(buildSkillAvoidEmbeddingText(skill))
-	avoidVector, err := a.embed(ctx, model, avoidText, dimension)
-	if err != nil {
-		return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
+	var avoidVector domain.EmbeddingVector
+	if strings.TrimSpace(skill.AvoidWhen) != "" {
+		avoidText := gen.GenerateIndexingPrompt(buildSkillAvoidEmbeddingText(skill))
+		avoidVector, err = a.embed(ctx, model, avoidText, dimension)
+		if err != nil {
+			return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
+		}
 	}
 	return useVector, avoidVector, nil
 }

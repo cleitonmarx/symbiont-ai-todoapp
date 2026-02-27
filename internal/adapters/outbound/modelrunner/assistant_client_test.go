@@ -406,7 +406,7 @@ func TestAssistantClientAdapter_VectorizeTodo(t *testing.T) {
             }`,
 			statusCode:         http.StatusOK,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "Item: Test. Due date: 2024-01-01. Current status: OPEN.",
+			expectRequestInput: "Test",
 			expectedVec:        []float64{1.1, 2.2, 3.3},
 		},
 		"no-embedding-data": {
@@ -418,21 +418,21 @@ func TestAssistantClientAdapter_VectorizeTodo(t *testing.T) {
             }`,
 			statusCode:         http.StatusOK,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "Item: Test. Due date: 2024-01-01. Current status: OPEN.",
+			expectRequestInput: "Test",
 			expectErr:          true,
 		},
 		"server-error": {
 			response:           `Internal Server Error`,
 			statusCode:         http.StatusInternalServerError,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "Item: Test. Due date: 2024-01-01. Current status: OPEN.",
+			expectRequestInput: "Test",
 			expectErr:          true,
 		},
 		"invalid-json": {
 			response:           `{invalid json}`,
 			statusCode:         http.StatusOK,
 			model:              "ai/otherembeddingmodel",
-			expectRequestInput: "Item: Test. Due date: 2024-01-01. Current status: OPEN.",
+			expectRequestInput: "Test",
 			expectErr:          true,
 		},
 	}
@@ -593,7 +593,7 @@ func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 			model: "ai/otherembeddingmodel",
 			skill: baseSkill,
 			expectInputs: []string{
-				"name: todo-mutation-safety\nuse_when: update todos\ntags: todos, mutation\ntools: fetch_todos, update_todos\ncontent: Never invent IDs",
+				"name: todo-mutation-safety\nuse_when: update todos\ntags: todos, mutation\ntools: fetch_todos, update_todos",
 				"avoid_when: chat only",
 			},
 			expectedUse:   []float64{1.1, 2.2, 3.3},
@@ -608,7 +608,7 @@ func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 				Content: "Use fetch_todos for read operations",
 			},
 			expectInputs: []string{
-				"task: search result | query: name: todo-fetch\nuse_when: list todos\ntools: fetch_todos\ncontent: Use fetch_todos for read operations",
+				"title: none | text: name: todo-fetch\nuse_when: list todos\ntools: fetch_todos",
 			},
 			expectedUse:   []float64{1.1, 2.2, 3.3},
 			expectedAvoid: nil,
@@ -663,114 +663,6 @@ func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 		})
 	}
 }
-
-// func TestAssistantClientAdapter_VectorizeAssistantActionDefinition(t *testing.T) {
-// 	t.Parallel()
-
-// 	action := domain.AssistantActionDefinition{
-// 		Name:        "update_todo_due_date",
-// 		Description: "Update due date for exactly one existing todo.",
-// 	}
-
-// 	tests := map[string]struct {
-// 		response           string
-// 		statusCode         int
-// 		model              string
-// 		expectRequestInput string
-// 		expectErr          bool
-// 		expectedVec        []float64
-// 	}{
-// 		"success-with-gemma-embedding": {
-// 			response: `{
-// 				"model": "ai/embeddinggemma",
-// 				"object": "list",
-// 				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
-// 				"data": [
-// 					{
-// 						"embedding": [1.1, 2.2, 3.3],
-// 						"index": 0,
-// 						"object": "embedding"
-// 					}
-// 				]
-// 			}`,
-// 			statusCode:         http.StatusOK,
-// 			model:              "ai/embeddinggemma",
-// 			expectRequestInput: "title: update_todo_due_date | text: action: update todo due date | description: Update due date for exactly one existing todo.",
-// 			expectedVec:        []float64{1.1, 2.2, 3.3},
-// 		},
-// 		"success-with-default-embedding-generator": {
-// 			response: `{
-// 				"model": "ai/otherembeddingmodel",
-// 				"object": "list",
-// 				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
-// 				"data": [
-// 					{
-// 						"embedding": [1.1, 2.2, 3.3],
-// 						"index": 0,
-// 						"object": "embedding"
-// 					}
-// 				]
-// 			}`,
-// 			statusCode:         http.StatusOK,
-// 			model:              "ai/otherembeddingmodel",
-// 			expectRequestInput: "Action Name: update_todo_due_date. Description: Update due date for exactly one existing todo..",
-// 			expectedVec:        []float64{1.1, 2.2, 3.3},
-// 		},
-// 		"no-embedding-data": {
-// 			response: `{
-// 				"model": "ai/otherembeddingmodel",
-// 				"object": "list",
-// 				"usage": { "prompt_tokens": 6, "total_tokens": 6 },
-// 				"data": []
-// 			}`,
-// 			statusCode:         http.StatusOK,
-// 			model:              "ai/otherembeddingmodel",
-// 			expectRequestInput: "Action Name: update_todo_due_date. Description: Update due date for exactly one existing todo..",
-// 			expectErr:          true,
-// 		},
-// 		"server-error": {
-// 			response:           `Internal Server Error`,
-// 			statusCode:         http.StatusInternalServerError,
-// 			model:              "ai/otherembeddingmodel",
-// 			expectRequestInput: "Action Name: update_todo_due_date. Description: Update due date for exactly one existing todo..",
-// 			expectErr:          true,
-// 		},
-// 		"invalid-json": {
-// 			response:           `{invalid json}`,
-// 			statusCode:         http.StatusOK,
-// 			model:              "ai/otherembeddingmodel",
-// 			expectRequestInput: "Action Name: update_todo_due_date. Description: Update due date for exactly one existing todo..",
-// 			expectErr:          true,
-// 		},
-// 	}
-
-// 	for name, tt := range tests {
-// 		t.Run(name, func(t *testing.T) {
-// 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 				var req EmbeddingsRequest
-// 				json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
-// 				assert.Equal(t, tt.expectRequestInput, req.Input)
-
-// 				w.WriteHeader(tt.statusCode)
-// 				w.Write([]byte(tt.response)) //nolint:errcheck
-// 			}))
-// 			defer server.Close()
-
-// 			client := NewDRMAPIClient(server.URL, "", server.Client())
-// 			adapter := NewAssistantClientAdapter(client, client)
-
-// 			vec, err := adapter.VectorizeAssistantActionDefinition(context.Background(), tt.model, action)
-
-// 			if tt.expectErr {
-// 				assert.Error(t, err)
-// 				return
-// 			}
-
-// 			assert.NoError(t, err)
-// 			assert.Equal(t, tt.expectedVec, vec.Vector)
-// 		})
-// 	}
-// }
 
 func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
 	t.Parallel()

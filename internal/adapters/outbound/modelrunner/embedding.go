@@ -54,7 +54,7 @@ func (a gemmaEmbedding) Dimensions() *int {
 type defaultEmbeddingGenerator struct{}
 
 func (a defaultEmbeddingGenerator) GenerateIndexingPrompt(document string) string {
-	return fmt.Sprintf("Item: %s.", document)
+	return document
 }
 
 func (a defaultEmbeddingGenerator) GenerateSearchPrompt(searchInput string) string {

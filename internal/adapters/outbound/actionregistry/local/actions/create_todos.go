@@ -36,13 +36,6 @@ func (a BulkTodoCreatorAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "create_todos",
 		Description: "Create multiple todo items in one call (batch).",
-		Hints: domain.AssistantActionHints{
-			UseWhen: "Use for multi-task creation requests: tasks (plural), checklist, roadmap, steps, or plan for a goal (e.g., plan a trip).\n" +
-				"- If user gives a title prefix, apply it to every created task title.\n" +
-				"- If user gives a target date/window, distribute due dates chronologically up to that date.",
-			AvoidWhen: "Do not use for single-task creation, updates, or deletes.",
-			ArgRules:  "Required key: todos. Each item requires title and due_date (YYYY-MM-DD).",
-		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{

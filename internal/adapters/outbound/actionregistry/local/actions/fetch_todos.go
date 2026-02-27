@@ -36,11 +36,6 @@ func (lft TodoFetcherAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
 		Name:        "fetch_todos",
 		Description: "Fetch todos with pagination and optional filters.",
-		Hints: domain.AssistantActionHints{
-			UseWhen:   "Use to list todos in chat or disambiguate target tasks before update/delete.",
-			AvoidWhen: "Do not use when only UI filtering is requested.",
-			ArgRules:  "Always send page and page_size. status must be OPEN or DONE when present. Use similarity sort only with search_by_similarity. due_after and due_before must come together.",
-		},
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{

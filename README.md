@@ -5,14 +5,13 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 ## Features
 
 - 📝 **Todo Management**: Create, update, delete, filter, sort, and paginate todos
-- 🤖 **LLM Chat & Tools**: Streamed AI chat (SSE) with tool-calling for local and external tools
-- ✅ **Action Approval Flow**: Human approval for sensitive/destructive tool execution (local actions and MCP tools)
-- 📦 **Batch Todo Actions**: Assistant-first bulk operations (`create_todos`, `update_todos`, `update_todos_due_date`, `delete_todos`)
+- 🤖 **LLM Chat & Actions/Tools**: Streamed AI chat (SSE) with action/tool-calling for local and external actions/tools
+- 🧩 **Skill-Based Action/Tool Routing**: Markdown runbooks (`skills/*.md`) used to decide which actions/tools are injected each turn
+- ✅ **Action/Tools Approval Flow**: Human approval for sensitive/destructive action/tool execution (local actions and MCP tools)
 - 🔗 **MCP Gateway Integration**: MCP-based external tools via `docker/mcp-gateway` (default setup includes DuckDuckGo tools)
-- 🎛️ **Tool Definition Overrides**: MCP tool descriptions/inputs/hints can be overridden with YAML for tighter model behavior control
 - 💬 **Conversation Management**: Conversation history with rename/delete and auto/LLM title generation
 - 📌 **Board Summary**: AI-generated board summary from todo domain events
-- 🧠 **Chat Summary**: Conversation-aware AI summaries from chat-message events
+- 🧠 **Conversation/Context Compression**: Conversation-aware AI summaries from chat-message events
 - 🔔 **Event-Driven Workflow**: Outbox + Pub/Sub workers for asynchronous processing
 - 🧠 **Vector Search**: PostgreSQL `pgvector` + embeddings for semantic todo search
 - 🔌 **Dual APIs**: REST (OpenAPI) + GraphQL
@@ -33,10 +32,11 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - **PostgreSQL** (`internal/adapters/outbound/postgres`): Primary data store with migrations and vector extension support
 - **Vault Provider** (`internal/adapters/outbound/config/vault_provider.go`): Loads secret-backed config values (`DB_USER`, `DB_PASS`)
 - **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI/DRM-compatible client for chat, summarization, embeddings, and model listing
-- **Assistant Action Registries** (`internal/adapters/outbound/actionregistry`):
+- **Assistant Action/Tool Registries** (`internal/adapters/outbound/actionregistry`):
   - `local`: Built-in app actions (UI filters, fetch todos, and batch todo mutations)
-  - `mcp`: MCP gateway-backed tool registry using `github.com/modelcontextprotocol/go-sdk/mcp`
-  - `composite`: Aggregates local + MCP actions and ranks relevance with embeddings
+  - `mcp`: MCP gateway-backed action/tool registry using `github.com/modelcontextprotocol/go-sdk/mcp`
+  - `composite`: Aggregates local + MCP actions/tools
+- **Assistant Skill Registry** (`internal/adapters/outbound/skillregistry`): Loads markdown skills and selects skills using turn context (current input, recent user inputs, and optional conversation summary)
 - **Telemetry** (`internal/telemetry`): Traces and metrics instrumentation for HTTP, DB, Pub/Sub, and use cases
 
 ### Generated Introspection Graph
@@ -93,10 +93,10 @@ This is useful for destructive operations (for example, deleting todos) and exte
 
 ### Configuring approval
 
-- You can enable approval per action.
+- You can enable approval per action/tool.
 - You can customize the prompt title/description, preview fields, and timeout.
 - Local actions location: `internal/adapters/outbound/actionregistry/local/actions/`
-- MCP tools YAML location: `internal/adapters/outbound/actionregistry/mcp/tool_overrides.yaml`
+- MCP tool YAML location: `internal/adapters/outbound/actionregistry/mcp/tool_overrides.yaml`
 
 Example:
 
@@ -111,6 +111,58 @@ tools:
         - url
       timeout: 90s
 ```
+
+## Skill-Based Routing
+
+The assistant can use skills as lightweight runbooks to improve action/tool selection.
+
+- Skill files live in: `internal/adapters/outbound/skillregistry/skills/*.md`
+- Each skill has YAML frontmatter (`name`, `use_when`, `avoid_when`, `priority`, `tags`, `tools`) plus workflow instructions in markdown body
+- At runtime, selected skills are converted into:
+  - Action/tool allowlist for the turn (`tools` field)
+  - System guidance prompt for action/tool workflow
+
+Current selector uses weighted context:
+
+- Current user input (highest weight)
+- Recent user inputs
+- Conversation summary (optional, lower weight)
+
+## Runtime Profiles and Minimum Machine
+
+You can run this app in two main modes:
+
+### 1) Local models (Docker Model Runner / compatible local endpoint)
+
+Recommended hardware profile for a smooth local experience:
+
+- CPU: 12 high-performance cores (or equivalent compute throughput)
+- GPU: 30+ cores
+- Memory: 32 GB unified/system RAM
+- Storage: 20+ GB free for models, caches, and containers
+
+### 2) OpenAI API (lighter local machine requirements)
+
+When using remote OpenAI models, local requirements are mostly for app services:
+
+- CPU: 4 vCPU
+- RAM: 8 GB
+- Disk: 10+ GB free
+
+Use this environment configuration:
+
+```yaml
+- LLM_MODEL_HOST=https://api.openai.com
+- LLM_API_KEY=$(OPENAI_API_KEY)
+- LLM_SUMMARY_MODEL=gpt-4.1-nano-2025-04-14
+- LLM_CHAT_SUMMARY_MODEL=gpt-4.1-nano-2025-04-14
+- LLM_CHAT_TITLE_MODEL=gpt-4.1-nano-2025-04-14
+```
+
+### Embedding Model
+
+`embeddinggemma:300M-Q8_0` is highly recommended for this project due to its speed/capacity tradeoff. You can still use another embedding model if needed by updating `LLM_EMBEDDING_MODEL`.
+
 
 ## Quick Start (Docker Compose)
 

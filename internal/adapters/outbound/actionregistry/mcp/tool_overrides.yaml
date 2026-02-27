@@ -13,10 +13,6 @@ tools:
           type: integer
           description: Maximum number of search results to return. Default to 2 for normal requests. Use 3 only when needed. Use larger values only when the user explicitly asks for broad research.
           required: false
-    hints:
-      use_when: Use to gather external information or references before deciding or answering.
-      avoid_when: Do not use for todo CRUD operations or when the user request is fully internal to the app.
-      arg_rules: Always send a specific query and include max_results. Default max_results=2. Never exceed 3 unless the user explicitly asks for broad research. Prefer one focused query per turn.
 
   - name: fetch_content
     status_message: 📄 Fetching page content...
@@ -39,7 +35,3 @@ tools:
           type: integer
           description: Maximum number of characters returned from extracted content. Default to 200 for normal requests. Use up to 300 only when necessary. Use larger values only when the user explicitly asks for detailed extraction.
           required: false
-    hints:
-      use_when: Use after search when you need full page details from one selected URL.
-      avoid_when: Do not use without a concrete URL or for actions that modify tasks.
-      arg_rules: Provide a valid public URL and include max_length. Default max_length=200. Never exceed 300 unless the user explicitly asks for detailed extraction. Fetch one URL per turn unless the user explicitly asks to compare multiple sources.

@@ -14,58 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// func TestMCPRegistry_ListEmbeddings_MapsToolSchema(t *testing.T) {
-// 	t.Parallel()
-
-// 	session := &fakeSession{
-// 		listResults: []*mcp.ListToolsResult{
-// 			{
-// 				Tools: []*mcp.Tool{
-// 					{
-// 						Name:        "create_task",
-// 						Description: "Creates one task",
-// 						InputSchema: map[string]any{
-// 							"type": "object",
-// 							"properties": map[string]any{
-// 								"title": map[string]any{
-// 									"type":        "string",
-// 									"description": "Task title",
-// 								},
-// 								"priority": map[string]any{
-// 									"type": []any{"integer", "null"},
-// 								},
-// 							},
-// 							"required": []any{"title"},
-// 						},
-// 					},
-// 				},
-// 			},
-// 		},
-// 	}
-
-// 	registry := newMCPRegistryWithConnector(
-// 		Config{
-// 			Endpoint: "http://localhost:8811/mcp",
-// 		},
-// 		&fakeConnector{session: session},
-// 		nil,
-// 		"",
-// 	)
-// 	require.NoError(t, registry.initializeActions(t.Context()))
-
-// 	embeddingsList := registry.ListEmbeddings(t.Context())
-// 	require.Len(t, embeddingsList, 1)
-
-// 	def := embeddingsList[0].Action.Definition()
-// 	assert.Equal(t, "create_task", def.Name)
-// 	assert.Equal(t, "Creates one task", def.Description)
-// 	assert.Equal(t, "object", def.Input.Type)
-// 	assert.Equal(t, "string", def.Input.Fields["title"].Type)
-// 	assert.True(t, def.Input.Fields["title"].Required)
-// 	assert.Equal(t, "Task title", def.Input.Fields["title"].Description)
-// 	assert.Equal(t, "integer|null", def.Input.Fields["priority"].Type)
-// }
-
 func TestMCPRegistry_Execute_CallsTool(t *testing.T) {
 	t.Parallel()
 

@@ -25,10 +25,8 @@ import (
 )
 
 const (
-	defaultRelevantActionsTopK     = 3
-	defaultRelevantActionsMinScore = 0.35
-	defaultRequestTimeout          = 20 * time.Second
-	defaultStatusMessage           = "⏳ Running MCP tool..."
+	defaultRequestTimeout = 20 * time.Second
+	defaultStatusMessage  = "⏳ Running MCP tool..."
 )
 
 var _ domain.AssistantActionRegistry = (*MCPRegistry)(nil)
@@ -230,78 +228,6 @@ func (r *MCPRegistry) StatusMessage(actionName string) string {
 	return action.StatusMessage()
 }
 
-// ListEmbeddings returns all tool definitions currently available from MCP.
-// func (r *MCPRegistry) ListEmbeddings(ctx context.Context) []actionregistry.ActionEmbedding {
-// 	_, span := telemetry.Start(ctx)
-// 	defer span.End()
-
-// 	return copySortedEmbeddings(r.actionsByName)
-// }
-
-// ListRelevant returns semantically relevant tools for user input.
-// Falls back to all tools when embeddings are unavailable.
-// func (r *MCPRegistry) ListRelevant(ctx context.Context, userInput string) []domain.AssistantActionDefinition {
-// 	spanCtx, span := telemetry.Start(ctx)
-// 	defer span.End()
-
-// 	allActions := r.ListEmbeddings(spanCtx)
-// 	if len(allActions) == 0 {
-// 		return nil
-// 	}
-
-// 	if r.semanticEncoder == nil || strings.TrimSpace(r.embeddingModel) == "" {
-// 		return definitionsFromEmbeddings(allActions)
-// 	}
-
-// 	queryCtx, cancel := r.withTimeout(spanCtx)
-// 	defer cancel()
-
-// 	queryVector, err := r.semanticEncoder.VectorizeQuery(queryCtx, r.embeddingModel, userInput)
-// 	if err != nil || len(queryVector.Vector) == 0 {
-// 		return definitionsFromEmbeddings(allActions)
-// 	}
-
-// 	type scoredAction struct {
-// 		definition domain.AssistantActionDefinition
-// 		score      float64
-// 	}
-
-// 	scored := make([]scoredAction, 0, len(allActions))
-// 	for _, action := range allActions {
-// 		if len(action.Embedding) == 0 {
-// 			continue
-// 		}
-
-// 		def := action.Action.Definition()
-// 		score, ok := common.CosineSimilarity(queryVector.Vector, action.Embedding)
-// 		if !ok || score < defaultRelevantActionsMinScore {
-// 			continue
-// 		}
-// 		scored = append(scored, scoredAction{
-// 			definition: def,
-// 			score:      score,
-// 		})
-// 	}
-
-// 	if len(scored) == 0 {
-// 		return definitionsFromEmbeddings(allActions)
-// 	}
-
-// 	sort.Slice(scored, func(i, j int) bool {
-// 		if scored[i].score == scored[j].score {
-// 			return scored[i].definition.Name < scored[j].definition.Name
-// 		}
-// 		return scored[i].score > scored[j].score
-// 	})
-
-// 	limit := min(len(scored), defaultRelevantActionsTopK)
-// 	relevant := make([]domain.AssistantActionDefinition, 0, limit)
-// 	for i := range limit {
-// 		relevant = append(relevant, scored[i].definition)
-// 	}
-// 	return relevant
-// }
-
 // withTimeout applies request timeout defaults to MCP network calls.
 func (r *MCPRegistry) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	if r.cfg.RequestTimeout <= 0 {
@@ -351,16 +277,6 @@ func (r *MCPRegistry) initializeActions(ctx context.Context) error {
 		if overrideStatusMessage, found := overrides.StatusMessages[def.Name]; found {
 			statusMessage = overrideStatusMessage
 		}
-
-		// var embedding []float64
-		// if r.semanticEncoder != nil && strings.TrimSpace(r.embeddingModel) != "" {
-		// 	vectorCtx, cancel := r.withTimeout(ctx)
-		// 	vector, err := r.semanticEncoder.VectorizeAssistantActionDefinition(vectorCtx, r.embeddingModel, def)
-		// 	cancel()
-		// 	if err == nil {
-		// 		embedding = vector.Vector
-		// 	}
-		// }
 
 		actions[def.Name] = mcpToolAction{definition: def, statusMessage: statusMessage, execute: r.Execute}
 	}
@@ -431,7 +347,6 @@ type assistantActionDefinitionOverride struct {
 	Description   string                        `yaml:"description"`
 	StatusMessage string                        `yaml:"status_message"`
 	Input         assistantActionInputConfig    `yaml:"input"`
-	Hints         assistantActionHintsConfig    `yaml:"hints"`
 	Approval      assistantActionApprovalConfig `yaml:"approval"`
 	Approvals     assistantActionApprovalConfig `yaml:"approvals"`
 }
@@ -452,14 +367,6 @@ type assistantActionFieldOverride struct {
 	Enum        []any                                   `yaml:"enum"`
 	Fields      map[string]assistantActionFieldOverride `yaml:"fields"`
 	Items       *assistantActionFieldOverride           `yaml:"items"`
-}
-
-// assistantActionHintsConfig allows configuring free-form usage hints for MCP tools,
-// which can be surfaced in the UI or used by the assistant loop for better tool selection and argument formatting.
-type assistantActionHintsConfig struct {
-	UseWhen   string `yaml:"use_when"`
-	AvoidWhen string `yaml:"avoid_when"`
-	ArgRules  string `yaml:"arg_rules"`
 }
 
 // assistantActionApprovalConfig allows configuring human-in-the-loop approval policies for MCP tools,
@@ -592,11 +499,6 @@ func parseToolOverrides(content []byte) (toolOverrides, error) {
 				Type:   strings.TrimSpace(override.Input.Type),
 				Fields: fields,
 			},
-			// Hints: domain.AssistantActionHints{
-			// 	UseWhen:   strings.TrimSpace(override.Hints.UseWhen),
-			// 	AvoidWhen: strings.TrimSpace(override.Hints.AvoidWhen),
-			// 	ArgRules:  strings.TrimSpace(override.Hints.ArgRules),
-			// },
 		}
 
 		approvalCfg := override.Approval
@@ -641,9 +543,6 @@ func mergeAssistantActionDefinition(base, override domain.AssistantActionDefinit
 	merged.Input.Fields = baseFields
 	maps.Copy(merged.Input.Fields, override.Input.Fields)
 
-	// if override.HasHints() {
-	// 	merged.Hints = override.Hints
-	// }
 	if hasApprovalOverride(override.Approval) {
 		merged.Approval = override.Approval
 	}
@@ -904,27 +803,6 @@ func actionErrorMessage(callID, code, details string) domain.AssistantMessage {
 		Content:      fmt.Sprintf("errors[1]{error,details}%s,%s", code, details),
 	}
 }
-
-// copySortedEmbeddings returns a stable name-ordered snapshot of action embeddings.
-// func copySortedEmbeddings(actionsByName map[string]actionregistry.ActionEmbedding) []actionregistry.ActionEmbedding {
-// 	actions := make([]actionregistry.ActionEmbedding, 0, len(actionsByName))
-// 	for _, action := range actionsByName {
-// 		actions = append(actions, action)
-// 	}
-// 	sort.Slice(actions, func(i, j int) bool {
-// 		return actions[i].Action.Definition().Name < actions[j].Action.Definition().Name
-// 	})
-// 	return actions
-// }
-
-// definitionsFromEmbeddings strips embedding vectors and returns only action definitions.
-// func definitionsFromEmbeddings(actions []actionregistry.ActionEmbedding) []domain.AssistantActionDefinition {
-// 	definitions := make([]domain.AssistantActionDefinition, 0, len(actions))
-// 	for _, action := range actions {
-// 		definitions = append(definitions, action.Action.Definition())
-// 	}
-// 	return definitions
-// }
 
 // withAPIKey injects one header into every request by wrapping the provided HTTP transport.
 func withAPIKey(httpClient *http.Client, headerName, apiKey string) *http.Client {

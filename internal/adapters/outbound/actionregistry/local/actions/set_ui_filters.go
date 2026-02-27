@@ -36,7 +36,7 @@ func (t UIFiltersSetterAction) Definition() domain.AssistantActionDefinition {
 				},
 				"page_size": {
 					Type:        "integer",
-					Description: "Items per page. Optional.",
+					Description: "Items per page. Optional. Allowed values: 25, 50, 100.",
 					Required:    false,
 					Enum:        []any{25, 50, 100},
 				},
@@ -48,7 +48,7 @@ func (t UIFiltersSetterAction) Definition() domain.AssistantActionDefinition {
 				},
 				"search_by_similarity": {
 					Type:        "string",
-					Description: "semantic search query. Optional`.",
+					Description: "semantic search query. Optional.",
 					Required:    false,
 				},
 				"search_by_title": {
@@ -58,7 +58,7 @@ func (t UIFiltersSetterAction) Definition() domain.AssistantActionDefinition {
 				},
 				"sort_by": {
 					Type:        "string",
-					Description: "sort option. Optional.",
+					Description: "Optional sort. Allowed: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc. Use similarity sort only with search_by_similarity. similarityAsc returns most similar first.",
 					Required:    false,
 					Enum:        []any{"dueDateAsc", "dueDateDesc", "createdAtAsc", "createdAtDesc", "similarityAsc", "similarityDesc"},
 				},
@@ -66,11 +66,13 @@ func (t UIFiltersSetterAction) Definition() domain.AssistantActionDefinition {
 					Type:        "string",
 					Description: "lower due-date bound in YYYY-MM-DD. Must be provided with due_before. Optional.",
 					Required:    false,
+					Format:      "date",
 				},
 				"due_before": {
 					Type:        "string",
 					Description: "upper due-date bound in YYYY-MM-DD. Must be provided with due_after. Optional.",
 					Required:    false,
+					Format:      "date",
 				},
 			},
 		},
@@ -90,7 +92,7 @@ func (t UIFiltersSetterAction) Execute(_ context.Context, call domain.AssistantA
 		PageSize           *int    `json:"page_size"`
 	}{}
 
-	exampleArgs := `{"search_by_similarity":"buy milk","sort_by":"similarityAsc","page":1,"page_size":10}`
+	exampleArgs := `{"search_by_similarity":"buy milk","sort_by":"similarityAsc","page":1,"page_size":25}`
 
 	if err := unmarshalActionInput(call.Input, &params); err != nil {
 		return domain.AssistantMessage{

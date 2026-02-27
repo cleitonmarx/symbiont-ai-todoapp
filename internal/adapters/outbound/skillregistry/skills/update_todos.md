@@ -1,8 +1,8 @@
 ---
 name: todo-update
-use_when: User asks to update todos, including status/details changes, due date rescheduling, and marking todos done.
-avoid_when: User asks to create/add todos, fetch/list/confirm only, summarize only, or delete todos.
-priority: 92
+use_when: User explicitly asks to modify existing todos (update/edit/change/mark complete/reopen/reschedule/postpone/change due date).
+avoid_when: User asks to create/add todos, fetch/list/confirm only, summarize/overview/recap/count, or delete todos.
+priority: 90
 tags: [todos, update, mutation, status, due-date, schedule, mark]
 tools: [fetch_todos, update_todos, update_todos_due_date]
 ---
@@ -19,6 +19,7 @@ Rules:
 7. Keep tool arguments as strict JSON only.
 8. If update fails due to argument shape, correct and retry once.
 9. Keywords: update, mark done, complete, reopen, due date, deadline, reschedule, postpone.
+10. If intent is read-only summary/count/overview, do not use this skill.
 
 Preferred flow:
 - Detect update intent and target todo(s).

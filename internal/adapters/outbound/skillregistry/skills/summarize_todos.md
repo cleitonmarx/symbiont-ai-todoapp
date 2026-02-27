@@ -1,39 +1,31 @@
 ---
 name: todo-summary
-use_when: User asks for a concise summary/overview/recap todos, including prompts like "summary only" or "how many todos".
-avoid_when: User asks to create, update, reschedule, delete, or explicitly list individual todos.
-priority: 96
-tags: [todos, summary, concise, recap, overview, count]
+use_when: User asks to summarize/recap/overview/count todos in compact form (for example "give me a concise summary of my medical appointments", "make a concise summary of open todos due from March 1-7", "summary in one short paragraph", "brief summary", "high-level recap").
+avoid_when: User asks to create, update, reschedule, or delete todos, or explicitly asks to list/show/display individual todos.
+priority: 100
+tags: [todos, summary, summarize, concise, brief, recap, overview, count, paragraph, short, one-paragraph, medical, appointments, due, due-range, date-window, week]
 tools: [fetch_todos]
 ---
 
-Goal: provide a concise summary of todos without listing individual tasks.
+Goal: provide a concise summary without listing individual todos.
 
 Rules:
-1. Always fetch todos first with `fetch_todos`.
-2. Paginate through all results: start with `page=1`, keep fetching with `next_page` until it is null.
-3. Accumulate todos from every fetched page before producing the final summary.
-4. Count the total number of fetched todos across all pages.
-5. Ensure the total count matches the accumulated fetched results.
-6. If counts do not reconcile, recompute and fix before answering.
-7. Do not output category breakdowns or individual task lists.
-8. If the user asks for similarity search, include similarity parameters in `fetch_todos`; otherwise use normal filters.
-9. Keep the explanation very compact.
-10. This skill overrides default task-list formatting rules for this turn.
-11. Use one concise sentence to describe the overall focus/trend.
-
-Counting algorithm:
-1. Initialize `total = 0`.
-2. Iterate all fetched todos once.
-3. Increment `total` by 1 for each todo.
-4. If `total` differs from accumulated fetched results metadata, recalculate before responding.
-
-Output format:
-- `Total Summary (N tasks)`
-- One short sentence with the main focus/trend.
+1. Always call `fetch_todos` first.
+2. If user provides a date window (explicit or relative), apply `due_after` and `due_before` on the first fetch.
+3. If the date window is explicit and valid, do not ask follow-up questions.
+4. If user mentions a topic/domain (for example medical appointments, tax, travel), include a query filter on the first fetch (`search_by_similarity` preferred; `search_by_title` acceptable when explicitly title-oriented).
+5. Do not run unfiltered fetches when the prompt contains topical constraints.
+6. Pagination is mandatory for summaries: if `next_page` is not null, call `fetch_todos` again with that page.
+7. Keep paginating until `next_page` is null. Do not produce the final summary before the loop is complete.
+8. Keep the same scope across pagination (status, due range, query, sort); only `page` changes.
+9. If the prompt is topical and the first scoped fetch returns zero results, retry once with `search_by_similarity=<topic phrase>` and `sort_by=similarityAsc`, preserving status and due window.
+10. Aggregate all pages before summarizing.
+11. Return one short paragraph only (no category breakdown, no itemized list).
+12. Treat phrases like "medical appointments", "doctor visits", "health tasks", and "due from <month day-day>" as strong summary filters, not as follow-up questions.
 
 Preferred flow:
-- Fetch first page for the requested scope.
-- While `next_page` is present, fetch the next page and accumulate items.
-- Validate reconciliation for the final total.
-- Return only the final compact summary.
+- Build scope first (status + due window + topic query when present).
+- Fetch page 1.
+- If `next_page` exists, keep fetching `page=next_page` with the same scope until `next_page` is null.
+- If zero results on page 1, retry once with similarity search in the same scope.
+- Return one concise paragraph summary.

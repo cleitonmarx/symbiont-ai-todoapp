@@ -51,7 +51,7 @@ func (lft TodoFetcherAction) Definition() domain.AssistantActionDefinition {
 				},
 				"status": {
 					Type:        "string",
-					Description: "Optional status filter. Allowed values: OPEN or DONE.",
+					Description: "Optional status filter.",
 					Required:    false,
 					Enum:        []any{domain.TodoStatus_OPEN, domain.TodoStatus_DONE},
 				},

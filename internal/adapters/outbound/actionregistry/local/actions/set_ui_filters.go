@@ -29,44 +29,47 @@ func (t UIFiltersSetterAction) Definition() domain.AssistantActionDefinition {
 		Input: domain.AssistantActionInput{
 			Type: "object",
 			Fields: map[string]domain.AssistantActionField{
-				"status": {
-					Type:        "string",
-					Description: "Optional status filter. Allowed: OPEN or DONE.",
-					Required:    false,
-				},
-				"search_by_similarity": {
-					Type:        "string",
-					Description: "Optional semantic search query.",
-					Required:    false,
-				},
-				"search_by_title": {
-					Type:        "string",
-					Description: "Optional title contains query.",
-					Required:    false,
-				},
-				"sort_by": {
-					Type:        "string",
-					Description: "Optional sort. Allowed: dueDateAsc, dueDateDesc, createdAtAsc, createdAtDesc, similarityAsc, similarityDesc.",
-					Required:    false,
-				},
-				"due_after": {
-					Type:        "string",
-					Description: "Optional lower due-date bound in YYYY-MM-DD. Must be provided with due_before.",
-					Required:    false,
-				},
-				"due_before": {
-					Type:        "string",
-					Description: "Optional upper due-date bound in YYYY-MM-DD. Must be provided with due_after.",
-					Required:    false,
-				},
 				"page": {
 					Type:        "integer",
-					Description: "Optional page number starting from 1. Default 1.",
+					Description: "page number starting from 1. Optional.",
 					Required:    false,
 				},
 				"page_size": {
 					Type:        "integer",
-					Description: "Optional page size. Default 10. Use 25, 50, or 100 for larger sizes.",
+					Description: "Items per page. Optional.",
+					Required:    false,
+					Enum:        []any{25, 50, 100},
+				},
+				"status": {
+					Type:        "string",
+					Description: "status filter. Optional.",
+					Required:    false,
+					Enum:        []any{domain.TodoStatus_OPEN, domain.TodoStatus_DONE},
+				},
+				"search_by_similarity": {
+					Type:        "string",
+					Description: "semantic search query. Optional`.",
+					Required:    false,
+				},
+				"search_by_title": {
+					Type:        "string",
+					Description: "title contains query. Optional.",
+					Required:    false,
+				},
+				"sort_by": {
+					Type:        "string",
+					Description: "sort option. Optional.",
+					Required:    false,
+					Enum:        []any{"dueDateAsc", "dueDateDesc", "createdAtAsc", "createdAtDesc", "similarityAsc", "similarityDesc"},
+				},
+				"due_after": {
+					Type:        "string",
+					Description: "lower due-date bound in YYYY-MM-DD. Must be provided with due_before. Optional.",
+					Required:    false,
+				},
+				"due_before": {
+					Type:        "string",
+					Description: "upper due-date bound in YYYY-MM-DD. Must be provided with due_after. Optional.",
 					Required:    false,
 				},
 			},

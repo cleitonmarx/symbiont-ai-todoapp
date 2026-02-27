@@ -23,6 +23,11 @@ const (
 	defaultAvoidPenaltyWeight     = 0.80
 	defaultAvoidBlockThreshold    = 0.45
 	defaultStrongUseWhenScore     = 0.55
+	defaultCurrentInputWeight     = 0.65
+	defaultRecentInputsWeight     = 0.25
+	defaultSummaryWeight          = 0.10
+	defaultRecentInputsLimit      = 3
+	defaultSelectionMaxChars      = 400
 )
 
 // Config controls skill relevance ranking behavior.
@@ -32,6 +37,11 @@ type Config struct {
 	AvoidPenaltyWeight     float64
 	AvoidBlockThreshold    float64
 	StrongUseWhenScore     float64
+	CurrentInputWeight     float64
+	RecentInputsWeight     float64
+	SummaryWeight          float64
+	RecentInputsLimit      int
+	SelectionMaxChars      int
 }
 
 // Registry stores static markdown skills and ranks relevance with embeddings.
@@ -45,6 +55,11 @@ type Registry struct {
 	avoidPenaltyWeight  float64
 	avoidBlockThreshold float64
 	strongUseWhenScore  float64
+	currentInputWeight  float64
+	recentInputsWeight  float64
+	summaryWeight       float64
+	recentInputsLimit   int
+	selectionMaxChars   int
 }
 
 // skillFrontMatter represents the expected YAML frontmatter structure in skill markdown files.
@@ -70,6 +85,11 @@ type embeddedSkill struct {
 type scoredSkill struct {
 	definition domain.AssistantSkillDefinition
 	score      float64
+}
+
+type weightedQueryVector struct {
+	weight float64
+	vector []float64
 }
 
 //go:embed skills/*.md
@@ -119,6 +139,37 @@ func NewSkillRegistry(ctx context.Context, skills []domain.AssistantSkillDefinit
 		strongUseWhenScore = defaultStrongUseWhenScore
 	}
 
+	currentInputWeight := cfg.CurrentInputWeight
+	if currentInputWeight <= 0 {
+		currentInputWeight = defaultCurrentInputWeight
+	}
+
+	recentInputsWeight := cfg.RecentInputsWeight
+	if recentInputsWeight < 0 {
+		recentInputsWeight = 0
+	}
+	if recentInputsWeight == 0 {
+		recentInputsWeight = defaultRecentInputsWeight
+	}
+
+	summaryWeight := cfg.SummaryWeight
+	if summaryWeight < 0 {
+		summaryWeight = 0
+	}
+	if summaryWeight == 0 {
+		summaryWeight = defaultSummaryWeight
+	}
+
+	recentInputsLimit := cfg.RecentInputsLimit
+	if recentInputsLimit <= 0 {
+		recentInputsLimit = defaultRecentInputsLimit
+	}
+
+	selectionMaxChars := cfg.SelectionMaxChars
+	if selectionMaxChars <= 0 {
+		selectionMaxChars = defaultSelectionMaxChars
+	}
+
 	definitions := copySkillDefinitions(skills)
 	sort.Slice(definitions, func(i, j int) bool {
 		if definitions[i].Priority == definitions[j].Priority {
@@ -142,27 +193,59 @@ func NewSkillRegistry(ctx context.Context, skills []domain.AssistantSkillDefinit
 		avoidPenaltyWeight:  avoidPenaltyWeight,
 		avoidBlockThreshold: avoidBlockThreshold,
 		strongUseWhenScore:  strongUseWhenScore,
+		currentInputWeight:  currentInputWeight,
+		recentInputsWeight:  recentInputsWeight,
+		summaryWeight:       summaryWeight,
+		recentInputsLimit:   recentInputsLimit,
+		selectionMaxChars:   selectionMaxChars,
 	}, nil
 }
 
-// ListRelevant returns only the top relevant skills for the given user input.
-func (r Registry) ListRelevant(ctx context.Context, userInput string) []domain.AssistantSkillDefinition {
+// ListRelevant returns only the top relevant skills for the given turn context.
+func (r Registry) ListRelevant(ctx context.Context, query domain.AssistantSkillQueryContext) []domain.AssistantSkillDefinition {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	userInput = strings.TrimSpace(userInput)
-	if userInput == "" || r.encoder == nil || strings.TrimSpace(r.embeddingModel) == "" || len(r.embedded) == 0 {
+	if r.encoder == nil || strings.TrimSpace(r.embeddingModel) == "" || len(r.embedded) == 0 {
 		return nil
 	}
 
-	queryVector, err := r.encoder.VectorizeQuery(spanCtx, r.embeddingModel, userInput)
-	if err != nil || len(queryVector.Vector) == 0 {
+	currentInput, recentInputs := buildSelectionInputs(query.Messages, r.selectionMaxChars, r.recentInputsLimit)
+	if currentInput == "" {
 		return nil
+	}
+
+	currentVector, err := r.encoder.VectorizeQuery(spanCtx, r.embeddingModel, currentInput)
+	if err != nil || len(currentVector.Vector) == 0 {
+		return nil
+	}
+
+	var recentVector []float64
+	if recentInputs != "" {
+		vec, err := r.encoder.VectorizeQuery(spanCtx, r.embeddingModel, recentInputs)
+		if err == nil && len(vec.Vector) > 0 {
+			recentVector = vec.Vector
+		}
+	}
+
+	var summaryVector []float64
+	summary := truncateToLastChars(strings.TrimSpace(query.ConversationSummary), r.selectionMaxChars)
+	if summary != "" {
+		vec, err := r.encoder.VectorizeQuery(spanCtx, r.embeddingModel, summary)
+		if err == nil && len(vec.Vector) > 0 {
+			summaryVector = vec.Vector
+		}
+	}
+
+	queryVectors := []weightedQueryVector{
+		{weight: r.currentInputWeight, vector: currentVector.Vector},
+		{weight: r.recentInputsWeight, vector: recentVector},
+		{weight: r.summaryWeight, vector: summaryVector},
 	}
 
 	scored := make([]scoredSkill, 0, len(r.embedded))
 	for _, skill := range r.embedded {
-		score, ok := r.scoreSkill(queryVector.Vector, skill)
+		score, ok := r.scoreSkill(queryVectors, skill)
 		if !ok || score < r.minScore {
 			continue
 		}
@@ -198,19 +281,17 @@ func (r Registry) ListRelevant(ctx context.Context, userInput string) []domain.A
 	return relevant
 }
 
-// scoreSkill calculates a relevance score for a skill based on cosine similarity of the query vector
-// with the skill's use and avoid vectors, applying penalties and thresholds as configured.
-func (r Registry) scoreSkill(queryVector []float64, skill embeddedSkill) (float64, bool) {
-	useScore, ok := common.CosineSimilarity(queryVector, skill.useVector)
+// scoreSkill calculates a relevance score for a skill based on weighted cosine similarity
+// of current input, recent inputs, and optional summary vectors.
+func (r Registry) scoreSkill(queryVectors []weightedQueryVector, skill embeddedSkill) (float64, bool) {
+	useScore, ok := weightedSimilarity(queryVectors, skill.useVector)
 	if !ok {
 		return 0, false
 	}
 
 	avoidScore := 0.0
 	if len(skill.avoidVector) > 0 {
-		if sim, ok := common.CosineSimilarity(queryVector, skill.avoidVector); ok {
-			avoidScore = sim
-		}
+		avoidScore, _ = weightedSimilarity(queryVectors, skill.avoidVector)
 		if avoidScore >= r.avoidBlockThreshold && useScore < r.strongUseWhenScore {
 			return 0, false
 		}
@@ -218,6 +299,99 @@ func (r Registry) scoreSkill(queryVector []float64, skill embeddedSkill) (float6
 
 	score := useScore - (r.avoidPenaltyWeight * avoidScore) + priorityBoost(skill.definition.Priority)
 	return score, true
+}
+
+func weightedSimilarity(queryVectors []weightedQueryVector, skillVector []float64) (float64, bool) {
+	if len(skillVector) == 0 {
+		return 0, false
+	}
+
+	weightedSum := 0.0
+	totalWeight := 0.0
+	for _, q := range queryVectors {
+		if q.weight <= 0 || len(q.vector) == 0 {
+			continue
+		}
+		sim, ok := common.CosineSimilarity(q.vector, skillVector)
+		if !ok {
+			continue
+		}
+		weightedSum += q.weight * sim
+		totalWeight += q.weight
+	}
+
+	if totalWeight == 0 {
+		return 0, false
+	}
+
+	return weightedSum / totalWeight, true
+}
+
+func buildSelectionInputs(messages []domain.AssistantMessage, maxChars int, recentLimit int) (string, string) {
+	if len(messages) == 0 {
+		return "", ""
+	}
+
+	currentIndex := -1
+	currentInput := ""
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
+		if msg.Role != domain.ChatRole_User {
+			continue
+		}
+		content := strings.TrimSpace(msg.Content)
+		if content == "" {
+			continue
+		}
+		currentIndex = i
+		currentInput = truncateToLastChars(content, maxChars)
+		break
+	}
+	if currentIndex == -1 || currentInput == "" {
+		return "", ""
+	}
+
+	if recentLimit <= 0 {
+		return currentInput, ""
+	}
+
+	recent := make([]string, 0, recentLimit)
+	for i := currentIndex - 1; i >= 0 && len(recent) < recentLimit; i-- {
+		msg := messages[i]
+		if msg.Role != domain.ChatRole_User {
+			continue
+		}
+		content := strings.TrimSpace(msg.Content)
+		if content == "" {
+			continue
+		}
+		recent = append(recent, truncateToLastChars(content, maxChars))
+	}
+
+	if len(recent) == 0 {
+		return currentInput, ""
+	}
+
+	// keep chronological order (oldest to newest) for a better context sentence.
+	for i, j := 0, len(recent)-1; i < j; i, j = i+1, j-1 {
+		recent[i], recent[j] = recent[j], recent[i]
+	}
+
+	return currentInput, strings.Join(recent, "\n")
+}
+
+func truncateToLastChars(input string, maxChars int) string {
+	trimmed := strings.TrimSpace(input)
+	if maxChars <= 0 {
+		return ""
+	}
+
+	runes := []rune(trimmed)
+	if len(runes) <= maxChars {
+		return trimmed
+	}
+
+	return string(runes[len(runes)-maxChars:])
 }
 
 // embedSkills generates use and avoid vectors for each skill definition.
@@ -388,23 +562,23 @@ func copySkillDefinitions(skills []domain.AssistantSkillDefinition) []domain.Ass
 
 // InitLocalSkillRegistry registers a local skill registry backed by static markdown files.
 type InitLocalSkillRegistry struct {
-	SemanticEncoder        domain.SemanticEncoder `resolve:""`
-	EmbeddingModel         string                 `config:"LLM_EMBEDDING_MODEL"`
-	RelevantSkillsTopK     int                    `config:"ASSISTANT_RELEVANT_SKILLS_TOP_K" default:"3"`
-	RelevantSkillsMinScore float64                `config:"ASSISTANT_RELEVANT_SKILLS_MIN_SCORE" default:"0.2"`
-	AvoidPenaltyWeight     float64                `config:"ASSISTANT_SKILLS_AVOID_PENALTY_WEIGHT" default:"0.8"`
-	AvoidBlockThreshold    float64                `config:"ASSISTANT_SKILLS_AVOID_BLOCK_THRESHOLD" default:"0.45"`
-	StrongUseWhenScore     float64                `config:"ASSISTANT_SKILLS_STRONG_USE_WHEN_SCORE" default:"0.55"`
+	SemanticEncoder domain.SemanticEncoder `resolve:""`
+	EmbeddingModel  string                 `config:"LLM_EMBEDDING_MODEL"`
 }
 
 // Initialize loads skills and registers the domain skill registry.
 func (i InitLocalSkillRegistry) Initialize(ctx context.Context) (context.Context, error) {
 	registry, err := NewSkillRegistryFromFS(ctx, i.SemanticEncoder, i.EmbeddingModel, Config{
-		RelevantSkillsTopK:     i.RelevantSkillsTopK,
-		RelevantSkillsMinScore: i.RelevantSkillsMinScore,
-		AvoidPenaltyWeight:     i.AvoidPenaltyWeight,
-		AvoidBlockThreshold:    i.AvoidBlockThreshold,
-		StrongUseWhenScore:     i.StrongUseWhenScore,
+		RelevantSkillsTopK:     defaultRelevantSkillsTopK,
+		RelevantSkillsMinScore: defaultRelevantSkillsMinScore,
+		AvoidPenaltyWeight:     defaultAvoidPenaltyWeight,
+		AvoidBlockThreshold:    defaultAvoidBlockThreshold,
+		StrongUseWhenScore:     defaultStrongUseWhenScore,
+		CurrentInputWeight:     defaultCurrentInputWeight,
+		RecentInputsWeight:     defaultRecentInputsWeight,
+		SummaryWeight:          defaultSummaryWeight,
+		RecentInputsLimit:      defaultRecentInputsLimit,
+		SelectionMaxChars:      defaultSelectionMaxChars,
 	})
 	if err != nil {
 		return ctx, fmt.Errorf("failed to initialize skill registry: %w", err)

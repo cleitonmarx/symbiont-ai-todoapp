@@ -211,17 +211,84 @@ Build a simple plan in steps.
 	})
 	require.NoError(t, err)
 
-	relevant := registry.ListRelevant(context.Background(), "please delete my groceries todos")
+	relevant := registry.ListRelevant(context.Background(), domain.AssistantSkillQueryContext{
+		Messages: []domain.AssistantMessage{
+			{Role: domain.ChatRole_User, Content: "please delete my groceries todos"},
+		},
+	})
 	require.NotEmpty(t, relevant)
 	assert.Equal(t, "todo-mutation-safety", relevant[0].Name)
 	assert.LessOrEqual(t, len(relevant), 2)
 
-	chatRelevant := registry.ListRelevant(context.Background(), "just chat summary")
+	chatRelevant := registry.ListRelevant(context.Background(), domain.AssistantSkillQueryContext{
+		Messages: []domain.AssistantMessage{
+			{Role: domain.ChatRole_User, Content: "just chat summary"},
+		},
+	})
 	require.NotEmpty(t, chatRelevant)
 	assert.Equal(t, "planning", chatRelevant[0].Name)
 
-	none := registry.ListRelevant(context.Background(), "")
+	none := registry.ListRelevant(context.Background(), domain.AssistantSkillQueryContext{})
 	assert.Empty(t, none)
+}
+
+func TestBuildSelectionInputs_Table(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		messages    []domain.AssistantMessage
+		maxChars    int
+		recentLimit int
+		wantCurrent string
+		wantRecent  string
+	}{
+		{
+			name: "current-and-recent-user-inputs",
+			messages: []domain.AssistantMessage{
+				{Role: domain.ChatRole_User, Content: "plan trip to tokyo"},
+				{Role: domain.ChatRole_Assistant, Content: "What dates?"},
+				{Role: domain.ChatRole_User, Content: "april 5 to 18"},
+			},
+			maxChars:    400,
+			recentLimit: 3,
+			wantCurrent: "april 5 to 18",
+			wantRecent:  "plan trip to tokyo",
+		},
+		{
+			name: "respects-recent-limit",
+			messages: []domain.AssistantMessage{
+				{Role: domain.ChatRole_User, Content: "u1"},
+				{Role: domain.ChatRole_User, Content: "u2"},
+				{Role: domain.ChatRole_User, Content: "u3"},
+				{Role: domain.ChatRole_User, Content: "u4"},
+			},
+			maxChars:    400,
+			recentLimit: 2,
+			wantCurrent: "u4",
+			wantRecent:  "u2\nu3",
+		},
+		{
+			name: "returns-empty-without-user-message",
+			messages: []domain.AssistantMessage{
+				{Role: domain.ChatRole_System, Content: "system"},
+			},
+			maxChars:    400,
+			recentLimit: 3,
+			wantCurrent: "",
+			wantRecent:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotCurrent, gotRecent := buildSelectionInputs(tt.messages, tt.maxChars, tt.recentLimit)
+			assert.Equal(t, tt.wantCurrent, gotCurrent)
+			assert.Equal(t, tt.wantRecent, gotRecent)
+		})
+	}
 }
 
 func TestInitLocalSkillRegistry_Initialize(t *testing.T) {
@@ -231,13 +298,8 @@ func TestInitLocalSkillRegistry_Initialize(t *testing.T) {
 		Return(domain.EmbeddingVector{Vector: []float64{1, 0}}, domain.EmbeddingVector{Vector: []float64{0, 1}}, nil)
 
 	i := InitLocalSkillRegistry{
-		SemanticEncoder:        enc,
-		EmbeddingModel:         "test-embedding-model",
-		RelevantSkillsTopK:     5,
-		RelevantSkillsMinScore: 0.1,
-		AvoidPenaltyWeight:     0.5,
-		AvoidBlockThreshold:    0.3,
-		StrongUseWhenScore:     0.7,
+		SemanticEncoder: enc,
+		EmbeddingModel:  "test-embedding-model",
 	}
 
 	ctx, err := i.Initialize(t.Context())

@@ -30,14 +30,9 @@ const (
 	CHAT_TEMPERATURE = 0.2
 	CHAT_TOP_P       = 0.7
 
-	MAX_ACTION_SELECTION_CHARS = 400
-	MAX_ACTION_PROMPT_CHARS    = 800
+	MAX_SKILLS_SELECTION_CHARS = 400
+	MAX_SKILLS_PROMPT_CHARS    = 4000
 	MAX_RECOVERY_MESSAGES      = 8
-
-	fetchTodosActionName         = "fetch_todos"
-	updateTodosActionName        = "update_todos"
-	updateTodosDueDateActionName = "update_todos_due_date"
-	deleteTodosActionName        = "delete_todos"
 )
 
 //go:embed prompts/chat.yml
@@ -73,6 +68,7 @@ type StreamChatImpl struct {
 	timeProvider            domain.CurrentTimeProvider
 	assistant               domain.Assistant
 	actionRegistry          domain.AssistantActionRegistry
+	skillRegistry           domain.AssistantSkillRegistry
 	approvalDispatcher      domain.AssistantActionApprovalDispatcher
 	embeddingModel          string
 	maxActionCycles         int
@@ -87,6 +83,7 @@ func NewStreamChatImpl(
 	timeProvider domain.CurrentTimeProvider,
 	assistant domain.Assistant,
 	actionRegistry domain.AssistantActionRegistry,
+	assistantSkillRegistry domain.AssistantSkillRegistry,
 	approvalDispatcher domain.AssistantActionApprovalDispatcher,
 	uow domain.UnitOfWork,
 	embeddingModel string,
@@ -101,6 +98,7 @@ func NewStreamChatImpl(
 		timeProvider:            timeProvider,
 		assistant:               assistant,
 		actionRegistry:          actionRegistry,
+		skillRegistry:           assistantSkillRegistry,
 		approvalDispatcher:      approvalDispatcher,
 		embeddingModel:          embeddingModel,
 		maxActionCycles:         maxActionCycles,
@@ -140,16 +138,25 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		Content: userMessage,
 	})
 
-	relevantActions := sc.actionRegistry.ListRelevant(
-		spanCtx,
-		buildActionSelectionText(messagesHistory),
-	)
-	relevantActions = sc.withRecoveryActions(relevantActions)
+	skills := sc.skillRegistry.ListRelevant(spanCtx, buildActionSelectionText(messagesHistory))
+	relevantActions := make([]domain.AssistantActionDefinition, 0, len(skills))
+	uniqueActionNames := make(map[string]struct{})
+	for _, s := range skills {
+		sc.logger.Printf("StreamChat: skill '%s' is relevant for the current conversation context", s.Name)
+		for _, tool := range s.Tools {
+			if action, ok := sc.actionRegistry.GetDefinition(tool); ok {
+				if _, exists := uniqueActionNames[action.Name]; !exists {
+					relevantActions = append(relevantActions, action)
+					uniqueActionNames[action.Name] = struct{}{}
+				}
+			}
+		}
+	}
 
-	if actionPrompt := buildActionsPrompt(relevantActions); actionPrompt != "" {
+	if skillsPrompt := buildSkillsPrompt(skills); skillsPrompt != "" {
 		messagesHistory = append(messagesHistory, domain.AssistantMessage{
 			Role:    domain.ChatRole_System,
-			Content: actionPrompt,
+			Content: skillsPrompt,
 		})
 	}
 
@@ -506,7 +513,6 @@ func (sc StreamChatImpl) handleActionCallEvent(
 			Content: "Tool call failed. Read the tool error details/example, then retry with corrected arguments or another tool. " +
 				"If updating/deleting todos failed due to missing or unmatched IDs, fetch todos first to resolve UUIDs, then retry.",
 		})
-		req.AvailableActions = sc.withRecoveryActions(req.AvailableActions)
 	}
 
 	return true, nil
@@ -974,73 +980,86 @@ func buildActionSelectionText(messages []domain.AssistantMessage) string {
 		}
 	}
 
-	return truncateToLastChars(selectionText, MAX_ACTION_SELECTION_CHARS)
+	return truncateToLastChars(selectionText, MAX_SKILLS_SELECTION_CHARS)
 }
 
-// buildActionsPrompt creates a compact system prompt containing only the
-// relevant action guidance for this turn.
-func buildActionsPrompt(actions []domain.AssistantActionDefinition) string {
-	if len(actions) == 0 {
+// buildSkillsPrompt constructs a prompt describing the assistant skills
+// to guide the model's tool selection and usage.
+func buildSkillsPrompt(skills []domain.AssistantSkillDefinition) string {
+	if len(skills) == 0 {
 		return ""
 	}
 
-	var b strings.Builder
-	b.WriteString("Tooling rules for this turn:\n")
-	b.WriteString("- Use only available tools for this turn.\n")
-	b.WriteString("- Arguments must be strict JSON matching each tool schema.\n")
-	b.WriteString("- For fields named id, *_id, or ids: use UUID values only (never title text).\n")
-	b.WriteString("- If required UUIDs are missing, fetch/select items first, then call mutation tools.\n")
-	b.WriteString("- If a tool call fails (for example `error` or `errors[...]`), correct the arguments or use another tool; do not stop after the first failure.\n")
-	b.WriteString("Tools in scope (priority order):\n")
+	unique := func(values []string) []string {
+		out := make([]string, 0, len(values))
+		seen := map[string]struct{}{}
+		for _, raw := range values {
+			v := strings.TrimSpace(raw)
+			if v == "" {
+				continue
+			}
+			key := strings.ToLower(v)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, v)
+		}
+		return out
+	}
 
-	for _, action := range actions {
-		b.WriteString("- ")
-		b.WriteString(action.Name)
-		b.WriteString(": ")
-		b.WriteString(action.ComposeHint())
+	var b strings.Builder
+	b.WriteString("Skill runbooks for this turn:\n")
+	b.WriteString("- Follow these workflows when deciding and calling tools.\n")
+	b.WriteString("- Use strict JSON for tool arguments and match tool schemas exactly.\n\n")
+
+	for _, skill := range skills {
+		name := strings.TrimSpace(skill.Name)
+		if name == "" {
+			continue
+		}
+
+		b.WriteString("Skill: ")
+		b.WriteString(name)
+		b.WriteString("\n")
+
+		if useWhen := strings.TrimSpace(skill.UseWhen); useWhen != "" {
+			b.WriteString("Use when: ")
+			b.WriteString(useWhen)
+			b.WriteString("\n")
+		}
+		if avoidWhen := strings.TrimSpace(skill.AvoidWhen); avoidWhen != "" {
+			b.WriteString("Avoid when: ")
+			b.WriteString(avoidWhen)
+			b.WriteString("\n")
+		}
+
+		tools := unique(skill.Tools)
+		if len(tools) > 0 {
+			b.WriteString("Tools: ")
+			b.WriteString(strings.Join(tools, ", "))
+			b.WriteString("\n")
+		}
+
+		if content := strings.TrimSpace(skill.Content); content != "" {
+			b.WriteString("Workflow:\n")
+			b.WriteString(content)
+			b.WriteString("\n")
+		}
+
 		b.WriteString("\n")
 	}
 
-	return truncateToFirstChars(strings.TrimSpace(b.String()), MAX_ACTION_PROMPT_CHARS)
+	prompt := strings.TrimSpace(b.String())
+	if prompt == "" {
+		return ""
+	}
+
+	return truncateToFirstChars(prompt, MAX_SKILLS_PROMPT_CHARS)
 }
 
-func (sc StreamChatImpl) withRecoveryActions(actions []domain.AssistantActionDefinition) []domain.AssistantActionDefinition {
-	if len(actions) == 0 {
-		return actions
-	}
-
-	needsTodoFetcher := false
-	hasTodoFetcher := false
-	insertAt := 0
-
-	for i, action := range actions {
-		switch action.Name {
-		case fetchTodosActionName:
-			hasTodoFetcher = true
-		case updateTodosActionName, updateTodosDueDateActionName, deleteTodosActionName:
-			if !needsTodoFetcher {
-				insertAt = i
-			}
-			needsTodoFetcher = true
-		}
-	}
-
-	if !needsTodoFetcher || hasTodoFetcher {
-		return actions
-	}
-
-	fetchTodosDefinition, found := sc.actionRegistry.GetDefinition(fetchTodosActionName)
-	if !found {
-		return actions
-	}
-
-	withRecovery := make([]domain.AssistantActionDefinition, 0, len(actions)+1)
-	withRecovery = append(withRecovery, actions[:insertAt]...)
-	withRecovery = append(withRecovery, fetchTodosDefinition)
-	withRecovery = append(withRecovery, actions[insertAt:]...)
-	return withRecovery
-}
-
+// prepareRunTurnRecovery modifies the request messages to include a system message
+// about the failure and compacts the history for a recovery attempt.
 func (sc StreamChatImpl) prepareRunTurnRecovery(
 	runTurnErr error,
 	req *domain.AssistantTurnRequest,
@@ -1065,6 +1084,8 @@ func (sc StreamChatImpl) prepareRunTurnRecovery(
 	return true
 }
 
+// compactToLastMessages returns the last maxMessages from the input slice,
+// or all messages if the total count is less than or equal to maxMessages.
 func compactToLastMessages(messages []domain.AssistantMessage, maxMessages int) []domain.AssistantMessage {
 	if maxMessages <= 0 || len(messages) == 0 {
 		return nil
@@ -1181,9 +1202,11 @@ type InitStreamChat struct {
 	Uow                     domain.UnitOfWork                        `resolve:""`
 	TimeProvider            domain.CurrentTimeProvider               `resolve:""`
 	AssistantActionRegistry domain.AssistantActionRegistry           `resolve:""`
+	AssistantSkillRegistry  domain.AssistantSkillRegistry            `resolve:""`
 	ApprovalDispatcher      domain.AssistantActionApprovalDispatcher `resolve:""`
 	Assistant               domain.Assistant                         `resolve:""`
 	EmbeddingModel          string                                   `config:"LLM_EMBEDDING_MODEL"`
+
 	// Maximum number of action cycles to prevent infinite loops
 	// It restricts how many times the Assistant can invoke actions in a single chat session
 	MaxActionCycles int `config:"LLM_MAX_ACTION_CYCLES" default:"50"`
@@ -1199,6 +1222,7 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 		i.TimeProvider,
 		i.Assistant,
 		i.AssistantActionRegistry,
+		i.AssistantSkillRegistry,
 		i.ApprovalDispatcher,
 		i.Uow,
 		i.EmbeddingModel,

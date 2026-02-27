@@ -29,6 +29,7 @@ type streamChatTestTableEntry struct {
 		*domain.MockCurrentTimeProvider,
 		*domain.MockAssistant,
 		*domain.MockAssistantActionRegistry,
+		*domain.MockAssistantSkillRegistry,
 		*domain.MockUnitOfWork,
 		*domain.MockOutboxRepository,
 	)
@@ -50,9 +51,9 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	timeProvider := domain.NewMockCurrentTimeProvider(t)
 	assistant := domain.NewMockAssistant(t)
 	actionRegistry := domain.NewMockAssistantActionRegistry(t)
+	skillRegistry := domain.NewMockAssistantSkillRegistry(t)
 	uow := domain.NewMockUnitOfWork(t)
 	outbox := domain.NewMockOutboxRepository(t)
-
 	if strings.TrimSpace(tt.userMessage) != "" && tt.model != "" && !tt.customSummaryExpectation {
 		summaryRepo.EXPECT().
 			GetConversationSummary(mock.Anything, conversationID).
@@ -61,7 +62,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	}
 
 	if tt.setExpectations != nil {
-		tt.setExpectations(chatRepo, summaryRepo, conversationRepo, timeProvider, assistant, actionRegistry, uow, outbox)
+		tt.setExpectations(chatRepo, summaryRepo, conversationRepo, timeProvider, assistant, actionRegistry, skillRegistry, uow, outbox)
 	}
 
 	useCase := NewStreamChatImpl(
@@ -72,6 +73,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 		timeProvider,
 		assistant,
 		actionRegistry,
+		skillRegistry,
 		nil,
 		uow,
 		"test-embedding-model",

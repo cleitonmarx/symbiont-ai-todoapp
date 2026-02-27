@@ -134,9 +134,15 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			timeProvider := domain.NewMockCurrentTimeProvider(t)
 			assistant := domain.NewMockAssistant(t)
 			actionRegistry := domain.NewMockAssistantActionRegistry(t)
+			skillRegistry := domain.NewMockAssistantSkillRegistry(t)
 			approvalDispatcher := domain.NewMockAssistantActionApprovalDispatcher(t)
 			uow := domain.NewMockUnitOfWork(t)
 			outbox := domain.NewMockOutboxRepository(t)
+
+			skillRegistry.EXPECT().
+				ListRelevant(mock.Anything, mock.Anything).
+				Return([]domain.AssistantSkillDefinition{}).
+				Once()
 
 			timeProvider.EXPECT().
 				Now().
@@ -155,11 +161,6 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			chatRepo.EXPECT().
 				ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
 				Return([]domain.ChatMessage{}, false, nil).
-				Once()
-
-			actionRegistry.EXPECT().
-				ListRelevant(mock.Anything, "Delete todo 1").
-				Return([]domain.AssistantActionDefinition{actionDefinition}).
 				Once()
 
 			actionRegistry.EXPECT().
@@ -286,6 +287,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				timeProvider,
 				assistant,
 				actionRegistry,
+				skillRegistry,
 				approvalDispatcher,
 				uow,
 				"test-embedding-model",

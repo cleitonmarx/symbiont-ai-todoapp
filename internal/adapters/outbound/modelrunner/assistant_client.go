@@ -182,7 +182,6 @@ func buildSkillUseEmbeddingText(skill domain.AssistantSkillDefinition) string {
 	if len(skill.Tools) > 0 {
 		parts = append(parts, "tools: "+strings.Join(skill.Tools, ", "))
 	}
-	parts = appendIfNotEmpty(parts, "content: "+strings.TrimSpace(skill.Content))
 	return strings.Join(parts, "\n")
 }
 

@@ -1,6 +1,6 @@
 ---
 name: todo-summary
-use_when: User asks for a concise summary/overview/recap todos, including prompts like "don't list todos", "summary only", or "how many todos".
+use_when: User asks for a concise summary/overview/recap todos, including prompts like "summary only" or "how many todos".
 avoid_when: User asks to create, update, reschedule, delete, or explicitly list individual todos.
 priority: 96
 tags: [todos, summary, concise, recap, overview, count]

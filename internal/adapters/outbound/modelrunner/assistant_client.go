@@ -150,19 +150,56 @@ func (a AssistantClient) VectorizeQuery(ctx context.Context, model, query string
 	return vec, nil
 }
 
-// VectorizeAssistantActionDefinition implements domain.SemanticEncoder.
-func (a AssistantClient) VectorizeAssistantActionDefinition(ctx context.Context, model string, action domain.AssistantActionDefinition) (domain.EmbeddingVector, error) {
-	spanCtx, span := telemetry.Start(ctx)
-	defer span.End()
-
-	gen := a.embeddingFactory.Get(model)
-	prompt := gen.GenerateAssistentActionDefinitionPrompt(action)
-	dimension := gen.Dimensions()
-	vec, err := a.embed(spanCtx, model, prompt, dimension)
-	if telemetry.RecordErrorAndStatus(span, err) {
-		return domain.EmbeddingVector{}, err
+// VectorizeSkillDefinition implements domain.SemanticEncoder.
+func (a AssistantClient) VectorizeSkillDefinition(
+	ctx context.Context,
+	model string,
+	skill domain.AssistantSkillDefinition,
+) (domain.EmbeddingVector, domain.EmbeddingVector, error) {
+	useVector, err := a.VectorizeQuery(ctx, model, buildSkillUseEmbeddingText(skill))
+	if err != nil {
+		return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
 	}
-	return vec, nil
+
+	avoidText := buildSkillAvoidEmbeddingText(skill)
+	if avoidText == "" {
+		return useVector, domain.EmbeddingVector{}, nil
+	}
+
+	avoidVector, err := a.VectorizeQuery(ctx, model, avoidText)
+	if err != nil {
+		return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
+	}
+	return useVector, avoidVector, nil
+}
+
+func buildSkillUseEmbeddingText(skill domain.AssistantSkillDefinition) string {
+	parts := make([]string, 0, 5)
+	parts = appendIfNotEmpty(parts, "name: "+strings.TrimSpace(skill.Name))
+	parts = appendIfNotEmpty(parts, "use_when: "+strings.TrimSpace(skill.UseWhen))
+	if len(skill.Tags) > 0 {
+		parts = append(parts, "tags: "+strings.Join(skill.Tags, ", "))
+	}
+	if len(skill.Tools) > 0 {
+		parts = append(parts, "tools: "+strings.Join(skill.Tools, ", "))
+	}
+	parts = appendIfNotEmpty(parts, "content: "+strings.TrimSpace(skill.Content))
+	return strings.Join(parts, "\n")
+}
+
+func buildSkillAvoidEmbeddingText(skill domain.AssistantSkillDefinition) string {
+	avoid := strings.TrimSpace(skill.AvoidWhen)
+	if avoid == "" {
+		return ""
+	}
+	return "avoid_when: " + avoid
+}
+
+func appendIfNotEmpty(values []string, value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return values
+	}
+	return append(values, value)
 }
 
 func (a AssistantClient) embed(ctx context.Context, model, input string, dimension *int) (domain.EmbeddingVector, error) {

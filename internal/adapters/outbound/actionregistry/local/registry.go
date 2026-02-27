@@ -15,7 +15,6 @@ import (
 
 // LocalRegistry manages a set of assistant actions defined within the todo application.
 type LocalRegistry struct {
-	//embeddingByActionName map[string]actionregistry.ActionEmbedding
 	actionsByName map[string]domain.AssistantAction
 }
 

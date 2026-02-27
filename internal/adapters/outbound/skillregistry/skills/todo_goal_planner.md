@@ -1,7 +1,7 @@
 ---
 name: todo-goal-planner
 use_when: User asks to create/build/generate a new end-to-end plan toward a goal or deadline (for example build the entire plan, break this into tasks, roadmap, checklist, step-by-step, until date X), especially when research/recommendations are requested.
-avoid_when: User asks to list/find/search/filter/sort/paginate/confirm existing todos, requests summary-only, or asks for simple create/update/delete/fetch operations on known todos.
+avoid_when: User asks to list/find/search/filter/sort/paginate/confirm existing todos, requests summary-only, or asks for create/update/delete/fetch operations on known todos.
 priority: 95
 tags: [todos, planning, roadmap, milestones, deadline, project, research]
 tools: [search, fetch_content, create_todos, fetch_todos]

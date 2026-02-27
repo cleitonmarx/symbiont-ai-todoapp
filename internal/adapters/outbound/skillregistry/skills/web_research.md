@@ -1,9 +1,9 @@
 ---
 name: web-research
-use_when: User asks for external information, references, recent updates, or content from websites.
+use_when: User asks for external information, references, recent updates, or content from websites or URLs.
 avoid_when: Request is fully about internal todo CRUD with no need for external sources.
 priority: 75
-tags: [web, search, fetch, research, online, references]
+tags: [web, search, fetch, content, research, online, references]
 tools: [search, fetch_content]
 ---
 

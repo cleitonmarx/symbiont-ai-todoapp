@@ -3,7 +3,7 @@ name: todo-summary
 use_when: User asks to summarize/recap/overview/count todos in compact form (for example "give me a concise summary of my medical appointments", "make a concise summary of open todos due from March 1-7", "summary in one short paragraph", "brief summary", "high-level recap").
 avoid_when: User asks to create, update, reschedule, or delete todos, or explicitly asks to list/show/display individual todos.
 priority: 100
-tags: [todos, summary, summarize, concise, brief, recap, overview, count, paragraph, short, one-paragraph, medical, appointments, due, due-range, date-window, week]
+tags: [todos, summary, summarize, concise, brief, recap, overview, count, paragraph, short, one-paragraph, due, due-range, date-window, week]
 tools: [fetch_todos]
 ---
 

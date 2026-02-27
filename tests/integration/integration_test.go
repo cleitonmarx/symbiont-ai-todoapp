@@ -382,7 +382,6 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 
 		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsTextFromScanner(t, scanner)
 		fmt.Println("Chat response:", deltaText)
-		fmt.Printf("Action started text: %s\n", actionStartedText)
 		require.Contains(t, actionStartedText, "🗑️ Deleting todos...")
 		require.GreaterOrEqual(t, actionCompletedCount, 1)
 	})

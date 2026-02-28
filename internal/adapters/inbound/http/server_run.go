@@ -12,6 +12,8 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont/introspection"
+	"github.com/cleitonmarx/symbiont/introspection/mermaid"
 	"github.com/rs/cors"
 )
 
@@ -33,6 +35,7 @@ type TodoAppServer struct {
 	DeleteConversationUseCase   usecases.DeleteConversation   `resolve:""`
 	ListAvailableModelsUseCase  usecases.ListAvailableModels  `resolve:""`
 	StreamChatUseCase           usecases.StreamChat           `resolve:""`
+	introspectionReport         introspection.Report
 }
 
 //go:embed webappdist/*
@@ -51,7 +54,7 @@ func (api TodoAppServer) Run(ctx context.Context) error {
 	mux.Handle("/", http.FileServerFS(sub))
 
 	// Register introspection endpoint for debugging and testing purposes
-	mux.HandleFunc("/introspect", IntrospectHandler)
+	mux.Handle("/introspect/", mermaid.NewGraphHandler("TodoApp", api.introspectionReport))
 
 	// Create the OpenAPI handler with telemetry middleware
 	h := gen.HandlerWithOptions(api, gen.StdHTTPServerOptions{

@@ -2,7 +2,7 @@
 
 This document contains the full generated Mermaid graph for the TodoApp Symbiont composition.
 
-Interactive endpoint when running locally: `http://localhost:8080/introspect`
+Interactive endpoint when running locally: `http://localhost:8080/introspect/`
 
 ```mermaid
 ---

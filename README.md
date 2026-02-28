@@ -41,7 +41,7 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 
 ### Generated Introspection Graph
 
-- Interactive graph endpoint: `http://localhost:8080/introspect`
+- Interactive graph endpoint: `http://localhost:8080/introspect/`
 - Full generated Mermaid graph: `docs/introspection.md`
 
 ## Async Batching Behavior
@@ -224,7 +224,7 @@ Useful local URLs:
 
 - App + REST API + embedded UI: `http://localhost:8080`
 - GraphQL playground: `http://localhost:8085`
-- App dependency graph introspection: `http://localhost:8080/introspect`
+- App dependency graph introspection: `http://localhost:8080/introspect/`
 - Jaeger: `http://localhost:16686`
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (admin/admin)

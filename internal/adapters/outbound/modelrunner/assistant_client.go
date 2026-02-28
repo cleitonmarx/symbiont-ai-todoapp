@@ -374,24 +374,15 @@ type InitAssistantClient struct {
 	HttpClient         *http.Client `resolve:""`
 	EmbeddingModelHost string       `config:"LLM_EMBEDDING_MODEL_HOST"`
 	ModelHost          string       `config:"LLM_MODEL_HOST"`
-	APIKey             string       `config:"LLM_API_KEY" default:"-"`
-	EmbeddingAPIKey    string       `config:"LLM_EMBEDDING_API_KEY" default:"-"`
+	APIKey             string       `config:"LLM_API_KEY" default:""`
+	EmbeddingAPIKey    string       `config:"LLM_EMBEDDING_API_KEY" default:""`
 }
 
 // Initialize registers assistant/model interfaces.
 func (i InitAssistantClient) Initialize(ctx context.Context) (context.Context, error) {
-	apiKey := ""
-	if i.APIKey != "-" {
-		apiKey = i.APIKey
-	}
-	embeddingAPIKey := ""
-	if i.EmbeddingAPIKey != "-" {
-		embeddingAPIKey = i.EmbeddingAPIKey
-	}
-
 	adapter := NewAssistantClientAdapter(
-		NewDRMAPIClient(i.ModelHost, apiKey, i.HttpClient),
-		NewDRMAPIClient(i.EmbeddingModelHost, embeddingAPIKey, i.HttpClient),
+		NewDRMAPIClient(i.ModelHost, i.APIKey, i.HttpClient),
+		NewDRMAPIClient(i.EmbeddingModelHost, i.EmbeddingAPIKey, i.HttpClient),
 	)
 	depend.Register[domain.Assistant](adapter)
 	depend.Register[domain.SemanticEncoder](adapter)

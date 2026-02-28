@@ -1,37 +1,14 @@
 package http
 
 import (
-	"embed"
-	"html/template"
-	"net/http"
+	"context"
 
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont/introspection"
 )
 
-var (
-	//go:embed templates/introspect.gohtml
-	templateFS embed.FS
-	tmpl       = template.Must(template.ParseFS(templateFS, "templates/introspect.gohtml"))
-)
-
-// TodoApp Introspection Graph
-// (GET /introspect)
-func IntrospectHandler(w http.ResponseWriter, r *http.Request) {
-	mermaidGraph, err := depend.ResolveNamed[string]("introspection-graph-mermaid")
-	if err != nil {
-		http.Error(w, "Failed to resolve dependency graph", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-
-	if err := tmpl.Execute(w, struct {
-		Graph string
-		Title string
-	}{
-		Title: "TodoApp Introspection Graph",
-		Graph: mermaidGraph,
-	}); err != nil {
-		http.Error(w, "Failed to render introspection page", http.StatusInternalServerError)
-	}
+// Introspect is the implementation of the Introspector interface for the TodoAppServer,
+// which receives the introspection report and stores it in the server struct for later use in the introspection handler.
+func (api *TodoAppServer) Introspect(_ context.Context, r introspection.Report) error {
+	api.introspectionReport = r
+	return nil
 }

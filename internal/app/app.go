@@ -75,6 +75,5 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&workers.ConversationTitleGenerator{},
 			&workers.ActionApprovalDispatcher{},
 			&workers.MessageRelay{},
-		).
-		Introspect(&MermaidGraphIntrospector{})
+		)
 }

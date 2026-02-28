@@ -21,8 +21,8 @@ import (
 // InitOpenTelemetry is a component that sets up OpenTelemetry tracing.
 type InitOpenTelemetry struct {
 	Logger          *log.Logger `resolve:""`
-	TracesEndpoint  string      `config:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" default:"-"`
-	MetricsEndpoint string      `config:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT" default:"-"`
+	TracesEndpoint  string      `config:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" default:""`
+	MetricsEndpoint string      `config:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT" default:""`
 	tp              *sdktrace.TracerProvider
 	se              sdktrace.SpanExporter
 	mp              *sdkmetric.MeterProvider
@@ -42,7 +42,7 @@ func (o *InitOpenTelemetry) Initialize(ctx context.Context) (context.Context, er
 		return ctx, err
 	}
 
-	if o.TracesEndpoint != "-" {
+	if o.TracesEndpoint != "" {
 		// Set up trace provider.
 		o.tp, o.se, err = newTracerProvider(ctx, res)
 		if err != nil {
@@ -51,7 +51,7 @@ func (o *InitOpenTelemetry) Initialize(ctx context.Context) (context.Context, er
 		otel.SetTracerProvider(o.tp)
 	}
 
-	if o.MetricsEndpoint != "-" {
+	if o.MetricsEndpoint != "" {
 		// Set up meter provider.
 		o.mp, o.me, err = newMeterProvider(ctx, res)
 		if err != nil {

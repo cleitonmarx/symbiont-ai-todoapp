@@ -46,7 +46,7 @@ type Config struct {
 func (c Config) withDefaults() Config {
 	cfg := c
 	apiKeyHeader := strings.TrimSpace(cfg.APIKeyHeader)
-	if apiKeyHeader == "" || apiKeyHeader == "-" {
+	if apiKeyHeader == "" {
 		cfg.APIKeyHeader = "Authorization"
 	}
 	if cfg.RequestTimeout <= 0 {
@@ -137,7 +137,7 @@ func NewMCPRegistry(
 	httpClient *http.Client,
 ) *MCPRegistry {
 	cfg = cfg.withDefaults()
-	if cfg.APIKey != "-" {
+	if cfg.APIKey != "" {
 		httpClient = withAPIKey(httpClient, cfg.APIKeyHeader, cfg.APIKey)
 	}
 	return &MCPRegistry{
@@ -881,8 +881,8 @@ type InitMCPActionRegistry struct {
 	Logger         *log.Logger   `resolve:""`
 	HttpClient     *http.Client  `resolve:""`
 	Endpoint       string        `config:"MCP_GATEWAY_ENDPOINT"`
-	APIKey         string        `config:"MCP_GATEWAY_API_KEY" default:"-"`
-	APIKeyHeader   string        `config:"MCP_GATEWAY_API_KEY_HEADER" default:"-"`
+	APIKey         string        `config:"MCP_GATEWAY_API_KEY" default:""`
+	APIKeyHeader   string        `config:"MCP_GATEWAY_API_KEY_HEADER" default:""`
 	RequestTimeout time.Duration `config:"MCP_GATEWAY_REQUEST_TIMEOUT" default:"20s"`
 	registry       *MCPRegistry
 }

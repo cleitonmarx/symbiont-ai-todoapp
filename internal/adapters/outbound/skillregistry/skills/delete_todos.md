@@ -1,13 +1,14 @@
 ---
 name: todo-delete
-use_when: User asks to delete, remove, clear, or erase specific todos.
-avoid_when: User asks to create/add todos, fetch/list/confirm only, mark done/open status, or update due dates/details.
-priority: 94
-tags: [todos, delete, destructive, mutation]
+use_when: User asks to delete, remove, clear, or erase todos, whether they name specific todos or refer to a subset of todos selected by a natural-language description, phrase, topic, status, criteria, search-like filter, or group/set description (for example delete old matching todos).
+avoid_when: User asks to create/add todos, fetch/list/confirm only, mark done/open status, update due dates/details, or is only greeting, thanking, or chatting.
+priority: 100
+embed_first_content_line: true
+tags: [todos, delete, remove, clear, erase, destructive, mutation, subset, natural-language-selection, matching-todos, filtered-todos, selected-set, selected-by-description, matching-set, group-delete, matching-description, matching-topic, matching-phrase, criteria, search-filter, status-delete]
 tools: [fetch_todos, delete_todos]
 ---
 
-Goal: execute deletions safely and only on confirmed targets.
+Goal: delete one or more existing todos, including subsets selected by natural-language description or filter, such as old or completed matching items, safely and only on confirmed targets.
 
 Rules:
 1. Treat deletion as destructive.

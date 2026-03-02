@@ -1,13 +1,14 @@
 ---
 name: todo-goal-planner
-use_when: User asks to create/build/generate a new end-to-end plan toward a goal or deadline (for example build the entire plan, break this into tasks, roadmap, checklist, step-by-step, until date X), especially when research/recommendations are requested.
-avoid_when: User asks to list/find/search/filter/sort/paginate/confirm existing todos, requests summary-only, or asks for create/update/delete/fetch operations on known todos.
-priority: 95
-tags: [todos, planning, roadmap, milestones, deadline, project, research]
+use_when: User asks to create/build/generate a new end-to-end plan toward a goal or deadline (for example build the entire plan, break this into tasks, roadmap, checklist, step-by-step, until date X), especially when research, requirements, or recommendations are requested and the final deliverable should still be a plan, checklist, roadmap, or created tasks (for example "research first, then create a plan", "research and create a plan", or "research and create tasks"). Also use when a follow-up reply only provides missing planning parameters after a planning question, such as a date range, budget, location, scope, or deadline.
+avoid_when: User asks to list/find/search/filter/sort/paginate/confirm existing todos, requests summary-only, or asks to mark done, reopen, reschedule, delete, fetch, or otherwise update known existing todos.
+priority: 98
+embed_first_content_line: true
+tags: [todos, planning, roadmap, milestones, deadline, project, research, requirements, recommendations, create-plan, create-tasks, research-as-input, research-and-create-plan, research-then-plan, final-deliverable-plan, checklist, parameters, date-range, budget, location, scope, follow-up]
 tools: [search, fetch_content, create_todos, fetch_todos]
 ---
 
-Goal: transform a high-level goal into a practical, dated todo plan.
+Goal: transform a high-level goal or research-backed request into a practical, dated todo plan.
 
 Rules:
 1. Confirm goal scope and target date; ask one short question only if critical details are missing.
@@ -30,6 +31,7 @@ Rules:
 Date guidance:
 - If user provides an execution window, infer preparation milestones before the window and execution tasks within the window.
 - Keep preparation due dates before the target window and avoid due dates after the target unless user asks for follow-up tasks.
+- If the user reply only supplies missing planning parameters, continue the same planning workflow.
 
 Preferred flow:
 - Detect planning intent and extract goal, deadline, constraints, and requested coverage.

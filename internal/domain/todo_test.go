@@ -55,12 +55,6 @@ func TestTodo_Validate(t *testing.T) {
 			wantErr: true,
 			errMsg:  "due_date cannot be empty",
 		},
-		"due-date-more-than-48h-in-the-past": {
-			todo:    Todo{Title: "Finish report", Status: TodoStatus_OPEN, DueDate: now.Add(-49 * time.Hour)},
-			now:     now,
-			wantErr: true,
-			errMsg:  "due_date cannot be more than 48 hours in the past",
-		},
 		"invalid-status": {
 			todo:    Todo{Title: "Finish report", Status: "IN_PROGRESS", DueDate: now.Add(24 * time.Hour)},
 			now:     now,

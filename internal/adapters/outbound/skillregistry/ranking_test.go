@@ -33,19 +33,19 @@ func TestRegistry_RankSkills(t *testing.T) {
 		"ranks-using-all-query-vectors-and-applies-priority": {
 			queryVectors: semanticEncoderParams{
 				QueryVectors: map[string][]float64{
-					"show matching todos":   {1, 0},
-					"recent todo context":   {1, 0},
-					"conversation summary":  {0, 1},
+					"show matching todos":  {1, 0},
+					"recent todo context":  {1, 0},
+					"conversation summary": {0, 1},
 				},
 			},
 			embedded: []embeddedSkill{
 				{
 					definition: domain.AssistantSkillDefinition{Name: "todo-read-view", Priority: 10},
-					useVector:   []float64{1, 0},
+					useVector:  []float64{1, 0},
 				},
 				{
 					definition: domain.AssistantSkillDefinition{Name: "todo-summary", Priority: 80},
-					useVector:   []float64{0.9, 0.4},
+					useVector:  []float64{0.9, 0.4},
 				},
 			},
 			currentInput: "show matching todos",
@@ -60,14 +60,14 @@ func TestRegistry_RankSkills(t *testing.T) {
 					"mark it done": {1, 0},
 				},
 				QueryErrors: map[string]error{
-					"recent context":     assert.AnError,
+					"recent context":      assert.AnError,
 					"conversation memory": assert.AnError,
 				},
 			},
 			embedded: []embeddedSkill{
 				{
 					definition: domain.AssistantSkillDefinition{Name: "todo-update"},
-					useVector:   []float64{1, 0},
+					useVector:  []float64{1, 0},
 				},
 			},
 			currentInput: "mark it done",
@@ -85,7 +85,7 @@ func TestRegistry_RankSkills(t *testing.T) {
 			embedded: []embeddedSkill{
 				{
 					definition: domain.AssistantSkillDefinition{Name: "web-research"},
-					useVector:   []float64{0.1, 1},
+					useVector:  []float64{0.1, 1},
 				},
 			},
 			currentInput: "search web",
@@ -266,11 +266,11 @@ func TestRegistry_ScoreSkill(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		queryVectors     []weightedQueryVector
-		skill            embeddedSkill
-		includePriority  bool
-		wantScore        float64
-		wantOk           bool
+		queryVectors    []weightedQueryVector
+		skill           embeddedSkill
+		includePriority bool
+		wantScore       float64
+		wantOk          bool
 	}{
 		"returns-false-without-use-similarity": {
 			queryVectors: []weightedQueryVector{{weight: 1, vector: nil}},

@@ -35,6 +35,7 @@ Rules:
 16. When both `set_ui_filters` and `fetch_todos` are called, keep filter/sort values consistent across both calls.
 17. If the user says "related", "similar", "about", or "regarding", prefer semantic search using `search_by_similarity` (not `search_by_title`).
 18. When using semantic search for related/similar intents, prefer `sort_by=similarityAsc` unless the user explicitly asked another sort.
+19. In user-facing responses, never mention internal action/tool names (for example `fetch_todos` or `set_ui_filters`).
 
 Preferred flow:
 - Detect whether intent is data retrieval, view/screen filter sync, or both.

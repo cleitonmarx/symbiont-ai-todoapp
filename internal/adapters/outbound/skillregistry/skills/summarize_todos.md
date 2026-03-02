@@ -32,6 +32,7 @@ Rules:
 19. If the user explicitly asks for grouping or counts by category, infer exactly one category per todo before aggregation.
 20. Use short, practical inferred categories based on the todo title; if a clear category cannot be inferred, use `Uncategorized`.
 21. When inferring categories, do not place the same todo in more than one category; category totals must sum exactly to the total number of todos in scope.
+22. In user-facing responses, never mention internal action/tool names (for example `fetch_todos` or `execute_code`).
 
 Preferred flow:
 - Build scope first (status + due window + topic query when present).

@@ -16,6 +16,7 @@ Rules:
 3. Use `fetch_content` when the user explicitly asks to open/fetch/read a specific webpage or URL, or when a concrete URL is needed for deeper details.
 4. Prefer one URL fetch per turn unless user asks to compare multiple sources.
 5. Keep tool arguments strict JSON and aligned with schema.
+6. In user-facing responses, never mention internal action/tool names (for example `search` or `fetch_content`).
 
 Preferred flow:
 - Detect external-info intent.

@@ -27,6 +27,7 @@ Rules:
 14. Use `fetch_todos` only when needed to confirm created results or avoid duplicates.
 15. Keep the response concise and practical; do not output internal tool details.
 16. If the request can be satisfied by reading/filtering existing todos, do not use this skill.
+17. In user-facing responses, never mention internal action/tool names (for example `search`, `fetch_content`, or `create_todos`).
 
 Date guidance:
 - If user provides an execution window, infer preparation milestones before the window and execution tasks within the window.

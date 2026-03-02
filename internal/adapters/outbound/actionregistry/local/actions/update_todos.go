@@ -74,7 +74,6 @@ func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 			PreviewFields: []string{
 				"todos[].title",
 				"todos[].status",
-				"todos[].due_date",
 			},
 			Timeout: 2 * time.Minute,
 		},

@@ -19,8 +19,12 @@ Rules:
 6. Do not stop after fetch-only results when deletion was requested; continue to deletion once IDs are resolved.
 7. Send strict JSON matching `delete_todos` schema.
 8. If first delete attempt fails due to missing/mismatched IDs, fetch again to resolve IDs and retry once in the same turn.
-9. After deletion, report what was removed and what was not.
-10. Keywords: delete, remove, erase, clear.
+9. Do not ask the user to wait, do not narrate that you will call tools, and do not ask for confirmation again when the target and delete intent are already clear.
+10. If the user confirms with a short follow-up like "yes" after you just resolved the target or proposed the exact deletion, treat it as approval to continue the pending delete workflow.
+11. Do not expose fetched todo IDs to the user.
+12. After deletion, report what was removed and what was not.
+13. Keywords: delete, remove, erase, clear.
+14. In user-facing responses, never mention internal action/tool names or IDs (for example `00000000-0000-0000-0000-000000000001`, `fetch_todos`, or `delete_todos`).
 
 Preferred flow:
 - Detect delete intent and targets.

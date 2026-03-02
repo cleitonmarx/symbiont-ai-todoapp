@@ -59,9 +59,9 @@ func TestMain(m *testing.M) {
 				"ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID": "action_approval_dispatcher",
 				"LLM_EMBEDDING_MODEL_HOST":               "http://localhost:12434",
 				"LLM_MODEL_HOST":                         "http://localhost:12434",
-				"LLM_CHAT_SUMMARY_MODEL":                 "qwen3:14B-Q6_K",
-				"LLM_CHAT_TITLE_MODEL":                   "qwen3:14B-Q6_K",
-				"LLM_SUMMARY_MODEL":                      "qwen3:14B-Q6_K",
+				"LLM_CHAT_SUMMARY_MODEL":                 "qwen2.5:7B-Q4_K_M",
+				"LLM_CHAT_TITLE_MODEL":                   "qwen2.5:7B-Q4_K_M",
+				"LLM_SUMMARY_MODEL":                      "qwen2.5:7B-Q4_K_M",
 				"LLM_EMBEDDING_MODEL":                    "embeddinggemma:300M-Q8_0",
 				"MCP_GATEWAY_ENDPOINT":                   "http://localhost:8811",
 			},
@@ -249,15 +249,15 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		modelName      string
 		conversationID uuid.UUID
 	)
-	const createTodoPrompt = "Create a new todo with title \"Integration Test Todo\", due date tomorrow."
+	const createTodoPrompt = "Create one todo named \"Integration Test Todo\" due tomorrow."
 
 	t.Run("fetch-available-models", func(t *testing.T) {
 		modelsResp, err := restCli.ListAvailableModelsWithResponse(t.Context())
 		require.NoError(t, err, "failed to call GetAvailableModels endpoint")
 		require.NotNil(t, modelsResp.JSON200, "expected non-nil response for GetAvailableModels")
 		require.Greater(t, len(modelsResp.JSON200.Models), 0, "expected at least one available model")
-		require.Contains(t, modelsResp.JSON200.Models, "qwen3:14B-Q6_K", "expected available models to include qwen3:14B-Q6_K")
-		i := slices.Index(modelsResp.JSON200.Models, "qwen3:14B-Q6_K")
+		require.Contains(t, modelsResp.JSON200.Models, "qwen2.5:7B-Q4_K_M", "expected available models to include qwen2.5:7B-Q4_K_M")
+		i := slices.Index(modelsResp.JSON200.Models, "qwen2.5:7B-Q4_K_M")
 		modelName = modelsResp.JSON200.Models[i]
 	})
 
@@ -307,7 +307,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			ConversationId: &conversationID,
 			Model:          modelName,
-			Message:        "Fetch 'Integration Test Todo' and tell me its title and status.",
+			Message:        "Show me my todo \"Integration Test Todo\" and tell me whether it is open or done.",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
@@ -327,7 +327,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			ConversationId: &conversationID,
 			Model:          modelName,
-			Message:        "Update the todo 'Integration Test Todo' status as DONE.",
+			Message:        "Mark my todo \"Integration Test Todo\" as done.",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
@@ -346,7 +346,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			ConversationId: &conversationID,
 			Model:          modelName,
-			Message:        "Delete the todo 'Integration Test Todo'",
+			Message:        "Delete my todo \"Integration Test Todo\".",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
 		defer chatResp.Body.Close() //nolint:errcheck
@@ -382,6 +382,43 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		fmt.Println("Chat response:", deltaText)
 		require.Contains(t, actionStartedText, "🗑️ Deleting todos...")
 		require.GreaterOrEqual(t, actionCompletedCount, 1)
+	})
+
+	t.Run("mcp-fetch-web-page-with-approval", func(t *testing.T) {
+		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
+			Model:          modelName,
+			ConversationId: &conversationID,
+			Message:        "Fetch the content of the external website https://duckduckgo.com/ and tell me only the page title.",
+		})
+		require.NoError(t, err, "failed to call StreamChat endpoint")
+		defer chatResp.Body.Close() //nolint:errcheck
+		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
+
+		scanner := newSSEScanner(chatResp.Body)
+
+		approvalRequest := readChatApprovalRequiredEvent(t, scanner)
+		require.Equal(t, "fetch_content", approvalRequest.Name, "expected action approval request for 'fetch_content' action")
+		fmt.Printf("\nReceived action approval request: %+v\n", approvalRequest)
+
+		approvalResp, err := restCli.SubmitActionApprovalWithResponse(t.Context(), rest.SubmitActionApprovalRequest{
+			ActionCallId:   approvalRequest.ActionCallID,
+			ActionName:     &approvalRequest.Name,
+			ConversationId: approvalRequest.ConversationID,
+			Reason:         common.Ptr("approved by integration test"),
+			Status:         rest.APPROVED,
+			TurnId:         approvalRequest.TurnID,
+		})
+
+		require.NoError(t, err, "failed to submit action approval")
+		require.NotNil(t, approvalResp, "expected non-nil response for SubmitActionApproval")
+		require.Equal(t, http.StatusAccepted, approvalResp.StatusCode(), "expected 202 Accepted for SubmitActionApproval")
+
+		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsTextFromScanner(t, scanner)
+
+		fmt.Println("Chat response:", deltaText)
+		require.Contains(t, actionStartedText, "📄 Fetching page content...")
+		require.GreaterOrEqual(t, actionCompletedCount, 1)
+		require.Contains(t, deltaText, "DuckDuckGo", "expected chat response to contain content fetched from the web page")
 	})
 
 	t.Run("check-conversation-summary-generated", func(t *testing.T) {
@@ -438,7 +475,7 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 		})
 		require.NoError(t, err, "failed to call ListChatMessages endpoint")
 		require.NotNil(t, messagesResp.JSON200, "expected non-nil response for ListChatMessages")
-		require.Len(t, messagesResp.JSON200.Messages, 8, "expected 8 messages in the conversation (4 user messages + 4 action calls)")
+		require.Len(t, messagesResp.JSON200.Messages, 10, "expected 10 messages in the conversation (5 user messages + 5 action calls)")
 	})
 
 	t.Run("delete-conversation", func(t *testing.T) {
@@ -463,44 +500,6 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 		require.NoError(t, err, "failed to call ListChatMessages endpoint after conversation deletion")
 		require.NotNil(t, messagesResp.JSON200, "expected non-nil response for ListChatMessages after conversation deletion")
 		require.Len(t, messagesResp.JSON200.Messages, 0, "expected 0 messages in the conversation after deletion")
-	})
-}
-
-func TestTodoApp_MCPIntegration(t *testing.T) {
-	t.Run("mcp-fetch-web-page-with-approval", func(t *testing.T) {
-		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
-			Model:   "qwen3:14B-Q6_K",
-			Message: "Fetch the content of URL https://duckduckgo.com/ and tell me the title of the page.",
-		})
-		require.NoError(t, err, "failed to call StreamChat endpoint")
-		defer chatResp.Body.Close() //nolint:errcheck
-		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
-
-		scanner := newSSEScanner(chatResp.Body)
-
-		approvalRequest := readChatApprovalRequiredEvent(t, scanner)
-		require.Equal(t, "fetch_content", approvalRequest.Name, "expected action approval request for 'fetch_content' action")
-		fmt.Printf("\nReceived action approval request: %+v\n", approvalRequest)
-
-		approvalResp, err := restCli.SubmitActionApprovalWithResponse(t.Context(), rest.SubmitActionApprovalRequest{
-			ActionCallId:   approvalRequest.ActionCallID,
-			ActionName:     &approvalRequest.Name,
-			ConversationId: approvalRequest.ConversationID,
-			Reason:         common.Ptr("approved by integration test"),
-			Status:         rest.APPROVED,
-			TurnId:         approvalRequest.TurnID,
-		})
-
-		require.NoError(t, err, "failed to submit action approval")
-		require.NotNil(t, approvalResp, "expected non-nil response for SubmitActionApproval")
-		require.Equal(t, http.StatusAccepted, approvalResp.StatusCode(), "expected 202 Accepted for SubmitActionApproval")
-
-		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsTextFromScanner(t, scanner)
-
-		fmt.Println("Chat response:", deltaText)
-		require.Contains(t, actionStartedText, "📄 Fetching page content...")
-		require.GreaterOrEqual(t, actionCompletedCount, 1)
-		require.Contains(t, deltaText, "DuckDuckGo", "expected chat response to contain content fetched from the web page")
 	})
 }
 

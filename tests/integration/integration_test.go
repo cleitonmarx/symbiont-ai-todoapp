@@ -333,7 +333,32 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		defer chatResp.Body.Close() //nolint:errcheck
 		require.Equal(t, 200, chatResp.StatusCode, "expected 200 OK response for StreamChat")
 
-		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsText(t, chatResp.Body)
+		scanner := newSSEScanner(chatResp.Body)
+
+		approvalRequest := readChatApprovalRequiredEvent(t, scanner)
+		require.Equal(t, "update_todos", approvalRequest.Name, "expected action approval request for 'update_todos' action")
+		fmt.Printf("\nReceived action approval request: %+v\n", approvalRequest)
+
+		approvalResp, err := restCli.SubmitActionApprovalWithResponse(t.Context(), rest.SubmitActionApprovalRequest{
+			ActionCallId:   approvalRequest.ActionCallID,
+			ActionName:     &approvalRequest.Name,
+			ConversationId: approvalRequest.ConversationID,
+			Reason:         common.Ptr("approved by integration test"),
+			Status:         rest.APPROVED,
+			TurnId:         approvalRequest.TurnID,
+		})
+		require.NoError(t, err, "failed to submit action approval")
+		require.NotNil(t, approvalResp, "expected non-nil response for SubmitActionApproval")
+		require.Equal(t, http.StatusAccepted, approvalResp.StatusCode(), "expected 202 Accepted for SubmitActionApproval")
+
+		approvalResolved := readChatApprovalResolvedEvent(t, scanner)
+		require.Equal(t, approvalRequest.ActionCallID, approvalResolved.ActionCallID, "expected resolved action_call_id to match required event")
+		require.Equal(t, approvalRequest.ConversationID, approvalResolved.ConversationID, "expected resolved conversation_id to match required event")
+		require.Equal(t, approvalRequest.TurnID, approvalResolved.TurnID, "expected resolved turn_id to match required event")
+		require.Equal(t, domain.ChatMessageApprovalStatus_Approved, approvalResolved.Status, "expected resolved status to be APPROVED")
+		fmt.Printf("\nReceived action approval resolved event: %+v\n", approvalResolved)
+
+		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsTextFromScanner(t, scanner)
 
 		fmt.Println("Chat response:", deltaText)
 		require.Contains(t, actionStartedText, "✏️ Updating your todos...")

@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
@@ -65,6 +66,17 @@ func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 					},
 				},
 			},
+		},
+		Approval: domain.AssistantActionApproval{
+			Required:    true,
+			Title:       "Confirm update of todos",
+			Description: "Updating todos will modify existing items. Please confirm.",
+			PreviewFields: []string{
+				"todos[].title",
+				"todos[].status",
+				"todos[].due_date",
+			},
+			Timeout: 2 * time.Minute,
 		},
 	}
 }

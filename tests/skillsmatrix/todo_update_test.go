@@ -12,17 +12,15 @@ func TestSkillRelevancePromptMatrix_TodoUpdate(t *testing.T) {
 	t.Parallel()
 
 	registry := newSkillMatrixRegistry(t)
-	tests := []skillMatrixCase{
-		{
-			name: "mark-done",
+	tests := map[string]skillMatrixCase{
+		"mark-done": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: `Mark my todo "Integration Test Todo" as done.`},
 			},
 			wantTop:     "todo-update",
 			wantContain: []string{"todo-update"},
 		},
-		{
-			name: "statement-implies-update",
+		"statement-implies-update": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "My dentist todo is done."},
 			},
@@ -31,8 +29,8 @@ func TestSkillRelevancePromptMatrix_TodoUpdate(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			runSkillMatrixCase(t, registry, tc)
 		})
 	}

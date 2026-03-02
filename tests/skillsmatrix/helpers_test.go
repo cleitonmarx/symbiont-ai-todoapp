@@ -15,7 +15,6 @@ import (
 )
 
 type skillMatrixCase struct {
-	name        string
 	messages    []domain.AssistantMessage
 	summary     string
 	wantTop     string

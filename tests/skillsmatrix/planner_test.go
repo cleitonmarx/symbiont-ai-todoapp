@@ -12,25 +12,22 @@ func TestSkillRelevancePromptMatrix_TodoGoalPlanner(t *testing.T) {
 	t.Parallel()
 
 	registry := newSkillMatrixRegistry(t)
-	tests := []skillMatrixCase{
-		{
-			name: "goal-planner",
+	tests := map[string]skillMatrixCase{
+		"goal-planner": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Plan a trip to Tokyo in April and create a todo plan for it."},
 			},
 			wantTop:     "todo-goal-planner",
 			wantContain: []string{"todo-goal-planner"},
 		},
-		{
-			name: "full-plan-before-deadline",
+		"full-plan-before-deadline": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Create a full plan to renew my passport before May."},
 			},
 			wantTop:     "todo-goal-planner",
 			wantContain: []string{"todo-goal-planner"},
 		},
-		{
-			name: "recent-context-helps-persistence",
+		"recent-context-helps-persistence": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Plan a trip to Tokyo in April."},
 				{Role: domain.ChatRole_Assistant, Content: "What dates are you considering?"},
@@ -39,8 +36,7 @@ func TestSkillRelevancePromptMatrix_TodoGoalPlanner(t *testing.T) {
 			wantTop:     "todo-goal-planner",
 			wantContain: []string{"todo-goal-planner"},
 		},
-		{
-			name: "continuation-with-budget-only",
+		"continuation-with-budget-only": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Create a full plan for moving apartment next month."},
 				{Role: domain.ChatRole_Assistant, Content: "What budget should I assume?"},
@@ -49,8 +45,7 @@ func TestSkillRelevancePromptMatrix_TodoGoalPlanner(t *testing.T) {
 			wantTop:     "todo-goal-planner",
 			wantContain: []string{"todo-goal-planner"},
 		},
-		{
-			name: "continuation-with-location-only",
+		"continuation-with-location-only": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Build a plan for an in-person conference trip."},
 				{Role: domain.ChatRole_Assistant, Content: "Which city is it in?"},
@@ -59,8 +54,7 @@ func TestSkillRelevancePromptMatrix_TodoGoalPlanner(t *testing.T) {
 			wantTop:     "todo-goal-planner",
 			wantContain: []string{"todo-goal-planner"},
 		},
-		{
-			name: "continuation-with-deadline-only",
+		"continuation-with-deadline-only": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Create an end-to-end study plan for my Go interview."},
 				{Role: domain.ChatRole_Assistant, Content: "When is the interview?"},
@@ -69,8 +63,7 @@ func TestSkillRelevancePromptMatrix_TodoGoalPlanner(t *testing.T) {
 			wantTop:     "todo-goal-planner",
 			wantContain: []string{"todo-goal-planner"},
 		},
-		{
-			name: "continuation-with-noisy-turns-within-limit",
+		"continuation-with-noisy-turns-within-limit": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Create an end-to-end relocation plan for next quarter."},
 				{Role: domain.ChatRole_Assistant, Content: "What budget should I assume?"},
@@ -83,8 +76,7 @@ func TestSkillRelevancePromptMatrix_TodoGoalPlanner(t *testing.T) {
 			wantTop:     "todo-goal-planner",
 			wantContain: []string{"todo-goal-planner"},
 		},
-		{
-			name: "continuation-at-recent-limit",
+		"continuation-at-recent-limit": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Create an end-to-end relocation plan for next quarter."},
 				{Role: domain.ChatRole_Assistant, Content: "What budget should I assume?"},
@@ -99,8 +91,7 @@ func TestSkillRelevancePromptMatrix_TodoGoalPlanner(t *testing.T) {
 			wantTop:     "todo-goal-planner",
 			wantContain: []string{"todo-goal-planner"},
 		},
-		{
-			name: "continuation-beyond-recent-limit",
+		"continuation-beyond-recent-limit": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Create an end-to-end relocation plan for next quarter."},
 				{Role: domain.ChatRole_Assistant, Content: "What budget should I assume?"},
@@ -116,16 +107,14 @@ func TestSkillRelevancePromptMatrix_TodoGoalPlanner(t *testing.T) {
 			},
 			wantTop: "",
 		},
-		{
-			name: "research-and-create-plan",
+		"research-and-create-plan": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Research Japan visa requirements and create a plan."},
 			},
 			wantTop:     "todo-goal-planner",
 			wantContain: []string{"todo-goal-planner"},
 		},
-		{
-			name: "research-and-create-tasks",
+		"research-and-create-tasks": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Research Tokyo in April and create tasks for me."},
 			},
@@ -134,8 +123,8 @@ func TestSkillRelevancePromptMatrix_TodoGoalPlanner(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			runSkillMatrixCase(t, registry, tc)
 		})
 	}

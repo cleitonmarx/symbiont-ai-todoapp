@@ -12,57 +12,50 @@ func TestSkillRelevancePromptMatrix_TodoReadView(t *testing.T) {
 	t.Parallel()
 
 	registry := newSkillMatrixRegistry(t)
-	tests := []skillMatrixCase{
-		{
-			name: "read-with-date-range",
+	tests := map[string]skillMatrixCase{
+		"read-with-date-range": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "List my open todos due from March 1-7."},
 			},
 			wantTop:     "todo-read-view",
 			wantContain: []string{"todo-read-view"},
 		},
-		{
-			name: "show-topical-items",
+		"show-topical-items": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Show my medical appointments."},
 			},
 			wantTop:     "todo-read-view",
 			wantContain: []string{"todo-read-view"},
 		},
-		{
-			name: "show-done-topical-items",
+		"show-done-topical-items": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Show done dentist todos."},
 			},
 			wantTop:     "todo-read-view",
 			wantContain: []string{"todo-read-view"},
 		},
-		{
-			name: "between-date-phrasing",
+		"between-date-phrasing": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "List my open todos between March 1 and March 7."},
 			},
 			wantTop:     "todo-read-view",
 			wantContain: []string{"todo-read-view"},
 		},
-		{
-			name: "relative-week-phrasing",
+		"relative-week-phrasing": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "List my open todos due this week."},
 			},
 			wantTop:     "todo-read-view",
 			wantContain: []string{"todo-read-view"},
 		},
-		{
-			name: "relative-next-month-phrasing",
+		"relative-next-month-phrasing": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "List my todos due next month."},
 			},
 			wantTop:     "todo-read-view",
 			wantContain: []string{"todo-read-view"},
 		},
-		{
-			name: "find-related-tasks",
+		"find-related-tasks": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: "Find todos related to taxes."},
 			},
@@ -71,8 +64,8 @@ func TestSkillRelevancePromptMatrix_TodoReadView(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			runSkillMatrixCase(t, registry, tc)
 		})
 	}

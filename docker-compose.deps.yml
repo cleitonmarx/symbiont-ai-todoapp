@@ -63,9 +63,10 @@ services:
     command:
       - --transport=streamable-http
       - --port=8811
-      - --servers=duckduckgo
+      - --servers=duckduckgo,mcp-code-interpreter
       - --tools=duckduckgo:fetch_content
       - --tools=duckduckgo:search
+      - --tools=execute_code
     ports:
       - "8811:8811"
     volumes:
@@ -79,8 +80,8 @@ services:
 
 
 models:
-  qwen3:
-    model: qwen3:14B-Q6_K
+  qwen2.5:
+    model: qwen2.5:7B-Q4_K_M
     context_size: 32768
     runtime_flags:
       - "--batch-size"

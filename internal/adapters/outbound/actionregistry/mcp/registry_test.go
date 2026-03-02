@@ -194,48 +194,96 @@ func TestRegistry_Execute_UnknownAction(t *testing.T) {
 func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 	t.Parallel()
 
-	session := &fakeSession{
-		listResults: []*mcp.ListToolsResult{
-			{
-				Tools: []*mcp.Tool{
-					{
-						Name:        "search",
-						Description: "Original description",
-						InputSchema: map[string]any{
-							"type": "object",
-							"properties": map[string]any{
-								"query": map[string]any{
-									"type":        "string",
-									"description": "Query",
-								},
-							},
-							"required": []any{"query"},
+	tests := map[string]struct {
+		tool   *mcp.Tool
+		assert func(*testing.T, *MCPRegistry)
+	}{
+		"search": {
+			tool: &mcp.Tool{
+				Name:        "search",
+				Description: "Original description",
+				InputSchema: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"query": map[string]any{
+							"type":        "string",
+							"description": "Query",
 						},
 					},
+					"required": []any{"query"},
 				},
+			},
+			assert: func(t *testing.T, registry *MCPRegistry) {
+				def, found := registry.GetDefinition("search")
+				require.True(t, found)
+				assert.Equal(t, "search", def.Name)
+				assert.Equal(t, "Search the web with DuckDuckGo and return concise result snippets with source links.", def.Description)
+				assert.Equal(t, "object", def.Input.Type)
+				assert.Equal(t, "string", def.Input.Fields["query"].Type)
+				assert.Equal(t, "Search query in natural language.", def.Input.Fields["query"].Description)
+				assert.True(t, def.Input.Fields["query"].Required)
+				assert.Equal(t, "integer", def.Input.Fields["max_results"].Type)
+				assert.Equal(t, "🔎 Searching on the web...", registry.StatusMessage("search"))
+			},
+		},
+		"execute-code": {
+			tool: &mcp.Tool{
+				Name:        "execute_code",
+				Description: "Original execute code description",
+				InputSchema: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"code": map[string]any{
+							"type":        "string",
+							"description": "Original code description",
+						},
+						"session_id": map[string]any{
+							"type":        "integer",
+							"description": "Original session_id description",
+						},
+					},
+					"required": []any{"code"},
+				},
+			},
+			assert: func(t *testing.T, registry *MCPRegistry) {
+				def, found := registry.GetDefinition("execute_code")
+				require.True(t, found)
+				assert.Equal(t, "execute_code", def.Name)
+				assert.Equal(t, "Execute short self-contained Python code for deterministic calculations, grouping, validation, and data shaping.", def.Description)
+				assert.Equal(t, "string", def.Input.Fields["code"].Type)
+				assert.Equal(t, "Python code to execute. Make it self-contained and inline the data you need directly in the script unless another tool field explicitly carries variables. End by evaluating `result` or another final expression to return the computed value.", def.Input.Fields["code"].Description)
+				assert.True(t, def.Input.Fields["code"].Required)
+				assert.Equal(t, "integer", def.Input.Fields["session_id"].Type)
+				assert.Equal(t, "Optional interpreter session ID. Omit it on the first call. Reuse the returned session_id only when you intentionally want to continue the same Python session in a later call.", def.Input.Fields["session_id"].Description)
+				assert.False(t, def.Input.Fields["session_id"].Required)
+				assert.Equal(t, "🧮 Running deterministic code...", registry.StatusMessage("execute_code"))
 			},
 		},
 	}
 
-	registry := newMCPRegistryWithConnector(
-		Config{
-			Endpoint: "http://localhost:8811/mcp",
-		},
-		&fakeConnector{session: session},
-	)
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	require.NoError(t, registry.initializeActions(context.Background()))
-	def, found := registry.GetDefinition("search")
-	require.True(t, found)
+			session := &fakeSession{
+				listResults: []*mcp.ListToolsResult{
+					{
+						Tools: []*mcp.Tool{tt.tool},
+					},
+				},
+			}
 
-	assert.Equal(t, "search", def.Name)
-	assert.Equal(t, "Search the web with DuckDuckGo and return concise result snippets with source links.", def.Description)
-	assert.Equal(t, "object", def.Input.Type)
-	assert.Equal(t, "string", def.Input.Fields["query"].Type)
-	assert.Equal(t, "Search query in natural language.", def.Input.Fields["query"].Description)
-	assert.True(t, def.Input.Fields["query"].Required)
-	assert.Equal(t, "integer", def.Input.Fields["max_results"].Type)
-	assert.Equal(t, "🔎 Searching on the web...", registry.StatusMessage("search"))
+			registry := newMCPRegistryWithConnector(
+				Config{
+					Endpoint: "http://localhost:8811/mcp",
+				},
+				&fakeConnector{session: session},
+			)
+
+			require.NoError(t, registry.initializeActions(context.Background()))
+			tt.assert(t, registry)
+		})
+	}
 }
 
 func TestParseActionCallArguments_Table(t *testing.T) {

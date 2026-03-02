@@ -1,7 +1,7 @@
 ---
 name: todo-update
 use_when: User explicitly asks to modify existing todos (update/edit/change/mark complete/reopen/reschedule/postpone/change due date), or clearly states that an existing todo should now have a different status/state (for example "my todo is done", "this task is completed", "reopen that todo", "my dentist todo is done").
-avoid_when: User asks to create/add todos, fetch/list/confirm only, summarize/overview/recap/count, or delete todos.
+avoid_when: User asks to create/add todos, fetch/list/confirm only, summarize/overview/recap/count, delete todos, or access external websites, webpages, URLs, or internet content.
 priority: 90
 tags: [todos, update, mutation, status, due-date, schedule, mark, complete, completed, done, reopen, state-change, my-todo-is-done]
 tools: [fetch_todos, update_todos, update_todos_due_date]

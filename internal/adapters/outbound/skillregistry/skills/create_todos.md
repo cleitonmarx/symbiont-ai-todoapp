@@ -1,9 +1,9 @@
 ---
 name: todo-create
-use_when: User asks to create/add/new todos or reminders (for example create todo, add task, remind me to).
-avoid_when: User asks to fetch/list/confirm existing todos, mark done/open, change only due dates, or delete todos.
+use_when: User asks to create/add/new todos or reminders, especially a single concrete todo with a clear title, short instruction, or direct due date (for example create todo, add task, remind me to, create one todo, create a todo named X due tomorrow).
+avoid_when: User asks to fetch/list/confirm existing todos, mark done/open, change only due dates, delete todos, or asks for an end-to-end plan, roadmap, checklist, or multi-step breakdown toward a broader goal.
 priority: 92
-tags: [todos, create, mutation, planning]
+tags: [todos, create, add, new, reminder, single-item, direct-create, concrete-title, due-date, mutation]
 tools: [create_todos]
 ---
 
@@ -15,7 +15,7 @@ Rules:
 3. Keep tool arguments strict JSON matching the schema.
 4. If due dates are ambiguous, ask one short follow-up question before creating.
 5. If tool call fails due to argument shape, fix and retry once.
-6. Keywords: create, add, new, reminder, plan.
+6. Keywords: create, add, new, reminder, create one todo, create a todo named, due tomorrow.
 
 Preferred flow:
 - Detect creation intent and extract todo items.

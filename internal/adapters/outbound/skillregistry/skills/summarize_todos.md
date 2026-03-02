@@ -1,14 +1,14 @@
 ---
 name: todo-summary
-use_when: User asks to summarize/recap/overview/count todos in compact form, or asks for the count/total/number of todos matching a topic, filter, or date window (for example "give me a concise summary", "make a concise summary of open todos due from March 1-7", "summary in one short paragraph", "brief summary", "high-level recap", "how many matching todos do I have", "how many todos match this topic", "how many of those do I have", "what is the total", "how many items do I have about this topic", "how many appointments do I have").
-avoid_when: User asks to create, update, reschedule, or delete todos, or explicitly asks to list/show/display individual todos.
+use_when: User asks to summarize/recap/overview/count existing todos in compact form, or asks for the count/total/number of todos matching a topic, filter, or date window, including prompts that first ask to find matching existing todos and then summarize them (for example "give me a concise summary", "make a concise summary of open todos due from March 1-7", "summary in one short paragraph", "brief summary", "high-level recap", "find my matching todos and summarize them", "summarize my matching todos", "how many matching todos do I have", "how many todos match this topic", "how many of those do I have", "what is the total", "how many items do I have about this topic", "how many appointments do I have").
+avoid_when: User asks to create, plan, build, generate, update, reschedule, or delete todos, explicitly asks to list/show/display individual todos, or asks to access external websites, webpages, URLs, or internet content.
 priority: 100
 embed_first_content_line: true
-tags: [todos, summary, summarize, concise, brief, recap, overview, count, total, number, matching, matching-todos, matching-items, topic-count, filter-count, date-window-count, count-question, count-by-topic, how-many, how-many-do-i-have, how-many-match, how-many-topic, paragraph, short, one-paragraph, due, due-range, date-window, week]
+tags: [todos, summary, summarize, concise, brief, recap, overview, count, total, number, matching, matching-todos, matching-items, topic-count, filter-count, date-window-count, count-question, count-by-topic, find-and-summarize, existing-todos-summary, how-many, how-many-do-i-have, how-many-match, how-many-topic, paragraph, short, one-paragraph, due, due-range, date-window, week]
 tools: [fetch_todos, execute_code]
 ---
 
-Goal: provide a concise summary without listing individual todos, using deterministic counting when available.
+Goal: summarize existing or matching todos concisely without listing individual items, using deterministic counting when available.
 
 Rules:
 1. Always call `fetch_todos` first.

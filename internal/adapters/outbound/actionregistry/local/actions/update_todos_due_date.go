@@ -63,6 +63,16 @@ func (a BulkTodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinit
 				},
 			},
 		},
+		Approval: domain.AssistantActionApproval{
+			Required:    true,
+			Title:       "Confirm update of todo due dates",
+			Description: "Updating due dates will modify existing todos. Please confirm.",
+			PreviewFields: []string{
+				"todos[].title",
+				"todos[].due_date",
+			},
+			Timeout: 2 * time.Minute,
+		},
 	}
 }
 

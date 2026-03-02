@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { TodoStatus, Todo } from '../types';
 
 interface TodoItemProps {
@@ -11,6 +11,14 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onUpdate, onDelete }) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState(todo.title);
   const [editDueDate, setEditDueDate] = useState(todo.due_date);
+
+  useEffect(() => {
+    if (isEditOpen) {
+      return;
+    }
+    setEditTitle(todo.title);
+    setEditDueDate(todo.due_date);
+  }, [isEditOpen, todo.due_date, todo.title]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -50,6 +58,12 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onUpdate, onDelete }) => {
   const handleSaveEdit = () => {
     onUpdate(todo.id, undefined, editTitle, editDueDate);
     setIsEditOpen(false);
+  };
+
+  const handleOpenEdit = () => {
+    setEditTitle(todo.title);
+    setEditDueDate(todo.due_date);
+    setIsEditOpen(true);
   };
 
   const handleCancelEdit = () => {
@@ -117,7 +131,7 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onUpdate, onDelete }) => {
               </button>
               <button
                 className="btn-secondary btn-icon"
-                onClick={() => setIsEditOpen(true)}
+                onClick={handleOpenEdit}
                 title="Edit todo"
                 aria-label="Edit todo"
               >

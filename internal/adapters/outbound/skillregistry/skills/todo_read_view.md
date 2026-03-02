@@ -1,9 +1,9 @@
 ---
 name: todo-read-view
-use_when: User asks to fetch/list/show/display/find/filter/sort/paginate existing todos (for example "list my open todos", "show done tasks", "list my open todos due from March 1-7"), or asks to adjust how todos are shown (for example my screen, my list, current view, what I am seeing, shown first).
-avoid_when: User asks for concise/brief summary, recap, overview, counts, paragraph-only output, or asks to create/update/reschedule/delete todos.
+use_when: User asks to fetch/list/show/display/find/filter/sort/paginate existing todos (for example "list my open todos", "show done tasks", "show done dentist todos", "list my open todos due from March 1-7", "list my todos due next month", "list my open todos due this week"), or asks to adjust how todos are shown (for example my screen, my list, current view, what I am seeing, shown first).
+avoid_when: User asks for concise/brief summary, recap, overview, counts, paragraph-only output, asks to create/update/reschedule/delete todos, or asks to access external websites, webpages, URLs, or internet content.
 priority: 96
-tags: [todos, read, view, filters, sorting, pagination, search, screen, list, app-view, open, done, due, due-range, date-range, from, between]
+tags: [todos, read, view, filters, sorting, pagination, search, screen, list, app-view, open, done, show-done, due, due-range, date-range, from, between, this-week, next-week, this-month, next-month]
 tools: [fetch_todos, set_ui_filters]
 ---
 
@@ -35,6 +35,7 @@ Rules:
 16. When both `set_ui_filters` and `fetch_todos` are called, keep filter/sort values consistent across both calls.
 17. If the user says "related", "similar", "about", or "regarding", prefer semantic search using `search_by_similarity` (not `search_by_title`).
 18. When using semantic search for related/similar intents, prefer `sort_by=similarityAsc` unless the user explicitly asked another sort.
+19. In user-facing responses, never mention internal action/tool names (for example `fetch_todos` or `set_ui_filters`).
 
 Preferred flow:
 - Detect whether intent is data retrieval, view/screen filter sync, or both.

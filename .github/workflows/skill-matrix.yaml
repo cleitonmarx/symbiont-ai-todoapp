@@ -1,0 +1,58 @@
+name: Skill Matrix
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "tests/skillsmatrix/**"
+      - "internal/adapters/outbound/skillregistry/**"
+      - "internal/adapters/outbound/modelrunner/**"
+      - ".github/workflows/skill-matrix.yaml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "tests/skillsmatrix/**"
+      - "internal/adapters/outbound/skillregistry/**"
+      - "internal/adapters/outbound/modelrunner/**"
+      - ".github/workflows/skill-matrix.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  skill-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: ./go.mod
+          cache: true
+          cache-dependency-path: ./go.sum
+
+      - name: Install Docker Model Runner Plugin
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl gnupg
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          sudo chmod a+r /etc/apt/keyrings/docker.gpg
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
+            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y docker-model-plugin
+
+      - name: Pull Embedding Model
+        run: |
+          docker model pull embeddinggemma:300M-Q8_0
+          docker model list
+
+      - name: Run Skill Matrix
+        run: |
+          go test -tags=skillmatrix -run '^TestSkillRelevancePromptMatrix' -v ./tests/skillsmatrix

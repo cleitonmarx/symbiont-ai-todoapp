@@ -593,8 +593,26 @@ func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 			model: "ai/otherembeddingmodel",
 			skill: baseSkill,
 			expectInputs: []string{
-				"name: todo-mutation-safety\nuse_when: update todos\ntags: todos, mutation\ntools: fetch_todos, update_todos",
-				"avoid_when: chat only",
+				"todo-mutation-safety\nupdate todos\nRelated terms: todos, mutation\nActions/tools: fetch_todos, update_todos",
+				"todo-mutation-safety\nAvoid when: chat only",
+			},
+			expectedUse:   []float64{1.1, 2.2, 3.3},
+			expectedAvoid: []float64{4.4, 5.5, 6.6},
+		},
+		"default-model-with-content-line-property": {
+			model: "ai/otherembeddingmodel",
+			skill: domain.AssistantSkillDefinition{
+				Name:                  "todo-delete",
+				UseWhen:               "delete todos",
+				AvoidWhen:             "chat only",
+				Tags:                  []string{"todos", "delete"},
+				Tools:                 []string{"fetch_todos", "delete_todos"},
+				EmbedFirstContentLine: true,
+				Content:               "Goal: execute deletions safely and only on confirmed targets.",
+			},
+			expectInputs: []string{
+				"todo-delete\ndelete todos\nGoal: execute deletions safely and only on confirmed targets.\nRelated terms: todos, delete\nActions/tools: fetch_todos, delete_todos",
+				"todo-delete\nAvoid when: chat only",
 			},
 			expectedUse:   []float64{1.1, 2.2, 3.3},
 			expectedAvoid: []float64{4.4, 5.5, 6.6},
@@ -608,7 +626,7 @@ func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 				Content: "Use fetch_todos for read operations",
 			},
 			expectInputs: []string{
-				"title: none | text: name: todo-fetch\nuse_when: list todos\ntools: fetch_todos",
+				"title: todo-fetch | text: list todos\nActions/tools: fetch_todos",
 			},
 			expectedUse:   []float64{1.1, 2.2, 3.3},
 			expectedAvoid: nil,

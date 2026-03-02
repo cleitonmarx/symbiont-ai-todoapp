@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog } from '../../components/ui/Dialog';
 import { Button } from '../../components/ui/Button';
 import type { Todo, TodoStatus } from '../../types';
@@ -45,6 +45,14 @@ export const TodoCard = ({ todo, onUpdate, onDelete }: TodoCardProps) => {
   const [title, setTitle] = useState(todo.title);
   const [dueDate, setDueDate] = useState(todo.due_date);
 
+  useEffect(() => {
+    if (editOpen) {
+      return;
+    }
+    setTitle(todo.title);
+    setDueDate(todo.due_date);
+  }, [editOpen, todo.due_date, todo.title]);
+
   const dueTone = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -68,6 +76,12 @@ export const TodoCard = ({ todo, onUpdate, onDelete }: TodoCardProps) => {
   const saveEdit = () => {
     onUpdate(todo.id, undefined, title, dueDate);
     setEditOpen(false);
+  };
+
+  const openEdit = () => {
+    setTitle(todo.title);
+    setDueDate(todo.due_date);
+    setEditOpen(true);
   };
 
   return (
@@ -104,7 +118,7 @@ export const TodoCard = ({ todo, onUpdate, onDelete }: TodoCardProps) => {
             Re-open
           </Button>
         )}
-        <Button type="button" variant="secondary" onClick={() => setEditOpen(true)}>
+        <Button type="button" variant="secondary" onClick={openEdit}>
           Edit
         </Button>
         <Button type="button" variant="danger" onClick={() => onDelete(todo.id)}>

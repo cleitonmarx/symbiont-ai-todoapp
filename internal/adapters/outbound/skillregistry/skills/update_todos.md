@@ -1,28 +1,34 @@
 ---
 name: todo-update
-use_when: User explicitly asks to modify existing todos (update/edit/change/mark complete/reopen/reschedule/postpone/change due date).
-avoid_when: User asks to create/add todos, fetch/list/confirm only, summarize/overview/recap/count, or delete todos.
+use_when: User explicitly asks to modify existing todos (update/edit/change/rename/mark complete/reopen/reschedule/postpone/change due date/change title), or clearly states that an existing todo should now have a different status/state (for example "my todo is done", "this task is completed", "reopen that todo", "my dentist todo is done", "update todo X title to Y").
+avoid_when: User asks to create/add todos, fetch/list/confirm only, summarize/overview/recap/count, delete todos, or access external websites, webpages, URLs, or internet content.
 priority: 90
-tags: [todos, update, mutation, status, due-date, schedule, mark]
+tags: [todos, update, edit, change, rename, title-change, update-title, mutation, status, due-date, deadline, reschedule, schedule, mark, complete, completed, done, reopen, state-change, my-todo-is-done]
 tools: [fetch_todos, update_todos, update_todos_due_date]
 ---
 
 Goal: update existing todos safely, including both general fields and due dates.
 
 Rules:
-1. Never invent IDs.
-2. If IDs are missing or ambiguous, call `fetch_todos` first.
-3. When resolving targets with `fetch_todos`, paginate all pages when needed: start at `page=1` and continue until `next_page` is null.
-4. If the change is only due date/deadline, prefer `update_todos_due_date`.
-5. For status/title/other non-date fields, use `update_todos`.
-6. Build payloads with required schema fields.
-7. Keep tool arguments as strict JSON only.
-8. If update fails due to argument shape, correct and retry once.
-9. Keywords: update, mark done, complete, reopen, due date, deadline, reschedule, postpone.
-10. If intent is read-only summary/count/overview, do not use this skill.
+1. Call `fetch_todos` first.
+2. When resolving targets with `fetch_todos`, paginate all pages when needed: start at `page=1` and continue until `next_page` is null.
+3. If the change is due date/deadline, prefer `update_todos_due_date`.
+4. For status or title, use `update_todos`.
+5. Build payloads with required schema fields.
+6. Keep tool arguments as strict JSON only.
+7. If update fails due to argument shape, correct and retry once.
+8. If the fetch result gives one unambiguous target, continue to the update in the same turn; do not stop after fetch-only results.
+9. Do not ask the user to wait, do not narrate that you will call tools, and do not ask for confirmation again when the user already requested the update clearly.
+10. If the user confirms with a short follow-up like "yes" after you just resolved the target or proposed the exact update, treat it as approval to continue the pending update workflow.
+11. When changing only the title, preserve the current due date and status unless the user explicitly asks to change them too.
+12. Keywords: update, edit, change, rename, title to, mark done, complete, completed, is done, reopen, due date, deadline, reschedule, postpone.
+13. If intent is read-only summary/count/overview, do not use this skill.
+14. In the responses, never mention internal action/tool names or IDs (for example `00000000-0000-0000-0000-000000000001`, `fetch_todos`, `update_todos`, or `update_todos_due_date`).
+15. Do not expose the fetched todo ID to the user.
 
 Preferred flow:
 - Detect update intent and target todo(s).
-- Resolve IDs using `fetch_todos` when needed; if there are multiple pages, keep fetching and accumulating matches across pages.
+- Always resolve IDs using `fetch_todos`; if there are multiple pages, keep fetching and accumulating matches across pages.
+- If the target is unambiguous after fetch, immediately call the correct update action in the same turn.
 - Route to the correct update tool (`update_todos` or `update_todos_due_date`).
 - Confirm final result to the user.

@@ -1,13 +1,14 @@
 ---
 name: todo-goal-planner
-use_when: User asks to create/build/generate a new end-to-end plan toward a goal or deadline (for example build the entire plan, break this into tasks, roadmap, checklist, step-by-step, until date X), especially when research/recommendations are requested.
-avoid_when: User asks to list/find/search/filter/sort/paginate/confirm existing todos, requests summary-only, or asks for create/update/delete/fetch operations on known todos.
-priority: 95
-tags: [todos, planning, roadmap, milestones, deadline, project, research]
+use_when: User asks to plan something from scratch and turn a broader goal into multiple related todos, a complete todo plan, a checklist, a roadmap, or step-by-step work toward a deadline. Also use when research, requirements, or recommendations are requested but the final deliverable should still be a plan or multiple created todos, and when a follow-up reply only provides missing planning parameters after a planning question, such as a date range, budget, location, scope, or deadline.
+avoid_when: User asks to create only one concrete todo or reminder, asks to list/find/search/filter/sort/paginate/confirm existing todos, asks to find existing todos and then summarize/recap/count them, requests summary/recap/overview output as the final deliverable, asks to mark done, reopen, reschedule, delete, fetch, or otherwise update known existing todos, or is only greeting, thanking, or chatting.
+priority: 94
+embed_first_content_line: true
+tags: [todos, plan, planning, multiple-todos, complete-todo-plan, todo-plan, roadmap, milestones, deadline, project, research, requirements, recommendations, create-plan, create-tasks, research-as-input, research-and-create-plan, research-then-plan, final-deliverable-plan, checklist, multi-step, step-by-step, parameters, date-range, budget, location, scope, follow-up]
 tools: [search, fetch_content, create_todos, fetch_todos]
 ---
 
-Goal: transform a high-level goal into a practical, dated todo plan.
+Goal: transform a broader goal or research-backed request into a practical, multi-step, dated todo plan.
 
 Rules:
 1. Confirm goal scope and target date; ask one short question only if critical details are missing.
@@ -26,10 +27,12 @@ Rules:
 14. Use `fetch_todos` only when needed to confirm created results or avoid duplicates.
 15. Keep the response concise and practical; do not output internal tool details.
 16. If the request can be satisfied by reading/filtering existing todos, do not use this skill.
+17. In user-facing responses, never mention internal action/tool names (for example `search`, `fetch_content`, or `create_todos`).
 
 Date guidance:
 - If user provides an execution window, infer preparation milestones before the window and execution tasks within the window.
 - Keep preparation due dates before the target window and avoid due dates after the target unless user asks for follow-up tasks.
+- If the user reply only supplies missing planning parameters, continue the same planning workflow.
 
 Preferred flow:
 - Detect planning intent and extract goal, deadline, constraints, and requested coverage.

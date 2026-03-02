@@ -602,13 +602,13 @@ func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 		"default-model-with-content-line-property": {
 			model: "ai/otherembeddingmodel",
 			skill: domain.AssistantSkillDefinition{
-				Name:             "todo-delete",
-				UseWhen:          "delete todos",
-				AvoidWhen:        "chat only",
-				Tags:             []string{"todos", "delete"},
-				Tools:            []string{"fetch_todos", "delete_todos"},
+				Name:                  "todo-delete",
+				UseWhen:               "delete todos",
+				AvoidWhen:             "chat only",
+				Tags:                  []string{"todos", "delete"},
+				Tools:                 []string{"fetch_todos", "delete_todos"},
 				EmbedFirstContentLine: true,
-				Content:          "Goal: execute deletions safely and only on confirmed targets.",
+				Content:               "Goal: execute deletions safely and only on confirmed targets.",
 			},
 			expectInputs: []string{
 				"todo-delete\ndelete todos\nGoal: execute deletions safely and only on confirmed targets.\nRelated terms: todos, delete\nActions/tools: fetch_todos, delete_todos",

@@ -107,18 +107,24 @@ func (r Registry) chooseRanking(contextRanked, latestOnly []scoredSkill, hasPrio
 		return contextRanked
 	}
 
+	// If the latest-only top skill is significantly higher scored than the context-aware top, prefer it.
 	if latestTop.score-contextTop.score >= r.cfg.LatestIntentOverrideDelta {
 		return trimRanked(latestOnly, r.cfg.RelevantSkillsTopK)
 	}
 
+	// If the latest-only top skill is above the minimum threshold and has a sufficient lead over the second-ranked latest-only skill, prefer it.
 	latestLeadDelta := r.cfg.LatestIntentOverrideDelta / 2
 	if latestLeadDelta <= 0 {
 		latestLeadDelta = 0.02
 	}
+
+	// Note: if the latest-only list has only one skill, we can consider it a strong signal and skip the second-skill comparison.
 	latestSecondScore := 0.0
 	if len(latestOnly) > 1 {
 		latestSecondScore = latestOnly[1].score
 	}
+
+	// The "hasPriorContext" condition is a safeguard to prevent latest-only override when we don't have any context signal at all, which would make the ranking too volatile.
 	if hasPriorContext && latestTop.score >= r.cfg.RelevantSkillsMinScore-r.cfg.LatestIntentOverrideDelta && latestTop.score-latestSecondScore >= latestLeadDelta {
 		return trimRanked(latestOnly, r.cfg.RelevantSkillsTopK)
 	}

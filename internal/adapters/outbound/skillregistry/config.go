@@ -1,16 +1,27 @@
 package skillregistry
 
 const (
+	// defaultRelevantSkillsTopK limits how many skills are returned after ranking.
 	defaultRelevantSkillsTopK        = 3
+	// defaultRelevantSkillsMinScore is the minimum score a skill must reach to be kept.
 	defaultRelevantSkillsMinScore    = 0.24
+	// defaultAvoidPenaltyWeight scales how much avoid_when similarity reduces the final score.
 	defaultAvoidPenaltyWeight        = 0.70
+	// defaultAvoidBlockThreshold blocks a skill entirely when avoid_when similarity is too strong.
 	defaultAvoidBlockThreshold       = 0.45
+	// defaultStrongUseWhenScore marks a skill as strongly relevant for scoring heuristics.
 	defaultStrongUseWhenScore        = 0.55
+	// defaultCurrentInputWeight gives the highest weight to the latest user request.
 	defaultCurrentInputWeight        = 0.50
+	// defaultRecentInputsWeight weights recent user inputs used for continuity.
 	defaultRecentInputsWeight        = 0.40
+	// defaultSummaryWeight weights conversation summary context during ranking.
 	defaultSummaryWeight             = 0.10
+	// defaultRecentInputsLimit controls how many recent user inputs are included in ranking context.
 	defaultRecentInputsLimit         = 4
+	// defaultSelectionMaxChars caps query text length before vectorization.
 	defaultSelectionMaxChars         = 400
+	// defaultLatestIntentOverrideDelta is the minimum score gap for latest-message intent override.
 	defaultLatestIntentOverrideDelta = 0.05
 )
 

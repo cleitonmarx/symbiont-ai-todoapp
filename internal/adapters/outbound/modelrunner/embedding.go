@@ -11,6 +11,8 @@ import (
 type EmbeddingGenerator interface {
 	// GenerateIndexingPrompt creates the prompt used for generating embeddings for a todo item.
 	GenerateIndexingPrompt(document string) string
+	// GenerateSkillPrompt creates the prompt used for generating embeddings for a skill document.
+	GenerateSkillPrompt(title, document string) string
 	// GenerateSearchPrompt creates the prompt used for generating embeddings for a search query.
 	GenerateSearchPrompt(searchInput string) string
 	// Dimension returns the dimension used by the embedding generator, if applicable.
@@ -41,6 +43,14 @@ func (a gemmaEmbedding) GenerateIndexingPrompt(document string) string {
 	return fmt.Sprintf("title: none | text: %s", document)
 }
 
+func (a gemmaEmbedding) GenerateSkillPrompt(title, document string) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		title = "none"
+	}
+	return fmt.Sprintf("title: %s | text: %s", title, document)
+}
+
 func (a gemmaEmbedding) GenerateSearchPrompt(searchInput string) string {
 	return fmt.Sprintf("task: search result | query: %s", searchInput)
 }
@@ -55,6 +65,18 @@ type defaultEmbeddingGenerator struct{}
 
 func (a defaultEmbeddingGenerator) GenerateIndexingPrompt(document string) string {
 	return document
+}
+
+func (a defaultEmbeddingGenerator) GenerateSkillPrompt(title, document string) string {
+	title = strings.TrimSpace(title)
+	document = strings.TrimSpace(document)
+	if title == "" {
+		return document
+	}
+	if document == "" {
+		return title
+	}
+	return title + "\n" + document
 }
 
 func (a defaultEmbeddingGenerator) GenerateSearchPrompt(searchInput string) string {

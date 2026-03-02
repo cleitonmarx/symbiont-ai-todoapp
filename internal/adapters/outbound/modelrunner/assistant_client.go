@@ -163,7 +163,7 @@ func (a AssistantClient) VectorizeSkillDefinition(
 		err       error
 	)
 	if strings.TrimSpace(skill.UseWhen) != "" {
-		useText := gen.GenerateIndexingPrompt(buildSkillUseEmbeddingText(skill))
+		useText := gen.GenerateSkillPrompt(skill.Name, buildSkillUseEmbeddingText(skill))
 		useVector, err = a.embed(ctx, model, useText, dimension)
 		if err != nil {
 			return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
@@ -172,7 +172,7 @@ func (a AssistantClient) VectorizeSkillDefinition(
 
 	var avoidVector domain.EmbeddingVector
 	if strings.TrimSpace(skill.AvoidWhen) != "" {
-		avoidText := gen.GenerateIndexingPrompt(buildSkillAvoidEmbeddingText(skill))
+		avoidText := gen.GenerateSkillPrompt(skill.Name, buildSkillAvoidEmbeddingText(skill))
 		avoidVector, err = a.embed(ctx, model, avoidText, dimension)
 		if err != nil {
 			return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
@@ -181,27 +181,35 @@ func (a AssistantClient) VectorizeSkillDefinition(
 	return useVector, avoidVector, nil
 }
 
+// buildSkillUseEmbeddingText constructs the text to be embedded
+// for a skill's "use" conditions, including the main useWhen text,
+// an optional first line of the content, tags, and tools.
 func buildSkillUseEmbeddingText(skill domain.AssistantSkillDefinition) string {
 	parts := make([]string, 0, 5)
-	parts = appendIfNotEmpty(parts, "name: "+strings.TrimSpace(skill.Name))
-	parts = appendIfNotEmpty(parts, "use_when: "+strings.TrimSpace(skill.UseWhen))
+	parts = appendIfNotEmpty(parts, strings.TrimSpace(skill.UseWhen))
+	if skill.EmbedFirstContentLine {
+		parts = appendIfNotEmpty(parts, firstSkillContentLine(skill.Content))
+	}
 	if len(skill.Tags) > 0 {
-		parts = append(parts, "tags: "+strings.Join(skill.Tags, ", "))
+		parts = append(parts, "Related terms: "+strings.Join(skill.Tags, ", "))
 	}
 	if len(skill.Tools) > 0 {
-		parts = append(parts, "tools: "+strings.Join(skill.Tools, ", "))
+		parts = append(parts, "Actions/tools: "+strings.Join(skill.Tools, ", "))
 	}
 	return strings.Join(parts, "\n")
 }
 
+// buildSkillAvoidEmbeddingText constructs the text to be embedded for a
+// skill's "avoid" conditions.
 func buildSkillAvoidEmbeddingText(skill domain.AssistantSkillDefinition) string {
 	avoid := strings.TrimSpace(skill.AvoidWhen)
 	if avoid == "" {
 		return ""
 	}
-	return "avoid_when: " + avoid
+	return "Avoid when: " + avoid
 }
 
+// appendIfNotEmpty appends a string to a slice if the string is not empty or whitespace.
 func appendIfNotEmpty(values []string, value string) []string {
 	if strings.TrimSpace(value) == "" {
 		return values
@@ -209,6 +217,20 @@ func appendIfNotEmpty(values []string, value string) []string {
 	return append(values, value)
 }
 
+// firstSkillContentLine extracts the first non-empty line from the skill content,
+// if EmbedFirstContentLine is true.
+func firstSkillContentLine(content string) string {
+	for line := range strings.SplitSeq(content, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		return line
+	}
+	return ""
+}
+
+// embed sends a request to the embedding API and returns the resulting vector in a provider-agnostic shape.
 func (a AssistantClient) embed(ctx context.Context, model, input string, dimension *int) (domain.EmbeddingVector, error) {
 	req := EmbeddingsRequest{Model: model, Input: input, Dimensions: dimension}
 	resp, err := a.embeddingClient.Embeddings(ctx, req)
@@ -259,8 +281,10 @@ func (a AssistantClient) ListAssistantModels(ctx context.Context) ([]domain.Assi
 		if m.Kind != domain.ModelKindAssistant {
 			continue
 		}
+		nameParts := strings.Split(m.Name, "/")
+		name := nameParts[len(nameParts)-1]
 		res = append(res, domain.AssistantModelInfo{
-			Name:              m.Name,
+			Name:              name,
 			SupportsStreaming: true,
 			SupportsActions:   true,
 		})

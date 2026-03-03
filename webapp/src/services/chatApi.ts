@@ -1,5 +1,5 @@
 import { apiClient, API_BASE_URL } from './httpClient';
-import type { Conversation, ConversationListResp } from '../types';
+import type { Conversation, ConversationListResp, ModelInfo, ModelListResponse } from '../types';
 
 export const streamChat = async (
   message: string,
@@ -52,8 +52,8 @@ export const clearChatMessages = async (conversationId: string): Promise<void> =
   await deleteConversation(conversationId);
 };
 
-export const fetchAvailableModels = async (): Promise<string[]> => {
-  const response = await apiClient.get('/api/v1/models');
+export const fetchAvailableModels = async (): Promise<ModelInfo[]> => {
+  const response = await apiClient.get<ModelListResponse>('/api/v1/models');
   return response.data?.models ?? [];
 };
 

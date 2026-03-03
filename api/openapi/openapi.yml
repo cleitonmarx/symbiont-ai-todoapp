@@ -540,10 +540,23 @@ components:
           type: array
           description: Available AI model identifiers.
           items:
-            type: string
-          example:
-            - gpt-4-todo-2026-01
-            - gpt-3.5-todo-2026-01
+            $ref: '#/components/schemas/ModelInfo'
+          
+
+    ModelInfo:
+      type: object
+      additionalProperties: false
+      required: [id, name, kind]
+      description: Information about an AI model.
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the model.
+          example: "docker.io/ai/gpt-4-todo-2026-01"
+        name:
+          type: string
+          description: Human-readable name for the model.
+          example: "gpt-4-todo-2026-01"
 
     CreateTodoRequest:
       type: object

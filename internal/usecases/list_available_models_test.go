@@ -24,12 +24,12 @@ func TestListAvailableModelsImpl_Query(t *testing.T) {
 				assistantCatalog.EXPECT().
 					ListAssistantModels(mock.Anything).
 					Return([]domain.AssistantModelInfo{
-						{Name: "gpt-4"},
+						{ID: "gpt-4", Name: "gpt-4"},
 					}, nil).
 					Once()
 			},
 			expectedModels: []domain.ModelInfo{
-				{Name: "gpt-4", Kind: domain.ModelKindAssistant},
+				{ID: "gpt-4", Name: "gpt-4", Kind: domain.ModelKindAssistant},
 			},
 			expectedErr: nil,
 		},

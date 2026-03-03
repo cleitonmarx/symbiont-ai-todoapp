@@ -237,6 +237,68 @@ func TestCompositeActionRegistry_StatusMessage(t *testing.T) {
 	}
 }
 
+func TestCompositeActionRegistry_GetRenderer(t *testing.T) {
+	t.Parallel()
+
+	renderer := &compositeMockRenderer{}
+
+	tests := map[string]struct {
+		actionName    string
+		registriesLen int
+		setMocks      func(t *testing.T, registries []*domain.MockAssistantActionRegistry)
+		assertResult  func(t *testing.T, got domain.ActionResultRenderer, found bool)
+	}{
+		"returns-renderer-from-first-registry-that-has-it": {
+			actionName:    "fetch_todos",
+			registriesLen: 2,
+			setMocks: func(_ *testing.T, registries []*domain.MockAssistantActionRegistry) {
+				registries[0].EXPECT().
+					GetRenderer("fetch_todos").
+					Return(nil, false).
+					Once()
+				registries[1].EXPECT().
+					GetRenderer("fetch_todos").
+					Return(renderer, true).
+					Once()
+			},
+			assertResult: func(t *testing.T, got domain.ActionResultRenderer, found bool) {
+				assert.True(t, found)
+				assert.Same(t, renderer, got)
+			},
+		},
+		"returns-not-found-when-missing-in-all-registries": {
+			actionName:    "missing_action",
+			registriesLen: 2,
+			setMocks: func(_ *testing.T, registries []*domain.MockAssistantActionRegistry) {
+				registries[0].EXPECT().GetRenderer("missing_action").Return(nil, false).Once()
+				registries[1].EXPECT().GetRenderer("missing_action").Return(nil, false).Once()
+			},
+			assertResult: func(t *testing.T, got domain.ActionResultRenderer, found bool) {
+				assert.False(t, found)
+				assert.Nil(t, got)
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			registryMocks := newMockRegistries(t, tt.registriesLen)
+			if tt.setMocks != nil {
+				tt.setMocks(t, registryMocks)
+			}
+
+			registries := make([]domain.AssistantActionRegistry, 0, tt.registriesLen)
+			for _, mock := range registryMocks {
+				registries = append(registries, mock)
+			}
+
+			registry := NewCompositeActionRegistry(t.Context(), registries...)
+			got, found := registry.GetRenderer(tt.actionName)
+			tt.assertResult(t, got, found)
+		})
+	}
+}
+
 func newMockRegistries(t *testing.T, count int) []*domain.MockAssistantActionRegistry {
 	t.Helper()
 
@@ -247,6 +309,12 @@ func newMockRegistries(t *testing.T, count int) []*domain.MockAssistantActionReg
 	}
 
 	return mocks
+}
+
+type compositeMockRenderer struct{}
+
+func (compositeMockRenderer) Render(_ domain.AssistantActionCall, _ domain.AssistantMessage) (domain.AssistantMessage, bool) {
+	return domain.AssistantMessage{}, false
 }
 
 func TestInitCompositeActionRegistry_Initialize(t *testing.T) {

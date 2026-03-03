@@ -1,7 +1,7 @@
 ---
 name: todo-create
 use_when: User asks to create/add/new todos or reminders, especially a single concrete todo with a clear title, short instruction, or direct due date (for example create todo, add task, remind me to, create one todo, create a todo named X due tomorrow).
-avoid_when: User asks to fetch/list/confirm existing todos, mark done/open, change only due dates, delete todos, or asks for an end-to-end plan, roadmap, checklist, or multi-step breakdown toward a broader goal.
+avoid_when: User asks to fetch/list/confirm existing todos, mark done/open, change only due dates, delete todos, asks for an end-to-end plan, roadmap, checklist, or multi-step breakdown toward a broader goal, or asks to inspect/open/fetch/read an external website, webpage, URL, or internet source.
 priority: 92
 tags: [todos, create, add, new, reminder, single-item, direct-create, concrete-title, due-date, mutation]
 tools: [create_todos]

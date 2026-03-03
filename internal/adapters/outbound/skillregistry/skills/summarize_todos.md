@@ -1,7 +1,7 @@
 ---
 name: todo-summary
 use_when: User asks for a concise summary, recap, overview, total, count, or "how many" answer about existing todos, including when the summary is scoped by topic, status, or date window.
-avoid_when: User asks to create, plan, build, generate, update, reschedule, or delete todos, explicitly asks to list/show/display individual todos, or asks to access external websites, webpages, URLs, or internet content.
+avoid_when: User asks to create, plan, build, generate, update, reschedule, or delete todos, asks to research something and then create tasks or a plan, explicitly asks to list/show/display individual todos, or asks to access external websites, webpages, URLs, or internet content.
 priority: 100
 embed_first_content_line: true
 tags: [todos, summary, summarize, concise, brief, recap, overview, count, total, number, matching, matching-todos, matching-items, topic-count, filter-count, date-window-count, count-question, count-by-topic, find-and-summarize, existing-todos-summary, how-many, how-many-do-i-have, how-many-match, how-many-topic, paragraph, short, one-paragraph, due, due-range, date-window, week]

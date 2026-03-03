@@ -701,8 +701,8 @@ func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
                 ]
             }`,
 			expected: []domain.ModelInfo{
-				{Name: "qwen3-embedding", Kind: domain.ModelKindEmbedding},
-				{Name: "llama3", Kind: domain.ModelKindAssistant},
+				{ID: "docker.io/ai/qwen3-embedding", Name: "qwen3-embedding", Kind: domain.ModelKindEmbedding},
+				{ID: "docker.io/ai/llama3", Name: "llama3", Kind: domain.ModelKindAssistant},
 			},
 		},
 		"empty-list": {

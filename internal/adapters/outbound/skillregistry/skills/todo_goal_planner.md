@@ -5,7 +5,7 @@ avoid_when: User asks to create only one concrete todo or reminder, asks to list
 priority: 94
 embed_first_content_line: true
 tags: [todos, plan, planning, multiple-todos, complete-todo-plan, todo-plan, roadmap, milestones, deadline, project, research, requirements, recommendations, create-plan, create-tasks, research-as-input, research-and-create-plan, research-then-plan, final-deliverable-plan, checklist, multi-step, step-by-step, parameters, date-range, budget, location, scope, follow-up]
-tools: [search, fetch_content, create_todos, fetch_todos]
+tools: [search, fetch_content, create_todos, fetch_todos, update_todos, update_todos_due_date, delete_todos]
 ---
 
 Goal: transform a broader goal or research-backed request into a practical, multi-step, dated todo plan.

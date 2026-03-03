@@ -204,6 +204,28 @@ func (sc StreamChatImpl) handleActionCallEvent(
 		return false, err
 	}
 
+	if actionSucceeded {
+		if renderedMessage, ok := sc.renderActionResult(actionCall, actionMessage); ok {
+			req.Messages = append(req.Messages,
+				domain.AssistantMessage{
+					Role:        domain.ChatRole_Assistant,
+					ActionCalls: []domain.AssistantActionCall{actionCall},
+				},
+				domain.AssistantMessage{
+					Role:         actionMessage.Role,
+					Content:      actionMessage.Content,
+					ActionCallID: actionMessage.ActionCallID,
+					ActionCalls:  actionMessage.ActionCalls,
+				},
+				renderedMessage,
+			)
+			if err := sc.handleRenderedActionResult(ctx, renderedMessage, state, onEvent); err != nil {
+				return false, err
+			}
+			return false, nil
+		}
+	}
+
 	req.Messages = append(req.Messages,
 		domain.AssistantMessage{
 			Role:        domain.ChatRole_Assistant,

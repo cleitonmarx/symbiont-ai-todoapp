@@ -65,6 +65,11 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 		tt.setExpectations(chatRepo, summaryRepo, conversationRepo, timeProvider, assistant, actionRegistry, skillRegistry, uow, outbox)
 	}
 
+	actionRegistry.EXPECT().
+		GetRenderer(mock.Anything).
+		Return(nil, false).
+		Maybe()
+
 	useCase := NewStreamChatImpl(
 		log.New(io.Discard, "", 0),
 		chatRepo,

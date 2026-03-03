@@ -34,6 +34,9 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 			messages[i].Content = fmt.Sprintf(
 				msg.Content,
 				now.Format(time.DateOnly),
+				now.Format(time.DateOnly),
+				now.AddDate(0, 0, -1).Format(time.DateOnly),
+				now.AddDate(0, 0, 1).Format(time.DateOnly),
 			)
 		}
 	}

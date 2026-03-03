@@ -12,6 +12,15 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+type actionTestRenderer struct {
+	rendered domain.AssistantMessage
+	ok       bool
+}
+
+func (r actionTestRenderer) Render(_ domain.AssistantActionCall, _ domain.AssistantMessage) (domain.AssistantMessage, bool) {
+	return r.rendered, r.ok
+}
+
 func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 	t.Parallel()
 
@@ -112,6 +121,123 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 			},
 			expectErr:       false,
 			expectedContent: "",
+		},
+		"success-with-renderer-bypasses-follow-up-runturn": {
+			userMessage: "Rename my todo",
+			model:       "test-model",
+			options: []StreamChatOption{
+				WithConversationID(conversationID),
+			},
+			setExpectations: func(
+				chatRepo *domain.MockChatMessageRepository,
+				summaryRepo *domain.MockConversationSummaryRepository,
+				conversationRepo *domain.MockConversationRepository,
+				timeProvider *domain.MockCurrentTimeProvider,
+				assistant *domain.MockAssistant,
+				actionRegistry *domain.MockAssistantActionRegistry,
+				skillRegistry *domain.MockAssistantSkillRegistry,
+				uow *domain.MockUnitOfWork,
+				outbox *domain.MockOutboxRepository,
+			) {
+				skillRegistry.EXPECT().
+					ListRelevant(mock.Anything, mock.Anything).
+					Return([]domain.AssistantSkillDefinition{}).
+					Once()
+
+				conversationRepo.EXPECT().
+					GetConversation(mock.Anything, conversationID).
+					Return(domain.Conversation{
+						ID: conversationID,
+					}, true, nil).
+					Once()
+				actionRegistry.EXPECT().
+					StatusMessage("update_todos").
+					Return("updating todos...\n")
+				actionRegistry.EXPECT().
+					Execute(
+						mock.Anything,
+						domain.AssistantActionCall{
+							ID:    "func-123",
+							Name:  "update_todos",
+							Input: "{\"todos\":[{\"id\":\"1\",\"title\":\"Updated\"}]}",
+							Text:  "updating todos...\n",
+						},
+						mock.MatchedBy(func(msgs []domain.AssistantMessage) bool {
+							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Rename my todo"
+						}),
+					).
+					Return(domain.AssistantMessage{
+						Role:         domain.ChatRole_Tool,
+						ActionCallID: common.Ptr("func-123"),
+						Content:      "todos[1]{id,title,due_date,status}\n1,Updated,2026-01-25,OPEN",
+					}).
+					Once()
+				actionRegistry.EXPECT().
+					GetRenderer("update_todos").
+					Return(actionTestRenderer{
+						rendered: domain.AssistantMessage{
+							Role:    domain.ChatRole_Assistant,
+							Content: "**Updated** (Due: Jan 25, 2026) - OPEN.",
+						},
+						ok: true,
+					}, true).
+					Once()
+
+				chatRepo.EXPECT().
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
+					Return([]domain.ChatMessage{}, false, nil).
+					Once()
+
+				expectNowCalls(timeProvider, fixedTime, 6)
+
+				assistant.EXPECT().
+					RunTurn(mock.Anything, mock.Anything, mock.Anything).
+					RunAndReturn(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+						if err := onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+							UserMessageID:      userMsgID,
+							AssistantMessageID: assistantMsgID,
+						}); err != nil {
+							return err
+						}
+						return onEvent(ctx, domain.AssistantEventType_ActionRequested, domain.AssistantActionCall{
+							ID:    "func-123",
+							Name:  "update_todos",
+							Input: `{"todos":[{"id":"1","title":"Updated"}]}`,
+						})
+					}).
+					Once()
+
+				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+					{
+						Role:            domain.ChatRole_User,
+						Content:         "Rename my todo",
+						ID:              &userMsgID,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
+					},
+					{
+						Role:            domain.ChatRole_Assistant,
+						Content:         "",
+						ActionCallsLen:  1,
+						HasActionCallID: false,
+					},
+					{
+						Role:            domain.ChatRole_Tool,
+						Content:         "todos[1]{id,title,due_date,status}\n1,Updated,2026-01-25,OPEN",
+						ActionCallsLen:  0,
+						HasActionCallID: true,
+					},
+					{
+						Role:            domain.ChatRole_Assistant,
+						Content:         "**Updated** (Due: Jan 25, 2026) - OPEN.",
+						ID:              &assistantMsgID,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
+					},
+				})
+			},
+			expectErr:       false,
+			expectedContent: "updating todos...\n**Updated** (Due: Jan 25, 2026) - OPEN.",
 		},
 		"action-message-marked-as-failed-when-content-has-error": {
 			userMessage: "Call failing action",

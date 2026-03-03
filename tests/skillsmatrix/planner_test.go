@@ -116,7 +116,7 @@ func TestSkillRelevancePromptMatrix_TodoGoalPlanner(t *testing.T) {
 		},
 		"research-and-create-tasks": {
 			messages: []domain.AssistantMessage{
-				{Role: domain.ChatRole_User, Content: "Research Tokyo in April and create tasks for me."},
+				{Role: domain.ChatRole_User, Content: "Research the requirements and create tasks for me."},
 			},
 			wantTop:     "todo-goal-planner",
 			wantContain: []string{"todo-goal-planner"},

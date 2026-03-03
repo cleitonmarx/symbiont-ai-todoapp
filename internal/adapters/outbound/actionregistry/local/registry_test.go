@@ -156,6 +156,48 @@ func TestActionRegistry_GetDefinition(t *testing.T) {
 	}
 }
 
+func TestActionRegistry_GetRenderer(t *testing.T) {
+	t.Parallel()
+
+	renderer := &actionsMockRenderer{}
+
+	tests := map[string]struct {
+		actionName   string
+		setupActions func(t *testing.T) []domain.AssistantAction
+		assertResult func(t *testing.T, got domain.ActionResultRenderer, found bool)
+	}{
+		"returns-renderer-when-action-exists": {
+			actionName: "fetch_todos",
+			setupActions: func(t *testing.T) []domain.AssistantAction {
+				action := domain.NewMockAssistantAction(t)
+				action.EXPECT().Definition().Return(mockAssistantActionDefinition("fetch_todos")).Maybe()
+				action.EXPECT().Renderer().Return(renderer, true).Once()
+				return []domain.AssistantAction{action}
+			},
+			assertResult: func(t *testing.T, got domain.ActionResultRenderer, found bool) {
+				assert.True(t, found)
+				assert.Same(t, renderer, got)
+			},
+		},
+		"returns-not-found-when-action-does-not-exist": {
+			actionName:   "missing_action",
+			setupActions: func(t *testing.T) []domain.AssistantAction { return nil },
+			assertResult: func(t *testing.T, got domain.ActionResultRenderer, found bool) {
+				assert.False(t, found)
+				assert.Nil(t, got)
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			registry := NewActionRegistry(nil, "", tt.setupActions(t)...)
+			got, found := registry.GetRenderer(tt.actionName)
+			tt.assertResult(t, got, found)
+		})
+	}
+}
+
 func TestInitActionRegistry_Initialize(t *testing.T) {
 	t.Parallel()
 
@@ -177,4 +219,10 @@ func mockAssistantActionDefinition(name string) domain.AssistantActionDefinition
 			Fields: map[string]domain.AssistantActionField{},
 		},
 	}
+}
+
+type actionsMockRenderer struct{}
+
+func (actionsMockRenderer) Render(_ domain.AssistantActionCall, _ domain.AssistantMessage) (domain.AssistantMessage, bool) {
+	return domain.AssistantMessage{}, false
 }

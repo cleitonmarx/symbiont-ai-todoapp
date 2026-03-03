@@ -21,6 +21,11 @@ func (t UIFiltersSetterAction) StatusMessage() string {
 	return "🎛️ Applying filters..."
 }
 
+// Renderer reports that set_ui_filters does not expose a deterministic renderer.
+func (t UIFiltersSetterAction) Renderer() (domain.ActionResultRenderer, bool) {
+	return nil, false
+}
+
 // Definition returns the assistant action definition for UIFiltersSetterAction.
 func (t UIFiltersSetterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{

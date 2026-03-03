@@ -31,6 +31,11 @@ func (a BulkTodoCreatorAction) StatusMessage() string {
 	return "📝 Creating your todos..."
 }
 
+// Renderer returns the deterministic result renderer for created todos.
+func (a BulkTodoCreatorAction) Renderer() (domain.ActionResultRenderer, bool) {
+	return createTodosRenderer{}, true
+}
+
 // Definition returns the assistant action definition for BulkTodoCreatorAction.
 func (a BulkTodoCreatorAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{

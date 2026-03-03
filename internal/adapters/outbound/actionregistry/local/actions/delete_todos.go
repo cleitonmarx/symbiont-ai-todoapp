@@ -30,6 +30,11 @@ func (a BulkTodoDeleterAction) StatusMessage() string {
 	return "🗑️ Deleting todos..."
 }
 
+// Renderer returns the deterministic result renderer for deleted todos.
+func (a BulkTodoDeleterAction) Renderer() (domain.ActionResultRenderer, bool) {
+	return deleteTodosRenderer{}, true
+}
+
 // Definition returns the assistant action definition for BulkTodoDeleterAction.
 func (a BulkTodoDeleterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{

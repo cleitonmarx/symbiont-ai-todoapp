@@ -10,6 +10,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/google/uuid"
+	"github.com/toon-format/toon-go"
 )
 
 // extractDateParam tries to extract a date from the provided parameter
@@ -121,20 +122,54 @@ func mapTodoFilterBuildErrCode(err error) string {
 
 // formatTodosRows formats todos as a compact table-like payload consumed by the assistant.
 func formatTodosRows(todos []domain.Todo) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "todos[%d]{id,title,due_date,status}", len(todos))
-	for _, todo := range todos {
-		fmt.Fprintf(&b, "\n%s,%s,%s,%s", todo.ID, todo.Title, todo.DueDate.Format(time.DateOnly), todo.Status)
+	type todoRow struct {
+		ID      string `toon:"id"`
+		Title   string `toon:"title"`
+		DueDate string `toon:"due_date"`
+		Status  string `toon:"status"`
 	}
-	return b.String()
+	type payload struct {
+		Todos []todoRow `toon:"todos"`
+	}
+
+	rows := make([]todoRow, 0, len(todos))
+	for _, todo := range todos {
+		rows = append(rows, todoRow{
+			ID:      todo.ID.String(),
+			Title:   todo.Title,
+			DueDate: todo.DueDate.Format(time.DateOnly),
+			Status:  string(todo.Status),
+		})
+	}
+
+	content, err := toon.MarshalString(payload{Todos: rows})
+	if err != nil {
+		return newActionError("marshal_error", err.Error(), "")
+	}
+	return content
 }
 
 // formatDeletedRows formats deleted todo ids as a compact table-like payload.
 func formatDeletedRows(ids []uuid.UUID) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "todos[%d]{id,deleted}", len(ids))
-	for _, id := range ids {
-		fmt.Fprintf(&b, "\n%s,true", id.String())
+	type deletedRow struct {
+		ID      string `toon:"id"`
+		Deleted bool   `toon:"deleted"`
 	}
-	return b.String()
+	type payload struct {
+		Todos []deletedRow `toon:"todos"`
+	}
+
+	rows := make([]deletedRow, 0, len(ids))
+	for _, id := range ids {
+		rows = append(rows, deletedRow{
+			ID:      id.String(),
+			Deleted: true,
+		})
+	}
+
+	content, err := toon.MarshalString(payload{Todos: rows})
+	if err != nil {
+		return newActionError("marshal_error", err.Error(), "")
+	}
+	return content
 }

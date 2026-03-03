@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/toon-format/toon-go"
 )
 
 func TestBulkTodoUpdaterAction(t *testing.T) {
@@ -76,7 +77,13 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Updated 1","status":"DONE"},{"id":"` + todoID2.String() + `","title":"Updated 2"}]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Contains(t, resp.Content, "todos[2]{id,title,due_date,status}")
+				payload := struct {
+					Todos []struct {
+						Title string `toon:"title"`
+					} `toon:"todos"`
+				}{}
+				assert.NoError(t, toon.UnmarshalString(resp.Content, &payload))
+				assert.Len(t, payload.Todos, 2)
 			},
 		},
 		"update-todos-invalid-arguments": {

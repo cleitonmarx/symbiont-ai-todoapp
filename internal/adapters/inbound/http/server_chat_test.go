@@ -19,6 +19,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -29,19 +30,61 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	fixedTime := time.Date(2026, 1, 22, 10, 30, 0, 0, time.UTC)
 	fixedID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	turnID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
+	actionExecuted := true
 
 	domainMessage := domain.ChatMessage{
-		ID:        fixedID,
-		ChatRole:  "user",
-		Content:   "Hello, how are you?",
-		CreatedAt: fixedTime,
+		ID:             fixedID,
+		TurnID:         turnID,
+		ChatRole:       "user",
+		Content:        "Hello, how are you?",
+		CreatedAt:      fixedTime,
+		ActionExecuted: &actionExecuted,
+		SelectedSkills: []domain.AssistantSelectedSkill{
+			{
+				Name:   "update_todos",
+				Source: "skills/update_todos.md",
+				Tools:  []string{"fetch_todos", "update_todos"},
+			},
+		},
+		ActionDetails: []domain.ChatMessageActionDetail{
+			{
+				ActionCallID:   "call-1",
+				Name:           "update_todos",
+				Input:          `{"todos":[{"id":"1"}]}`,
+				Text:           "Updating todos...",
+				Output:         "todo updated",
+				MessageState:   domain.ChatMessageState_Completed,
+				ActionExecuted: &actionExecuted,
+			},
+		},
 	}
 
 	openAPIMessage := gen.ChatMessage{
-		Id:        fixedID,
-		Role:      gen.ChatMessageRole("user"),
-		Content:   "Hello, how are you?",
-		CreatedAt: fixedTime,
+		Id:             fixedID,
+		TurnId:         common.Ptr(openapi_types.UUID(turnID)),
+		Role:           gen.ChatMessageRole("user"),
+		Content:        "Hello, how are you?",
+		CreatedAt:      fixedTime,
+		ActionExecuted: &actionExecuted,
+		SelectedSkills: &[]gen.SelectedSkill{
+			{
+				Name:   "update_todos",
+				Source: "skills/update_todos.md",
+				Tools:  []string{"fetch_todos", "update_todos"},
+			},
+		},
+		ActionDetails: &[]gen.ChatMessageActionDetail{
+			{
+				ActionCallId:   "call-1",
+				Name:           "update_todos",
+				Input:          `{"todos":[{"id":"1"}]}`,
+				Text:           "Updating todos...",
+				Output:         "todo updated",
+				MessageState:   gen.ChatMessageActionDetailMessageState(domain.ChatMessageState_Completed),
+				ActionExecuted: &actionExecuted,
+			},
+		},
 	}
 
 	tests := map[string]struct {

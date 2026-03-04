@@ -19,9 +19,12 @@ Rules:
 6. If a scoped topical fetch returns zero results on page 1, retry once with `search_by_similarity=<topic phrase>` and `sort_by=similarityAsc`, preserving the rest of the scope.
 7. Call `execute_code` after pagination before answering. Use it for exact totals and counts.
 8. If the user explicitly asks for grouping or counts by category, infer exactly one short category per todo before aggregation. Use `Uncategorized` only when needed.
-9. Do not answer from `fetch_todos` results alone when the user asked for a summary, total, or count. Answer only after `execute_code` returns.
-10. Return one short paragraph only. Do not list individual todos or mention internal action/tool names.
+9. In case of an error in `execute_code`, try at least 5 times more, always trying to fix the input using the error messages' guidance.
+10. Return one short paragraph only. Do not list individual todos.
 11. Do not use `input[...]` or assume the interpreter injects variables automatically; inline the normalized todo list in the code.
+12. In the `code` field, send raw Python source with real newlines. Do not write escaped source like `\\n`, `\\t`, or escaped Markdown code fences.
+13. The tool arguments must be valid JSON, but the value of `code` must be plain Python text, not a JSON-encoded Python string.
+14. Prefer single quotes inside Python dicts and strings when possible to reduce escaping pressure.
 
 Preferred flow:
 - Build the scope.
@@ -33,30 +36,30 @@ Preferred flow:
 `execute_code` template:
 ```python
 todos = [
-    {"title": "Call Alice", "category": "Personal", "status": "OPEN"},
-    {"title": "Doctor Appointment", "category": "Medical", "status": "DONE"},
-    {"title": "Call my brother", "category": "Personal", "status": "DONE"},
+    {'title': 'Call Alice', 'category': 'Personal', 'status': 'OPEN'},
+    {'title': 'Doctor Appointment', 'category': 'Medical', 'status': 'DONE'},
+    {'title': 'Call my brother', 'category': 'Personal', 'status': 'DONE'},
 ]
 
 by_category = {}
 for todo in todos:
-    category = todo.get("category") or "Uncategorized"
+    category = todo.get('category') or 'Uncategorized'
     item = by_category.setdefault(category, {
-        "total": 0,
-        "open_count": 0,
-        "done_count": 0,
+        'total': 0,
+        'open_count': 0,
+        'done_count': 0,
     })
-    item["total"] += 1
-    if todo.get("status") == "OPEN":
-        item["open_count"] += 1
-    if todo.get("status") == "DONE":
-        item["done_count"] += 1
+    item['total'] += 1
+    if todo.get('status') == 'OPEN':
+        item['open_count'] += 1
+    if todo.get('status') == 'DONE':
+        item['done_count'] += 1
 
 result = {
-    "total": len(todos),
-    "open_count": sum(1 for t in todos if t.get("status") == "OPEN"),
-    "done_count": sum(1 for t in todos if t.get("status") == "DONE"),
-    "by_category": by_category,
+    'total': len(todos),
+    'open_count': sum(1 for t in todos if t.get('status') == 'OPEN'),
+    'done_count': sum(1 for t in todos if t.get('status') == 'DONE'),
+    'by_category': by_category,
 }
 
 result

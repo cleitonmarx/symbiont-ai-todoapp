@@ -2,7 +2,7 @@ package skillregistry
 
 const (
 	// defaultRelevantSkillsTopK limits how many skills are returned after ranking.
-	defaultRelevantSkillsTopK = 3
+	defaultRelevantSkillsTopK = 2
 	// defaultRelevantSkillsMinScore is the minimum score a skill must reach to be kept.
 	defaultRelevantSkillsMinScore = 0.23
 	// defaultAvoidPenaltyWeight scales how much avoid_when similarity reduces the final score.

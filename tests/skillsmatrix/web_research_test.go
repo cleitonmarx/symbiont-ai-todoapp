@@ -9,8 +9,6 @@ import (
 )
 
 func TestSkillRelevancePromptMatrix_WebResearch(t *testing.T) {
-	t.Parallel()
-
 	registry := newSkillMatrixRegistry(t)
 	tests := map[string]skillMatrixCase{
 		"web-research": {
@@ -41,6 +39,13 @@ func TestSkillRelevancePromptMatrix_WebResearch(t *testing.T) {
 				{Role: domain.ChatRole_User, Content: "What about my hotel's research? List the top 3."},
 				{Role: domain.ChatRole_Assistant, Content: `You have 2 open hotel-related tasks: "Research and book hotel in Tokyo" and "Confirm hotel reservation and transportation in Tokyo".`},
 				{Role: domain.ChatRole_User, Content: "Research the web for the top 3 hotels in Tokyo."},
+			},
+			wantTop:     "web-research",
+			wantContain: []string{"web-research"},
+		},
+		"test001": {
+			messages: []domain.AssistantMessage{
+				{Role: domain.ChatRole_User, Content: "Research the internet for grocery stores near me in Maple Ridge, BC."},
 			},
 			wantTop:     "web-research",
 			wantContain: []string{"web-research"},

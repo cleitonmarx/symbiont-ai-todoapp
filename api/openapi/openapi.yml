@@ -356,7 +356,9 @@ paths:
       tags: [AI Chat]
       summary: Stream assistant response for a user message (single global chat)
       description: >
-        Streams Server-Sent Events (SSE). Events: meta, delta, tool_call_started, tool_call_finished, done, error.
+        Streams Server-Sent Events (SSE). Events: turn_started, message_delta,
+        action_approval_required, action_approval_resolved, action_started,
+        action_completed, turn_completed.
       requestBody:
         required: true
         content:
@@ -374,19 +376,19 @@ paths:
                 example:
                   summary: Example SSE events
                   value: |
-                    event: meta
-                    data: {"conversation_id":"4b825f1e-8c3a-4d2b-9f1e-7c9a0b5e6d8f","user_message_id":"1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d","assistant_message_id":"0f7d6ef6-1f2a-4e0c-9f6d-7d7c7c2e1a11","started_at":"2026-01-23T22:10:00Z"}
+                    event: turn_started
+                    data: {"conversation_id":"4b825f1e-8c3a-4d2b-9f1e-7c9a0b5e6d8f","user_message_id":"1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d","assistant_message_id":"0f7d6ef6-1f2a-4e0c-9f6d-7d7c7c2e1a11","turn_id":"8d1b3124-4d8a-4d8f-8b8b-2f1cc4d55aa1","conversation_created":false,"selected_skills":[{"name":"update_todos","source":"skills/update_todos.md","tools":["fetch_todos","update_todos"]}]}
 
-                    event: delta
+                    event: message_delta
                     data: {"text":"You have 2 overdue todos:"}
 
-                    event: tool_call_started
-                    data: {"id":"call_1","function":"set_ui_filters","arguments":"{\"search_by_similarity\":\"buy milk\",\"sort_by\":\"similarityAsc\",\"page\":1,\"page_size\":10}","text":"🎛️ Applying filters...\n\n","apply_ui_filters":true,"filters":{"search_query":"buy milk","search_type":"SIMILARITY","sort_by":"similarityAsc","page":1,"page_size":10}}
+                    event: action_started
+                    data: {"id":"call_1","name":"set_ui_filters","input":"{\"search_by_similarity\":\"buy milk\",\"sort_by\":\"similarityAsc\",\"page\":1,\"page_size\":10}","text":"🎛️ Applying filters...\n\n"}
 
-                    event: tool_call_finished
-                    data: {"id":"call_1","function":"set_ui_filters","ok":true,"should_refetch":true}
+                    event: action_completed
+                    data: {"id":"call_1","name":"set_ui_filters","success":true,"should_refetch":true,"action_executed":true,"output_preview":"ok","output_truncated":false}
 
-                    event: done
+                    event: turn_completed
                     data: {"assistant_message_id":"0f7d6ef6-1f2a-4e0c-9f6d-7d7c7c2e1a11","completed_at":"2026-01-23T22:10:05Z","usage":{"prompt_tokens":123,"completion_tokens":45,"total_tokens":168}}
         "400":
           description: Invalid request
@@ -724,6 +726,7 @@ components:
         - overdue
         - near_deadline
         - summary
+        - generated_at
       properties:
         counts:
           $ref: '#/components/schemas/TodoStatusCounts'
@@ -752,6 +755,10 @@ components:
           type: string
           description: Short, user-facing summary of the board state.
           example: "You have three overdue tasks that need immediate attention."
+        generated_at:
+          type: string
+          format: date-time
+          description: Timestamp when this summary was generated.
 
     TodoStatusCounts:
       type: object
@@ -966,9 +973,73 @@ components:
           enum: [user, assistant, system]
         content:
           type: string
+        turn_id:
+          type: string
+          format: uuid
+        selected_skills:
+          type: array
+          items:
+            $ref: "#/components/schemas/SelectedSkill"
+        action_details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessageActionDetail"
+        action_executed:
+          type: boolean
+          nullable: true
         created_at:
           type: string
           format: date-time
+
+    ChatMessageActionDetail:
+      type: object
+      additionalProperties: false
+      required: [action_call_id, name, input, text, output, message_state]
+      properties:
+        action_call_id:
+          type: string
+        name:
+          type: string
+        input:
+          type: string
+        text:
+          type: string
+        output:
+          type: string
+        message_state:
+          type: string
+          enum: [COMPLETED, FAILED]
+        error_message:
+          type: string
+          nullable: true
+        approval_status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, AUTO_REJECTED, EXPIRED]
+          nullable: true
+        approval_decision_reason:
+          type: string
+          nullable: true
+        approval_decided_at:
+          type: string
+          format: date-time
+          nullable: true
+        action_executed:
+          type: boolean
+          nullable: true
+
+    SelectedSkill:
+      type: object
+      additionalProperties: false
+      required: [name, source, tools]
+      properties:
+        name:
+          type: string
+        source:
+          type: string
+        tools:
+          type: array
+          items:
+            type: string
 
     DateRange:
       type: object

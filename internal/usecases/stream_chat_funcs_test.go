@@ -164,6 +164,9 @@ type persistCallExpectation struct {
 	TotalTokens            *int
 	ActionCallsLen         int
 	HasActionCallID        bool
+	SelectedSkills         []domain.AssistantSelectedSkill
+	ActionExecuted         *bool
+	FirstActionCallText    *string
 	CreateErr              error
 }
 
@@ -239,6 +242,7 @@ func expectPersistSequence(
 			assert.Equal(t, expectedState, msg.MessageState)
 			assert.Equal(t, exp.HasActionCallID, msg.ActionCallID != nil)
 			assert.Len(t, msg.ActionCalls, exp.ActionCallsLen)
+			assert.ElementsMatch(t, exp.SelectedSkills, msg.SelectedSkills)
 			assert.NotEqual(t, uuid.Nil, msg.TurnID)
 			assert.Equal(t, int64(createIdx-1), msg.TurnSequence)
 			assert.Equal(t, fixedTime, msg.CreatedAt)
@@ -286,6 +290,16 @@ func expectPersistSequence(
 				}
 			} else {
 				assert.Nil(t, msg.ApprovalDecidedAt)
+			}
+			if exp.ActionExecuted != nil {
+				if assert.NotNil(t, msg.ActionExecuted) {
+					assert.Equal(t, *exp.ActionExecuted, *msg.ActionExecuted)
+				}
+			}
+			if exp.FirstActionCallText != nil {
+				if assert.NotEmpty(t, msg.ActionCalls) {
+					assert.Equal(t, *exp.FirstActionCallText, msg.ActionCalls[0].Text)
+				}
 			}
 
 			if exp.CreateErr == nil {

@@ -50,6 +50,8 @@ func (sc StreamChatImpl) handleMetaEvent(
 	meta := data.(domain.AssistantTurnStarted)
 	meta.ConversationID = state.conversation.ID
 	meta.ConversationCreated = state.conversationCreated
+	meta.TurnID = state.turnID
+	meta.SelectedSkills = state.selectedSkills
 	state.assistantMsgID = meta.AssistantMessageID
 	state.userMsg.ID = meta.UserMessageID
 	state.userMsg.CreatedAt = sc.timeProvider.Now()
@@ -75,6 +77,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 	if state.tracker.hasExceededMaxCycles() || state.tracker.hasExceededMaxActionCalls(actionCall.Name, actionCall.Input) {
 		return false, nil
 	}
+	actionCall.Text = sc.actionRegistry.StatusMessage(actionCall.Name)
 
 	assistantActionCallMsg := domain.ChatMessage{
 		ID:             uuid.New(),
@@ -126,6 +129,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 			ApprovalStatus:         &approvalDecision.Status,
 			ApprovalDecisionReason: approvalDecision.Reason,
 			ApprovalDecidedAt:      common.Ptr(approvalDecision.DecidedAt),
+			ActionExecuted:         common.Ptr(false),
 			CreatedAt:              now,
 			UpdatedAt:              now,
 		}
@@ -135,11 +139,15 @@ func (sc StreamChatImpl) handleActionCallEvent(
 		}
 
 		actionCompleted := domain.AssistantActionCompleted{
-			ID:            actionCall.ID,
-			Name:          actionCall.Name,
-			Success:       false,
-			ShouldRefetch: false,
-			Error:         &reason,
+			ID:              actionCall.ID,
+			Name:            actionCall.Name,
+			Success:         false,
+			ShouldRefetch:   false,
+			Error:           &reason,
+			ApprovalStatus:  &approvalDecision.Status,
+			ActionExecuted:  common.Ptr(false),
+			OutputPreview:   buildOutputPreview(actionContent),
+			OutputTruncated: isOutputPreviewTruncated(actionContent),
 		}
 		if err := onEvent(ctx, domain.AssistantEventType_ActionCompleted, actionCompleted); err != nil {
 			return false, err
@@ -156,7 +164,6 @@ func (sc StreamChatImpl) handleActionCallEvent(
 		return true, nil
 	}
 
-	actionCall.Text = sc.actionRegistry.StatusMessage(actionCall.Name)
 	if err := onEvent(ctx, domain.AssistantEventType_ActionStarted, actionCall); err != nil {
 		return false, err
 	}
@@ -174,6 +181,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 		Content:        actionMessage.Content,
 		Model:          model,
 		MessageState:   domain.ChatMessageState_Completed,
+		ActionExecuted: common.Ptr(true),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -192,10 +200,14 @@ func (sc StreamChatImpl) handleActionCallEvent(
 	}
 
 	actionCompleted := domain.AssistantActionCompleted{
-		ID:            actionCall.ID,
-		Name:          actionCall.Name,
-		Success:       actionSucceeded,
-		ShouldRefetch: actionSucceeded,
+		ID:              actionCall.ID,
+		Name:            actionCall.Name,
+		Success:         actionSucceeded,
+		ShouldRefetch:   actionSucceeded,
+		ApprovalStatus:  &approvalDecision.Status,
+		ActionExecuted:  common.Ptr(true),
+		OutputPreview:   buildOutputPreview(actionMessage.Content),
+		OutputTruncated: isOutputPreviewTruncated(actionMessage.Content),
 	}
 	if !actionSucceeded {
 		actionCompleted.Error = &actionMessage.Content
@@ -267,6 +279,29 @@ func approvalDecisionReason(decision domain.AssistantActionApprovalDecision) str
 	default:
 		return "action execution was not approved"
 	}
+}
+
+// actionOutputPreviewMaxChars defines the maximum number of characters for the action output preview.
+const actionOutputPreviewMaxChars = 4000
+
+// buildOutputPreview generates a truncated preview of the action output for display
+// in the UI and to assist with token limits.
+func buildOutputPreview(content string) *string {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return nil
+	}
+	preview := truncateToFirstChars(trimmed, actionOutputPreviewMaxChars)
+	return common.Ptr(preview)
+}
+
+// isOutputPreviewTruncated checks if the action output exceeds the maximum character limit for the preview.
+func isOutputPreviewTruncated(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return false
+	}
+	return len([]rune(trimmed)) > actionOutputPreviewMaxChars
 }
 
 // approvalBlockedActionContent builds the synthetic tool payload used when approval blocks execution.

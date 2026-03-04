@@ -54,6 +54,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 		expectActionExecution      bool
 		expectedActionCompletedErr *string
 		expectedActionCompletedOK  bool
+		expectedActionExecuted     *bool
 		expectedEventSequence      []domain.AssistantEventType
 		expectActionStarted        bool
 	}{
@@ -69,6 +70,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			expectedToolMessageState:  domain.ChatMessageState_Completed,
 			expectActionExecution:     true,
 			expectedActionCompletedOK: true,
+			expectedActionExecuted:    common.Ptr(true),
 			expectedEventSequence: []domain.AssistantEventType{
 				domain.AssistantEventType_TurnStarted,
 				domain.AssistantEventType_ActionApprovalRequired,
@@ -94,6 +96,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			expectActionExecution:      false,
 			expectedActionCompletedErr: common.Ptr("user denied"),
 			expectedActionCompletedOK:  false,
+			expectedActionExecuted:     common.Ptr(false),
 			expectedEventSequence: []domain.AssistantEventType{
 				domain.AssistantEventType_TurnStarted,
 				domain.AssistantEventType_ActionApprovalRequired,
@@ -113,6 +116,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			expectActionExecution:      false,
 			expectedActionCompletedErr: common.Ptr("approval request expired"),
 			expectedActionCompletedOK:  false,
+			expectedActionExecuted:     common.Ptr(false),
 			expectedEventSequence: []domain.AssistantEventType{
 				domain.AssistantEventType_TurnStarted,
 				domain.AssistantEventType_ActionApprovalRequired,
@@ -173,12 +177,12 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				Return(actionDefinition, true).
 				Once()
 
-			if tc.expectActionExecution {
-				actionRegistry.EXPECT().
-					StatusMessage(actionName).
-					Return("executing delete_todo...").
-					Once()
+			actionRegistry.EXPECT().
+				StatusMessage(actionName).
+				Return("executing delete_todo...").
+				Once()
 
+			if tc.expectActionExecution {
 				actionRegistry.EXPECT().
 					Execute(
 						mock.Anything,
@@ -263,6 +267,10 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 					Content:         "",
 					ActionCallsLen:  1,
 					HasActionCallID: false,
+					FirstActionCallText: func() *string {
+						msg := "executing delete_todo..."
+						return &msg
+					}(),
 				},
 				{
 					Role:                   domain.ChatRole_Tool,
@@ -274,6 +282,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 					ApprovalDecidedAt:      &expectedApprovalDecidedAt,
 					ActionCallsLen:         0,
 					HasActionCallID:        true,
+					ActionExecuted:         tc.expectedActionExecuted,
 				},
 				{
 					Role:            domain.ChatRole_Assistant,
@@ -344,12 +353,16 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			assert.Equal(t, actionName, actionCompletedData.Name)
 			assert.Equal(t, tc.expectedActionCompletedOK, actionCompletedData.Success)
 			assert.Equal(t, tc.expectedActionCompletedErr, actionCompletedData.Error)
+			assert.Equal(t, tc.expectedActionExecuted, actionCompletedData.ActionExecuted)
+			assert.Equal(t, &tc.expectedStatus, actionCompletedData.ApprovalStatus)
+			require.NotNil(t, actionCompletedData.OutputPreview)
+			assert.Equal(t, tc.expectedToolContent, *actionCompletedData.OutputPreview)
+			assert.False(t, actionCompletedData.OutputTruncated)
 
 			if tc.expectActionStarted {
 				assert.True(t, actionStartedSeen)
 			} else {
 				assert.False(t, actionStartedSeen)
-				actionRegistry.AssertNotCalled(t, "StatusMessage", mock.Anything)
 				actionRegistry.AssertNotCalled(t, "Execute", mock.Anything, mock.Anything, mock.Anything)
 			}
 

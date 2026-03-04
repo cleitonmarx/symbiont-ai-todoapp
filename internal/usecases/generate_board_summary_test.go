@@ -73,7 +73,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 					mock.MatchedBy(func(req domain.AssistantTurnRequest) bool {
 						return req.Model == "mistral" &&
 							len(req.Messages) == 2 &&
-							req.Messages[0].Role == "developer" &&
+							req.Messages[0].Role == "system" &&
 							req.Messages[1].Role == "user" &&
 							strings.Contains(req.Messages[0].Content, "You are a helpful assistant that summarizes todo progress") &&
 							strings.Contains(req.Messages[1].Content, "Open: 2\n  Done: 1")

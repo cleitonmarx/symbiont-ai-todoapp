@@ -6,6 +6,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestNewAssistantSelectedSkill(t *testing.T) {
+	t.Parallel()
+
+	definition := AssistantSkillDefinition{
+		Name:   "update_todos",
+		Source: "skills/update_todos.md",
+		Tools:  []string{"fetch_todos", "update_todos"},
+	}
+
+	got := NewAssistantSelectedSkill(definition)
+
+	assert.Equal(t, AssistantSelectedSkill{
+		Name:   "update_todos",
+		Source: "skills/update_todos.md",
+		Tools:  []string{"fetch_todos", "update_todos"},
+	}, got)
+
+	definition.Tools[0] = "mutated"
+	assert.Equal(t, []string{"fetch_todos", "update_todos"}, got.Tools)
+}
+
 func TestAssistantActionDefinition_RequiresApproval(t *testing.T) {
 	t.Parallel()
 

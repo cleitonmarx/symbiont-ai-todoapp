@@ -13,6 +13,7 @@ export interface BoardSummary {
   overdue: string[];
   near_deadline: string[];
   summary: string;
+  generated_at: string;
 }
 
 export const getBoardSummary = async (): Promise<BoardSummary | null> => {

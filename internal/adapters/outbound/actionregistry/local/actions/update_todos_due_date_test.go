@@ -178,7 +178,7 @@ func TestBulkTodoDueDateUpdaterAction(t *testing.T) {
 			assert.True(t, definition.Approval.Required)
 			assert.Equal(t, "Confirm update of todo due dates", definition.Approval.Title)
 			assert.Equal(t, "Updating due dates will modify existing todos. Please confirm.", definition.Approval.Description)
-			assert.Equal(t, []string{"todos[].title", "todos[].due_date"}, definition.Approval.PreviewFields)
+			assert.Equal(t, []string{"todos[].id", "todos[].due_date"}, definition.Approval.PreviewFields)
 			assert.Equal(t, 2*time.Minute, definition.Approval.Timeout)
 
 			resp := action.Execute(context.Background(), tt.functionCall, tt.history)

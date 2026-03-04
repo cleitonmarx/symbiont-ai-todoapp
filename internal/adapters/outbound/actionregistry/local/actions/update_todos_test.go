@@ -155,7 +155,7 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 			assert.True(t, definition.Approval.Required)
 			assert.Equal(t, "Confirm update of todos", definition.Approval.Title)
 			assert.Equal(t, "Updating todos will modify existing items. Please confirm.", definition.Approval.Description)
-			assert.Equal(t, []string{"todos[].title", "todos[].status"}, definition.Approval.PreviewFields)
+			assert.Equal(t, []string{"todos[].id", "todos[].title", "todos[].status"}, definition.Approval.PreviewFields)
 			assert.Equal(t, 2*time.Minute, definition.Approval.Timeout)
 
 			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})

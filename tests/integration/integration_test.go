@@ -246,16 +246,12 @@ func TestTodoApp_GraphQLAPI(t *testing.T) {
 
 func TestTodoApp_ChatRestAPI(t *testing.T) {
 	var (
-		model          string
-		conversationID uuid.UUID
+		model            string
+		conversationID   uuid.UUID
+		createTodoPrompt = "Create one todo named \"Integration Test Todo\" due tomorrow."
 	)
-	const createTodoPrompt = "Create one todo named \"Integration Test Todo\" due tomorrow."
-	resolveModel := func(t *testing.T) string {
-		t.Helper()
-		if model != "" {
-			return model
-		}
 
+	t.Run("fetch-available-models", func(t *testing.T) {
 		expectedModel := rest.ModelInfo{Id: "docker.io/ai/qwen3:4B-F16", Name: "qwen3:4B-F16"}
 		modelsResp, err := restCli.ListAvailableModelsWithResponse(t.Context())
 		require.NoError(t, err, "failed to call GetAvailableModels endpoint")
@@ -264,16 +260,11 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		require.Contains(t, modelsResp.JSON200.Models, expectedModel, "expected available models to include qwen3:4B-F16")
 		i := slices.Index(modelsResp.JSON200.Models, expectedModel)
 		model = modelsResp.JSON200.Models[i].Id
-		return model
-	}
-
-	t.Run("fetch-available-models", func(t *testing.T) {
-		require.NotEmpty(t, resolveModel(t), "expected model to be resolved")
 	})
 
 	t.Run("create-todo", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
-			Model:   resolveModel(t),
+			Model:   model,
 			Message: createTodoPrompt,
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
@@ -316,7 +307,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 	t.Run("chat-fetch-todo", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			ConversationId: &conversationID,
-			Model:          resolveModel(t),
+			Model:          model,
 			Message:        "Fetch the todo \"Integration Test Todo\".",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
@@ -336,7 +327,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 	t.Run("mark-todo-done", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			ConversationId: &conversationID,
-			Model:          resolveModel(t),
+			Model:          model,
 			Message:        "Mark my todo \"Integration Test Todo\" as done.",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")
@@ -380,7 +371,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 	t.Run("delete-todo-with-approval", func(t *testing.T) {
 		chatResp, err := restCli.StreamChat(t.Context(), rest.StreamChatJSONRequestBody{
 			ConversationId: &conversationID,
-			Model:          resolveModel(t),
+			Model:          model,
 			Message:        "Delete the todo \"Integration Test Todo\".",
 		})
 		require.NoError(t, err, "failed to call StreamChat endpoint")

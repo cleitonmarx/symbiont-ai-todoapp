@@ -37,14 +37,14 @@ tools:
           required: false
 
   - name: execute_code
-    status_message: 🧮 Running deterministic code...
-    description: Execute short self-contained Python code for deterministic calculations, grouping, validation, and data shaping.
+    status_message: 🧮 Running code...
+    description: Execute short self-contained Python code for deterministic calculations, grouping, validation, and data shaping. The tool input must be valid JSON, but the `code` field must contain raw Python source with real newlines, not escaped source like `\\n` or `\\t`. Prefer compact self-contained scripts and use single quotes inside Python when possible to reduce escaping.
     input:
       type: object
       fields:
         code:
           type: string
-          description: Python code to execute. Make it self-contained and inline the data you need directly in the script unless another tool field explicitly carries variables. End by evaluating `result` or another final expression to return the computed value.
+          description: Python code to execute. Send raw Python source with actual newlines. Do not send JSON-encoded Python or escaped Markdown fences. Make it self-contained and inline the data you need directly in the script unless another tool field explicitly carries variables. End by evaluating `result` or another final expression to return the computed value.
           required: true
         session_id:
           type: integer

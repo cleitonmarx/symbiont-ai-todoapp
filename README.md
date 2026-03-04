@@ -135,7 +135,7 @@ Use prompts like these to trigger the intended skills and actions/tools.
 ### Create Todos
 
 - "Create a todo: Renew passport by 2026-03-20."
-- "Add these todos: book dentist for next week, buy groceries for Saturday."
+- "Create these todos: book dentist due tomorrow and buy groceries for next week."
 - "Create a checklist for moving apartment next month."
 
 ### Read/View Todos
@@ -181,12 +181,12 @@ Recommended hardware profile for a smooth local experience:
 
 - CPU: 12 high-performance cores (or equivalent compute throughput)
 - GPU: 30+ cores
-- Memory: 16 GB unified/system RAM
+- Memory: 24 GB unified/system RAM
 - Storage: 20+ GB free for models, caches, and containers
 
 Model note:
 
-- `qwen2.5:7B-Q4_K_M` requires about 9 GB of memory in this setup.
+- `qwen3:4B-F16` requires about 15 GB of memory in this setup.
 
 ### 2) OpenAI API (lighter local machine requirements)
 
@@ -216,7 +216,7 @@ Use this environment configuration:
 Prerequisites:
 
 - Docker + Docker Compose
-- Docker Model Runner (or compatible model endpoint) for `qwen2.5` and `embeddinggemma`
+- Docker Model Runner (or compatible model endpoint) for `qwen3` and `embeddinggemma`
 
 Run everything:
 
@@ -268,9 +268,9 @@ CHAT_TITLE_EVENTS_SUBSCRIPTION_ID=chat_message_title_generator \
 ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID=action_approval_dispatcher \
 LLM_MODEL_HOST=http://localhost:12434 \
 LLM_EMBEDDING_MODEL_HOST=http://localhost:12434 \
-LLM_SUMMARY_MODEL=qwen2.5:7B-Q4_K_M \
-LLM_CHAT_SUMMARY_MODEL=qwen2.5:7B-Q4_K_M \
-LLM_CHAT_TITLE_MODEL=qwen2.5:7B-Q4_K_M \
+LLM_SUMMARY_MODEL=qwen3:4B-F16 \
+LLM_CHAT_SUMMARY_MODEL=qwen3:4B-F16 \
+LLM_CHAT_TITLE_MODEL=qwen3:4B-F16 \
 LLM_EMBEDDING_MODEL=embeddinggemma:300M-Q8_0 \
 MCP_GATEWAY_ENDPOINT=http://localhost:8811 \
 go run ./cmd/todoapp

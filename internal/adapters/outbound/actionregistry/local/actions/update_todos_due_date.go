@@ -31,6 +31,11 @@ func (a BulkTodoDueDateUpdaterAction) StatusMessage() string {
 	return "📅 Updating due dates..."
 }
 
+// Renderer returns the deterministic result renderer for due date updates.
+func (a BulkTodoDueDateUpdaterAction) Renderer() (domain.ActionResultRenderer, bool) {
+	return updateTodosDueDateRenderer{}, true
+}
+
 // Definition returns the assistant action definition for BulkTodoDueDateUpdaterAction.
 func (a BulkTodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
@@ -68,7 +73,7 @@ func (a BulkTodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinit
 			Title:       "Confirm update of todo due dates",
 			Description: "Updating due dates will modify existing todos. Please confirm.",
 			PreviewFields: []string{
-				"todos[].title",
+				"todos[].id",
 				"todos[].due_date",
 			},
 			Timeout: 2 * time.Minute,

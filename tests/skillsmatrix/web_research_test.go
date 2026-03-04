@@ -34,7 +34,6 @@ func TestSkillRelevancePromptMatrix_WebResearch(t *testing.T) {
 			wantTop:     "web-research",
 			wantContain: []string{"web-research"},
 		},
-
 		"web-research-after-trip-plan-follow-up": {
 			messages: []domain.AssistantMessage{
 				{Role: domain.ChatRole_User, Content: `Plan a trip to Tokyo from April 4-14. Research for the best hotels and ramen restaurants, and create a complete todo plan for it. Use task prefix: "Japan Trip:"`},

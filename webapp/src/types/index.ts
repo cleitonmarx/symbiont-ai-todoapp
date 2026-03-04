@@ -65,8 +65,13 @@ export interface ChatStreamRequest {
   conversation_id?: string;
 }
 
+export interface ModelInfo {
+  id: string;
+  name: string;
+}
+
 export interface ModelListResponse {
-  models: string[];
+  models: ModelInfo[];
 }
 
 export type ConversationTitleSource = 'user' | 'llm' | 'auto';

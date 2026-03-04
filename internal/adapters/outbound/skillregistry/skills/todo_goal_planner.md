@@ -1,14 +1,14 @@
 ---
 name: todo-goal-planner
-use_when: User asks to plan something from scratch and turn a broader goal into multiple related todos, a complete todo plan, a checklist, a roadmap, or step-by-step work toward a deadline. Also use when research, requirements, or recommendations are requested but the final deliverable should still be a plan or multiple created todos, and when a follow-up reply only provides missing planning parameters after a planning question, such as a date range, budget, location, scope, or deadline.
-avoid_when: User asks to create only one concrete todo or reminder, asks to list/find/search/filter/sort/paginate/confirm existing todos, asks to find existing todos and then summarize/recap/count them, requests summary/recap/overview output as the final deliverable, asks to mark done, reopen, reschedule, delete, fetch, or otherwise update known existing todos, or is only greeting, thanking, or chatting.
+use_when: User asks to plan something from scratch and turn a broader goal into multiple related todos, a complete todo plan, a checklist, a roadmap, a study plan, a trip plan, or step-by-step work toward a deadline. Also use when research, requirements, or recommendations are requested but the final deliverable should still be a plan or multiple created todos/tasks, including requests like "research something and create tasks", "research and create tasks", or "research and create tasks for me", and when a follow-up reply only provides missing planning parameters after a planning question, such as a date range, budget, location, scope, destination, or deadline.
+avoid_when: User asks to create only one concrete todo or reminder, asks to list/find/search/filter/sort/paginate/confirm existing todos, asks to find existing todos and then summarize/recap/count them, requests summary/recap/overview output as the final deliverable, asks to mark done, reopen, reschedule, delete, fetch, or otherwise update known existing todos, asks to inspect/open/fetch/read one explicit external website, webpage, or URL as the final deliverable, or is only greeting, thanking, or chatting.
 priority: 94
 embed_first_content_line: true
-tags: [todos, plan, planning, multiple-todos, complete-todo-plan, todo-plan, roadmap, milestones, deadline, project, research, requirements, recommendations, create-plan, create-tasks, research-as-input, research-and-create-plan, research-then-plan, final-deliverable-plan, checklist, multi-step, step-by-step, parameters, date-range, budget, location, scope, follow-up]
-tools: [search, fetch_content, create_todos, fetch_todos]
+tags: [todos, plan, planning, multiple-todos, complete-todo-plan, todo-plan, roadmap, milestones, deadline, project, research, requirements, recommendations, create-plan, create-tasks, create-tasks-for-me, create-multiple-tasks, research-as-input, research-something-and-create-tasks, research-and-create-plan, research-and-create-tasks, research-then-plan, final-deliverable-plan, checklist, multi-step, step-by-step, study-plan, interview-plan, trip-plan, travel-plan, travel, destination, itinerary, parameters, date-range, budget, location, scope, follow-up, follow-up-deadline]
+tools: [search, fetch_content, create_todos, fetch_todos, update_todos, update_todos_due_date, delete_todos]
 ---
 
-Goal: transform a broader goal or research-backed request into a practical, multi-step, dated todo plan.
+Goal: transform a broader goal, research-backed request, trip-planning request, or follow-up planning parameter into a practical, multi-step, dated todo plan with multiple created todos, including requests to research something first and then create tasks for the user.
 
 Rules:
 1. Confirm goal scope and target date; ask one short question only if critical details are missing.

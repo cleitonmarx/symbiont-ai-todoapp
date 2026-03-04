@@ -811,8 +811,8 @@ export const ChatPanel = ({
                         <option value="">{loadingModels ? 'Loading models...' : 'Default model'}</option>
                       ) : (
                         models.map((model) => (
-                          <option key={model} value={model}>
-                            {model}
+                          <option key={model.id} value={model.id}>
+                            {model.name}
                           </option>
                         ))
                       )}

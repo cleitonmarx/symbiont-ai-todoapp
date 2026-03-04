@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/toon-format/toon-go"
 )
 
 func TestBulkTodoCreatorAction(t *testing.T) {
@@ -68,7 +69,13 @@ func TestBulkTodoCreatorAction(t *testing.T) {
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
 				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
-				assert.Contains(t, resp.Content, "todos[2]{id,title,due_date,status}")
+				payload := struct {
+					Todos []struct {
+						Title string `toon:"title"`
+					} `toon:"todos"`
+				}{}
+				assert.NoError(t, toon.UnmarshalString(resp.Content, &payload))
+				assert.Len(t, payload.Todos, 2)
 			},
 		},
 		"create-todos-invalid-arguments": {

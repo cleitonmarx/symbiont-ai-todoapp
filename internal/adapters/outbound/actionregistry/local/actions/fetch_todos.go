@@ -31,6 +31,11 @@ func (t TodoFetcherAction) StatusMessage() string {
 	return "🔎 Fetching todos..."
 }
 
+// Renderer reports that fetch_todos does not expose a deterministic renderer yet.
+func (t TodoFetcherAction) Renderer() (domain.ActionResultRenderer, bool) {
+	return nil, false
+}
+
 // Definition returns the assistant action definition for TodoFetcherAction.
 func (lft TodoFetcherAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{

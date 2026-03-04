@@ -86,3 +86,86 @@ func TestBuildSkillsPrompt(t *testing.T) {
 		})
 	}
 }
+
+func TestCompactToLastMessages(t *testing.T) {
+	t.Parallel()
+
+	msgs := []domain.AssistantMessage{
+		{Role: domain.ChatRole_User, Content: "one"},
+		{Role: domain.ChatRole_Assistant, Content: "two"},
+		{Role: domain.ChatRole_User, Content: "three"},
+	}
+
+	tests := map[string]struct {
+		messages  []domain.AssistantMessage
+		max       int
+		wantTexts []string
+	}{
+		"returns-nil-when-max-non-positive": {
+			messages: msgs,
+			max:      0,
+		},
+		"returns-nil-when-empty": {
+			max: 2,
+		},
+		"returns-copy-when-within-limit": {
+			messages:  msgs[:2],
+			max:       3,
+			wantTexts: []string{"one", "two"},
+		},
+		"returns-last-messages-when-over-limit": {
+			messages:  msgs,
+			max:       2,
+			wantTexts: []string{"two", "three"},
+		},
+	}
+
+	for name, tt := range tests {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := compactToLastMessages(tt.messages, tt.max)
+			assert.Len(t, got, len(tt.wantTexts))
+			for i, want := range tt.wantTexts {
+				assert.Equal(t, want, got[i].Content)
+			}
+			if len(got) > 0 && len(tt.messages) > 0 {
+				assert.NotSame(t, &tt.messages[0], &got[0])
+			}
+		})
+	}
+}
+
+func TestTruncateToFirstChars(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		input string
+		max   int
+		want  string
+	}{
+		"returns-empty-when-max-non-positive": {
+			input: "hello",
+			max:   0,
+			want:  "",
+		},
+		"trims-and-keeps-when-short-enough": {
+			input: "  hello  ",
+			max:   10,
+			want:  "hello",
+		},
+		"truncates-by-rune": {
+			input: "ábcdef",
+			max:   3,
+			want:  "ábc",
+		},
+	}
+
+	for name, tt := range tests {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, truncateToFirstChars(tt.input, tt.max))
+		})
+	}
+}

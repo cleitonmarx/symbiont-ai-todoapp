@@ -262,8 +262,11 @@ func (a AssistantClient) ListAvailableModels(ctx context.Context) ([]domain.Mode
 		if strings.Contains(m.ID, "embed") {
 			kind = domain.ModelKindEmbedding
 		}
+		nameParts := strings.Split(m.ID, "/")
+		name := nameParts[len(nameParts)-1]
 		models[i] = domain.ModelInfo{
-			Name: strings.TrimPrefix(m.ID, "docker.io/ai/"),
+			ID:   m.ID,
+			Name: name,
 			Kind: kind,
 		}
 	}
@@ -272,18 +275,23 @@ func (a AssistantClient) ListAvailableModels(ctx context.Context) ([]domain.Mode
 
 // ListAssistantModels implements domain.AssistantModelCatalog.
 func (a AssistantClient) ListAssistantModels(ctx context.Context) ([]domain.AssistantModelInfo, error) {
-	models, err := a.ListAvailableModels(ctx)
-	if err != nil {
+	spanCtx, span := telemetry.Start(ctx)
+	defer span.End()
+
+	resp, err := a.client.AvailableModels(spanCtx)
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, err
 	}
-	res := make([]domain.AssistantModelInfo, 0, len(models))
-	for _, m := range models {
-		if m.Kind != domain.ModelKindAssistant {
+
+	res := make([]domain.AssistantModelInfo, 0, len(resp.Data))
+	for _, m := range resp.Data {
+		if strings.Contains(m.ID, "embed") {
 			continue
 		}
-		nameParts := strings.Split(m.Name, "/")
+		nameParts := strings.Split(m.ID, "/")
 		name := nameParts[len(nameParts)-1]
 		res = append(res, domain.AssistantModelInfo{
+			ID:                m.ID,
 			Name:              name,
 			SupportsStreaming: true,
 			SupportsActions:   true,

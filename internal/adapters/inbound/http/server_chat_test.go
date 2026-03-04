@@ -312,14 +312,17 @@ func TestTodoAppServer_ListAvailableModels(t *testing.T) {
 				m.EXPECT().
 					Query(mock.Anything).
 					Return([]domain.ModelInfo{
-						{Name: "gpt-4", Kind: domain.ModelKindAssistant},
-						{Name: "text-embed", Kind: domain.ModelKindEmbedding},
-						{Name: "gpt-3.5", Kind: domain.ModelKindAssistant},
+						{ID: "gpt-4", Name: "gpt-4", Kind: domain.ModelKindAssistant},
+						{ID: "text-embed", Name: "text-embed", Kind: domain.ModelKindEmbedding},
+						{ID: "gpt-3.5", Name: "gpt-3.5", Kind: domain.ModelKindAssistant},
 					}, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ModelListResp{
-				Models: []string{"gpt-4", "gpt-3.5"},
+				Models: []gen.ModelInfo{
+					{Id: "gpt-4", Name: "gpt-4"},
+					{Id: "gpt-3.5", Name: "gpt-3.5"},
+				},
 			},
 		},
 		"returns-error-on-usecase-failure": {

@@ -184,6 +184,8 @@ type AssistantAction interface {
 	Definition() AssistantActionDefinition
 	// StatusMessage returns a status message about the action execution, or a default message if not implemented.
 	StatusMessage() string
+	// Renderer returns an optional deterministic renderer for successful action results.
+	Renderer() (ActionResultRenderer, bool)
 	// Execute runs the action with the given input and returns the resulting assistant message.
 	Execute(context.Context, AssistantActionCall, []AssistantMessage) AssistantMessage
 }
@@ -194,6 +196,17 @@ type AssistantActionRegistry interface {
 	Execute(context.Context, AssistantActionCall, []AssistantMessage) AssistantMessage
 	// GetDefinition returns one action definition by name.
 	GetDefinition(actionName string) (AssistantActionDefinition, bool)
+	// GetRenderer returns one deterministic action result renderer by action name when available.
+	GetRenderer(actionName string) (ActionResultRenderer, bool)
 	// StatusMessage returns a status message about the action execution, or a default message if not implemented.
 	StatusMessage(actionName string) string
+}
+
+// ActionResultRenderer converts a raw action result into a deterministic
+// assistant-facing message when the action result format is known.
+type ActionResultRenderer interface {
+	// Render transforms a successful action result into an assistant message.
+	// It returns ok=false when the renderer does not support the action or the
+	// result payload cannot be deterministically interpreted.
+	Render(actionCall AssistantActionCall, result AssistantMessage) (rendered AssistantMessage, ok bool)
 }

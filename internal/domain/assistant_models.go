@@ -12,12 +12,14 @@ const (
 
 // ModelInfo describes one available model in a provider-agnostic format.
 type ModelInfo struct {
+	ID   string
 	Name string
 	Kind ModelKind
 }
 
 // AssistantModelInfo describes a model that can be used for assistant turns.
 type AssistantModelInfo struct {
+	ID   string
 	Name string
 	// SupportsStreaming indicates the model can emit incremental deltas.
 	SupportsStreaming bool

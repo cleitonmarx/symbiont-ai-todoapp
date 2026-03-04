@@ -4,7 +4,7 @@ const (
 	// defaultRelevantSkillsTopK limits how many skills are returned after ranking.
 	defaultRelevantSkillsTopK = 3
 	// defaultRelevantSkillsMinScore is the minimum score a skill must reach to be kept.
-	defaultRelevantSkillsMinScore = 0.24
+	defaultRelevantSkillsMinScore = 0.23
 	// defaultAvoidPenaltyWeight scales how much avoid_when similarity reduces the final score.
 	defaultAvoidPenaltyWeight = 0.70
 	// defaultAvoidBlockThreshold blocks a skill entirely when avoid_when similarity is too strong.

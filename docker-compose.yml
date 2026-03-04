@@ -32,13 +32,13 @@ services:
       - LLM_EMBEDDING_MODEL_HOST=http://model-runner.docker.internal
       - LLM_EMBEDDING_MODEL=embeddinggemma:300M-Q8_0 
       - LLM_MODEL_HOST=http://model-runner.docker.internal
-      - LLM_SUMMARY_MODEL=qwen2.5:7B-Q4_K_M
-      - LLM_CHAT_SUMMARY_MODEL=qwen2.5:7B-Q4_K_M
-      - LLM_CHAT_TITLE_MODEL=qwen2.5:7B-Q4_K_M
+      - LLM_SUMMARY_MODEL=qwen3:4B-F16
+      - LLM_CHAT_SUMMARY_MODEL=qwen3:4B-F16
+      - LLM_CHAT_TITLE_MODEL=qwen3:4B-F16
       - MCP_GATEWAY_ENDPOINT=http://mcp-gateway:8811
 
     models:
-      - qwen2.5
+      - qwen3
       - embeddinggemma
     depends_on:
       jaeger:

@@ -9,13 +9,13 @@ import {
   updateConversation,
   type ActionApprovalStatus,
 } from '../services/chatApi';
-import type { AssistantTodoFilters, ChatMessage, Conversation } from '../types';
+import type { AssistantTodoFilters, ChatMessage, Conversation, ModelInfo } from '../types';
 
 interface UseChatReturn {
   messages: ChatMessage[];
   conversations: Conversation[];
   activeConversationId: string | null;
-  models: string[];
+  models: ModelInfo[];
   selectedModel: string;
   toolCallingStatus: string | null;
   toolCallingCount: number;
@@ -168,6 +168,24 @@ const persistModel = (model: string): void => {
   }
 };
 
+const resolveSelectedModelId = (availableModels: ModelInfo[], currentSelection: string): string => {
+  if (!currentSelection) {
+    return availableModels[0]?.id ?? '';
+  }
+
+  const matchingById = availableModels.find((model) => model.id === currentSelection);
+  if (matchingById) {
+    return matchingById.id;
+  }
+
+  const matchingByName = availableModels.find((model) => model.name === currentSelection);
+  if (matchingByName) {
+    return matchingByName.id;
+  }
+
+  return availableModels[0]?.id ?? '';
+};
+
 const parseSetUIFiltersArguments = (rawInput?: string): SetUIFiltersArguments => {
   if (!rawInput) {
     return {};
@@ -307,7 +325,7 @@ export const useChat = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<ModelInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState(loadPersistedModel);
   const [toolCallingStatus, setToolCallingStatus] = useState<string | null>(null);
   const [toolCallingCount, setToolCallingCount] = useState(0);
@@ -451,12 +469,7 @@ export const useChat = ({
       setLoadingModels(true);
       const availableModels = await fetchAvailableModels();
       setModels(availableModels);
-      setSelectedModel((current) => {
-        if (current && availableModels.includes(current)) {
-          return current;
-        }
-        return availableModels[0] ?? '';
-      });
+      setSelectedModel((current) => resolveSelectedModelId(availableModels, current));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load models');

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/toon-format/toon-go"
 )
 
 func TestBulkTodoUpdaterAction(t *testing.T) {
@@ -76,7 +77,13 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Updated 1","status":"DONE"},{"id":"` + todoID2.String() + `","title":"Updated 2"}]}`,
 			},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Contains(t, resp.Content, "todos[2]{id,title,due_date,status}")
+				payload := struct {
+					Todos []struct {
+						Title string `toon:"title"`
+					} `toon:"todos"`
+				}{}
+				assert.NoError(t, toon.UnmarshalString(resp.Content, &payload))
+				assert.Len(t, payload.Todos, 2)
 			},
 		},
 		"update-todos-invalid-arguments": {
@@ -148,7 +155,7 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 			assert.True(t, definition.Approval.Required)
 			assert.Equal(t, "Confirm update of todos", definition.Approval.Title)
 			assert.Equal(t, "Updating todos will modify existing items. Please confirm.", definition.Approval.Description)
-			assert.Equal(t, []string{"todos[].title", "todos[].status"}, definition.Approval.PreviewFields)
+			assert.Equal(t, []string{"todos[].id", "todos[].title", "todos[].status"}, definition.Approval.PreviewFields)
 			assert.Equal(t, 2*time.Minute, definition.Approval.Timeout)
 
 			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})

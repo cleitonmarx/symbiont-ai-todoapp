@@ -139,6 +139,11 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 			uow := domain.NewMockUnitOfWork(t)
 			outbox := domain.NewMockOutboxRepository(t)
 
+			actionRegistry.EXPECT().
+				GetRenderer(mock.Anything).
+				Return(nil, false).
+				Maybe()
+
 			skillRegistry.EXPECT().
 				ListRelevant(mock.Anything, mock.Anything).
 				Return([]domain.AssistantSkillDefinition{}).

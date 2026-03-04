@@ -1,7 +1,7 @@
 ---
 name: todo-delete
 use_when: User asks to delete, remove, clear, or erase todos, whether they name specific todos or refer to a subset of todos selected by a natural-language description, phrase, topic, status, criteria, search-like filter, or group/set description (for example delete old matching todos).
-avoid_when: User asks to create/add todos, plan/build/generate a checklist or roadmap, fetch/list/confirm only, mark done/open status, update due dates/details, or is only greeting, thanking, or chatting.
+avoid_when: User asks to create/add todos, plan/build/generate a checklist or roadmap, fetch/list/show/display/find/search/filter/confirm only, asks for related/similar/about/regarding todos without destructive intent, mark done/open status, update due dates/details, asks to inspect/open/fetch/read an external website, webpage, URL, or internet source, or is only greeting, thanking, or chatting.
 priority: 94
 embed_first_content_line: true
 tags: [todos, delete, remove, clear, erase, destructive, mutation, subset, natural-language-selection, matching-todos, filtered-todos, selected-set, selected-by-description, matching-set, group-delete, matching-description, matching-topic, matching-phrase, criteria, search-filter, status-delete]

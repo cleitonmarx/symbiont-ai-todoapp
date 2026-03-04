@@ -55,9 +55,16 @@ func TestSkillRelevancePromptMatrix_TodoReadView(t *testing.T) {
 			wantTop:     "todo-read-view",
 			wantContain: []string{"todo-read-view"},
 		},
+		"overdue-todos": {
+			messages: []domain.AssistantMessage{
+				{Role: domain.ChatRole_User, Content: "List my overdue todos."},
+			},
+			wantTop:     "todo-read-view",
+			wantContain: []string{"todo-read-view"},
+		},
 		"find-related-tasks": {
 			messages: []domain.AssistantMessage{
-				{Role: domain.ChatRole_User, Content: "Find todos related to taxes."},
+				{Role: domain.ChatRole_User, Content: "Show me todos related to taxes."},
 			},
 			wantTop:     "todo-read-view",
 			wantContain: []string{"todo-read-view"},

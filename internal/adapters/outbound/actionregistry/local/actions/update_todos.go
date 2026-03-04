@@ -29,6 +29,11 @@ func (a BulkTodoUpdaterAction) StatusMessage() string {
 	return "✏️ Updating your todos..."
 }
 
+// Renderer returns the deterministic result renderer for todo updates.
+func (a BulkTodoUpdaterAction) Renderer() (domain.ActionResultRenderer, bool) {
+	return updateTodosRenderer{}, true
+}
+
 // Definition returns the assistant action definition for BulkTodoUpdaterAction.
 func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 	return domain.AssistantActionDefinition{
@@ -72,6 +77,7 @@ func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 			Title:       "Confirm update of todos",
 			Description: "Updating todos will modify existing items. Please confirm.",
 			PreviewFields: []string{
+				"todos[].id",
 				"todos[].title",
 				"todos[].status",
 			},

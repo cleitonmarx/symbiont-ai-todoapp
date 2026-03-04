@@ -222,10 +222,19 @@ type ListTodosResp struct {
 	PreviousPage *int `json:"previous_page"`
 }
 
+// ModelInfo Information about an AI model.
+type ModelInfo struct {
+	// Id Unique identifier for the model.
+	Id string `json:"id"`
+
+	// Name Human-readable name for the model.
+	Name string `json:"name"`
+}
+
 // ModelListResp List of available AI models.
 type ModelListResp struct {
 	// Models Available AI model identifiers.
-	Models []string `json:"models"`
+	Models []ModelInfo `json:"models"`
 }
 
 // NextUpTodoItem defines model for NextUpTodoItem.

@@ -59,7 +59,7 @@ func newSkillMatrixRegistry(t *testing.T) domain.AssistantSkillRegistry {
 
 	registry, err := skillregistry.NewSkillRegistry(ctx, skills, encoder, "embeddinggemma:300M-Q8_0", skillregistry.Config{
 		RelevantSkillsTopK:     2,
-		RelevantSkillsMinScore: 0.24,
+		RelevantSkillsMinScore: 0.23,
 		AvoidPenaltyWeight:     0.70,
 		AvoidBlockThreshold:    0.45,
 		StrongUseWhenScore:     0.55,

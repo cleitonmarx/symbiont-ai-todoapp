@@ -452,6 +452,61 @@ func (_c *MockAssistantAction_Execute_Call) RunAndReturn(run func(context1 conte
 	return _c
 }
 
+// Renderer provides a mock function for the type MockAssistantAction
+func (_mock *MockAssistantAction) Renderer() (ActionResultRenderer, bool) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Renderer")
+	}
+
+	var r0 ActionResultRenderer
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func() (ActionResultRenderer, bool)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() ActionResultRenderer); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ActionResultRenderer)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() bool); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
+}
+
+// MockAssistantAction_Renderer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Renderer'
+type MockAssistantAction_Renderer_Call struct {
+	*mock.Call
+}
+
+// Renderer is a helper method to define mock.On call
+func (_e *MockAssistantAction_Expecter) Renderer() *MockAssistantAction_Renderer_Call {
+	return &MockAssistantAction_Renderer_Call{Call: _e.mock.On("Renderer")}
+}
+
+func (_c *MockAssistantAction_Renderer_Call) Run(run func()) *MockAssistantAction_Renderer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockAssistantAction_Renderer_Call) Return(actionResultRenderer ActionResultRenderer, b bool) *MockAssistantAction_Renderer_Call {
+	_c.Call.Return(actionResultRenderer, b)
+	return _c
+}
+
+func (_c *MockAssistantAction_Renderer_Call) RunAndReturn(run func() (ActionResultRenderer, bool)) *MockAssistantAction_Renderer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StatusMessage provides a mock function for the type MockAssistantAction
 func (_mock *MockAssistantAction) StatusMessage() string {
 	ret := _mock.Called()
@@ -646,6 +701,68 @@ func (_c *MockAssistantActionRegistry_GetDefinition_Call) RunAndReturn(run func(
 	return _c
 }
 
+// GetRenderer provides a mock function for the type MockAssistantActionRegistry
+func (_mock *MockAssistantActionRegistry) GetRenderer(actionName string) (ActionResultRenderer, bool) {
+	ret := _mock.Called(actionName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRenderer")
+	}
+
+	var r0 ActionResultRenderer
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func(string) (ActionResultRenderer, bool)); ok {
+		return returnFunc(actionName)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) ActionResultRenderer); ok {
+		r0 = returnFunc(actionName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ActionResultRenderer)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) bool); ok {
+		r1 = returnFunc(actionName)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
+}
+
+// MockAssistantActionRegistry_GetRenderer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRenderer'
+type MockAssistantActionRegistry_GetRenderer_Call struct {
+	*mock.Call
+}
+
+// GetRenderer is a helper method to define mock.On call
+//   - actionName string
+func (_e *MockAssistantActionRegistry_Expecter) GetRenderer(actionName interface{}) *MockAssistantActionRegistry_GetRenderer_Call {
+	return &MockAssistantActionRegistry_GetRenderer_Call{Call: _e.mock.On("GetRenderer", actionName)}
+}
+
+func (_c *MockAssistantActionRegistry_GetRenderer_Call) Run(run func(actionName string)) *MockAssistantActionRegistry_GetRenderer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAssistantActionRegistry_GetRenderer_Call) Return(actionResultRenderer ActionResultRenderer, b bool) *MockAssistantActionRegistry_GetRenderer_Call {
+	_c.Call.Return(actionResultRenderer, b)
+	return _c
+}
+
+func (_c *MockAssistantActionRegistry_GetRenderer_Call) RunAndReturn(run func(actionName string) (ActionResultRenderer, bool)) *MockAssistantActionRegistry_GetRenderer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StatusMessage provides a mock function for the type MockAssistantActionRegistry
 func (_mock *MockAssistantActionRegistry) StatusMessage(actionName string) string {
 	ret := _mock.Called(actionName)
@@ -693,6 +810,99 @@ func (_c *MockAssistantActionRegistry_StatusMessage_Call) Return(s string) *Mock
 }
 
 func (_c *MockAssistantActionRegistry_StatusMessage_Call) RunAndReturn(run func(actionName string) string) *MockAssistantActionRegistry_StatusMessage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockActionResultRenderer creates a new instance of MockActionResultRenderer. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockActionResultRenderer(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockActionResultRenderer {
+	mock := &MockActionResultRenderer{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockActionResultRenderer is an autogenerated mock type for the ActionResultRenderer type
+type MockActionResultRenderer struct {
+	mock.Mock
+}
+
+type MockActionResultRenderer_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockActionResultRenderer) EXPECT() *MockActionResultRenderer_Expecter {
+	return &MockActionResultRenderer_Expecter{mock: &_m.Mock}
+}
+
+// Render provides a mock function for the type MockActionResultRenderer
+func (_mock *MockActionResultRenderer) Render(actionCall AssistantActionCall, result AssistantMessage) (AssistantMessage, bool) {
+	ret := _mock.Called(actionCall, result)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Render")
+	}
+
+	var r0 AssistantMessage
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func(AssistantActionCall, AssistantMessage) (AssistantMessage, bool)); ok {
+		return returnFunc(actionCall, result)
+	}
+	if returnFunc, ok := ret.Get(0).(func(AssistantActionCall, AssistantMessage) AssistantMessage); ok {
+		r0 = returnFunc(actionCall, result)
+	} else {
+		r0 = ret.Get(0).(AssistantMessage)
+	}
+	if returnFunc, ok := ret.Get(1).(func(AssistantActionCall, AssistantMessage) bool); ok {
+		r1 = returnFunc(actionCall, result)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
+}
+
+// MockActionResultRenderer_Render_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Render'
+type MockActionResultRenderer_Render_Call struct {
+	*mock.Call
+}
+
+// Render is a helper method to define mock.On call
+//   - actionCall AssistantActionCall
+//   - result AssistantMessage
+func (_e *MockActionResultRenderer_Expecter) Render(actionCall interface{}, result interface{}) *MockActionResultRenderer_Render_Call {
+	return &MockActionResultRenderer_Render_Call{Call: _e.mock.On("Render", actionCall, result)}
+}
+
+func (_c *MockActionResultRenderer_Render_Call) Run(run func(actionCall AssistantActionCall, result AssistantMessage)) *MockActionResultRenderer_Render_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 AssistantActionCall
+		if args[0] != nil {
+			arg0 = args[0].(AssistantActionCall)
+		}
+		var arg1 AssistantMessage
+		if args[1] != nil {
+			arg1 = args[1].(AssistantMessage)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockActionResultRenderer_Render_Call) Return(rendered AssistantMessage, ok bool) *MockActionResultRenderer_Render_Call {
+	_c.Call.Return(rendered, ok)
+	return _c
+}
+
+func (_c *MockActionResultRenderer_Render_Call) RunAndReturn(run func(actionCall AssistantActionCall, result AssistantMessage) (AssistantMessage, bool)) *MockActionResultRenderer_Render_Call {
 	_c.Call.Return(run)
 	return _c
 }

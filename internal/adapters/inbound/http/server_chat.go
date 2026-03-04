@@ -120,7 +120,10 @@ func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Requ
 		if m.Kind != domain.ModelKindAssistant {
 			continue
 		}
-		rp.Models = append(rp.Models, m.Name)
+		rp.Models = append(rp.Models, gen.ModelInfo{
+			Id:   m.ID,
+			Name: m.Name,
+		})
 	}
 
 	respondJSON(w, http.StatusOK, rp)

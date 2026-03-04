@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/toon-format/toon-go"
 )
 
 func TestBulkTodoDueDateUpdaterAction(t *testing.T) {
@@ -86,7 +87,13 @@ func TestBulkTodoDueDateUpdaterAction(t *testing.T) {
 			},
 			history: []domain.AssistantMessage{},
 			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Contains(t, resp.Content, "todos[2]{id,title,due_date,status}")
+				payload := struct {
+					Todos []struct {
+						Title string `toon:"title"`
+					} `toon:"todos"`
+				}{}
+				assert.NoError(t, toon.UnmarshalString(resp.Content, &payload))
+				assert.Len(t, payload.Todos, 2)
 			},
 		},
 		"update-todos-due-date-invalid-arguments": {
@@ -171,7 +178,7 @@ func TestBulkTodoDueDateUpdaterAction(t *testing.T) {
 			assert.True(t, definition.Approval.Required)
 			assert.Equal(t, "Confirm update of todo due dates", definition.Approval.Title)
 			assert.Equal(t, "Updating due dates will modify existing todos. Please confirm.", definition.Approval.Description)
-			assert.Equal(t, []string{"todos[].title", "todos[].due_date"}, definition.Approval.PreviewFields)
+			assert.Equal(t, []string{"todos[].id", "todos[].due_date"}, definition.Approval.PreviewFields)
 			assert.Equal(t, 2*time.Minute, definition.Approval.Timeout)
 
 			resp := action.Execute(context.Background(), tt.functionCall, tt.history)

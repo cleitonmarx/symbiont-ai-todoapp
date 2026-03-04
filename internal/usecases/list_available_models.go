@@ -40,6 +40,7 @@ func (uc ListAvailableModelsImpl) Query(ctx context.Context) ([]domain.ModelInfo
 	res := make([]domain.ModelInfo, 0, len(assistantModels))
 	for _, m := range assistantModels {
 		res = append(res, domain.ModelInfo{
+			ID:   m.ID,
 			Name: m.Name,
 			Kind: domain.ModelKindAssistant,
 		})

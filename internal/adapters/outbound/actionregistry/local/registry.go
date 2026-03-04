@@ -57,6 +57,15 @@ func (r LocalRegistry) GetDefinition(actionName string) (domain.AssistantActionD
 	return details.Definition(), true
 }
 
+// GetRenderer returns one deterministic action result renderer by action name.
+func (r LocalRegistry) GetRenderer(actionName string) (domain.ActionResultRenderer, bool) {
+	details, exists := r.actionsByName[actionName]
+	if !exists {
+		return nil, false
+	}
+	return details.Renderer()
+}
+
 // StatusMessage returns a status message about the action execution.
 func (r LocalRegistry) StatusMessage(actionName string) string {
 	if action, ok := r.actionsByName[actionName]; ok {

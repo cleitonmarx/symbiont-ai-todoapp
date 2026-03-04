@@ -50,6 +50,17 @@ func (r CompositeActionRegistry) GetDefinition(actionName string) (domain.Assist
 	return domain.AssistantActionDefinition{}, false
 }
 
+// GetRenderer returns one deterministic action result renderer by action name.
+func (r CompositeActionRegistry) GetRenderer(actionName string) (domain.ActionResultRenderer, bool) {
+	for _, actionRegistry := range r.registriesActions {
+		renderer, found := actionRegistry.GetRenderer(actionName)
+		if found {
+			return renderer, true
+		}
+	}
+	return nil, false
+}
+
 // StatusMessage iterates through the composed registries to get the status message for the given action, returning a default message if none found.
 func (r CompositeActionRegistry) StatusMessage(actionName string) string {
 	for _, actionRegistry := range r.registriesActions {

@@ -111,7 +111,7 @@ func toBoardSummary(summary domain.BoardSummary) gen.BoardSummary {
 			DONE: summary.Content.Counts.Done,
 			OPEN: summary.Content.Counts.Open,
 		},
-		GeneratedAt:   summary.GeneratedAt,
+		GeneratedAt:  summary.GeneratedAt,
 		NearDeadline: summary.Content.NearDeadline,
 		NextUp:       []gen.NextUpTodoItem{},
 		Overdue:      summary.Content.Overdue,

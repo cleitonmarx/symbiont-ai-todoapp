@@ -136,21 +136,21 @@ func TestToolFormatterRegistry_FormatArguments(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		toolName string
-		input    map[string]any
-		want     map[string]any
+		toolName  string
+		input     map[string]any
+		want      map[string]any
 		wantFound bool
 	}{
 		"formats-known-tool": {
-			toolName: "execute_code",
-			input:    map[string]any{"code": `result = 1\nresult`},
-			want:     map[string]any{"code": "result = 1\nresult"},
+			toolName:  "execute_code",
+			input:     map[string]any{"code": `result = 1\nresult`},
+			want:      map[string]any{"code": "result = 1\nresult"},
 			wantFound: true,
 		},
 		"returns-not-found-for-unknown-tool": {
-			toolName: "missing",
-			input:    map[string]any{"code": "x"},
-			want:     map[string]any{"code": "x"},
+			toolName:  "missing",
+			input:     map[string]any{"code": "x"},
+			want:      map[string]any{"code": "x"},
 			wantFound: false,
 		},
 	}

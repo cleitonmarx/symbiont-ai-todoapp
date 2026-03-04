@@ -216,7 +216,7 @@ Use this environment configuration:
 Prerequisites:
 
 - Docker + Docker Compose
-- Docker Model Runner (or compatible model endpoint) for `qwen3` and `embeddinggemma`
+- Docker Model Runner for `qwen3` and `embeddinggemma`
 
 Run everything:
 

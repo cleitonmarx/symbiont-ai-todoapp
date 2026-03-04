@@ -16,6 +16,8 @@ CREATE TABLE chat_messages (
     approval_status TEXT,
     approval_decision_reason TEXT,
     approval_decided_at TIMESTAMPTZ,
+    selected_skills JSONB,
+    action_executed BOOLEAN,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL
 );

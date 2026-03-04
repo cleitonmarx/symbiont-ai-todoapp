@@ -33,6 +33,8 @@ var chatFields = []string{
 	"approval_status",
 	"approval_decision_reason",
 	"approval_decided_at",
+	"selected_skills",
+	"action_executed",
 	"created_at",
 	"updated_at",
 }
@@ -63,6 +65,10 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 		if telemetry.RecordErrorAndStatus(span, err) {
 			return err
 		}
+		selectedSkillsJSON, err := json.Marshal(message.SelectedSkills)
+		if telemetry.RecordErrorAndStatus(span, err) {
+			return err
+		}
 
 		insertQry = insertQry.Values(
 			message.ID,
@@ -82,6 +88,8 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 			message.ApprovalStatus,
 			message.ApprovalDecisionReason,
 			message.ApprovalDecidedAt,
+			selectedSkillsJSON,
+			message.ActionExecuted,
 			message.CreatedAt,
 			message.UpdatedAt,
 		)
@@ -174,8 +182,9 @@ func (r ChatMessageRepository) ListChatMessages(
 	var msgs []domain.ChatMessage
 	for rows.Next() {
 		var (
-			m      domain.ChatMessage
-			tcJSON []byte
+			m                  domain.ChatMessage
+			tcJSON             []byte
+			selectedSkillsJSON []byte
 		)
 
 		if err := rows.Scan(
@@ -196,6 +205,8 @@ func (r ChatMessageRepository) ListChatMessages(
 			&m.ApprovalStatus,
 			&m.ApprovalDecisionReason,
 			&m.ApprovalDecidedAt,
+			&selectedSkillsJSON,
+			&m.ActionExecuted,
 			&m.CreatedAt,
 			&m.UpdatedAt,
 		); telemetry.RecordErrorAndStatus(span, err) {
@@ -204,6 +215,11 @@ func (r ChatMessageRepository) ListChatMessages(
 
 		if len(tcJSON) > 0 {
 			if err := json.Unmarshal(tcJSON, &m.ActionCalls); telemetry.RecordErrorAndStatus(span, err) {
+				return nil, false, err
+			}
+		}
+		if len(selectedSkillsJSON) > 0 {
+			if err := json.Unmarshal(selectedSkillsJSON, &m.SelectedSkills); telemetry.RecordErrorAndStatus(span, err) {
 				return nil, false, err
 			}
 		}

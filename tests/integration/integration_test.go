@@ -345,7 +345,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 			ActionName:     &approvalRequest.Name,
 			ConversationId: approvalRequest.ConversationID,
 			Reason:         common.Ptr("approved by integration test"),
-			Status:         rest.APPROVED,
+			Status:         rest.ActionApprovalStatusAPPROVED,
 			TurnId:         approvalRequest.TurnID,
 		})
 		require.NoError(t, err, "failed to submit action approval")
@@ -389,7 +389,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 			ActionName:     &approvalRequest.Name,
 			ConversationId: approvalRequest.ConversationID,
 			Reason:         common.Ptr("approved by integration test"),
-			Status:         rest.APPROVED,
+			Status:         rest.ActionApprovalStatusAPPROVED,
 			TurnId:         approvalRequest.TurnID,
 		})
 
@@ -514,7 +514,7 @@ func TestToodApp_MCPGatewayIntegration(t *testing.T) {
 			ActionName:     &approvalRequest.Name,
 			ConversationId: approvalRequest.ConversationID,
 			Reason:         common.Ptr("approved by integration test"),
-			Status:         rest.APPROVED,
+			Status:         rest.ActionApprovalStatusAPPROVED,
 			TurnId:         approvalRequest.TurnID,
 		})
 

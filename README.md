@@ -135,7 +135,7 @@ Use prompts like these to trigger the intended skills and actions/tools.
 ### Create Todos
 
 - "Create a todo: Renew passport by 2026-03-20."
-- "Add these todos: book dentist for next week, buy groceries for Saturday."
+- "Create these todos: book dentist due tomorrow and buy groceries for next week."
 - "Create a checklist for moving apartment next month."
 
 ### Read/View Todos

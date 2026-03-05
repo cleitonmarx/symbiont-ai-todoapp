@@ -43,7 +43,7 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 				TurnId:         turnID,
 				ActionCallId:   "call-1",
 				ActionName:     common.Ptr("delete_todo"),
-				Status:         gen.APPROVED,
+				Status:         gen.ActionApprovalStatusAPPROVED,
 				Reason:         common.Ptr("approved"),
 			}),
 			setupUsecase: func(t *testing.T) usecases.SubmitActionApproval {
@@ -86,7 +86,7 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 				ConversationId: conversationID,
 				TurnId:         turnID,
 				ActionCallId:   "call-3",
-				Status:         gen.REJECTED,
+				Status:         gen.ActionApprovalStatusREJECTED,
 			}),
 			setupUsecase: func(t *testing.T) usecases.SubmitActionApproval {
 				t.Helper()
@@ -109,7 +109,7 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 				ConversationId: conversationID,
 				TurnId:         turnID,
 				ActionCallId:   "call-4",
-				Status:         gen.REJECTED,
+				Status:         gen.ActionApprovalStatusREJECTED,
 			}),
 			setupUsecase: func(t *testing.T) usecases.SubmitActionApproval {
 				t.Helper()

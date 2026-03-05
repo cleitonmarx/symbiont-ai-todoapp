@@ -9,7 +9,6 @@ import (
 )
 
 func TestSkillRelevancePromptMatrix_TodoReadView(t *testing.T) {
-	t.Parallel()
 
 	registry := newSkillMatrixRegistry(t)
 	tests := map[string]skillMatrixCase{

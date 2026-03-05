@@ -158,10 +158,14 @@ const TodoApp = () => {
         type="button"
         className={`ui-chat-fab ${chatOpen ? 'active' : ''}`}
         onClick={() => setChatOpen((value) => !value)}
+        aria-pressed={chatOpen}
         aria-label={chatButtonLabel}
         title={chatButtonLabel}
       >
-        {chatOpen ? '✕' : 'AI'}
+        <span className="ui-chat-fab-icon" aria-hidden>
+          {chatOpen ? '✕' : '✦'}
+        </span>
+        <span className="ui-chat-fab-label">Assistant</span>
       </button>
 
       {isMobile && chatOpen ? (

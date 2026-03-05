@@ -31,10 +31,12 @@ type AssistantUsage struct {
 
 // AssistantTurnStarted contains metadata for a streaming assistant session.
 type AssistantTurnStarted struct {
-	ConversationID      uuid.UUID `json:"conversation_id"`
-	UserMessageID       uuid.UUID `json:"user_message_id"`
-	AssistantMessageID  uuid.UUID `json:"assistant_message_id"`
-	ConversationCreated bool      `json:"conversation_created"`
+	ConversationID      uuid.UUID                `json:"conversation_id"`
+	UserMessageID       uuid.UUID                `json:"user_message_id"`
+	AssistantMessageID  uuid.UUID                `json:"assistant_message_id"`
+	ConversationCreated bool                     `json:"conversation_created"`
+	TurnID              uuid.UUID                `json:"turn_id"`
+	SelectedSkills      []AssistantSelectedSkill `json:"selected_skills,omitempty"`
 }
 
 // AssistantMessageDelta contains a text delta from the stream.
@@ -75,11 +77,15 @@ type AssistantActionApprovalResolved struct {
 
 // AssistantActionCompleted indicates an action invocation has finished.
 type AssistantActionCompleted struct {
-	ID            string  `json:"id"`
-	Name          string  `json:"name"`
-	Success       bool    `json:"success"`
-	Error         *string `json:"error,omitempty"`
-	ShouldRefetch bool    `json:"should_refetch"`
+	ID              string                     `json:"id"`
+	Name            string                     `json:"name"`
+	Success         bool                       `json:"success"`
+	Error           *string                    `json:"error,omitempty"`
+	ShouldRefetch   bool                       `json:"should_refetch"`
+	ApprovalStatus  *ChatMessageApprovalStatus `json:"approval_status,omitempty"`
+	ActionExecuted  *bool                      `json:"action_executed,omitempty"`
+	OutputPreview   *string                    `json:"output_preview,omitempty"`
+	OutputTruncated bool                       `json:"output_truncated,omitempty"`
 }
 
 // AssistantTurnCompleted contains completion metadata and usage.

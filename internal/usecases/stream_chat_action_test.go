@@ -103,12 +103,17 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						Content:         "",
 						ActionCallsLen:  1,
 						HasActionCallID: false,
+						FirstActionCallText: func() *string {
+							msg := "calling list_todos"
+							return &msg
+						}(),
 					},
 					{
 						Role:            domain.ChatRole_Tool,
 						Content:         "",
 						ActionCallsLen:  0,
 						HasActionCallID: true,
+						ActionExecuted:  common.Ptr(true),
 					},
 					{
 						Role:            domain.ChatRole_Assistant,
@@ -220,12 +225,17 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						Content:         "",
 						ActionCallsLen:  1,
 						HasActionCallID: false,
+						FirstActionCallText: func() *string {
+							msg := "updating todos...\n"
+							return &msg
+						}(),
 					},
 					{
 						Role:            domain.ChatRole_Tool,
 						Content:         "todos[1]{id,title,due_date,status}\n1,Updated,2026-01-25,OPEN",
 						ActionCallsLen:  0,
 						HasActionCallID: true,
+						ActionExecuted:  common.Ptr(true),
 					},
 					{
 						Role:            domain.ChatRole_Assistant,
@@ -336,6 +346,10 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						Content:         "",
 						ActionCallsLen:  1,
 						HasActionCallID: false,
+						FirstActionCallText: func() *string {
+							msg := "calling failing_action...\n"
+							return &msg
+						}(),
 					},
 					{
 						Role:            domain.ChatRole_Tool,
@@ -344,6 +358,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						Content:         actionErr,
 						ActionCallsLen:  0,
 						HasActionCallID: true,
+						ActionExecuted:  common.Ptr(true),
 					},
 					{
 						Role:            domain.ChatRole_Assistant,
@@ -426,6 +441,10 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						Content:         "",
 						ActionCallsLen:  1,
 						HasActionCallID: false,
+						FirstActionCallText: func() *string {
+							msg := "calling fetch_todos...\n"
+							return &msg
+						}(),
 					},
 					{
 						Role:            domain.ChatRole_Assistant,
@@ -515,12 +534,17 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						Content:         "",
 						ActionCallsLen:  1,
 						HasActionCallID: false,
+						FirstActionCallText: func() *string {
+							msg := "calling fetch_todos...\n"
+							return &msg
+						}(),
 					},
 					{
 						Role:            domain.ChatRole_Tool,
 						Content:         "action result",
 						ActionCallsLen:  0,
 						HasActionCallID: true,
+						ActionExecuted:  common.Ptr(true),
 					},
 					{
 						Role:            domain.ChatRole_Assistant,

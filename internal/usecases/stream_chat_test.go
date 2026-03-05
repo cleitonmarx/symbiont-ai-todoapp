@@ -3,6 +3,8 @@ package usecases
 import (
 	"context"
 	"errors"
+	"io"
+	"log"
 	"strings"
 	"testing"
 	"time"
@@ -814,6 +816,135 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			testStreamChatImpl(t, tt)
 		})
 	}
+}
+
+func TestStreamChatImpl_Execute_PersistsSelectedSkillsAndEmitsTurnMetadata(t *testing.T) {
+	t.Parallel()
+
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	userMsgID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	assistantMsgID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
+	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
+	selectedDefinitions := []domain.AssistantSkillDefinition{
+		{
+			Name:   "update_todos",
+			Source: "skills/update_todos.md",
+			Tools:  []string{"fetch_todos", "update_todos"},
+		},
+	}
+	expectedSkills := []domain.AssistantSelectedSkill{
+		domain.NewAssistantSelectedSkill(selectedDefinitions[0]),
+	}
+
+	chatRepo := domain.NewMockChatMessageRepository(t)
+	summaryRepo := domain.NewMockConversationSummaryRepository(t)
+	conversationRepo := domain.NewMockConversationRepository(t)
+	timeProvider := domain.NewMockCurrentTimeProvider(t)
+	assistant := domain.NewMockAssistant(t)
+	actionRegistry := domain.NewMockAssistantActionRegistry(t)
+	skillRegistry := domain.NewMockAssistantSkillRegistry(t)
+	uow := domain.NewMockUnitOfWork(t)
+	outbox := domain.NewMockOutboxRepository(t)
+
+	actionRegistry.EXPECT().
+		GetRenderer(mock.Anything).
+		Return(nil, false).
+		Maybe()
+
+	skillRegistry.EXPECT().
+		ListRelevant(mock.Anything, mock.Anything).
+		Return(selectedDefinitions).
+		Once()
+
+	actionRegistry.EXPECT().
+		GetDefinition("fetch_todos").
+		Return(domain.AssistantActionDefinition{Name: "fetch_todos"}, true).
+		Once()
+	actionRegistry.EXPECT().
+		GetDefinition("update_todos").
+		Return(domain.AssistantActionDefinition{Name: "update_todos"}, true).
+		Once()
+
+	conversationRepo.EXPECT().
+		GetConversation(mock.Anything, conversationID).
+		Return(domain.Conversation{ID: conversationID}, true, nil).
+		Once()
+
+	summaryRepo.EXPECT().
+		GetConversationSummary(mock.Anything, conversationID).
+		Return(domain.ConversationSummary{}, false, nil).
+		Once()
+
+	chatRepo.EXPECT().
+		ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
+		Return([]domain.ChatMessage{}, false, nil).
+		Once()
+
+	expectNowCalls(timeProvider, fixedTime, 4)
+
+	assistant.EXPECT().
+		RunTurn(mock.Anything, mock.Anything, mock.Anything).
+		Run(func(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) {
+			assert.Len(t, req.AvailableActions, 2)
+			_ = onEvent(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{
+				UserMessageID:      userMsgID,
+				AssistantMessageID: assistantMsgID,
+			})
+			_ = onEvent(ctx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Done."})
+			_ = onEvent(ctx, domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
+				AssistantMessageID: assistantMsgID.String(),
+				CompletedAt:        fixedTime.Format(time.RFC3339),
+			})
+		}).
+		Return(nil)
+
+	expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+		{
+			Role:            domain.ChatRole_User,
+			Content:         "Update my todos",
+			ID:              &userMsgID,
+			ActionCallsLen:  0,
+			HasActionCallID: false,
+		},
+		{
+			Role:            domain.ChatRole_Assistant,
+			Content:         "Done.",
+			ID:              &assistantMsgID,
+			ActionCallsLen:  0,
+			HasActionCallID: false,
+			SelectedSkills:  expectedSkills,
+		},
+	})
+
+	useCase := NewStreamChatImpl(
+		log.New(io.Discard, "", 0),
+		chatRepo,
+		summaryRepo,
+		conversationRepo,
+		timeProvider,
+		assistant,
+		actionRegistry,
+		skillRegistry,
+		nil,
+		uow,
+		"test-embedding-model",
+		7,
+	)
+
+	var turnStarted domain.AssistantTurnStarted
+	err := useCase.Execute(context.Background(), "Update my todos", "test-model", func(_ context.Context, eventType domain.AssistantEventType, data any) error {
+		if eventType == domain.AssistantEventType_TurnStarted {
+			turnStarted = data.(domain.AssistantTurnStarted)
+		}
+		return nil
+	}, WithConversationID(conversationID))
+
+	assert.NoError(t, err)
+	assert.Equal(t, conversationID, turnStarted.ConversationID)
+	assert.Equal(t, userMsgID, turnStarted.UserMessageID)
+	assert.Equal(t, assistantMsgID, turnStarted.AssistantMessageID)
+	assert.NotEqual(t, uuid.Nil, turnStarted.TurnID)
+	assert.Equal(t, expectedSkills, turnStarted.SelectedSkills)
 }
 
 func TestInitStreamChat_Initialize(t *testing.T) {

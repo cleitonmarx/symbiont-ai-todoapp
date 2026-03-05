@@ -48,6 +48,22 @@ func TestMCPRegistry_Execute(t *testing.T) {
 			initialize:    true,
 			assertMessage: func(t *testing.T, msg domain.AssistantMessage) { assert.Equal(t, "error: failed", msg.Content) },
 		},
+		"execute-code-normalizes-escaped-newlines": {
+			session: &fakeSession{
+				listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{{Name: "execute_code", Description: "Executes code", InputSchema: map[string]any{"type": "object"}}}}},
+				callResult:  &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: `{"result":["ok"]}`}}},
+			},
+			call:       domain.AssistantActionCall{ID: "call-exec", Name: "execute_code", Input: `{"code":"result = 1\\nresult"}`},
+			initialize: true,
+			assertMessage: func(t *testing.T, msg domain.AssistantMessage) {
+				assert.Equal(t, "ok", msg.Content)
+			},
+			assertSession: func(t *testing.T, session *fakeSession) {
+				require.NotNil(t, session.lastCallParams)
+				assert.Equal(t, "execute_code", session.lastCallParams.Name)
+				assert.Equal(t, "result = 1\nresult", session.lastCallParams.Arguments.(map[string]any)["code"])
+			},
+		},
 		"unknown-action": {
 			session:       &fakeSession{},
 			call:          domain.AssistantActionCall{ID: "call-unknown", Name: "missing_tool", Input: `{}`},
@@ -149,8 +165,8 @@ func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 			assert: func(t *testing.T, registry *MCPRegistry) {
 				def, found := registry.GetDefinition("execute_code")
 				require.True(t, found)
-				assert.Equal(t, "Execute short self-contained Python code for deterministic calculations, grouping, validation, and data shaping.", def.Description)
-				assert.Equal(t, "🧮 Running deterministic code...", registry.StatusMessage("execute_code"))
+				assert.Equal(t, "Execute short self-contained Python code for deterministic calculations, grouping, validation, and data shaping. The tool input must be valid JSON, but the `code` field must contain raw Python source with real newlines, not escaped source like `\\\\n` or `\\\\t`. Prefer compact self-contained scripts and use single quotes inside Python when possible to reduce escaping.", def.Description)
+				assert.Equal(t, "🧮 Running code...", registry.StatusMessage("execute_code"))
 			},
 		},
 	}

@@ -133,9 +133,11 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		Messages:            messagesHistory,
 		ConversationSummary: summaryContext,
 	})
+	selectedSkills := make([]domain.AssistantSelectedSkill, 0, len(skills))
 	relevantActions := make([]domain.AssistantActionDefinition, 0, len(skills))
 	uniqueActionNames := make(map[string]struct{})
 	for _, s := range skills {
+		selectedSkills = append(selectedSkills, domain.NewAssistantSelectedSkill(s))
 		sc.logger.Printf("StreamChat: skill '%s' is relevant for the current conversation context", s.Name)
 		for _, tool := range s.Tools {
 			if action, ok := sc.actionRegistry.GetDefinition(tool); ok {
@@ -167,6 +169,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		conversation:        conversation,
 		conversationCreated: conversationCreated,
 		turnID:              uuid.New(),
+		selectedSkills:      selectedSkills,
 		tracker: newActionCycleTracker(
 			sc.maxActionCycles,
 			MAX_REPEATED_ACTION_CALL_HIT,
@@ -227,6 +230,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		TurnSequence:     state.nextTurnSequence(),
 		ChatRole:         domain.ChatRole_Assistant,
 		Content:          state.assistantMsgContent.String(),
+		SelectedSkills:   state.selectedSkills,
 		Model:            model,
 		MessageState:     domain.ChatMessageState_Completed,
 		PromptTokens:     state.tokenUsage.PromptTokens,

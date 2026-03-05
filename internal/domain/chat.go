@@ -60,6 +60,9 @@ type ChatMessage struct {
 	ApprovalStatus         *ChatMessageApprovalStatus
 	ApprovalDecisionReason *string
 	ApprovalDecidedAt      *time.Time
+	SelectedSkills         []AssistantSelectedSkill
+	ActionExecuted         *bool
+	ActionDetails          []ChatMessageActionDetail
 	PromptTokens           int
 	CompletionTokens       int
 	TotalTokens            int
@@ -67,9 +70,25 @@ type ChatMessage struct {
 	UpdatedAt              time.Time
 }
 
+// ChatMessageActionDetail summarizes one assistant action call for chat-history projections.
+type ChatMessageActionDetail struct {
+	ActionCallID           string
+	Name                   string
+	Input                  string
+	Text                   string
+	Output                 string
+	MessageState           ChatMessageState
+	ErrorMessage           *string
+	ApprovalStatus         *ChatMessageApprovalStatus
+	ApprovalDecisionReason *string
+	ApprovalDecidedAt      *time.Time
+	ActionExecuted         *bool
+}
+
 // IsActionCallSuccess returns true if the message represents a successful action call result.
 func (m ChatMessage) IsActionCallSuccess() bool {
-	return m.ChatRole == ChatRole_Tool &&
+	return (m.ActionExecuted == nil || *m.ActionExecuted) &&
+		m.ChatRole == ChatRole_Tool &&
 		m.ActionCallID != nil &&
 		m.MessageState == ChatMessageState_Completed
 }

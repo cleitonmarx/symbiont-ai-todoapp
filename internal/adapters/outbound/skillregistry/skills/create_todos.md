@@ -16,7 +16,6 @@ Rules:
 4. If due dates are ambiguous, ask one short follow-up question before creating.
 5. If tool call fails due to argument shape, fix and retry once.
 6. Keywords: create, add, new, reminder, create one todo, create a todo named, due tomorrow.
-7. In user-facing responses, never mention internal action/tool names (for example `create_todos`).
 
 Preferred flow:
 - Detect creation intent and extract todo items.

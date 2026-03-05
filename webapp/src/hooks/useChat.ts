@@ -9,7 +9,16 @@ import {
   updateConversation,
   type ActionApprovalStatus,
 } from '../services/chatApi';
-import type { AssistantTodoFilters, ChatMessage, Conversation, ModelInfo } from '../types';
+import type {
+  AssistantTodoFilters,
+  ChatMessage,
+  ChatMessageActionDetail,
+  ChatMessageApprovalStatus,
+  ChatMessageState,
+  Conversation,
+  ModelInfo,
+  SelectedSkill,
+} from '../types';
 
 interface UseChatReturn {
   messages: ChatMessage[];
@@ -64,6 +73,8 @@ interface StreamTurnStartedEventData {
   conversation_id?: string;
   user_message_id?: string;
   assistant_message_id?: string;
+  turn_id?: string;
+  selected_skills?: unknown;
   conversation_created?: boolean;
 }
 
@@ -84,6 +95,10 @@ interface StreamActionCompletedEventData {
   success?: boolean;
   error?: string;
   should_refetch?: boolean;
+  approval_status?: ChatMessageApprovalStatus;
+  action_executed?: boolean;
+  output_preview?: string;
+  output_truncated?: boolean;
 }
 
 interface StreamActionApprovalRequiredEventData {
@@ -317,6 +332,127 @@ const wait = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
+const normalizeSkillTools = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+};
+
+const normalizeSelectedSkills = (raw: unknown): SelectedSkill[] | undefined => {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return undefined;
+  }
+
+  const normalized: SelectedSkill[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+
+    const record = item as Record<string, unknown>;
+    const name = typeof record.name === 'string' ? record.name : typeof record.Name === 'string' ? record.Name : '';
+    const source =
+      typeof record.source === 'string' ? record.source : typeof record.Source === 'string' ? record.Source : '';
+
+    if (!name.trim()) {
+      continue;
+    }
+
+    normalized.push({
+      name,
+      source,
+      tools: normalizeSkillTools(record.tools ?? record.Tools),
+    });
+  }
+
+  return normalized.length > 0 ? normalized : undefined;
+};
+
+const cloneSelectedSkills = (skills?: SelectedSkill[] | unknown): SelectedSkill[] | undefined => {
+  const normalized = normalizeSelectedSkills(skills);
+  if (!normalized) {
+    return undefined;
+  }
+
+  return normalized.map((skill) => ({
+    ...skill,
+    tools: [...skill.tools],
+  }));
+};
+
+const cloneActionDetails = (details?: ChatMessageActionDetail[]): ChatMessageActionDetail[] | undefined => {
+  if (!details || details.length === 0) {
+    return undefined;
+  }
+
+  return details.map((detail) => ({ ...detail }));
+};
+
+const normalizeMessage = (message: ChatMessage): ChatMessage => ({
+  ...message,
+  selected_skills: cloneSelectedSkills(message.selected_skills),
+  action_details: cloneActionDetails(message.action_details),
+});
+
+const updateMessageById = (
+  messages: ChatMessage[],
+  messageId: string,
+  updater: (message: ChatMessage) => ChatMessage,
+): ChatMessage[] => {
+  const index = messages.findIndex((message) => message.id === messageId);
+  if (index === -1) {
+    return messages;
+  }
+
+  const next = [...messages];
+  next[index] = updater(next[index]);
+  return next;
+};
+
+const renameMessageId = (messages: ChatMessage[], previousId: string, nextId: string): ChatMessage[] => {
+  if (!previousId || previousId === nextId) {
+    return messages;
+  }
+
+  return updateMessageById(messages, previousId, (message) => ({
+    ...message,
+    id: nextId,
+  }));
+};
+
+const upsertActionDetail = (
+  details: ChatMessageActionDetail[] | undefined,
+  actionCallId: string,
+  patch: Partial<ChatMessageActionDetail>,
+): ChatMessageActionDetail[] => {
+  const normalizedActionCallId = actionCallId.trim();
+  if (!normalizedActionCallId) {
+    return details ? [...details] : [];
+  }
+
+  const nextDetails = details ? details.map((detail) => ({ ...detail })) : [];
+  const index = nextDetails.findIndex((detail) => detail.action_call_id === normalizedActionCallId);
+
+  if (index === -1) {
+    nextDetails.push({
+      action_call_id: normalizedActionCallId,
+      name: patch.name ?? normalizedActionCallId,
+      ...patch,
+    });
+    return nextDetails;
+  }
+
+  nextDetails[index] = {
+    ...nextDetails[index],
+    ...patch,
+    action_call_id: normalizedActionCallId,
+    name: patch.name ?? nextDetails[index].name,
+  };
+  return nextDetails;
+};
+
 export const useChat = ({
   onChatDone,
   onToolExecuted,
@@ -395,7 +531,7 @@ export const useChat = ({
         setLoadingMessages(true);
         clearPendingApproval();
         const response = await fetchChatMessages(conversationId, 1, CHAT_MESSAGES_PAGE_SIZE);
-        setMessages(response.messages || []);
+        setMessages((response.messages || []).map(normalizeMessage));
         resetToolActivity();
         setError(null);
       } catch (err) {
@@ -639,6 +775,7 @@ export const useChat = ({
         const decoder = new TextDecoder();
         let assistantContent = '';
         let assistantMessageId = '';
+        let currentAssistantMessageId = '';
         let streamConversationId: string | null = activeConversationRef.current;
         let assistantCompleted = false;
         let buffer = '';
@@ -649,6 +786,7 @@ export const useChat = ({
           content: '',
           created_at: new Date().toISOString(),
         };
+        currentAssistantMessageId = tempAssistantMsg.id;
         setMessages((prev) => [...prev, tempAssistantMsg]);
 
         const processEvent = (rawEvent: string) => {
@@ -694,8 +832,22 @@ export const useChat = ({
                 });
               }
               if (data.assistant_message_id) {
+                const previousAssistantMessageId = currentAssistantMessageId;
                 assistantMessageId = data.assistant_message_id;
+                currentAssistantMessageId = data.assistant_message_id;
+                setMessages((prev) =>
+                  renameMessageId(prev, previousAssistantMessageId, data.assistant_message_id as string),
+                );
               }
+              setMessages((prev) =>
+                updateMessageById(prev, currentAssistantMessageId, (message) => ({
+                  ...message,
+                  id: currentAssistantMessageId,
+                  turn_id: typeof data.turn_id === 'string' ? data.turn_id : message.turn_id,
+                  selected_skills:
+                    cloneSelectedSkills(data.selected_skills) ?? cloneSelectedSkills(message.selected_skills),
+                })),
+              );
               if (data.conversation_created === true) {
                 composingNewConversationRef.current = false;
               }
@@ -711,17 +863,13 @@ export const useChat = ({
               assistantContent += data.text;
 
               setMessages((prev) => {
-                const updated = [...prev];
-                const lastIndex = updated.length - 1;
-                const lastMsg = updated[lastIndex];
-                if (lastMsg && lastMsg.role === 'assistant') {
-                  updated[lastIndex] = {
-                    ...lastMsg,
-                    id: assistantMessageId || lastMsg.id,
-                    content: assistantContent,
-                  };
-                }
-                return updated;
+                const nextAssistantMessageId = assistantMessageId || currentAssistantMessageId;
+                currentAssistantMessageId = nextAssistantMessageId;
+                return updateMessageById(prev, nextAssistantMessageId, (message) => ({
+                  ...message,
+                  id: nextAssistantMessageId,
+                  content: assistantContent,
+                }));
               });
               return;
             }
@@ -730,6 +878,18 @@ export const useChat = ({
               const data = rawData as StreamActionStartedEventData;
               if (data.text) {
                 updateToolCallingStatus(data.text, data.name);
+              }
+              if (data.id) {
+                setMessages((prev) =>
+                  updateMessageById(prev, currentAssistantMessageId, (message) => ({
+                    ...message,
+                    action_details: upsertActionDetail(message.action_details, data.id as string, {
+                      name: typeof data.name === 'string' ? data.name : undefined,
+                      input: typeof data.input === 'string' ? data.input : undefined,
+                      text: typeof data.text === 'string' ? data.text : undefined,
+                    }),
+                  })),
+                );
               }
               const assistantFilters = parseAssistantFilters(data);
               if (assistantFilters !== null) {
@@ -740,6 +900,26 @@ export const useChat = ({
 
             if (eventType === 'action_completed') {
               const data = rawData as StreamActionCompletedEventData;
+              if (data.id) {
+                const nextMessageState: ChatMessageState | undefined =
+                  data.success === true ? 'COMPLETED' : data.success === false ? 'FAILED' : undefined;
+                setMessages((prev) =>
+                  updateMessageById(prev, currentAssistantMessageId, (message) => ({
+                    ...message,
+                    action_details: upsertActionDetail(message.action_details, data.id as string, {
+                      name: typeof data.name === 'string' ? data.name : undefined,
+                      message_state: nextMessageState,
+                      error_message: typeof data.error === 'string' ? data.error : undefined,
+                      approval_status: data.approval_status,
+                      action_executed:
+                        typeof data.action_executed === 'boolean' ? data.action_executed : undefined,
+                      output: typeof data.output_preview === 'string' ? data.output_preview : undefined,
+                      output_truncated:
+                        typeof data.output_truncated === 'boolean' ? data.output_truncated : undefined,
+                    }),
+                  })),
+                );
+              }
               if (data.should_refetch === true) {
                 onToolExecuted?.();
               }
@@ -768,6 +948,17 @@ export const useChat = ({
                 timeoutMs,
                 expiresAt: timeoutMs ? Date.now() + timeoutMs : null,
               });
+              setMessages((prev) =>
+                updateMessageById(prev, currentAssistantMessageId, (message) => ({
+                  ...message,
+                  turn_id: data.turn_id,
+                  action_details: upsertActionDetail(message.action_details, data.action_call_id as string, {
+                    name: data.name,
+                    input: typeof data.input === 'string' ? data.input : undefined,
+                    approval_status: 'PENDING',
+                  }),
+                })),
+              );
               return;
             }
 
@@ -788,6 +979,28 @@ export const useChat = ({
                 }
                 return current;
               });
+              setMessages((prev) =>
+                updateMessageById(prev, currentAssistantMessageId, (message) => ({
+                  ...message,
+                  action_details: upsertActionDetail(message.action_details, resolvedActionCallID, {
+                    name: typeof data.name === 'string' ? data.name : undefined,
+                    approval_status:
+                      typeof data.status === 'string'
+                        ? (data.status as ChatMessageApprovalStatus)
+                        : undefined,
+                    approval_decision_reason: typeof data.reason === 'string' ? data.reason : undefined,
+                    approval_decided_at: new Date().toISOString(),
+                    action_executed:
+                      data.status === 'APPROVED'
+                        ? undefined
+                        : data.status === 'REJECTED' ||
+                            data.status === 'EXPIRED' ||
+                            data.status === 'AUTO_REJECTED'
+                          ? false
+                          : undefined,
+                  }),
+                })),
+              );
               return;
             }
 
@@ -795,7 +1008,12 @@ export const useChat = ({
               const data = rawData as StreamTurnCompletedEventData;
               assistantCompleted = true;
               if (data.assistant_message_id) {
+                const previousAssistantMessageId = currentAssistantMessageId;
                 assistantMessageId = data.assistant_message_id;
+                currentAssistantMessageId = data.assistant_message_id;
+                setMessages((prev) =>
+                  renameMessageId(prev, previousAssistantMessageId, data.assistant_message_id as string),
+                );
               }
               clearPendingApproval();
               resetToolActivity();
@@ -864,12 +1082,9 @@ export const useChat = ({
 
         if (assistantMessageId) {
           setMessages((prev) => {
-            const updated = [...prev];
-            const lastIndex = updated.length - 1;
-            if (updated[lastIndex]?.role === 'assistant') {
-              updated[lastIndex] = { ...updated[lastIndex], id: assistantMessageId };
-            }
-            return updated;
+            const previousAssistantMessageId = currentAssistantMessageId;
+            currentAssistantMessageId = assistantMessageId;
+            return renameMessageId(prev, previousAssistantMessageId, assistantMessageId);
           });
         }
 

@@ -58,6 +58,7 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 					OPEN: 5,
 					DONE: 3,
 				},
+				GeneratedAt: generatedAt,
 				NextUp: []gen.NextUpTodoItem{
 					{
 						Title:  "Buy groceries",

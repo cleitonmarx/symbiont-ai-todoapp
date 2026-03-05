@@ -3,7 +3,12 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useChat } from '../../hooks/useChat';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
-import type { AssistantTodoFilters } from '../../types';
+import type {
+  AssistantTodoFilters,
+  ChatMessage,
+  ChatMessageActionDetail,
+  SelectedSkill,
+} from '../../types';
 
 marked.setOptions({
   breaks: true,
@@ -22,6 +27,7 @@ const MINUTE_MS = 60 * 1000;
 const SECOND_MS = 1000;
 const HOUR_MINUTES = 60;
 const DAY_MINUTES = 24 * HOUR_MINUTES;
+const AUTO_SCROLL_THRESHOLD_PX = 72;
 
 const formatConversationAge = (updatedAt: string): string => {
   const updatedTime = new Date(updatedAt).getTime();
@@ -272,6 +278,62 @@ const buildApprovalPreviewItems = (rawInput: string, previewFields: string[]): s
   return values;
 };
 
+const formatSkillSource = (source: string): string => {
+  const trimmed = source.trim();
+  if (!trimmed) {
+    return 'Unknown source';
+  }
+
+  const segments = trimmed.split('/').filter(Boolean);
+  return segments[segments.length - 1] ?? trimmed;
+};
+
+const getActionStatusMeta = (
+  detail: ChatMessageActionDetail,
+): { label: string; tone: 'completed' | 'failed' | 'pending' | 'blocked' } => {
+  if (detail.approval_status === 'REJECTED') {
+    return { label: 'Rejected', tone: 'blocked' };
+  }
+  if (detail.approval_status === 'EXPIRED') {
+    return { label: 'Expired', tone: 'blocked' };
+  }
+  if (detail.approval_status === 'AUTO_REJECTED') {
+    return { label: 'Auto-rejected', tone: 'blocked' };
+  }
+  if (detail.approval_status === 'PENDING') {
+    return { label: 'Awaiting approval', tone: 'pending' };
+  }
+  if (detail.message_state === 'COMPLETED' && detail.action_executed !== false) {
+    return { label: 'Completed', tone: 'completed' };
+  }
+  if (detail.message_state === 'FAILED') {
+    return { label: 'Failed', tone: 'failed' };
+  }
+  return { label: 'In progress', tone: 'pending' };
+};
+
+const buildDetailsSummary = (message: ChatMessage): { meta: string } | null => {
+  const skillCount = message.selected_skills?.length ?? 0;
+  const actionCount = message.action_details?.length ?? 0;
+
+  if (skillCount === 0 && actionCount === 0) {
+    return null;
+  }
+
+  const metaParts: string[] = [];
+  if (skillCount > 0) {
+    metaParts.push(`${skillCount} skill${skillCount === 1 ? '' : 's'}`);
+  }
+  if (actionCount > 0) {
+    metaParts.push(`${actionCount} action${actionCount === 1 ? '' : 's'}`);
+  }
+
+  return { meta: metaParts.join(' · ') };
+};
+
+const hasTurnDetails = (message: ChatMessage): boolean =>
+  (message.selected_skills?.length ?? 0) > 0 || (message.action_details?.length ?? 0) > 0;
+
 export const ChatPanel = ({
   onChatDone,
   onToolExecuted,
@@ -320,9 +382,11 @@ export const ChatPanel = ({
   const [conversationError, setConversationError] = useState<string | null>(null);
   const [approvalReason, setApprovalReason] = useState('');
   const [approvalNow, setApprovalNow] = useState(() => Date.now());
+  const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
+  const shouldAutoScrollRef = useRef(true);
 
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
@@ -360,15 +424,55 @@ export const ChatPanel = ({
   }, [loadConversations, loadModels]);
 
   useEffect(() => {
-    if (messages.length > 0 && messagesContainerRef.current) {
+    const container = messagesContainerRef.current;
+    if (messages.length > 0 && container) {
       if (isInitialLoad.current) {
-        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        container.scrollTop = container.scrollHeight;
         isInitialLoad.current = false;
+        shouldAutoScrollRef.current = true;
+        setShowScrollToLatest(false);
+      } else if (shouldAutoScrollRef.current) {
+        container.scrollTop = container.scrollHeight;
+        setShowScrollToLatest(false);
       } else {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setShowScrollToLatest(true);
       }
     }
   }, [messages]);
+
+  useEffect(() => {
+    isInitialLoad.current = true;
+    shouldAutoScrollRef.current = true;
+    setShowScrollToLatest(false);
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    if (loading && !shouldAutoScrollRef.current) {
+      setShowScrollToLatest(true);
+    }
+  }, [loading]);
+
+  const handleMessagesScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX;
+    setShowScrollToLatest(!shouldAutoScrollRef.current);
+  };
+
+  const scrollToLatestMessage = () => {
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    shouldAutoScrollRef.current = true;
+    setShowScrollToLatest(false);
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     let isActive = true;
@@ -675,7 +779,7 @@ export const ChatPanel = ({
               </div>
             </header>
 
-            <div className="ui-chat-messages" ref={messagesContainerRef}>
+            <div className="ui-chat-messages" ref={messagesContainerRef} onScroll={handleMessagesScroll}>
             {error ? <div className="ui-chat-error">{error}</div> : null}
 
             {!loadingMessages && messages.length === 0 ? (
@@ -687,14 +791,128 @@ export const ChatPanel = ({
 
               {messages.map((message) => (
                 <article key={message.id} className={`ui-chat-message ${message.role}`}>
-                  <div className="ui-chat-message-content">
-                    {message.role === 'assistant' ? (
-                      <div dangerouslySetInnerHTML={{ __html: renderedMessages[String(message.id)] ?? '' }} />
-                    ) : (
-                      message.content
-                    )}
-                  </div>
-                  <time>{new Date(message.created_at).toLocaleTimeString()}</time>
+                  {(() => {
+                    const detailsSummary = buildDetailsSummary(message);
+
+                    return (
+                      <>
+                        {message.role === 'assistant' && hasTurnDetails(message) ? (
+                          <details className="ui-chat-turn-details">
+                            <summary className="ui-chat-turn-summary">
+                              <span className="ui-chat-turn-summary-line" aria-hidden="true" />
+                              <span className="ui-chat-turn-summary-center">
+                                <span className="ui-chat-turn-summary-controls">
+                                  <span className="ui-chat-turn-summary-meta">{detailsSummary?.meta ?? ''}</span>
+                                </span>
+                                <span className="ui-chat-turn-summary-icon" aria-hidden="true" />
+                              </span>
+                              <span className="ui-chat-turn-summary-line" aria-hidden="true" />
+                            </summary>
+
+                            {(message.selected_skills?.length ?? 0) > 0 ? (
+                              <section className="ui-chat-turn-section">
+                                <h3>Skills</h3>
+                                <div className="ui-chat-skill-list">
+                                  {(message.selected_skills ?? []).map((skill: SelectedSkill) => (
+                                    <article
+                                      key={`${message.id}-${skill.name}-${skill.source}`}
+                                      className="ui-chat-skill-card"
+                                    >
+                                      <div className="ui-chat-skill-header">
+                                        <strong>{skill.name}</strong>
+                                        <span>{formatSkillSource(skill.source)}</span>
+                                      </div>
+                                      {skill.tools.length > 0 ? (
+                                        <div className="ui-chat-skill-tools">
+                                          {skill.tools.map((tool) => (
+                                            <span key={`${skill.name}-${tool}`} className="ui-chat-chip">
+                                              {tool}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : null}
+                                    </article>
+                                  ))}
+                                </div>
+                              </section>
+                            ) : null}
+
+                            {(message.action_details?.length ?? 0) > 0 ? (
+                              <section className="ui-chat-turn-section">
+                                <h3>Actions</h3>
+                                <div className="ui-chat-action-list">
+                                  {(message.action_details ?? []).map((detail: ChatMessageActionDetail) => {
+                                    const status = getActionStatusMeta(detail);
+                                    const statusText = detail.text?.trim() || detail.name || 'Action';
+                                    const hasRawDetails = Boolean(detail.input?.trim() || detail.output?.trim());
+
+                                    return (
+                                      <article
+                                        key={`${message.id}-${detail.action_call_id}`}
+                                        className="ui-chat-action-card"
+                                      >
+                                        <div className="ui-chat-action-header">
+                                          <div>
+                                            <strong>{statusText}</strong>
+                                            {detail.name && detail.text !== detail.name ? (
+                                              <p className="ui-chat-action-name">{detail.name}</p>
+                                            ) : null}
+                                          </div>
+                                          <span className={`ui-chat-action-badge ${status.tone}`}>{status.label}</span>
+                                        </div>
+
+                                        {detail.error_message ? (
+                                          <p className="ui-chat-action-meta ui-chat-action-meta-error">
+                                            {detail.error_message}
+                                          </p>
+                                        ) : null}
+                                        {detail.approval_decision_reason ? (
+                                          <p className="ui-chat-action-meta">
+                                            Decision: {detail.approval_decision_reason}
+                                          </p>
+                                        ) : null}
+                                        {detail.output_truncated ? (
+                                          <p className="ui-chat-action-meta">Result preview truncated for chat history.</p>
+                                        ) : null}
+
+                                        {hasRawDetails ? (
+                                          <details className="ui-chat-action-raw">
+                                            <summary>Raw input and result</summary>
+                                            {detail.input?.trim() ? (
+                                              <div className="ui-chat-action-raw-block">
+                                                <span>Input</span>
+                                                <pre>{formatApprovalInput(detail.input)}</pre>
+                                              </div>
+                                            ) : null}
+                                            {detail.output?.trim() ? (
+                                              <div className="ui-chat-action-raw-block">
+                                                <span>Result</span>
+                                                <pre>{detail.output}</pre>
+                                              </div>
+                                            ) : null}
+                                          </details>
+                                        ) : null}
+                                      </article>
+                                    );
+                                  })}
+                                </div>
+                              </section>
+                            ) : null}
+                          </details>
+                        ) : null}
+                        {message.role === 'assistant' ? (
+                          renderedMessages[String(message.id)]?.trim() ? (
+                            <div className="ui-chat-message-content">
+                              <div dangerouslySetInnerHTML={{ __html: renderedMessages[String(message.id)] ?? '' }} />
+                            </div>
+                          ) : null
+                        ) : (
+                          <div className="ui-chat-message-content">{message.content}</div>
+                        )}
+                        <time>{new Date(message.created_at).toLocaleTimeString()}</time>
+                      </>
+                    );
+                  })()}
                 </article>
               ))}
 
@@ -706,6 +924,18 @@ export const ChatPanel = ({
                     <span />
                   </div>
                 </article>
+              ) : null}
+
+              {showScrollToLatest ? (
+                <button
+                  type="button"
+                  className="ui-chat-scroll-latest"
+                  onClick={scrollToLatestMessage}
+                  aria-label="Scroll to latest message"
+                  title="Scroll to latest message"
+                >
+                  ↓
+                </button>
               ) : null}
 
               <div ref={messagesEndRef} />

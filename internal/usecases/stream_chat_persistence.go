@@ -50,6 +50,7 @@ func (sc StreamChatImpl) persistFailureMessages(
 		TurnSequence:     state.nextTurnSequence(),
 		ChatRole:         domain.ChatRole_Assistant,
 		Content:          "",
+		SelectedSkills:   state.selectedSkills,
 		Model:            model,
 		MessageState:     domain.ChatMessageState_Failed,
 		ErrorMessage:     &errorMessage,
@@ -100,6 +101,7 @@ type streamChatExecutionState struct {
 	conversationCreated      bool
 	assistantMsgContent      strings.Builder
 	assistantMsgID           uuid.UUID
+	selectedSkills           []domain.AssistantSelectedSkill
 	tokenUsage               domain.AssistantUsage
 	turnID                   uuid.UUID
 	turnSequence             int64

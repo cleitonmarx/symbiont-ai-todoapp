@@ -22,8 +22,8 @@ import (
 
 // Defines values for ActionApprovalStatus.
 const (
-	APPROVED ActionApprovalStatus = "APPROVED"
-	REJECTED ActionApprovalStatus = "REJECTED"
+	ActionApprovalStatusAPPROVED ActionApprovalStatus = "APPROVED"
+	ActionApprovalStatusREJECTED ActionApprovalStatus = "REJECTED"
 )
 
 // Defines values for ChatMessageRole.
@@ -31,6 +31,21 @@ const (
 	ChatMessageRoleAssistant ChatMessageRole = "assistant"
 	ChatMessageRoleSystem    ChatMessageRole = "system"
 	ChatMessageRoleUser      ChatMessageRole = "user"
+)
+
+// Defines values for ChatMessageActionDetailApprovalStatus.
+const (
+	ChatMessageActionDetailApprovalStatusAPPROVED     ChatMessageActionDetailApprovalStatus = "APPROVED"
+	ChatMessageActionDetailApprovalStatusAUTOREJECTED ChatMessageActionDetailApprovalStatus = "AUTO_REJECTED"
+	ChatMessageActionDetailApprovalStatusEXPIRED      ChatMessageActionDetailApprovalStatus = "EXPIRED"
+	ChatMessageActionDetailApprovalStatusPENDING      ChatMessageActionDetailApprovalStatus = "PENDING"
+	ChatMessageActionDetailApprovalStatusREJECTED     ChatMessageActionDetailApprovalStatus = "REJECTED"
+)
+
+// Defines values for ChatMessageActionDetailMessageState.
+const (
+	COMPLETED ChatMessageActionDetailMessageState = "COMPLETED"
+	FAILED    ChatMessageActionDetailMessageState = "FAILED"
 )
 
 // Defines values for ConversationTitleSource.
@@ -77,6 +92,9 @@ type BoardSummary struct {
 	// Counts Count of todos per status.
 	Counts TodoStatusCounts `json:"counts"`
 
+	// GeneratedAt Timestamp when this summary was generated.
+	GeneratedAt time.Time `json:"generated_at"`
+
 	// NearDeadline Titles of todos approaching their due date.
 	NearDeadline []string `json:"near_deadline"`
 
@@ -107,14 +125,39 @@ type ChatHistoryResp struct {
 
 // ChatMessage defines model for ChatMessage.
 type ChatMessage struct {
-	Content   string             `json:"content"`
-	CreatedAt time.Time          `json:"created_at"`
-	Id        openapi_types.UUID `json:"id"`
-	Role      ChatMessageRole    `json:"role"`
+	ActionDetails  *[]ChatMessageActionDetail `json:"action_details,omitempty"`
+	ActionExecuted *bool                      `json:"action_executed"`
+	Content        string                     `json:"content"`
+	CreatedAt      time.Time                  `json:"created_at"`
+	Id             openapi_types.UUID         `json:"id"`
+	Role           ChatMessageRole            `json:"role"`
+	SelectedSkills *[]SelectedSkill           `json:"selected_skills,omitempty"`
+	TurnId         *openapi_types.UUID        `json:"turn_id,omitempty"`
 }
 
 // ChatMessageRole defines model for ChatMessage.Role.
 type ChatMessageRole string
+
+// ChatMessageActionDetail defines model for ChatMessageActionDetail.
+type ChatMessageActionDetail struct {
+	ActionCallId           string                                 `json:"action_call_id"`
+	ActionExecuted         *bool                                  `json:"action_executed"`
+	ApprovalDecidedAt      *time.Time                             `json:"approval_decided_at"`
+	ApprovalDecisionReason *string                                `json:"approval_decision_reason"`
+	ApprovalStatus         *ChatMessageActionDetailApprovalStatus `json:"approval_status"`
+	ErrorMessage           *string                                `json:"error_message"`
+	Input                  string                                 `json:"input"`
+	MessageState           ChatMessageActionDetailMessageState    `json:"message_state"`
+	Name                   string                                 `json:"name"`
+	Output                 string                                 `json:"output"`
+	Text                   string                                 `json:"text"`
+}
+
+// ChatMessageActionDetailApprovalStatus defines model for ChatMessageActionDetail.ApprovalStatus.
+type ChatMessageActionDetailApprovalStatus string
+
+// ChatMessageActionDetailMessageState defines model for ChatMessageActionDetail.MessageState.
+type ChatMessageActionDetailMessageState string
 
 // ChatStreamRequest defines model for ChatStreamRequest.
 type ChatStreamRequest struct {
@@ -241,6 +284,13 @@ type ModelListResp struct {
 type NextUpTodoItem struct {
 	Reason string `json:"reason"`
 	Title  string `json:"title"`
+}
+
+// SelectedSkill defines model for SelectedSkill.
+type SelectedSkill struct {
+	Name   string   `json:"name"`
+	Source string   `json:"source"`
+	Tools  []string `json:"tools"`
 }
 
 // SubmitActionApprovalRequest defines model for SubmitActionApprovalRequest.

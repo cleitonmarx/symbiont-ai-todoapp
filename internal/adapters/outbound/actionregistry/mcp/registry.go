@@ -69,6 +69,9 @@ func (r *MCPRegistry) Execute(ctx context.Context, call domain.AssistantActionCa
 	if err != nil {
 		return actionErrorMessage(call.ID, "invalid_arguments", err.Error())
 	}
+	if formattedArguments, found := toolFormatters.FormatArguments(call.Name, arguments); found {
+		arguments = formattedArguments
+	}
 
 	if r.session == nil {
 		return actionErrorMessage(call.ID, "mcp_not_initialized", "mcp registry was not initialized with a live session")
@@ -86,8 +89,8 @@ func (r *MCPRegistry) Execute(ctx context.Context, call domain.AssistantActionCa
 	}
 
 	content := renderCallToolResult(result)
-	if resultFormatter, found := resultFormatters[call.Name]; found {
-		return resultFormatter.Format(content, call)
+	if formatted, found := toolFormatters.FormatResult(call.Name, content, call); found {
+		return formatted
 	}
 
 	if result != nil && result.IsError && !strings.Contains(strings.ToLower(content), "error") {

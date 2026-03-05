@@ -168,19 +168,21 @@ func buildPromptMessages(new domain.BoardSummaryContent, previous domain.BoardSu
 	}
 
 	for i, msg := range messages {
-		msg.Content = fmt.Sprintf(
-			msg.Content,
-			inputTOON,
-			previousTOON,
-			completedCandidatesText,
-			hints.DoneDelta,
-			hints.OverdueTitles,
-			hints.NearDeadlineTitles,
-			hints.NextUpOverdue,
-			hints.NextUpDueSoon,
-			hints.NextUpUpcoming,
-			hints.NextUpFuture,
-		)
+		if strings.Contains(msg.Content, "%[") {
+			msg.Content = fmt.Sprintf(
+				msg.Content,
+				inputTOON,
+				previousTOON,
+				completedCandidatesText,
+				hints.DoneDelta,
+				hints.OverdueTitles,
+				hints.NearDeadlineTitles,
+				hints.NextUpOverdue,
+				hints.NextUpDueSoon,
+				hints.NextUpUpcoming,
+				hints.NextUpFuture,
+			)
+		}
 		messages[i] = msg
 	}
 

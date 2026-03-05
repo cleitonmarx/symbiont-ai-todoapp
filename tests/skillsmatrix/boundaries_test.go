@@ -9,7 +9,6 @@ import (
 )
 
 func TestSkillRelevancePromptMatrix_Boundaries(t *testing.T) {
-	t.Parallel()
 
 	registry := newSkillMatrixRegistry(t)
 	tests := map[string]skillMatrixCase{

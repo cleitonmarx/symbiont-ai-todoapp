@@ -17,14 +17,11 @@ Rules:
 5. Build payloads with required schema fields.
 6. Keep tool arguments as strict JSON only.
 7. If update fails due to argument shape, correct and retry once.
-8. If the fetch result gives one unambiguous target, continue to the update in the same turn; do not stop after fetch-only results.
-9. Do not ask the user to wait, do not narrate that you will call tools, and do not ask for confirmation again when the user already requested the update clearly.
-10. If the user confirms with a short follow-up like "yes" after you just resolved the target or proposed the exact update, treat it as approval to continue the pending update workflow.
-11. When changing only the title, preserve the current due date and status unless the user explicitly asks to change them too.
-12. Keywords: update, edit, change, rename, title to, mark done, complete, completed, is done, reopen, due date, deadline, reschedule, postpone.
-13. If intent is read-only summary/count/overview, do not use this skill.
-14. In the responses, never mention internal action/tool names or IDs (for example `00000000-0000-0000-0000-000000000001`, `fetch_todos`, `update_todos`, or `update_todos_due_date`).
-15. Do not expose the fetched todo ID to the user.
+8. Do not ask the user to wait, do not narrate that you will call tools, and do not ask for confirmation again when the user already requested the update clearly.
+9. If the user confirms with a short follow-up like "yes" after you just resolved the target or proposed the exact update, treat it as approval to continue the pending update workflow.
+10. When changing only the title, preserve the current due date and status unless the user explicitly asks to change them too.
+11. Keywords: update, edit, change, rename, title to, mark done, complete, completed, is done, reopen, due date, deadline, reschedule, postpone.
+12. If intent is read-only summary/count/overview, do not use this skill.
 
 Preferred flow:
 - Detect update intent and target todo(s).

@@ -44,11 +44,44 @@ export interface ErrorResponse {
   };
 }
 
+export type ChatMessageState = 'COMPLETED' | 'FAILED';
+export type ChatMessageApprovalStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'AUTO_REJECTED'
+  | 'EXPIRED';
+
+export interface SelectedSkill {
+  name: string;
+  source: string;
+  tools: string[];
+}
+
+export interface ChatMessageActionDetail {
+  action_call_id: string;
+  name?: string;
+  input?: string;
+  text?: string;
+  output?: string;
+  message_state?: ChatMessageState;
+  error_message?: string;
+  approval_status?: ChatMessageApprovalStatus;
+  approval_decision_reason?: string;
+  approval_decided_at?: string;
+  action_executed?: boolean;
+  output_truncated?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   created_at: string;
+  turn_id?: string;
+  selected_skills?: SelectedSkill[];
+  action_details?: ChatMessageActionDetail[];
+  action_executed?: boolean;
 }
 
 export interface ChatHistoryResp {

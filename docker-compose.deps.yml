@@ -82,7 +82,7 @@ services:
 models:
   qwen3:
     model: qwen3:4B-F16
-    context_size: 16384
+    context_size: 65536
     runtime_flags:
       - "--batch-size"
       - "1024"

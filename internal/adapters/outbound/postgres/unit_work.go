@@ -6,26 +6,28 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/squirrel"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 )
 
-// UnitOfWork implements the domain.UnitOfWork interface for Postgres.
+// UnitOfWork is the Postgres implementation of transaction.UnitOfWork.
 type UnitOfWork struct {
 	db *sql.DB
 	tx *sql.Tx
 }
 
-// NewUnitOfWork creates a new instance of UnitOfWork.
+// NewUnitOfWork builds a UnitOfWork bound to a database handle.
 func NewUnitOfWork(db *sql.DB) *UnitOfWork {
 	return &UnitOfWork{
 		db: db,
 	}
 }
 
-// Execute runs the provided function within a database transaction.
-func (u *UnitOfWork) Execute(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
+// Execute opens a transaction, runs fn, and commits or rolls back.
+func (u *UnitOfWork) Execute(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -50,45 +52,35 @@ func (u *UnitOfWork) Execute(ctx context.Context, fn func(context.Context, domai
 	return tx.Commit()
 }
 
-// Todo returns the TodoRepository for this UnitOfWork.
-func (u *UnitOfWork) Todo() domain.TodoRepository {
+// Todo returns a todo repository bound to the current runner (tx when present).
+func (u *UnitOfWork) Todo() todo.Repository {
 	return NewTodoRepository(u.getBaseRunner())
 }
 
-// Conversation returns the ConversationRepository for this UnitOfWork.
-func (u *UnitOfWork) Conversation() domain.ConversationRepository {
+// Conversation returns a conversation repository bound to the current runner.
+func (u *UnitOfWork) Conversation() assistant.ConversationRepository {
 	return NewConversationRepository(u.getBaseRunner())
 }
 
-// ChatMessage returns the ChatMessageRepository for this UnitOfWork.
-func (u *UnitOfWork) ChatMessage() domain.ChatMessageRepository {
+// ChatMessage returns a chat message repository bound to the current runner.
+func (u *UnitOfWork) ChatMessage() assistant.ChatMessageRepository {
 	return NewChatMessageRepository(u.getBaseRunner())
 }
 
-// Outbox returns the OutboxRepository for this UnitOfWork.
-func (u *UnitOfWork) Outbox() domain.OutboxRepository {
+// Outbox returns an outbox repository bound to the current runner.
+func (u *UnitOfWork) Outbox() outbox.Repository {
 	return NewOutboxRepository(u.getBaseRunner())
 }
 
-func (u *UnitOfWork) ConversationSummary() domain.ConversationSummaryRepository {
+// ConversationSummary returns a conversation summary repository bound to the current runner.
+func (u *UnitOfWork) ConversationSummary() assistant.ConversationSummaryRepository {
 	return NewConversationSummaryRepository(u.getBaseRunner())
 }
 
-// getBaseRunner returns the appropriate BaseRunner (transaction or DB) for the UnitOfWork.
+// getBaseRunner picks the transaction runner when available, otherwise the DB handle.
 func (u *UnitOfWork) getBaseRunner() squirrel.BaseRunner {
 	if u.tx != nil {
 		return u.tx
 	}
 	return u.db
-}
-
-// InitUnitOfWork is responsible for initializing the UnitOfWork dependency.
-type InitUnitOfWork struct {
-	DB *sql.DB `resolve:""`
-}
-
-// Initialize registers the UnitOfWork in the dependency container.
-func (iuw InitUnitOfWork) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[domain.UnitOfWork](NewUnitOfWork(iuw.DB))
-	return ctx, nil
 }

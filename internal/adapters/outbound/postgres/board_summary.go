@@ -7,9 +7,8 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/squirrel"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -24,7 +23,7 @@ var (
 	}
 )
 
-// BoardSummaryRepository is a PostgreSQL implementation of domain.BoardSummaryRepository.
+// BoardSummaryRepository is a PostgreSQL implementation of todo.BoardSummaryRepository.
 type BoardSummaryRepository struct {
 	db    *sql.DB
 	pqsql squirrel.StatementBuilderType
@@ -39,7 +38,7 @@ func NewBoardSummaryRepository(db *sql.DB) BoardSummaryRepository {
 }
 
 // StoreSummary stores a board summary in the database, updating if it already exists.
-func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary domain.BoardSummary) error {
+func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary todo.BoardSummary) error {
 	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
 		attribute.String("summary_id", summary.ID.String()),
 		attribute.String("model", summary.Model),
@@ -80,11 +79,11 @@ func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary doma
 }
 
 // GetLatestSummary retrieves the most recently generated board summary.
-func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (domain.BoardSummary, bool, error) {
+func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (todo.BoardSummary, bool, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	var summary domain.BoardSummary
+	var summary todo.BoardSummary
 	var contentJSON []byte
 
 	err := bsr.pqsql.
@@ -105,26 +104,27 @@ func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (domain.
 
 	if telemetry.RecordErrorAndStatus(span, err) {
 		if err == sql.ErrNoRows {
-			return domain.BoardSummary{}, false, nil
+			return todo.BoardSummary{}, false, nil
 		}
-		return domain.BoardSummary{}, false, err
+		return todo.BoardSummary{}, false, err
 	}
 
 	// Unmarshal the JSON content
 	err = json.Unmarshal(contentJSON, &summary.Content)
 	if telemetry.RecordErrorAndStatus(span, err) {
-		return domain.BoardSummary{}, false, fmt.Errorf("failed to unmarshal summary content: %w", err)
+		return todo.BoardSummary{}, false, fmt.Errorf("failed to unmarshal summary content: %w", err)
 	}
 
 	return summary, true, nil
 }
 
-func (bsr BoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (domain.BoardSummaryContent, error) {
+// CalculateSummaryContent computes aggregate board summary sections from todo data.
+func (bsr BoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (todo.BoardSummaryContent, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	var countsJSON, overdueJSON, nearDeadlineJSON, nextUpJSON []byte
-	var content domain.BoardSummaryContent
+	var content todo.BoardSummaryContent
 
 	err := bsr.pqsql.
 		Select(
@@ -138,21 +138,21 @@ func (bsr BoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (
 		QueryRowContext(spanCtx).
 		Scan(&countsJSON, &overdueJSON, &nearDeadlineJSON, &nextUpJSON)
 	if telemetry.RecordErrorAndStatus(span, err) {
-		return domain.BoardSummaryContent{}, err
+		return todo.BoardSummaryContent{}, err
 	}
 
 	// Unmarshal each field into the struct
 	if err := json.Unmarshal(countsJSON, &content.Counts); err != nil {
-		return domain.BoardSummaryContent{}, fmt.Errorf("counts unmarshal error: %w", err)
+		return todo.BoardSummaryContent{}, fmt.Errorf("counts unmarshal error: %w", err)
 	}
 	if err := json.Unmarshal(overdueJSON, &content.Overdue); err != nil {
-		return domain.BoardSummaryContent{}, fmt.Errorf("overdue unmarshal error: %w", err)
+		return todo.BoardSummaryContent{}, fmt.Errorf("overdue unmarshal error: %w", err)
 	}
 	if err := json.Unmarshal(nearDeadlineJSON, &content.NearDeadline); err != nil {
-		return domain.BoardSummaryContent{}, fmt.Errorf("near_deadline unmarshal error: %w", err)
+		return todo.BoardSummaryContent{}, fmt.Errorf("near_deadline unmarshal error: %w", err)
 	}
 	if err := json.Unmarshal(nextUpJSON, &content.NextUp); err != nil {
-		return domain.BoardSummaryContent{}, fmt.Errorf("next_up unmarshal error: %w", err)
+		return todo.BoardSummaryContent{}, fmt.Errorf("next_up unmarshal error: %w", err)
 	}
 
 	return content, nil
@@ -205,14 +205,3 @@ next_tasks AS (
         LIMIT 5
     ) sub
 )`
-
-// InitBoardSummaryRepository is a Symbiont initializer for BoardSummaryRepository.
-type InitBoardSummaryRepository struct {
-	DB *sql.DB `resolve:""`
-}
-
-// Initialize registers the BoardSummaryRepository in the dependency container.
-func (ibsr InitBoardSummaryRepository) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[domain.BoardSummaryRepository](NewBoardSummaryRepository(ibsr.DB))
-	return ctx, nil
-}

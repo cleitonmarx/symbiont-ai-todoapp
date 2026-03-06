@@ -2,14 +2,13 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +20,7 @@ func TestUnitOfWork_Execute(t *testing.T) {
 
 	tests := map[string]struct {
 		setupMock func(sqlmock.Sqlmock)
-		fn        func(ctx context.Context, uow domain.UnitOfWork) error
+		fn        func(ctx context.Context, scope transaction.Scope) error
 		expectErr bool
 	}{
 		"success-commit": {
@@ -32,8 +31,8 @@ func TestUnitOfWork_Execute(t *testing.T) {
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				m.ExpectCommit()
 			},
-			fn: func(ctx context.Context, uow domain.UnitOfWork) error {
-				return uow.Todo().DeleteTodo(ctx, todoID)
+			fn: func(ctx context.Context, scope transaction.Scope) error {
+				return scope.Todo().DeleteTodo(ctx, todoID)
 			},
 			expectErr: false,
 		},
@@ -45,8 +44,8 @@ func TestUnitOfWork_Execute(t *testing.T) {
 					WillReturnError(errors.New("delete error"))
 				m.ExpectRollback()
 			},
-			fn: func(ctx context.Context, uow domain.UnitOfWork) error {
-				return uow.Todo().DeleteTodo(ctx, todoID)
+			fn: func(ctx context.Context, scope transaction.Scope) error {
+				return scope.Todo().DeleteTodo(ctx, todoID)
 			},
 			expectErr: true,
 		},
@@ -54,7 +53,7 @@ func TestUnitOfWork_Execute(t *testing.T) {
 			setupMock: func(m sqlmock.Sqlmock) {
 				m.ExpectBegin().WillReturnError(errors.New("begin error"))
 			},
-			fn: func(ctx context.Context, uow domain.UnitOfWork) error {
+			fn: func(ctx context.Context, scope transaction.Scope) error {
 				return nil
 			},
 			expectErr: true,
@@ -67,8 +66,8 @@ func TestUnitOfWork_Execute(t *testing.T) {
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				m.ExpectCommit().WillReturnError(errors.New("commit error"))
 			},
-			fn: func(ctx context.Context, uow domain.UnitOfWork) error {
-				return uow.Todo().DeleteTodo(ctx, todoID)
+			fn: func(ctx context.Context, scope transaction.Scope) error {
+				return scope.Todo().DeleteTodo(ctx, todoID)
 			},
 			expectErr: true,
 		},
@@ -80,8 +79,8 @@ func TestUnitOfWork_Execute(t *testing.T) {
 					WillReturnError(errors.New("delete error"))
 				m.ExpectRollback().WillReturnError(errors.New("rollback error"))
 			},
-			fn: func(ctx context.Context, uow domain.UnitOfWork) error {
-				return uow.Todo().DeleteTodo(ctx, todoID)
+			fn: func(ctx context.Context, scope transaction.Scope) error {
+				return scope.Todo().DeleteTodo(ctx, todoID)
 			},
 			expectErr: true,
 		},
@@ -134,7 +133,7 @@ func TestUnitOfWork_Outbox(t *testing.T) {
 	outbox := uow.Outbox()
 
 	assert.NotNil(t, outbox)
-	assert.IsType(t, OutboxRepository{}, outbox)
+	assert.IsType(t, Repository{}, outbox)
 }
 
 func TestUnitOfWork_Conversation(t *testing.T) {
@@ -229,12 +228,12 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 	mock.ExpectExec("INSERT INTO outbox_events (id,entity_type,entity_id,topic,event_type,payload,status,retry_count,max_retries,last_error,dedupe_key,available_at,processed_at,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING").
 		WithArgs(
 			sqlmock.AnyArg(),
-			string(domain.OutboxEntityType_Todo),
+			string(outbox.EntityType_Todo),
 			todoID,
-			string(domain.OutboxTopic_Todo),
+			string(outbox.Topic_Todo),
 			"TODO.DELETED",
 			sqlmock.AnyArg(),
-			string(domain.OutboxStatus_Pending),
+			string(outbox.Status_Pending),
 			0,
 			5,
 			nil,
@@ -247,16 +246,16 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 	mock.ExpectCommit()
 
 	uow := NewUnitOfWork(db)
-	err = uow.Execute(context.Background(), func(ctx context.Context, uow domain.UnitOfWork) error {
+	err = uow.Execute(context.Background(), func(ctx context.Context, scope transaction.Scope) error {
 		// Delete todo
 		if err := uow.Todo().DeleteTodo(ctx, todoID); err != nil {
 			return err
 		}
 
 		// Publish event - both should use same transaction
-		event := domain.TodoEvent{
+		event := outbox.TodoEvent{
 			TodoID:    todoID,
-			Type:      domain.EventType_TODO_DELETED,
+			Type:      outbox.EventType_TODO_DELETED,
 			CreatedAt: time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC),
 		}
 		return uow.Outbox().CreateTodoEvent(ctx, event)
@@ -264,19 +263,4 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestInitUnitOfWork_Initialize(t *testing.T) {
-	t.Parallel()
-
-	i := &InitUnitOfWork{
-		DB: &sql.DB{},
-	}
-
-	_, err := i.Initialize(context.Background())
-	assert.NoError(t, err)
-
-	_, err = depend.Resolve[domain.UnitOfWork]()
-	assert.NoError(t, err)
-
 }

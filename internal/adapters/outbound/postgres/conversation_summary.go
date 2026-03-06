@@ -5,9 +5,8 @@ import (
 	"database/sql"
 
 	"github.com/Masterminds/squirrel"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +18,7 @@ var conversationSummaryFields = []string{
 	"updated_at",
 }
 
-// ConversationSummaryRepository is a PostgreSQL implementation of domain.ConversationSummaryRepository.
+// ConversationSummaryRepository is a PostgreSQL implementation of assistant.ConversationSummaryRepository.
 type ConversationSummaryRepository struct {
 	sb squirrel.StatementBuilderType
 }
@@ -35,11 +34,11 @@ func NewConversationSummaryRepository(br squirrel.BaseRunner) ConversationSummar
 func (r ConversationSummaryRepository) GetConversationSummary(
 	ctx context.Context,
 	conversationID uuid.UUID,
-) (domain.ConversationSummary, bool, error) {
+) (assistant.ConversationSummary, bool, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	var summary domain.ConversationSummary
+	var summary assistant.ConversationSummary
 	err := r.sb.
 		Select(conversationSummaryFields...).
 		From("conversations_summary").
@@ -55,16 +54,16 @@ func (r ConversationSummaryRepository) GetConversationSummary(
 		)
 	if telemetry.RecordErrorAndStatus(span, err) {
 		if err == sql.ErrNoRows {
-			return domain.ConversationSummary{}, false, nil
+			return assistant.ConversationSummary{}, false, nil
 		}
-		return domain.ConversationSummary{}, false, err
+		return assistant.ConversationSummary{}, false, err
 	}
 
 	return summary, true, nil
 }
 
 // StoreConversationSummary stores the latest conversation summary.
-func (r ConversationSummaryRepository) StoreConversationSummary(ctx context.Context, summary domain.ConversationSummary) error {
+func (r ConversationSummaryRepository) StoreConversationSummary(ctx context.Context, summary assistant.ConversationSummary) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -104,15 +103,4 @@ func (r ConversationSummaryRepository) DeleteConversationSummary(ctx context.Con
 	}
 
 	return nil
-}
-
-// InitConversationSummaryRepository is a Symbiont initializer for ConversationSummaryRepository.
-type InitConversationSummaryRepository struct {
-	DB *sql.DB `resolve:""`
-}
-
-// Initialize registers the ConversationSummaryRepository in the dependency container.
-func (i InitConversationSummaryRepository) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[domain.ConversationSummaryRepository](NewConversationSummaryRepository(i.DB))
-	return ctx, nil
 }

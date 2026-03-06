@@ -2,14 +2,13 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
+
 	"encoding/json"
 	"sort"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -52,7 +51,7 @@ func NewChatMessageRepository(br sq.BaseRunner) ChatMessageRepository {
 }
 
 // CreateChatMessages persists chat messages for the global conversation.
-func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages []domain.ChatMessage) error {
+func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages []assistant.ChatMessage) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -109,8 +108,8 @@ func (r ChatMessageRepository) ListChatMessages(
 	conversationID uuid.UUID,
 	page int,
 	pageSize int,
-	options ...domain.ListChatMessagesOption,
-) ([]domain.ChatMessage, bool, error) {
+	options ...assistant.ListChatMessagesOption,
+) ([]assistant.ChatMessage, bool, error) {
 	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
 		attribute.Int("page", page),
 		attribute.Int("page_size", pageSize),
@@ -118,7 +117,7 @@ func (r ChatMessageRepository) ListChatMessages(
 	))
 	defer span.End()
 
-	queryOptions := domain.ListChatMessagesParams{}
+	queryOptions := assistant.ListChatMessagesParams{}
 	for _, option := range options {
 		if option != nil {
 			option(&queryOptions)
@@ -179,10 +178,10 @@ func (r ChatMessageRepository) ListChatMessages(
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var msgs []domain.ChatMessage
+	var msgs []assistant.ChatMessage
 	for rows.Next() {
 		var (
-			m                  domain.ChatMessage
+			m                  assistant.ChatMessage
 			tcJSON             []byte
 			selectedSkillsJSON []byte
 		)
@@ -260,15 +259,4 @@ func (r ChatMessageRepository) DeleteConversationMessages(ctx context.Context, c
 		return err
 	}
 	return nil
-}
-
-// InitChatMessageRepository is a Symbiont initializer for ChatMessageRepository.
-type InitChatMessageRepository struct {
-	DB *sql.DB `resolve:""`
-}
-
-// Initialize registers the ChatMessageRepository in the dependency container.
-func (r InitChatMessageRepository) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[domain.ChatMessageRepository](NewChatMessageRepository(r.DB))
-	return ctx, nil
 }

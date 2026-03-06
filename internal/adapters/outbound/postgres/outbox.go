@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/google/uuid"
 )
@@ -31,20 +31,20 @@ var (
 	}
 )
 
-// OutboxRepository implements the domain.OutboxRepository interface for Postgres.
-type OutboxRepository struct {
+// Repository implements the event.Repository interface for Postgres.
+type Repository struct {
 	sb squirrel.StatementBuilderType
 }
 
-// NewOutboxRepository creates a new instance of OutboxRepository.
-func NewOutboxRepository(br squirrel.BaseRunner) OutboxRepository {
-	return OutboxRepository{
+// NewOutboxRepository creates a new instance of Repository.
+func NewOutboxRepository(br squirrel.BaseRunner) Repository {
+	return Repository{
 		sb: squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar).RunWith(br),
 	}
 }
 
 // CreateTodoEvent records a new event in the outbox.
-func (op OutboxRepository) CreateTodoEvent(ctx context.Context, event domain.TodoEvent) error {
+func (op Repository) CreateTodoEvent(ctx context.Context, event outbox.TodoEvent) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -72,12 +72,12 @@ func (op OutboxRepository) CreateTodoEvent(ctx context.Context, event domain.Tod
 		).
 		Values(
 			uuid.New(),
-			string(domain.OutboxEntityType_Todo),
+			string(outbox.EntityType_Todo),
 			event.TodoID,
-			string(domain.OutboxTopic_Todo),
+			string(outbox.Topic_Todo),
 			string(event.Type),
 			contentJSON,
-			string(domain.OutboxStatus_Pending),
+			string(outbox.Status_Pending),
 			0,
 			5,
 			nil,
@@ -97,7 +97,7 @@ func (op OutboxRepository) CreateTodoEvent(ctx context.Context, event domain.Tod
 }
 
 // CreateChatEvent records a new chat message event in the outbox.
-func (op OutboxRepository) CreateChatEvent(ctx context.Context, event domain.ChatMessageEvent) error {
+func (op Repository) CreateChatEvent(ctx context.Context, event outbox.ChatMessageEvent) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -120,12 +120,12 @@ func (op OutboxRepository) CreateChatEvent(ctx context.Context, event domain.Cha
 		).
 		Values(
 			uuid.New(),
-			string(domain.OutboxEntityType_ChatMessage),
+			string(outbox.EntityType_ChatMessage),
 			event.ChatMessageID,
-			string(domain.OutboxTopic_ChatMessages),
+			string(outbox.Topic_ChatMessages),
 			string(event.Type),
 			contentJSON,
-			string(domain.OutboxStatus_Pending),
+			string(outbox.Status_Pending),
 			0,
 			5,
 			nil,
@@ -144,13 +144,13 @@ func (op OutboxRepository) CreateChatEvent(ctx context.Context, event domain.Cha
 }
 
 // FetchPendingEvents retrieves a batch of pending outbox events from the database.
-func (op OutboxRepository) FetchPendingEvents(ctx context.Context, limit int) ([]domain.OutboxEvent, error) {
+func (op Repository) FetchPendingEvents(ctx context.Context, limit int) ([]outbox.Event, error) {
 	rows, err := op.sb.
 		Select(
 			outboxEventFields...,
 		).
 		From("outbox_events").
-		Where(squirrel.Eq{"status": string(domain.OutboxStatus_Pending)}).
+		Where(squirrel.Eq{"status": string(outbox.Status_Pending)}).
 		Where(squirrel.LtOrEq{"available_at": time.Now().UTC()}).
 		OrderBy("available_at ASC", "created_at ASC").
 		Limit(uint64(limit)).
@@ -162,9 +162,9 @@ func (op OutboxRepository) FetchPendingEvents(ctx context.Context, limit int) ([
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var events []domain.OutboxEvent
+	var events []outbox.Event
 	for rows.Next() {
-		var oe domain.OutboxEvent
+		var oe outbox.Event
 		var payloadBytes []byte
 
 		err := rows.Scan(
@@ -200,7 +200,7 @@ func (op OutboxRepository) FetchPendingEvents(ctx context.Context, limit int) ([
 }
 
 // UpdateEvent updates the status, retry count, and last error of an outbox event.
-func (op OutboxRepository) UpdateEvent(ctx context.Context, eventID uuid.UUID, status domain.OutboxStatus, retryCount int, lastError string) error {
+func (op Repository) UpdateEvent(ctx context.Context, eventID uuid.UUID, status outbox.Status, retryCount int, lastError string) error {
 	qry := op.sb.Update("outbox_events").
 		Set("status", string(status)).
 		Set("retry_count", retryCount).
@@ -208,11 +208,11 @@ func (op OutboxRepository) UpdateEvent(ctx context.Context, eventID uuid.UUID, s
 		Where(squirrel.Eq{"id": eventID})
 
 	switch status {
-	case domain.OutboxStatus_Pending:
+	case outbox.Status_Pending:
 		qry = qry.
 			Set("available_at", time.Now().UTC().Add(backoffDelay(retryCount))).
 			Set("processed_at", nil)
-	case domain.OutboxStatus_Processed:
+	case outbox.Status_Processed:
 		qry = qry.Set("processed_at", time.Now().UTC())
 	}
 
@@ -222,7 +222,7 @@ func (op OutboxRepository) UpdateEvent(ctx context.Context, eventID uuid.UUID, s
 }
 
 // DeleteEvent deletes an outbox event from the database.
-func (op OutboxRepository) DeleteEvent(ctx context.Context, eventID uuid.UUID) error {
+func (op Repository) DeleteEvent(ctx context.Context, eventID uuid.UUID) error {
 	_, err := op.sb.
 		Delete("outbox_events").
 		Where(squirrel.Eq{"id": eventID}).

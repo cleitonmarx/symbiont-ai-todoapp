@@ -4,26 +4,25 @@ import (
 	"context"
 	"sync"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 )
 
 // Dispatcher coordinates action approval decisions using in-memory Go channels.
 type Dispatcher struct {
 	mu      sync.Mutex
-	waiters map[domain.AssistantActionApprovalKey]chan domain.AssistantActionApprovalDecision
+	waiters map[assistant.ActionApprovalKey]chan assistant.ActionApprovalDecision
 }
 
 // NewDispatcher creates a new in-memory channel-backed approval dispatcher.
 func NewDispatcher() *Dispatcher {
 	return &Dispatcher{
-		waiters: make(map[domain.AssistantActionApprovalKey]chan domain.AssistantActionApprovalDecision),
+		waiters: make(map[assistant.ActionApprovalKey]chan assistant.ActionApprovalDecision),
 	}
 }
 
 // Wait blocks until a decision is dispatched for the given key, or context is canceled.
-func (d *Dispatcher) Wait(ctx context.Context, key domain.AssistantActionApprovalKey) (domain.AssistantActionApprovalDecision, error) {
+func (d *Dispatcher) Wait(ctx context.Context, key assistant.ActionApprovalKey) (assistant.ActionApprovalDecision, error) {
 	_, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -34,12 +33,12 @@ func (d *Dispatcher) Wait(ctx context.Context, key domain.AssistantActionApprova
 	case decision := <-ch:
 		return decision, nil
 	case <-ctx.Done():
-		return domain.AssistantActionApprovalDecision{}, ctx.Err()
+		return assistant.ActionApprovalDecision{}, ctx.Err()
 	}
 }
 
 // Dispatch sends a decision to an active waiter. Returns false when no waiter exists.
-func (d *Dispatcher) Dispatch(ctx context.Context, decision domain.AssistantActionApprovalDecision) bool {
+func (d *Dispatcher) Dispatch(ctx context.Context, decision assistant.ActionApprovalDecision) bool {
 	_, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -52,16 +51,18 @@ func (d *Dispatcher) Dispatch(ctx context.Context, decision domain.AssistantActi
 	return true
 }
 
-func (d *Dispatcher) registerWaiter(key domain.AssistantActionApprovalKey) chan domain.AssistantActionApprovalDecision {
+// registerWaiter creates and registers a new channel for the given key, returning the channel to wait on.
+func (d *Dispatcher) registerWaiter(key assistant.ActionApprovalKey) chan assistant.ActionApprovalDecision {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	ch := make(chan domain.AssistantActionApprovalDecision, 1)
+	ch := make(chan assistant.ActionApprovalDecision, 1)
 	d.waiters[key] = ch
 	return ch
 }
 
-func (d *Dispatcher) unregisterWaiter(key domain.AssistantActionApprovalKey, expected chan domain.AssistantActionApprovalDecision) {
+// unregisterWaiter removes the channel for the given key if it matches the expected channel, preventing leaks.
+func (d *Dispatcher) unregisterWaiter(key assistant.ActionApprovalKey, expected chan assistant.ActionApprovalDecision) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -71,7 +72,8 @@ func (d *Dispatcher) unregisterWaiter(key domain.AssistantActionApprovalKey, exp
 	}
 }
 
-func (d *Dispatcher) takeWaiter(key domain.AssistantActionApprovalKey) chan domain.AssistantActionApprovalDecision {
+// takeWaiter atomically retrieves and removes the channel for the given key, returning nil if no waiter exists.
+func (d *Dispatcher) takeWaiter(key assistant.ActionApprovalKey) chan assistant.ActionApprovalDecision {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -81,12 +83,4 @@ func (d *Dispatcher) takeWaiter(key domain.AssistantActionApprovalKey) chan doma
 	}
 	delete(d.waiters, key)
 	return ch
-}
-
-// InitDispatcher is used to initialize and register the dispatcher.
-type InitDispatcher struct{}
-
-func (i InitDispatcher) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[domain.AssistantActionApprovalDispatcher](NewDispatcher())
-	return ctx, nil
 }

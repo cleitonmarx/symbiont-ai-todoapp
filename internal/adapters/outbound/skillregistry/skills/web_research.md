@@ -1,5 +1,8 @@
 ---
 name: web-research
+display_name: Web Research
+aliases: [research, web]
+description: Search the web and extract information from external pages and URLs.
 use_when: User asks for external information, references, recent updates, requirements, rankings, recommendations, or content from websites, webpages, the internet, or explicit URLs (for example "research the web", "research the internet", "look up current rules", "open this website", "fetch this webpage", "tell me the page title", "search the web for sources", "find the best options online", "research the top options online", "research the top 3 options online", "look up current requirements online", "find the best places online", "research the top options in a place", "find the best hotels in a city online", "find grocery stores near me", "find nearby stores in my area", "look up local businesses near me", "search for businesses in my city", "research stores near my location"), or asks to inspect a specific external page and extract information from it.
 avoid_when: Request is fully about internal todo CRUD with no need for external sources, or asks to use research as an input step inside a larger plan, checklist, roadmap, or task breakdown instead of as the final answer. If research is only one step and the requested final deliverable is a plan or created tasks, prefer the planning skill (for example "research and create a plan" or "research and create tasks").
 priority: 60

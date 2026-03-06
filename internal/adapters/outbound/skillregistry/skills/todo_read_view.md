@@ -1,5 +1,8 @@
 ---
 name: todo-read-view
+display_name: List and View
+aliases: [list, read, view]
+description: List, search, filter, and sort existing todos or adjust the current view.
 use_when: User asks to fetch/list/show/display/find/filter/sort/paginate existing todos (for example "list my open todos", "show done tasks", "show done dentist todos", "list my open todos due from March 1-7", "list my todos due next month", "list my open todos due this week", "show my overdue todos", "find todos related to taxes"), or asks to adjust how todos are shown (for example my screen, my list, current view, what I am seeing, shown first).
 avoid_when: User asks for concise/brief summary, recap, overview, counts, paragraph-only output, asks to create/update/reschedule/delete todos, asks to research something and then create tasks or a plan, or asks to access external websites, webpages, URLs, or internet content.
 priority: 96

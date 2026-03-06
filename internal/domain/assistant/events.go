@@ -12,21 +12,21 @@ type EventType string
 
 const (
 	// EventType_TurnStarted indicates a chat turn has started.
-	EventType_TurnStarted            EventType = "turn_started"
+	EventType_TurnStarted EventType = "turn_started"
 	// EventType_MessageDelta indicates a streaming text delta event.
-	EventType_MessageDelta           EventType = "message_delta"
+	EventType_MessageDelta EventType = "message_delta"
 	// EventType_ActionRequested indicates the model requested a tool/action call.
-	EventType_ActionRequested        EventType = "action_requested"
+	EventType_ActionRequested EventType = "action_requested"
 	// EventType_ActionApprovalRequired indicates an action is waiting for human approval.
 	EventType_ActionApprovalRequired EventType = "action_approval_required"
 	// EventType_ActionApprovalResolved indicates an action approval decision was made.
 	EventType_ActionApprovalResolved EventType = "action_approval_resolved"
 	// EventType_ActionStarted indicates action execution started.
-	EventType_ActionStarted          EventType = "action_started"
+	EventType_ActionStarted EventType = "action_started"
 	// EventType_ActionCompleted indicates action execution completed.
-	EventType_ActionCompleted        EventType = "action_completed"
+	EventType_ActionCompleted EventType = "action_completed"
 	// EventType_TurnCompleted indicates a chat turn finished.
-	EventType_TurnCompleted          EventType = "turn_completed"
+	EventType_TurnCompleted EventType = "turn_completed"
 )
 
 // Usage contains token usage for one assistant turn.

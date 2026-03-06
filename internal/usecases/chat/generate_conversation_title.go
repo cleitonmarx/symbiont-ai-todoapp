@@ -23,18 +23,18 @@ const (
 	MAX_CHAT_MESSAGES_FOR_TITLE = 20
 
 	// CHAT_TITLE_MAX_TOKENS is the maximum token budget for title generation.
-	CHAT_TITLE_MAX_TOKENS  = 32
+	CHAT_TITLE_MAX_TOKENS = 32
 	// CHAT_TITLE_TEMPERATURE controls generation randomness for titles.
 	CHAT_TITLE_TEMPERATURE = 0.2
 	// CHAT_TITLE_TOP_P controls nucleus sampling for title generation.
-	CHAT_TITLE_TOP_P       = 0.7
+	CHAT_TITLE_TOP_P = 0.7
 
 	// MAX_PROMPT_MESSAGE_CHARS is the maximum character count kept per message in the title prompt.
 	MAX_PROMPT_MESSAGE_CHARS = 220
 	// MAX_PROMPT_SUMMARY_CHARS is the maximum character count kept from summary context in the title prompt.
 	MAX_PROMPT_SUMMARY_CHARS = 420
 	// MAX_PROMPT_TASK_TOPICS is the maximum number of task topics included in the title prompt.
-	MAX_PROMPT_TASK_TOPICS   = 3
+	MAX_PROMPT_TASK_TOPICS = 3
 )
 
 //go:embed prompts/conversation-title.yml

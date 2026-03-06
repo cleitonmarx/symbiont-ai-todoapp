@@ -35,7 +35,7 @@ const (
 	// CHAT_SUMMARY_TEMPERATURE controls generation randomness for chat summaries.
 	CHAT_SUMMARY_TEMPERATURE = 0.2
 	// CHAT_SUMMARY_TOP_P controls nucleus sampling for chat summaries.
-	CHAT_SUMMARY_TOP_P       = 0.7
+	CHAT_SUMMARY_TOP_P = 0.7
 
 	// CHAT_SUMMARY_FREQUENCY_PENALTY reduces repetition in generated summaries.
 	CHAT_SUMMARY_FREQUENCY_PENALTY = 0.7
@@ -50,15 +50,15 @@ const (
 	SUMMARY_OPEN_LOOPS_FIELD = "open_loops"
 
 	// DEFAULT_SUMMARY_FIELD_VALUE is the default fallback value for missing summary fields.
-	DEFAULT_SUMMARY_FIELD_VALUE       = "none"
+	DEFAULT_SUMMARY_FIELD_VALUE = "none"
 	// DEFAULT_SUMMARY_OUTPUT_FORMAT is the default output format for summaries.
-	DEFAULT_SUMMARY_OUTPUT_FORMAT     = "concise text"
+	DEFAULT_SUMMARY_OUTPUT_FORMAT = "concise text"
 	// MAX_SUMMARY_CONTENT_CHARS is the maximum character count for summarized message content.
-	MAX_SUMMARY_CONTENT_CHARS         = 320
+	MAX_SUMMARY_CONTENT_CHARS = 320
 	// MAX_SUMMARY_TOOL_CONTENT_CHARS is the maximum character count for summarized tool content.
-	MAX_SUMMARY_TOOL_CONTENT_CHARS    = 180
+	MAX_SUMMARY_TOOL_CONTENT_CHARS = 180
 	// MAX_SUMMARY_ERROR_CONTENT_CHARS is the maximum character count for summarized tool error content.
-	MAX_SUMMARY_ERROR_CONTENT_CHARS   = 180
+	MAX_SUMMARY_ERROR_CONTENT_CHARS = 180
 	// MAX_SUMMARY_ACTION_CALLS_PER_LINE is the maximum number of action calls serialized per summary line.
 	MAX_SUMMARY_ACTION_CALLS_PER_LINE = 5
 )

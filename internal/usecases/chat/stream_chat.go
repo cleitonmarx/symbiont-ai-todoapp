@@ -25,12 +25,12 @@ const (
 	// CHAT_TEMPERATURE controls generation randomness for streamed chat turns.
 	CHAT_TEMPERATURE = 0.2
 	// CHAT_TOP_P controls nucleus sampling for streamed chat turns.
-	CHAT_TOP_P       = 0.7
+	CHAT_TOP_P = 0.7
 
 	// MAX_SKILLS_PROMPT_CHARS is the maximum size of injected skill prompt content.
 	MAX_SKILLS_PROMPT_CHARS = 4000
 	// MAX_RECOVERY_MESSAGES is the maximum number of recovery messages retained in loops.
-	MAX_RECOVERY_MESSAGES   = 8
+	MAX_RECOVERY_MESSAGES = 8
 )
 
 // StreamChatParams holds optional parameters for StreamChat execution.

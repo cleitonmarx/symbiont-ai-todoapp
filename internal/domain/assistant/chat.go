@@ -12,15 +12,15 @@ type ChatRole string
 
 const (
 	// ChatRole_User represents a user-authored message.
-	ChatRole_User      ChatRole = "user"
+	ChatRole_User ChatRole = "user"
 	// ChatRole_Assistant represents an assistant-authored message.
 	ChatRole_Assistant ChatRole = "assistant"
 	// ChatRole_System represents a system instruction message.
-	ChatRole_System    ChatRole = "system"
+	ChatRole_System ChatRole = "system"
 	// ChatRole_Developer represents a developer instruction message.
 	ChatRole_Developer ChatRole = "developer"
 	// ChatRole_Tool represents a tool result message.
-	ChatRole_Tool      ChatRole = "tool"
+	ChatRole_Tool ChatRole = "tool"
 )
 
 // ChatMessageState represents the persistence state of a chat message.

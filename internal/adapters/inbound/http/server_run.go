@@ -11,7 +11,9 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/board"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 	"github.com/cleitonmarx/symbiont/introspection"
 	"github.com/cleitonmarx/symbiont/introspection/mermaid"
 	"github.com/rs/cors"
@@ -21,20 +23,20 @@ var _ gen.ServerInterface = (*TodoAppServer)(nil)
 
 // TodoAppServer is the REST API and UI HTTP server for the TodoApp application.
 type TodoAppServer struct {
-	Port                        int                           `config:"HTTP_PORT" default:"8080"`
-	Logger                      *log.Logger                   `resolve:""`
-	ListTodosUseCase            usecases.ListTodos            `resolve:""`
-	CreateTodoUseCase           usecases.CreateTodo           `resolve:""`
-	UpdateTodoUseCase           usecases.UpdateTodo           `resolve:""`
-	DeleteTodoUseCase           usecases.DeleteTodo           `resolve:""`
-	GetBoardSummaryUseCase      usecases.GetBoardSummary      `resolve:""`
-	ListConversationsUseCase    usecases.ListConversations    `resolve:""`
-	UpdateConversationUseCase   usecases.UpdateConversation   `resolve:""`
-	ListChatMessagesUseCase     usecases.ListChatMessages     `resolve:""`
-	SubmitActionApprovalUseCase usecases.SubmitActionApproval `resolve:""`
-	DeleteConversationUseCase   usecases.DeleteConversation   `resolve:""`
-	ListAvailableModelsUseCase  usecases.ListAvailableModels  `resolve:""`
-	StreamChatUseCase           usecases.StreamChat           `resolve:""`
+	Port                        int                       `config:"HTTP_PORT" default:"8080"`
+	Logger                      *log.Logger               `resolve:""`
+	ListTodosUseCase            todo.List                 `resolve:""`
+	CreateTodoUseCase           todo.Create               `resolve:""`
+	UpdateTodoUseCase           todo.Update               `resolve:""`
+	DeleteTodoUseCase           todo.Delete               `resolve:""`
+	GetBoardSummaryUseCase      board.GetBoardSummary     `resolve:""`
+	ListConversationsUseCase    chat.ListConversations    `resolve:""`
+	UpdateConversationUseCase   chat.UpdateConversation   `resolve:""`
+	ListChatMessagesUseCase     chat.ListChatMessages     `resolve:""`
+	SubmitActionApprovalUseCase chat.SubmitActionApproval `resolve:""`
+	DeleteConversationUseCase   chat.DeleteConversation   `resolve:""`
+	ListAvailableModelsUseCase  chat.ListAvailableModels  `resolve:""`
+	StreamChatUseCase           chat.StreamChat           `resolve:""`
 	introspectionReport         introspection.Report
 }
 

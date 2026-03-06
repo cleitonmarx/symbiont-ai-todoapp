@@ -11,17 +11,18 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 type submitActionApprovalStub struct {
-	execute func(ctx context.Context, input usecases.SubmitActionApprovalInput) error
+	execute func(ctx context.Context, input chat.SubmitActionApprovalInput) error
 }
 
-func (s submitActionApprovalStub) Execute(ctx context.Context, input usecases.SubmitActionApprovalInput) error {
+func (s submitActionApprovalStub) Execute(ctx context.Context, input chat.SubmitActionApprovalInput) error {
 	return s.execute(ctx, input)
 }
 
@@ -33,7 +34,7 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 
 	tests := map[string]struct {
 		body           []byte
-		setupUsecase   func(t *testing.T) usecases.SubmitActionApproval
+		setupUsecase   func(t *testing.T) chat.SubmitActionApproval
 		expectedStatus int
 		expectedError  *gen.ErrorResp
 	}{
@@ -46,15 +47,15 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 				Status:         gen.ActionApprovalStatusAPPROVED,
 				Reason:         common.Ptr("approved"),
 			}),
-			setupUsecase: func(t *testing.T) usecases.SubmitActionApproval {
+			setupUsecase: func(t *testing.T) chat.SubmitActionApproval {
 				t.Helper()
 				return submitActionApprovalStub{
-					execute: func(ctx context.Context, input usecases.SubmitActionApprovalInput) error {
+					execute: func(ctx context.Context, input chat.SubmitActionApprovalInput) error {
 						assert.Equal(t, conversationID, input.ConversationID)
 						assert.Equal(t, turnID, input.TurnID)
 						assert.Equal(t, "call-1", input.ActionCallID)
 						assert.Equal(t, "delete_todo", input.ActionName)
-						assert.Equal(t, domain.ChatMessageApprovalStatus_Approved, input.Status)
+						assert.Equal(t, assistant.ChatMessageApprovalStatus_Approved, input.Status)
 						assert.Equal(t, common.Ptr("approved"), input.Reason)
 						return nil
 					},
@@ -64,10 +65,10 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 		},
 		"invalid-json": {
 			body: []byte(`{"invalid"`),
-			setupUsecase: func(t *testing.T) usecases.SubmitActionApproval {
+			setupUsecase: func(t *testing.T) chat.SubmitActionApproval {
 				t.Helper()
 				return submitActionApprovalStub{
-					execute: func(ctx context.Context, input usecases.SubmitActionApprovalInput) error {
+					execute: func(ctx context.Context, input chat.SubmitActionApprovalInput) error {
 						t.Fatal("usecase should not be called")
 						return nil
 					},
@@ -88,11 +89,11 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 				ActionCallId:   "call-3",
 				Status:         gen.ActionApprovalStatusREJECTED,
 			}),
-			setupUsecase: func(t *testing.T) usecases.SubmitActionApproval {
+			setupUsecase: func(t *testing.T) chat.SubmitActionApproval {
 				t.Helper()
 				return submitActionApprovalStub{
-					execute: func(ctx context.Context, input usecases.SubmitActionApprovalInput) error {
-						return domain.NewValidationErr("status must be APPROVED or REJECTED")
+					execute: func(ctx context.Context, input chat.SubmitActionApprovalInput) error {
+						return core.NewValidationErr("status must be APPROVED or REJECTED")
 					},
 				}
 			},
@@ -111,10 +112,10 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 				ActionCallId:   "call-4",
 				Status:         gen.ActionApprovalStatusREJECTED,
 			}),
-			setupUsecase: func(t *testing.T) usecases.SubmitActionApproval {
+			setupUsecase: func(t *testing.T) chat.SubmitActionApproval {
 				t.Helper()
 				return submitActionApprovalStub{
-					execute: func(ctx context.Context, input usecases.SubmitActionApprovalInput) error {
+					execute: func(ctx context.Context, input chat.SubmitActionApprovalInput) error {
 						return errors.New("pubsub down")
 					},
 				}

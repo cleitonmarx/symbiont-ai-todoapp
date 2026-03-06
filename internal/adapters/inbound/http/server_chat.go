@@ -8,13 +8,13 @@ import (
 	"net/http"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"go.opentelemetry.io/otel/trace"
 )
 
-// List chat messages for a conversation with pagination
+// ListChatMessages lists chat messages for a conversation with pagination.
 // (GET /api/conversations/{conversation_id}/messages)
 func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request, params gen.ListChatMessagesParams) {
 	messages, hasMore, err := api.ListChatMessagesUseCase.Query(r.Context(), params.ConversationId, params.Page, params.PageSize)
@@ -45,7 +45,7 @@ func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request
 
 }
 
-// StreamChat handles streaming assistant chat responses
+// StreamChat handles streaming assistant chat responses.
 // (POST /api/chat/stream)
 func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	req := gen.StreamChatJSONRequestBody{}
@@ -76,12 +76,12 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	var options []usecases.StreamChatOption
+	var options []chat.StreamChatOption
 	if req.ConversationId != nil {
-		options = append(options, usecases.WithConversationID(*req.ConversationId))
+		options = append(options, chat.WithConversationID(*req.ConversationId))
 	}
 
-	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(ctx context.Context, eventType domain.AssistantEventType, data any) error {
+	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(ctx context.Context, eventType assistant.EventType, data any) error {
 		dataBytes, err := json.Marshal(data)
 		if err != nil {
 			return err
@@ -106,7 +106,7 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ListAvailableModels returns the list of available assistant models for chat
+// ListAvailableModels returns the list of available assistant models for chat.
 // (GET /api/models)
 func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Request) {
 	models, err := api.ListAvailableModelsUseCase.Query(r.Context())
@@ -117,7 +117,7 @@ func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Requ
 
 	rp := gen.ModelListResp{}
 	for _, m := range models {
-		if m.Kind != domain.ModelKindAssistant {
+		if m.Kind != assistant.ModelKindAssistant {
 			continue
 		}
 		rp.Models = append(rp.Models, gen.ModelInfo{

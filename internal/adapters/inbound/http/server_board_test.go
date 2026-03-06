@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/board"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,24 +24,24 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 	generatedAt := time.Date(2026, 1, 22, 10, 30, 0, 0, time.UTC)
 
 	tests := map[string]struct {
-		setupUsecases  func(*usecases.MockGetBoardSummary)
+		setupUsecases  func(*board.MockGetBoardSummary)
 		expectedStatus int
 		expectedBody   *gen.BoardSummary
 		expectedError  *gen.ErrorResp
 	}{
 		"success": {
-			setupUsecases: func(m *usecases.MockGetBoardSummary) {
-				m.EXPECT().Query(mock.Anything).Return(domain.BoardSummary{
+			setupUsecases: func(m *board.MockGetBoardSummary) {
+				m.EXPECT().Query(mock.Anything).Return(todo.BoardSummary{
 					ID:            fixedUUID,
 					Model:         "ai/gpt-oss:latest",
 					GeneratedAt:   generatedAt,
 					SourceVersion: 1,
-					Content: domain.BoardSummaryContent{
-						Counts: domain.TodoStatusCounts{
+					Content: todo.BoardSummaryContent{
+						Counts: todo.StatusCounts{
 							Open: 5,
 							Done: 3,
 						},
-						NextUp: []domain.NextUpTodoItem{
+						NextUp: []todo.NextUpItem{
 							{
 								Title:  "Buy groceries",
 								Reason: "Due tomorrow",
@@ -71,10 +72,10 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 			},
 		},
 		"summary-not-found": {
-			setupUsecases: func(m *usecases.MockGetBoardSummary) {
+			setupUsecases: func(m *board.MockGetBoardSummary) {
 				m.EXPECT().
 					Query(mock.Anything).
-					Return(domain.BoardSummary{}, domain.NewNotFoundErr("board summary not found"))
+					Return(todo.BoardSummary{}, core.NewNotFoundErr("board summary not found"))
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedError: &gen.ErrorResp{
@@ -85,10 +86,10 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 			},
 		},
 		"use-case-error": {
-			setupUsecases: func(m *usecases.MockGetBoardSummary) {
+			setupUsecases: func(m *board.MockGetBoardSummary) {
 				m.EXPECT().
 					Query(mock.Anything).
-					Return(domain.BoardSummary{}, errors.New("database error"))
+					Return(todo.BoardSummary{}, errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
 			expectedError: &gen.ErrorResp{
@@ -102,7 +103,7 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockGetBoardSummary := usecases.NewMockGetBoardSummary(t)
+			mockGetBoardSummary := board.NewMockGetBoardSummary(t)
 			tt.setupUsecases(mockGetBoardSummary)
 
 			server := &TodoAppServer{

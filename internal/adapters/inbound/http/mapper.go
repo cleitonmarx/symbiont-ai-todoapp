@@ -2,7 +2,9 @@ package http
 
 import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
@@ -10,10 +12,10 @@ import (
 func toError(err error) gen.ErrorResp {
 	errResp := gen.ErrorResp{}
 	switch e := err.(type) {
-	case *domain.ValidationErr:
+	case *core.ValidationErr:
 		errResp.Error.Code = gen.BADREQUEST
 		errResp.Error.Message = e.Error()
-	case *domain.NotFoundErr:
+	case *core.NotFoundErr:
 		errResp.Error.Code = gen.NOTFOUND
 		errResp.Error.Message = e.Error()
 	default:
@@ -23,7 +25,7 @@ func toError(err error) gen.ErrorResp {
 	return errResp
 }
 
-func toTodo(t domain.Todo) gen.Todo {
+func toTodo(t todo.Todo) gen.Todo {
 	return gen.Todo{
 		Id:        openapi_types.UUID(t.ID),
 		Title:     t.Title,
@@ -34,7 +36,7 @@ func toTodo(t domain.Todo) gen.Todo {
 	}
 }
 
-func toConversation(c domain.Conversation) gen.Conversation {
+func toConversation(c assistant.Conversation) gen.Conversation {
 	return gen.Conversation{
 		Id:          c.ID,
 		Title:       c.Title,
@@ -44,7 +46,7 @@ func toConversation(c domain.Conversation) gen.Conversation {
 	}
 }
 
-func toChatMessage(msg domain.ChatMessage) gen.ChatMessage {
+func toChatMessage(msg assistant.ChatMessage) gen.ChatMessage {
 	resp := gen.ChatMessage{
 		Id:        msg.ID,
 		Role:      gen.ChatMessageRole(msg.ChatRole),
@@ -105,7 +107,7 @@ func toChatMessage(msg domain.ChatMessage) gen.ChatMessage {
 	return resp
 }
 
-func toBoardSummary(summary domain.BoardSummary) gen.BoardSummary {
+func toBoardSummary(summary todo.BoardSummary) gen.BoardSummary {
 	resp := gen.BoardSummary{
 		Counts: gen.TodoStatusCounts{
 			DONE: summary.Content.Counts.Done,

@@ -50,6 +50,17 @@ func TestSkillRelevancePromptMatrix_WebResearch(t *testing.T) {
 			wantTop:     "web-research",
 			wantContain: []string{"web-research"},
 		},
+		"web-research-after-summary-and-view-context-shift": {
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: "Make a concise summary of my open todos from June."},
+				{Role: assistant.ChatRole_Assistant, Content: "You have 35 open todos for June, spanning personal tasks and work-related planning."},
+				{Role: assistant.ChatRole_User, Content: "Show it on my view."},
+				{Role: assistant.ChatRole_Assistant, Content: "Your view is now filtered to show all open todos due in June."},
+				{Role: assistant.ChatRole_User, Content: "Research on the web the events happening in Maple Ridge in June."},
+			},
+			wantTop:     "web-research",
+			wantContain: []string{"web-research"},
+		},
 	}
 
 	for name, tc := range tests {

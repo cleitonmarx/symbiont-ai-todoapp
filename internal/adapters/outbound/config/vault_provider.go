@@ -81,30 +81,4 @@ func (vp VaultProvider) Get(ctx context.Context, key string) (string, error) {
 	return strValue, nil
 }
 
-// Ensure VaultProvider implements config.Provider interface.
 var _ config.Provider = (*VaultProvider)(nil)
-
-// InitVaultProvider is used to initialize and register the VaultProvider
-type InitVaultProvider struct {
-	Server     string `config:"VAULT_ADDR"`
-	Token      string `config:"VAULT_TOKEN"`
-	MountPath  string `config:"VAULT_MOUNT_PATH"`
-	SecretPath string `config:"VAULT_SECRET_PATH"`
-}
-
-// Initialize sets up the VaultProvider and registers it in a composite provider as a global config provider.
-func (ivp InitVaultProvider) Initialize(ctx context.Context) (context.Context, error) {
-	vaultProvider, err := NewVaultProvider(ivp.Server, ivp.Token, ivp.MountPath, ivp.SecretPath)
-	if err != nil {
-		return ctx, fmt.Errorf("failed to initialize Vault provider: %w", err)
-	}
-
-	config.SetGlobalProvider(
-		config.NewCompositeProvider(
-			config.EnvVarProvider{},
-			vaultProvider,
-		),
-	)
-
-	return ctx, nil
-}

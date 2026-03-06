@@ -4,14 +4,13 @@ import (
 	"context"
 
 	pubsubV2 "cloud.google.com/go/pubsub/v2"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
-// PubSubEventPublisher implements domain.EventPublisher using Google Cloud Pub/Sub
+// PubSubEventPublisher implements outbox.EventPublisher using Google Cloud Pub/Sub
 type PubSubEventPublisher struct {
 	Client *pubsubV2.Client
 }
@@ -22,7 +21,7 @@ func NewPubSubEventPublisher(client *pubsubV2.Client) PubSubEventPublisher {
 }
 
 // PublishEvent publishes the given event to the appropriate Pub/Sub topic
-func (p PubSubEventPublisher) PublishEvent(ctx context.Context, event domain.OutboxEvent) error {
+func (p PubSubEventPublisher) PublishEvent(ctx context.Context, event outbox.Event) error {
 	spanCtx, span := telemetry.Start(ctx,
 		trace.WithAttributes(
 			attribute.String("event_id", event.ID.String()),
@@ -42,15 +41,4 @@ func (p PubSubEventPublisher) PublishEvent(ctx context.Context, event domain.Out
 
 	_, err := result.Get(ctx)
 	return err
-}
-
-// InitPublisher initializes the TodoEventPublisher implementation
-type InitPublisher struct {
-	Client *pubsubV2.Client `resolve:""`
-}
-
-// Initialize registers the PubSubEventPublisher as the implementation of TodoEventPublisher
-func (i *InitPublisher) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[domain.EventPublisher](NewPubSubEventPublisher(i.Client))
-	return ctx, nil
 }

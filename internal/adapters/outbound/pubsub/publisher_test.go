@@ -8,8 +8,7 @@ import (
 	pubsubV2 "cloud.google.com/go/pubsub/v2"
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"cloud.google.com/go/pubsub/v2/pstest"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/option"
@@ -25,12 +24,12 @@ func TestPubSubEventPublisher_PublishEvent(t *testing.T) {
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	tests := map[string]struct {
-		event           domain.OutboxEvent
+		event           outbox.Event
 		expectErr       bool
 		validateMessage func(*testing.T, *pubsubV2.Client, string)
 	}{
 		"success-publish-event": {
-			event: domain.OutboxEvent{
+			event: outbox.Event{
 				ID:         eventID,
 				EventType:  "TODO_CREATED",
 				EntityID:   todoID,
@@ -63,7 +62,7 @@ func TestPubSubEventPublisher_PublishEvent(t *testing.T) {
 			},
 		},
 		"error-topic-not-found": {
-			event: domain.OutboxEvent{
+			event: outbox.Event{
 				ID:         eventID,
 				EventType:  "TODO_CREATED",
 				EntityID:   todoID,
@@ -137,19 +136,4 @@ func TestPubSubEventPublisher_PublishEvent(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestInitPublisher_Initialize(t *testing.T) {
-	t.Parallel()
-
-	init := &InitPublisher{
-		Client: &pubsubV2.Client{},
-	}
-
-	_, err := init.Initialize(context.Background())
-	assert.NoError(t, err)
-
-	res, err := depend.Resolve[domain.EventPublisher]()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, res)
 }

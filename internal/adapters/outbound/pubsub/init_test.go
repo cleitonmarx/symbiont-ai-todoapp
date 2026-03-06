@@ -6,6 +6,7 @@ import (
 
 	pubsubV2 "cloud.google.com/go/pubsub/v2"
 	"cloud.google.com/go/pubsub/v2/pstest"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/option"
@@ -40,4 +41,19 @@ func TestInitClient_Initialize(t *testing.T) {
 	assert.NoError(t, err)
 
 	init.Close()
+}
+
+func TestInitPublisher_Initialize(t *testing.T) {
+	t.Parallel()
+
+	init := &InitPublisher{
+		Client: &pubsubV2.Client{},
+	}
+
+	_, err := init.Initialize(context.Background())
+	assert.NoError(t, err)
+
+	res, err := depend.Resolve[outbox.EventPublisher]()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, res)
 }

@@ -5,7 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/semantic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +26,7 @@ func TestRegistry_RankSkills(t *testing.T) {
 		"empty-current-input-returns-none": {
 			queryVectors: semanticEncoderParams{},
 			embedded: []embeddedSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "todo-read-view"}, useVector: []float64{1, 0}},
+				{definition: assistant.SkillDefinition{Name: "todo-read-view"}, useVector: []float64{1, 0}},
 			},
 			currentInput: "   ",
 			minScore:     0.10,
@@ -40,11 +41,11 @@ func TestRegistry_RankSkills(t *testing.T) {
 			},
 			embedded: []embeddedSkill{
 				{
-					definition: domain.AssistantSkillDefinition{Name: "todo-read-view", Priority: 10},
+					definition: assistant.SkillDefinition{Name: "todo-read-view", Priority: 10},
 					useVector:  []float64{1, 0},
 				},
 				{
-					definition: domain.AssistantSkillDefinition{Name: "todo-summary", Priority: 80},
+					definition: assistant.SkillDefinition{Name: "todo-summary", Priority: 80},
 					useVector:  []float64{0.9, 0.4},
 				},
 			},
@@ -66,7 +67,7 @@ func TestRegistry_RankSkills(t *testing.T) {
 			},
 			embedded: []embeddedSkill{
 				{
-					definition: domain.AssistantSkillDefinition{Name: "todo-update"},
+					definition: assistant.SkillDefinition{Name: "todo-update"},
 					useVector:  []float64{1, 0},
 				},
 			},
@@ -84,7 +85,7 @@ func TestRegistry_RankSkills(t *testing.T) {
 			},
 			embedded: []embeddedSkill{
 				{
-					definition: domain.AssistantSkillDefinition{Name: "web-research"},
+					definition: assistant.SkillDefinition{Name: "web-research"},
 					useVector:  []float64{0.1, 1},
 				},
 			},
@@ -98,9 +99,9 @@ func TestRegistry_RankSkills(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			var encoder domain.SemanticEncoder
+			var encoder semantic.Encoder
 			if strings.TrimSpace(tt.currentInput) == "" {
-				encoder = domain.NewMockSemanticEncoder(t)
+				encoder = semantic.NewMockEncoder(t)
 			} else {
 				encoder = newSemanticEncoder(t, "embed-model", tt.queryVectors)
 			}
@@ -139,58 +140,58 @@ func TestRegistry_ChooseRanking(t *testing.T) {
 	}{
 		"returns-latest-when-context-empty-and-latest-above-min": {
 			latestOnly: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "web-research"}, score: 0.30},
+				{definition: assistant.SkillDefinition{Name: "web-research"}, score: 0.30},
 			},
 			wantNames: []string{"web-research"},
 		},
 		"returns-none-when-context-empty-and-latest-below-min": {
 			latestOnly: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "web-research"}, score: 0.20},
+				{definition: assistant.SkillDefinition{Name: "web-research"}, score: 0.20},
 			},
 		},
 		"returns-context-when-latest-empty": {
 			contextRanked: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "todo-update"}, score: 0.40},
+				{definition: assistant.SkillDefinition{Name: "todo-update"}, score: 0.40},
 			},
 			wantNames: []string{"todo-update"},
 		},
 		"returns-context-when-top-skill-matches": {
 			contextRanked: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "todo-read-view"}, score: 0.41},
+				{definition: assistant.SkillDefinition{Name: "todo-read-view"}, score: 0.41},
 			},
 			latestOnly: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "todo-read-view"}, score: 0.60},
+				{definition: assistant.SkillDefinition{Name: "todo-read-view"}, score: 0.60},
 			},
 			wantNames: []string{"todo-read-view"},
 		},
 		"overrides-when-latest-significantly-higher": {
 			contextRanked: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "todo-goal-planner"}, score: 0.30},
+				{definition: assistant.SkillDefinition{Name: "todo-goal-planner"}, score: 0.30},
 			},
 			latestOnly: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "web-research"}, score: 0.36},
-				{definition: domain.AssistantSkillDefinition{Name: "todo-summary"}, score: 0.20},
+				{definition: assistant.SkillDefinition{Name: "web-research"}, score: 0.36},
+				{definition: assistant.SkillDefinition{Name: "todo-summary"}, score: 0.20},
 			},
 			wantNames: []string{"web-research", "todo-summary"},
 		},
 		"overrides-when-prior-context-and-latest-has-clear-lead": {
 			contextRanked: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "todo-goal-planner"}, score: 0.32},
+				{definition: assistant.SkillDefinition{Name: "todo-goal-planner"}, score: 0.32},
 			},
 			latestOnly: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "web-research"}, score: 0.22},
-				{definition: domain.AssistantSkillDefinition{Name: "todo-summary"}, score: 0.18},
+				{definition: assistant.SkillDefinition{Name: "web-research"}, score: 0.22},
+				{definition: assistant.SkillDefinition{Name: "todo-summary"}, score: 0.18},
 			},
 			hasPriorContext: true,
 			wantNames:       []string{"web-research", "todo-summary"},
 		},
 		"keeps-context-when-no-prior-context-for-soft-override": {
 			contextRanked: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "todo-goal-planner"}, score: 0.32},
+				{definition: assistant.SkillDefinition{Name: "todo-goal-planner"}, score: 0.32},
 			},
 			latestOnly: []scoredSkill{
-				{definition: domain.AssistantSkillDefinition{Name: "web-research"}, score: 0.22},
-				{definition: domain.AssistantSkillDefinition{Name: "todo-summary"}, score: 0.18},
+				{definition: assistant.SkillDefinition{Name: "web-research"}, score: 0.22},
+				{definition: assistant.SkillDefinition{Name: "todo-summary"}, score: 0.18},
 			},
 			wantNames: []string{"todo-goal-planner"},
 		},
@@ -213,9 +214,9 @@ func TestTrimRanked(t *testing.T) {
 	t.Parallel()
 
 	scored := []scoredSkill{
-		{definition: domain.AssistantSkillDefinition{Name: "a"}, score: 0.9},
-		{definition: domain.AssistantSkillDefinition{Name: "b"}, score: 0.8},
-		{definition: domain.AssistantSkillDefinition{Name: "c"}, score: 0.7},
+		{definition: assistant.SkillDefinition{Name: "a"}, score: 0.9},
+		{definition: assistant.SkillDefinition{Name: "b"}, score: 0.8},
+		{definition: assistant.SkillDefinition{Name: "c"}, score: 0.7},
 	}
 
 	tests := map[string]struct {
@@ -274,13 +275,13 @@ func TestRegistry_ScoreSkill(t *testing.T) {
 	}{
 		"returns-false-without-use-similarity": {
 			queryVectors: []weightedQueryVector{{weight: 1, vector: nil}},
-			skill:        embeddedSkill{definition: domain.AssistantSkillDefinition{Name: "x"}, useVector: []float64{1, 0}},
+			skill:        embeddedSkill{definition: assistant.SkillDefinition{Name: "x"}, useVector: []float64{1, 0}},
 			wantOk:       false,
 		},
 		"blocks-when-avoid-is-strong-and-use-is-not-strong": {
 			queryVectors: []weightedQueryVector{{weight: 1, vector: []float64{1, 0}}},
 			skill: embeddedSkill{
-				definition:  domain.AssistantSkillDefinition{Name: "x"},
+				definition:  assistant.SkillDefinition{Name: "x"},
 				useVector:   []float64{0.4, 1},
 				avoidVector: []float64{1, 0},
 			},
@@ -289,7 +290,7 @@ func TestRegistry_ScoreSkill(t *testing.T) {
 		"applies-avoid-penalty-and-priority": {
 			queryVectors: []weightedQueryVector{{weight: 1, vector: []float64{1, 0}}},
 			skill: embeddedSkill{
-				definition:  domain.AssistantSkillDefinition{Name: "x", Priority: 50},
+				definition:  assistant.SkillDefinition{Name: "x", Priority: 50},
 				useVector:   []float64{1, 0},
 				avoidVector: []float64{0.6, 0.8},
 			},

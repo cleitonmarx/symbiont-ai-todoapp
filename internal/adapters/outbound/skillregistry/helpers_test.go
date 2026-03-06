@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/semantic"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -20,20 +21,20 @@ type skillVector struct {
 	Avoid []float64
 }
 
-func newSemanticEncoder(t *testing.T, model string, params semanticEncoderParams) *domain.MockSemanticEncoder {
+func newSemanticEncoder(t *testing.T, model string, params semanticEncoderParams) *semantic.MockEncoder {
 	t.Helper()
 
-	enc := domain.NewMockSemanticEncoder(t)
+	enc := semantic.NewMockEncoder(t)
 	enc.EXPECT().
 		VectorizeQuery(mock.Anything, model, mock.Anything).
-		RunAndReturn(func(_ context.Context, _ string, query string) (domain.EmbeddingVector, error) {
+		RunAndReturn(func(_ context.Context, _ string, query string) (semantic.EmbeddingVector, error) {
 			if err, ok := params.QueryErrors[query]; ok {
-				return domain.EmbeddingVector{}, err
+				return semantic.EmbeddingVector{}, err
 			}
 			if vec, ok := params.QueryVectors[query]; ok {
-				return domain.EmbeddingVector{Vector: vec}, nil
+				return semantic.EmbeddingVector{Vector: vec}, nil
 			}
-			return domain.EmbeddingVector{}, nil
+			return semantic.EmbeddingVector{}, nil
 		})
 
 	for name, vector := range params.SkillVectors {
@@ -42,11 +43,11 @@ func newSemanticEncoder(t *testing.T, model string, params semanticEncoderParams
 			VectorizeSkillDefinition(
 				mock.Anything,
 				model,
-				mock.MatchedBy(func(skill domain.AssistantSkillDefinition) bool { return skill.Name == skillName }),
+				mock.MatchedBy(func(skill assistant.SkillDefinition) bool { return skill.Name == skillName }),
 			).
 			Return(
-				domain.EmbeddingVector{Vector: vector.Use},
-				domain.EmbeddingVector{Vector: vector.Avoid},
+				semantic.EmbeddingVector{Vector: vector.Use},
+				semantic.EmbeddingVector{Vector: vector.Avoid},
 				nil,
 			).
 			Once()
@@ -57,9 +58,9 @@ func newSemanticEncoder(t *testing.T, model string, params semanticEncoderParams
 			VectorizeSkillDefinition(
 				mock.Anything,
 				model,
-				mock.MatchedBy(func(skill domain.AssistantSkillDefinition) bool { return skill.Name == skillName }),
+				mock.MatchedBy(func(skill assistant.SkillDefinition) bool { return skill.Name == skillName }),
 			).
-			Return(domain.EmbeddingVector{}, domain.EmbeddingVector{}, err).
+			Return(semantic.EmbeddingVector{}, semantic.EmbeddingVector{}, err).
 			Once()
 	}
 

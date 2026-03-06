@@ -3,7 +3,7 @@ package skillregistry
 import (
 	"testing"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,7 +12,7 @@ func TestBuildSelectionInputs(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		messages    []domain.AssistantMessage
+		messages    []assistant.Message
 		maxChars    int
 		recentLimit int
 		wantCurrent string
@@ -20,10 +20,10 @@ func TestBuildSelectionInputs(t *testing.T) {
 	}{
 		{
 			name: "current-and-recent-user-inputs",
-			messages: []domain.AssistantMessage{
-				{Role: domain.ChatRole_User, Content: "plan trip to tokyo"},
-				{Role: domain.ChatRole_Assistant, Content: "What dates?"},
-				{Role: domain.ChatRole_User, Content: "april 5 to 18"},
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: "plan trip to tokyo"},
+				{Role: assistant.ChatRole_Assistant, Content: "What dates?"},
+				{Role: assistant.ChatRole_User, Content: "april 5 to 18"},
 			},
 			maxChars:    400,
 			recentLimit: 3,
@@ -32,11 +32,11 @@ func TestBuildSelectionInputs(t *testing.T) {
 		},
 		{
 			name: "respects-recent-limit",
-			messages: []domain.AssistantMessage{
-				{Role: domain.ChatRole_User, Content: "u1"},
-				{Role: domain.ChatRole_User, Content: "u2"},
-				{Role: domain.ChatRole_User, Content: "u3"},
-				{Role: domain.ChatRole_User, Content: "u4"},
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: "u1"},
+				{Role: assistant.ChatRole_User, Content: "u2"},
+				{Role: assistant.ChatRole_User, Content: "u3"},
+				{Role: assistant.ChatRole_User, Content: "u4"},
 			},
 			maxChars:    400,
 			recentLimit: 2,
@@ -45,10 +45,10 @@ func TestBuildSelectionInputs(t *testing.T) {
 		},
 		{
 			name: "short-follow-up-with-location-inherits-assistant-question",
-			messages: []domain.AssistantMessage{
-				{Role: domain.ChatRole_User, Content: "build a plan for an in-person conference trip"},
-				{Role: domain.ChatRole_Assistant, Content: "Which city is it in?"},
-				{Role: domain.ChatRole_User, Content: "Berlin."},
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: "build a plan for an in-person conference trip"},
+				{Role: assistant.ChatRole_Assistant, Content: "Which city is it in?"},
+				{Role: assistant.ChatRole_User, Content: "Berlin."},
 			},
 			maxChars:    400,
 			recentLimit: 3,
@@ -57,8 +57,8 @@ func TestBuildSelectionInputs(t *testing.T) {
 		},
 		{
 			name: "returns-empty-without-user-message",
-			messages: []domain.AssistantMessage{
-				{Role: domain.ChatRole_System, Content: "system"},
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_System, Content: "system"},
 			},
 			maxChars:    400,
 			recentLimit: 3,

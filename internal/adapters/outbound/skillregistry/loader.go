@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -24,12 +24,12 @@ type skillFrontMatter struct {
 
 // LoadSkillsFromFS reads markdown skills from a filesystem tree and returns
 // them sorted by priority.
-func LoadSkillsFromFS(skillsFS fs.FS) ([]domain.AssistantSkillDefinition, error) {
+func LoadSkillsFromFS(skillsFS fs.FS) ([]assistant.SkillDefinition, error) {
 	if skillsFS == nil {
 		return nil, errors.New("skills fs is nil")
 	}
 
-	skills := make([]domain.AssistantSkillDefinition, 0)
+	skills := make([]assistant.SkillDefinition, 0)
 	err := fs.WalkDir(skillsFS, ".", func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -69,11 +69,11 @@ func LoadSkillsFromFS(skillsFS fs.FS) ([]domain.AssistantSkillDefinition, error)
 }
 
 // parseSkillMarkdown parses one markdown skill file into a domain definition.
-func parseSkillMarkdown(path string, content []byte) (domain.AssistantSkillDefinition, error) {
+func parseSkillMarkdown(path string, content []byte) (assistant.SkillDefinition, error) {
 	raw := strings.ReplaceAll(string(content), "\r\n", "\n")
 	lines := strings.Split(raw, "\n")
 	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
-		return domain.AssistantSkillDefinition{}, errors.New("missing YAML frontmatter opening delimiter")
+		return assistant.SkillDefinition{}, errors.New("missing YAML frontmatter opening delimiter")
 	}
 
 	endIdx := -1
@@ -84,26 +84,26 @@ func parseSkillMarkdown(path string, content []byte) (domain.AssistantSkillDefin
 		}
 	}
 	if endIdx == -1 {
-		return domain.AssistantSkillDefinition{}, errors.New("missing YAML frontmatter closing delimiter")
+		return assistant.SkillDefinition{}, errors.New("missing YAML frontmatter closing delimiter")
 	}
 
 	metaRaw := strings.Join(lines[1:endIdx], "\n")
 	var meta skillFrontMatter
 	if err := yaml.Unmarshal([]byte(metaRaw), &meta); err != nil {
-		return domain.AssistantSkillDefinition{}, fmt.Errorf("invalid YAML frontmatter: %w", err)
+		return assistant.SkillDefinition{}, fmt.Errorf("invalid YAML frontmatter: %w", err)
 	}
 
 	name := strings.TrimSpace(meta.Name)
 	if name == "" {
-		return domain.AssistantSkillDefinition{}, errors.New("skill name is required")
+		return assistant.SkillDefinition{}, errors.New("skill name is required")
 	}
 
 	body := strings.TrimSpace(strings.Join(lines[endIdx+1:], "\n"))
 	if body == "" {
-		return domain.AssistantSkillDefinition{}, errors.New("skill content is required")
+		return assistant.SkillDefinition{}, errors.New("skill content is required")
 	}
 
-	return domain.AssistantSkillDefinition{
+	return assistant.SkillDefinition{
 		Name:                  name,
 		UseWhen:               strings.TrimSpace(meta.UseWhen),
 		AvoidWhen:             strings.TrimSpace(meta.AvoidWhen),
@@ -144,12 +144,12 @@ func sanitizeStringList(values []string) []string {
 
 // copySkillDefinitions deep-copies slice fields so registry state is isolated
 // from caller-owned skill definitions.
-func copySkillDefinitions(skills []domain.AssistantSkillDefinition) []domain.AssistantSkillDefinition {
+func copySkillDefinitions(skills []assistant.SkillDefinition) []assistant.SkillDefinition {
 	if len(skills) == 0 {
 		return nil
 	}
 
-	copied := make([]domain.AssistantSkillDefinition, 0, len(skills))
+	copied := make([]assistant.SkillDefinition, 0, len(skills))
 	for _, skill := range skills {
 		tags := make([]string, len(skill.Tags))
 		copy(tags, skill.Tags)

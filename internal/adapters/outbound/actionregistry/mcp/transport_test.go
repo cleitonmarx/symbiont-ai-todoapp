@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestWithAPIKey(t *testing.T) {
@@ -38,7 +37,7 @@ func TestWithAPIKey(t *testing.T) {
 
 			client := withAPIKey(nil, tt.headerName, tt.apiKey)
 			resp, err := client.Get(server.URL)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			defer resp.Body.Close() //nolint:errcheck
 
 			assert.Equal(t, tt.wantValue, gotHeaderVal)
@@ -73,9 +72,9 @@ func TestAuthRoundTripper_RoundTrip(t *testing.T) {
 			}
 
 			req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			resp, err := transport.RoundTrip(req)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			defer resp.Body.Close() //nolint:errcheck
 		})
 	}

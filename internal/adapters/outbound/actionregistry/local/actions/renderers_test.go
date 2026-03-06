@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/stretchr/testify/assert"
 	"github.com/toon-format/toon-go"
 )
@@ -22,17 +22,17 @@ func TestActionResultRenderers(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		renderer   domain.ActionResultRenderer
-		actionCall domain.AssistantActionCall
-		result     domain.AssistantMessage
+		renderer   assistant.ActionResultRenderer
+		actionCall assistant.ActionCall
+		result     assistant.Message
 		want       string
 		wantOK     bool
 	}{
 		"create-todos": {
 			renderer:   createTodosRenderer{},
-			actionCall: domain.AssistantActionCall{Name: "create_todos"},
-			result: domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			actionCall: assistant.ActionCall{Name: "create_todos"},
+			result: assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: common.Ptr("call-1"),
 				Content: mustMarshal(t, struct {
 					Todos []struct {
@@ -57,9 +57,9 @@ func TestActionResultRenderers(t *testing.T) {
 		},
 		"update-todos": {
 			renderer:   updateTodosRenderer{},
-			actionCall: domain.AssistantActionCall{Name: "update_todos"},
-			result: domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			actionCall: assistant.ActionCall{Name: "update_todos"},
+			result: assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: common.Ptr("call-2"),
 				Content: mustMarshal(t, struct {
 					Todos []struct {
@@ -85,9 +85,9 @@ func TestActionResultRenderers(t *testing.T) {
 		},
 		"update-todos-due-date": {
 			renderer:   updateTodosDueDateRenderer{},
-			actionCall: domain.AssistantActionCall{Name: "update_todos_due_date"},
-			result: domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			actionCall: assistant.ActionCall{Name: "update_todos_due_date"},
+			result: assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: common.Ptr("call-3"),
 				Content: mustMarshal(t, struct {
 					Todos []struct {
@@ -112,12 +112,12 @@ func TestActionResultRenderers(t *testing.T) {
 		},
 		"delete-todos": {
 			renderer: deleteTodosRenderer{},
-			actionCall: domain.AssistantActionCall{
+			actionCall: assistant.ActionCall{
 				Name:  "delete_todos",
 				Input: `{"todos":[{"title":"Call Alice"}]}`,
 			},
-			result: domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			result: assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: common.Ptr("call-4"),
 				Content: mustMarshal(t, struct {
 					Todos []struct {
@@ -138,9 +138,9 @@ func TestActionResultRenderers(t *testing.T) {
 		},
 		"returns-false-for-malformed-content": {
 			renderer:   updateTodosRenderer{},
-			actionCall: domain.AssistantActionCall{Name: "update_todos"},
-			result: domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			actionCall: assistant.ActionCall{Name: "update_todos"},
+			result: assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: common.Ptr("call-5"),
 				Content:      "malformed",
 			},
@@ -154,7 +154,7 @@ func TestActionResultRenderers(t *testing.T) {
 			got, ok := tt.renderer.Render(tt.actionCall, tt.result)
 			assert.Equal(t, tt.wantOK, ok)
 			if tt.wantOK {
-				assert.Equal(t, domain.ChatRole_Assistant, got.Role)
+				assert.Equal(t, assistant.ChatRole_Assistant, got.Role)
 				assert.Equal(t, tt.want, got.Content)
 			}
 		})

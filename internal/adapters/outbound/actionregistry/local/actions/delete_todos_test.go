@@ -5,48 +5,51 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
+	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/toon-format/toon-go"
 )
 
-func TestBulkTodoDeleterAction(t *testing.T) {
+func TestDeleteTodosAction(t *testing.T) {
 	t.Parallel()
 
 	todoID1 := uuid.New()
 	todoID2 := uuid.New()
 
 	tests := map[string]struct {
-		setupMocks   func(*domain.MockUnitOfWork, *usecases.MockTodoDeleter)
-		functionCall domain.AssistantActionCall
-		validateResp func(t *testing.T, resp domain.AssistantMessage)
+		setupMocks   func(*transaction.MockUnitOfWork, *todouc.MockDeleter)
+		functionCall assistant.ActionCall
+		validateResp func(t *testing.T, resp assistant.Message)
 	}{
 		"delete-todos-success": {
-			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
+			setupMocks: func(uow *transaction.MockUnitOfWork, deleter *todouc.MockDeleter) {
+				scope := transaction.NewMockScope(t)
+
 				deleter.EXPECT().
-					Delete(mock.Anything, uow, todoID1).
+					Delete(mock.Anything, scope, todoID1).
 					Return(nil).
 					Once()
 				deleter.EXPECT().
-					Delete(mock.Anything, uow, todoID2).
+					Delete(mock.Anything, scope, todoID2).
 					Return(nil).
 					Once()
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
-						return fn(ctx, uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
+						return fn(ctx, scope)
 					}).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "delete_todos",
 				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Task 1"},{"id":"` + todoID2.String() + `","title":"Task 2"}]}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+			validateResp: func(t *testing.T, resp assistant.Message) {
 				payload := struct {
 					Todos []struct {
 						Deleted bool `toon:"deleted"`
@@ -57,56 +60,58 @@ func TestBulkTodoDeleterAction(t *testing.T) {
 			},
 		},
 		"delete-todos-invalid-arguments": {
-			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
+			setupMocks: func(uow *transaction.MockUnitOfWork, deleter *todouc.MockDeleter) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "delete_todos",
 				Input: `invalid json`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+			validateResp: func(t *testing.T, resp assistant.Message) {
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
 		"delete-todos-invalid-id": {
-			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
+			setupMocks: func(uow *transaction.MockUnitOfWork, deleter *todouc.MockDeleter) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "delete_todos",
 				Input: `{"todos":[{"id":"invalid-uuid","title":"Invalid Task"}]}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+			validateResp: func(t *testing.T, resp assistant.Message) {
 				assert.Contains(t, resp.Content, "invalid_todo_id")
 			},
 		},
 		"delete-todos-missing-title": {
-			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {},
-			functionCall: domain.AssistantActionCall{
+			setupMocks: func(uow *transaction.MockUnitOfWork, deleter *todouc.MockDeleter) {},
+			functionCall: assistant.ActionCall{
 				Name:  "delete_todos",
 				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"   "} ]}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+			validateResp: func(t *testing.T, resp assistant.Message) {
 				assert.Contains(t, resp.Content, "invalid_title")
 			},
 		},
 		"delete-todos-delete-error": {
-			setupMocks: func(uow *domain.MockUnitOfWork, deleter *usecases.MockTodoDeleter) {
+			setupMocks: func(uow *transaction.MockUnitOfWork, deleter *todouc.MockDeleter) {
+				scope := transaction.NewMockScope(t)
+
 				deleter.EXPECT().
-					Delete(mock.Anything, uow, todoID1).
+					Delete(mock.Anything, scope, todoID1).
 					Return(errors.New("delete error")).
 					Once()
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
-						return fn(ctx, uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
+						return fn(ctx, scope)
 					}).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "delete_todos",
 				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Task 1"}]}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+			validateResp: func(t *testing.T, resp assistant.Message) {
 				assert.Contains(t, resp.Content, "delete_todos_error")
 			},
 		},
@@ -114,11 +119,11 @@ func TestBulkTodoDeleterAction(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			uow := domain.NewMockUnitOfWork(t)
-			deleter := usecases.NewMockTodoDeleter(t)
+			uow := transaction.NewMockUnitOfWork(t)
+			deleter := todouc.NewMockDeleter(t)
 			tt.setupMocks(uow, deleter)
 
-			action := NewBulkTodoDeleterAction(uow, deleter)
+			action := NewDeleteTodosAction(uow, deleter)
 			assert.NotEmpty(t, action.StatusMessage())
 
 			definition := action.Definition()
@@ -126,7 +131,7 @@ func TestBulkTodoDeleterAction(t *testing.T) {
 			assert.NotEmpty(t, definition.Description)
 			assert.NotEmpty(t, definition.Input)
 
-			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
+			resp := action.Execute(context.Background(), tt.functionCall, []assistant.Message{})
 			tt.validateResp(t, resp)
 		})
 	}

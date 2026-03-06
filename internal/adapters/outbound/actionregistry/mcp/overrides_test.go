@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +14,7 @@ func TestParseToolOverrideDefinitions(t *testing.T) {
 
 	tests := map[string]struct {
 		content string
-		assert  func(*testing.T, map[string]domain.AssistantActionDefinition, error)
+		assert  func(*testing.T, map[string]assistant.ActionDefinition, error)
 	}{
 		"valid-yaml": {
 			content: `
@@ -32,7 +32,7 @@ tools:
   - name: "   "
     description: ignored
 `,
-			assert: func(t *testing.T, got map[string]domain.AssistantActionDefinition, err error) {
+			assert: func(t *testing.T, got map[string]assistant.ActionDefinition, err error) {
 				require.NoError(t, err)
 				require.Len(t, got, 1)
 				require.Contains(t, got, "search")
@@ -53,7 +53,7 @@ tools:
         - todos[].id
       timeout: 45s
 `,
-			assert: func(t *testing.T, got map[string]domain.AssistantActionDefinition, err error) {
+			assert: func(t *testing.T, got map[string]assistant.ActionDefinition, err error) {
 				require.NoError(t, err)
 				require.Contains(t, got, "delete_todos")
 				assert.True(t, got["delete_todos"].Approval.Required)
@@ -69,14 +69,14 @@ tools:
     approvals:
       timeout: 45
 `,
-			assert: func(t *testing.T, _ map[string]domain.AssistantActionDefinition, err error) {
+			assert: func(t *testing.T, _ map[string]assistant.ActionDefinition, err error) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "invalid approval timeout")
 			},
 		},
 		"invalid-yaml": {
 			content: "tools: [",
-			assert: func(t *testing.T, _ map[string]domain.AssistantActionDefinition, err error) {
+			assert: func(t *testing.T, _ map[string]assistant.ActionDefinition, err error) {
 				require.Error(t, err)
 			},
 		},
@@ -188,12 +188,12 @@ func TestApprovalOverrideHelpers(t *testing.T) {
 
 		tests := map[string]struct {
 			input   assistantActionApprovalConfig
-			want    domain.AssistantActionApproval
+			want    assistant.ActionApproval
 			wantErr string
 		}{
 			"valid": {
 				input: assistantActionApprovalConfig{Required: true, Title: " Confirm ", Description: " Desc ", PreviewFields: []string{" todos[].title "}, Timeout: "30s"},
-				want:  domain.AssistantActionApproval{Required: true, Title: "Confirm", Description: "Desc", PreviewFields: []string{"todos[].title"}, Timeout: 30 * time.Second},
+				want:  assistant.ActionApproval{Required: true, Title: "Confirm", Description: "Desc", PreviewFields: []string{"todos[].title"}, Timeout: 30 * time.Second},
 			},
 			"invalid-timeout": {
 				input:   assistantActionApprovalConfig{Timeout: "30"},

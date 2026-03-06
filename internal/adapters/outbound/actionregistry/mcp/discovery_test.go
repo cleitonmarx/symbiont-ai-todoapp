@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -202,7 +202,7 @@ func TestActionErrorMessage(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			msg := actionErrorMessage(tt.callID, tt.code, tt.details)
-			assert.Equal(t, domain.ChatRole_Tool, msg.Role)
+			assert.Equal(t, assistant.ChatRole_Tool, msg.Role)
 			require.NotNil(t, msg.ActionCallID)
 			assert.Equal(t, tt.callID, *msg.ActionCallID)
 			assert.Contains(t, msg.Content, tt.code)

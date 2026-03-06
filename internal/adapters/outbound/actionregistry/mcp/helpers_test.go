@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -56,11 +56,11 @@ func (s *fakeSession) Close() error {
 }
 
 type fakeRenderer struct {
-	message domain.AssistantMessage
+	message assistant.Message
 	ok      bool
 }
 
-func (r fakeRenderer) Render(_ domain.AssistantActionCall, _ domain.AssistantMessage) (domain.AssistantMessage, bool) {
+func (r fakeRenderer) Render(_ assistant.ActionCall, _ assistant.Message) (assistant.Message, bool) {
 	return r.message, r.ok
 }
 

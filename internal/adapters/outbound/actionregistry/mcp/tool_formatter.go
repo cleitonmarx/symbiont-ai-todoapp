@@ -4,20 +4,21 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 )
 
 // toolFormatter customizes MCP tool arguments before execution and/or formats
 // tool results after execution.
 type toolFormatter interface {
 	FormatArguments(arguments map[string]any) map[string]any
-	FormatResult(actionResult string, call domain.AssistantActionCall) domain.AssistantMessage
+	FormatResult(actionResult string, call assistant.ActionCall) assistant.Message
 }
 
 // executeCodeToolFormatter handles both the input and output quirks of the
 // "execute_code" tool.
 type executeCodeToolFormatter struct{}
 
+// FormatArguments normalizes escaped code content for the execute_code tool.
 func (f executeCodeToolFormatter) FormatArguments(arguments map[string]any) map[string]any {
 	if len(arguments) == 0 {
 		return arguments
@@ -49,7 +50,8 @@ func (f executeCodeToolFormatter) FormatArguments(arguments map[string]any) map[
 	return arguments
 }
 
-func (f executeCodeToolFormatter) FormatResult(actionResult string, call domain.AssistantActionCall) domain.AssistantMessage {
+// FormatResult converts the execute_code response payload into a tool message.
+func (f executeCodeToolFormatter) FormatResult(actionResult string, call assistant.ActionCall) assistant.Message {
 	var (
 		result struct {
 			Errors []string `json:"error"`
@@ -65,8 +67,8 @@ func (f executeCodeToolFormatter) FormatResult(actionResult string, call domain.
 		content = strings.Join(result.Result, "\n")
 	}
 
-	return domain.AssistantMessage{
-		Role:         domain.ChatRole_Tool,
+	return assistant.Message{
+		Role:         assistant.ChatRole_Tool,
 		ActionCallID: &call.ID,
 		Content:      content,
 	}
@@ -86,10 +88,10 @@ func (r toolFormatterRegistry) FormatArguments(toolName string, arguments map[st
 }
 
 // FormatResult applies a registered result formatter for the given tool name.
-func (r toolFormatterRegistry) FormatResult(toolName, actionResult string, call domain.AssistantActionCall) (domain.AssistantMessage, bool) {
+func (r toolFormatterRegistry) FormatResult(toolName, actionResult string, call assistant.ActionCall) (assistant.Message, bool) {
 	formatter, found := r[toolName]
 	if !found {
-		return domain.AssistantMessage{}, false
+		return assistant.Message{}, false
 	}
 	return formatter.FormatResult(actionResult, call), true
 }

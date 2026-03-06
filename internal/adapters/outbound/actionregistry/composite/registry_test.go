@@ -4,8 +4,7 @@ import (
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,56 +14,56 @@ func TestCompositeActionRegistry_Execute(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		call          domain.AssistantActionCall
-		history       []domain.AssistantMessage
+		call          assistant.ActionCall
+		history       []assistant.Message
 		registriesLen int
-		setMocks      func(t *testing.T, registries []*domain.MockAssistantActionRegistry)
-		assertMessage func(t *testing.T, message domain.AssistantMessage)
+		setMocks      func(t *testing.T, registries []*assistant.MockActionRegistry)
+		assertMessage func(t *testing.T, message assistant.Message)
 	}{
 		"routes-execution-to-matching-action": {
-			call:          domain.AssistantActionCall{ID: "call-1", Name: "fetch_todos", Input: "{}"},
-			history:       []domain.AssistantMessage{{Role: domain.ChatRole_User, Content: "hello"}},
+			call:          assistant.ActionCall{ID: "call-1", Name: "fetch_todos", Input: "{}"},
+			history:       []assistant.Message{{Role: assistant.ChatRole_User, Content: "hello"}},
 			registriesLen: 2,
-			setMocks: func(t *testing.T, registries []*domain.MockAssistantActionRegistry) {
+			setMocks: func(t *testing.T, registries []*assistant.MockActionRegistry) {
 				registries[0].EXPECT().
 					GetDefinition("fetch_todos").
-					Return(domain.AssistantActionDefinition{Name: "fetch_todos"}, true).
+					Return(assistant.ActionDefinition{Name: "fetch_todos"}, true).
 					Once()
 				registries[0].EXPECT().
 					Execute(
 						mock.Anything,
-						domain.AssistantActionCall{ID: "call-1", Name: "fetch_todos", Input: "{}"},
-						[]domain.AssistantMessage{{Role: domain.ChatRole_User, Content: "hello"}},
+						assistant.ActionCall{ID: "call-1", Name: "fetch_todos", Input: "{}"},
+						[]assistant.Message{{Role: assistant.ChatRole_User, Content: "hello"}},
 					).
-					Return(domain.AssistantMessage{
-						Role:         domain.ChatRole_Tool,
+					Return(assistant.Message{
+						Role:         assistant.ChatRole_Tool,
 						Content:      "todos",
 						ActionCallID: common.Ptr("call-1"),
 					}).
 					Once()
 			},
-			assertMessage: func(t *testing.T, message domain.AssistantMessage) {
+			assertMessage: func(t *testing.T, message assistant.Message) {
 				require.NotNil(t, message.ActionCallID)
-				assert.Equal(t, domain.ChatRole_Tool, message.Role)
+				assert.Equal(t, assistant.ChatRole_Tool, message.Role)
 				assert.Equal(t, "todos", message.Content)
 				assert.Equal(t, "call-1", *message.ActionCallID)
 			},
 		},
 		"returns-error-when-action-is-not-registered": {
-			call:          domain.AssistantActionCall{ID: "call-2", Name: "unknown_action", Input: "{}"},
+			call:          assistant.ActionCall{ID: "call-2", Name: "unknown_action", Input: "{}"},
 			registriesLen: 2,
-			setMocks: func(_ *testing.T, registries []*domain.MockAssistantActionRegistry) {
+			setMocks: func(_ *testing.T, registries []*assistant.MockActionRegistry) {
 				registries[0].EXPECT().
 					GetDefinition("unknown_action").
-					Return(domain.AssistantActionDefinition{}, false).
+					Return(assistant.ActionDefinition{}, false).
 					Once()
 				registries[1].EXPECT().
 					GetDefinition("unknown_action").
-					Return(domain.AssistantActionDefinition{}, false).
+					Return(assistant.ActionDefinition{}, false).
 					Once()
 			},
-			assertMessage: func(t *testing.T, message domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, message.Role)
+			assertMessage: func(t *testing.T, message assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, message.Role)
 				assert.Equal(t, "error: no registry found for action 'unknown_action'", message.Content)
 			},
 		},
@@ -76,7 +75,7 @@ func TestCompositeActionRegistry_Execute(t *testing.T) {
 			if tt.setMocks != nil {
 				tt.setMocks(t, registryMocks)
 			}
-			registries := make([]domain.AssistantActionRegistry, 0, tt.registriesLen)
+			registries := make([]assistant.ActionRegistry, 0, tt.registriesLen)
 			for _, mock := range registryMocks {
 				registries = append(registries, mock)
 			}
@@ -96,19 +95,19 @@ func TestCompositeActionRegistry_GetDefinition(t *testing.T) {
 	tests := map[string]struct {
 		actionName    string
 		registriesLen int
-		setMocks      func(t *testing.T, registries []*domain.MockAssistantActionRegistry)
-		assertResult  func(t *testing.T, definition domain.AssistantActionDefinition, found bool)
+		setMocks      func(t *testing.T, registries []*assistant.MockActionRegistry)
+		assertResult  func(t *testing.T, definition assistant.ActionDefinition, found bool)
 	}{
 		"returns-definition-from-first-registry": {
 			actionName:    "fetch_todos",
 			registriesLen: 2,
-			setMocks: func(_ *testing.T, registries []*domain.MockAssistantActionRegistry) {
+			setMocks: func(_ *testing.T, registries []*assistant.MockActionRegistry) {
 				registries[0].EXPECT().
 					GetDefinition("fetch_todos").
-					Return(domain.AssistantActionDefinition{Name: "fetch_todos", Description: "from first"}, true).
+					Return(assistant.ActionDefinition{Name: "fetch_todos", Description: "from first"}, true).
 					Once()
 			},
-			assertResult: func(t *testing.T, definition domain.AssistantActionDefinition, found bool) {
+			assertResult: func(t *testing.T, definition assistant.ActionDefinition, found bool) {
 				assert.True(t, found)
 				assert.Equal(t, "fetch_todos", definition.Name)
 				assert.Equal(t, "from first", definition.Description)
@@ -117,17 +116,17 @@ func TestCompositeActionRegistry_GetDefinition(t *testing.T) {
 		"falls-back-to-next-registry-when-first-misses": {
 			actionName:    "update_todos",
 			registriesLen: 2,
-			setMocks: func(_ *testing.T, registries []*domain.MockAssistantActionRegistry) {
+			setMocks: func(_ *testing.T, registries []*assistant.MockActionRegistry) {
 				registries[0].EXPECT().
 					GetDefinition("update_todos").
-					Return(domain.AssistantActionDefinition{}, false).
+					Return(assistant.ActionDefinition{}, false).
 					Once()
 				registries[1].EXPECT().
 					GetDefinition("update_todos").
-					Return(domain.AssistantActionDefinition{Name: "update_todos", Description: "from second"}, true).
+					Return(assistant.ActionDefinition{Name: "update_todos", Description: "from second"}, true).
 					Once()
 			},
-			assertResult: func(t *testing.T, definition domain.AssistantActionDefinition, found bool) {
+			assertResult: func(t *testing.T, definition assistant.ActionDefinition, found bool) {
 				assert.True(t, found)
 				assert.Equal(t, "update_todos", definition.Name)
 				assert.Equal(t, "from second", definition.Description)
@@ -136,19 +135,19 @@ func TestCompositeActionRegistry_GetDefinition(t *testing.T) {
 		"returns-not-found-when-missing-in-all-registries": {
 			actionName:    "missing_action",
 			registriesLen: 2,
-			setMocks: func(_ *testing.T, registries []*domain.MockAssistantActionRegistry) {
+			setMocks: func(_ *testing.T, registries []*assistant.MockActionRegistry) {
 				registries[0].EXPECT().
 					GetDefinition("missing_action").
-					Return(domain.AssistantActionDefinition{}, false).
+					Return(assistant.ActionDefinition{}, false).
 					Once()
 				registries[1].EXPECT().
 					GetDefinition("missing_action").
-					Return(domain.AssistantActionDefinition{}, false).
+					Return(assistant.ActionDefinition{}, false).
 					Once()
 			},
-			assertResult: func(t *testing.T, definition domain.AssistantActionDefinition, found bool) {
+			assertResult: func(t *testing.T, definition assistant.ActionDefinition, found bool) {
 				assert.False(t, found)
-				assert.Equal(t, domain.AssistantActionDefinition{}, definition)
+				assert.Equal(t, assistant.ActionDefinition{}, definition)
 			},
 		},
 	}
@@ -160,7 +159,7 @@ func TestCompositeActionRegistry_GetDefinition(t *testing.T) {
 				tt.setMocks(t, registryMocks)
 			}
 
-			registries := make([]domain.AssistantActionRegistry, 0, tt.registriesLen)
+			registries := make([]assistant.ActionRegistry, 0, tt.registriesLen)
 			for _, mockRegistry := range registryMocks {
 				registries = append(registries, mockRegistry)
 			}
@@ -180,20 +179,20 @@ func TestCompositeActionRegistry_StatusMessage(t *testing.T) {
 	tests := map[string]struct {
 		actionName    string
 		registriesLen int
-		setMocks      func(t *testing.T, registries []*domain.MockAssistantActionRegistry)
+		setMocks      func(t *testing.T, registries []*assistant.MockActionRegistry)
 		expected      string
 	}{
 		"returns-action-status-message-when-action-exists": {
 			actionName:    "search_web",
 			registriesLen: 2,
-			setMocks: func(t *testing.T, registries []*domain.MockAssistantActionRegistry) {
+			setMocks: func(t *testing.T, registries []*assistant.MockActionRegistry) {
 				registries[0].EXPECT().
 					GetDefinition("search_web").
-					Return(domain.AssistantActionDefinition{}, false).
+					Return(assistant.ActionDefinition{}, false).
 					Once()
 				registries[1].EXPECT().
 					GetDefinition("search_web").
-					Return(domain.AssistantActionDefinition{Name: "search_web"}, true).
+					Return(assistant.ActionDefinition{Name: "search_web"}, true).
 					Once()
 				registries[1].EXPECT().
 					StatusMessage("search_web").
@@ -205,14 +204,14 @@ func TestCompositeActionRegistry_StatusMessage(t *testing.T) {
 		"returns-default-status-message-when-action-does-not-exist": {
 			actionName:    "missing_action",
 			registriesLen: 2,
-			setMocks: func(_ *testing.T, registries []*domain.MockAssistantActionRegistry) {
+			setMocks: func(_ *testing.T, registries []*assistant.MockActionRegistry) {
 				registries[0].EXPECT().
 					GetDefinition("missing_action").
-					Return(domain.AssistantActionDefinition{}, false).
+					Return(assistant.ActionDefinition{}, false).
 					Once()
 				registries[1].EXPECT().
 					GetDefinition("missing_action").
-					Return(domain.AssistantActionDefinition{}, false).
+					Return(assistant.ActionDefinition{}, false).
 					Once()
 			},
 			expected: "⏳ Processing request...",
@@ -226,7 +225,7 @@ func TestCompositeActionRegistry_StatusMessage(t *testing.T) {
 				tt.setMocks(t, registryMocks)
 			}
 
-			registries := make([]domain.AssistantActionRegistry, 0, tt.registriesLen)
+			registries := make([]assistant.ActionRegistry, 0, tt.registriesLen)
 			for _, mock := range registryMocks {
 				registries = append(registries, mock)
 			}
@@ -245,13 +244,13 @@ func TestCompositeActionRegistry_GetRenderer(t *testing.T) {
 	tests := map[string]struct {
 		actionName    string
 		registriesLen int
-		setMocks      func(t *testing.T, registries []*domain.MockAssistantActionRegistry)
-		assertResult  func(t *testing.T, got domain.ActionResultRenderer, found bool)
+		setMocks      func(t *testing.T, registries []*assistant.MockActionRegistry)
+		assertResult  func(t *testing.T, got assistant.ActionResultRenderer, found bool)
 	}{
 		"returns-renderer-from-first-registry-that-has-it": {
 			actionName:    "fetch_todos",
 			registriesLen: 2,
-			setMocks: func(_ *testing.T, registries []*domain.MockAssistantActionRegistry) {
+			setMocks: func(_ *testing.T, registries []*assistant.MockActionRegistry) {
 				registries[0].EXPECT().
 					GetRenderer("fetch_todos").
 					Return(nil, false).
@@ -261,7 +260,7 @@ func TestCompositeActionRegistry_GetRenderer(t *testing.T) {
 					Return(renderer, true).
 					Once()
 			},
-			assertResult: func(t *testing.T, got domain.ActionResultRenderer, found bool) {
+			assertResult: func(t *testing.T, got assistant.ActionResultRenderer, found bool) {
 				assert.True(t, found)
 				assert.Same(t, renderer, got)
 			},
@@ -269,11 +268,11 @@ func TestCompositeActionRegistry_GetRenderer(t *testing.T) {
 		"returns-not-found-when-missing-in-all-registries": {
 			actionName:    "missing_action",
 			registriesLen: 2,
-			setMocks: func(_ *testing.T, registries []*domain.MockAssistantActionRegistry) {
+			setMocks: func(_ *testing.T, registries []*assistant.MockActionRegistry) {
 				registries[0].EXPECT().GetRenderer("missing_action").Return(nil, false).Once()
 				registries[1].EXPECT().GetRenderer("missing_action").Return(nil, false).Once()
 			},
-			assertResult: func(t *testing.T, got domain.ActionResultRenderer, found bool) {
+			assertResult: func(t *testing.T, got assistant.ActionResultRenderer, found bool) {
 				assert.False(t, found)
 				assert.Nil(t, got)
 			},
@@ -287,7 +286,7 @@ func TestCompositeActionRegistry_GetRenderer(t *testing.T) {
 				tt.setMocks(t, registryMocks)
 			}
 
-			registries := make([]domain.AssistantActionRegistry, 0, tt.registriesLen)
+			registries := make([]assistant.ActionRegistry, 0, tt.registriesLen)
 			for _, mock := range registryMocks {
 				registries = append(registries, mock)
 			}
@@ -299,12 +298,12 @@ func TestCompositeActionRegistry_GetRenderer(t *testing.T) {
 	}
 }
 
-func newMockRegistries(t *testing.T, count int) []*domain.MockAssistantActionRegistry {
+func newMockRegistries(t *testing.T, count int) []*assistant.MockActionRegistry {
 	t.Helper()
 
-	mocks := make([]*domain.MockAssistantActionRegistry, 0, count)
+	mocks := make([]*assistant.MockActionRegistry, 0, count)
 	for range count {
-		r := domain.NewMockAssistantActionRegistry(t)
+		r := assistant.NewMockActionRegistry(t)
 		mocks = append(mocks, r)
 	}
 
@@ -313,18 +312,6 @@ func newMockRegistries(t *testing.T, count int) []*domain.MockAssistantActionReg
 
 type compositeMockRenderer struct{}
 
-func (compositeMockRenderer) Render(_ domain.AssistantActionCall, _ domain.AssistantMessage) (domain.AssistantMessage, bool) {
-	return domain.AssistantMessage{}, false
-}
-
-func TestInitCompositeActionRegistry_Initialize(t *testing.T) {
-	t.Parallel()
-
-	r := &InitCompositeActionRegistry{}
-	ctx, err := r.Initialize(t.Context())
-	require.NoError(t, err)
-	assert.NotNil(t, ctx)
-	dep, err := depend.Resolve[domain.AssistantActionRegistry]()
-	require.NoError(t, err)
-	assert.IsType(t, CompositeActionRegistry{}, dep)
+func (compositeMockRenderer) Render(_ assistant.ActionCall, _ assistant.Message) (assistant.Message, bool) {
+	return assistant.Message{}, false
 }

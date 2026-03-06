@@ -4,26 +4,25 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 )
 
-// CompositeActionRegistry implements domain.AssistantActionRegistry interface.
+// CompositeActionRegistry implements assistant.ActionRegistry interface.
 // It aggregates actions from multiple EmbeddingActionRegistry instances.
 type CompositeActionRegistry struct {
-	registriesActions []domain.AssistantActionRegistry
+	registriesActions []assistant.ActionRegistry
 }
 
 // NewCompositeActionRegistry creates a new CompositeActionRegistry from the given embedding registries.
-func NewCompositeActionRegistry(ctx context.Context, registries ...domain.AssistantActionRegistry) CompositeActionRegistry {
+func NewCompositeActionRegistry(ctx context.Context, registries ...assistant.ActionRegistry) CompositeActionRegistry {
 	return CompositeActionRegistry{
 		registriesActions: registries,
 	}
 }
 
 // Execute iterates through the composed registries to execute the given action call, returning the first successful result.
-func (r CompositeActionRegistry) Execute(ctx context.Context, call domain.AssistantActionCall, conversationHistory []domain.AssistantMessage) domain.AssistantMessage {
+func (r CompositeActionRegistry) Execute(ctx context.Context, call assistant.ActionCall, conversationHistory []assistant.Message) assistant.Message {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 	for _, actionRegistry := range r.registriesActions {
@@ -33,25 +32,25 @@ func (r CompositeActionRegistry) Execute(ctx context.Context, call domain.Assist
 		}
 		return actionRegistry.Execute(spanCtx, call, conversationHistory)
 	}
-	return domain.AssistantMessage{
-		Role:    domain.ChatRole_Tool,
+	return assistant.Message{
+		Role:    assistant.ChatRole_Tool,
 		Content: fmt.Sprintf("error: no registry found for action '%s'", call.Name),
 	}
 }
 
 // GetDefinition returns one action definition by name.
-func (r CompositeActionRegistry) GetDefinition(actionName string) (domain.AssistantActionDefinition, bool) {
+func (r CompositeActionRegistry) GetDefinition(actionName string) (assistant.ActionDefinition, bool) {
 	for _, actionRegistry := range r.registriesActions {
 		definition, found := actionRegistry.GetDefinition(actionName)
 		if found {
 			return definition, true
 		}
 	}
-	return domain.AssistantActionDefinition{}, false
+	return assistant.ActionDefinition{}, false
 }
 
 // GetRenderer returns one deterministic action result renderer by action name.
-func (r CompositeActionRegistry) GetRenderer(actionName string) (domain.ActionResultRenderer, bool) {
+func (r CompositeActionRegistry) GetRenderer(actionName string) (assistant.ActionResultRenderer, bool) {
 	for _, actionRegistry := range r.registriesActions {
 		renderer, found := actionRegistry.GetRenderer(actionName)
 		if found {
@@ -70,17 +69,4 @@ func (r CompositeActionRegistry) StatusMessage(actionName string) string {
 		}
 	}
 	return "⏳ Processing request..."
-}
-
-// InitCompositeActionRegistry is the initializer for CompositeActionRegistry, composing local and MCP gateway registries.
-type InitCompositeActionRegistry struct {
-	Local domain.AssistantActionRegistry `resolve:"local"`
-	MCP   domain.AssistantActionRegistry `resolve:"mcp"`
-}
-
-// Initialize creates a CompositeActionRegistry from the local and MCP gateway registries and registers it in the dependency container.
-func (i InitCompositeActionRegistry) Initialize(ctx context.Context) (context.Context, error) {
-	composite := NewCompositeActionRegistry(ctx, i.Local, i.MCP)
-	depend.Register[domain.AssistantActionRegistry](composite)
-	return ctx, nil
 }

@@ -8,14 +8,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // toolToActionDefinition converts an MCP tool schema into the domain action format.
-func toolToActionDefinition(tool *mcp.Tool) domain.AssistantActionDefinition {
+func toolToActionDefinition(tool *mcp.Tool) assistant.ActionDefinition {
 	if tool == nil {
-		return domain.AssistantActionDefinition{}
+		return assistant.ActionDefinition{}
 	}
 
 	description := strings.TrimSpace(tool.Description)
@@ -23,7 +23,7 @@ func toolToActionDefinition(tool *mcp.Tool) domain.AssistantActionDefinition {
 		description = strings.TrimSpace(tool.Title)
 	}
 
-	return domain.AssistantActionDefinition{
+	return assistant.ActionDefinition{
 		Name:        strings.TrimSpace(tool.Name),
 		Description: description,
 		Input:       schemaToInput(tool.InputSchema),
@@ -31,10 +31,10 @@ func toolToActionDefinition(tool *mcp.Tool) domain.AssistantActionDefinition {
 }
 
 // schemaToInput extracts a simplified action input definition from JSON Schema-like MCP input.
-func schemaToInput(schema any) domain.AssistantActionInput {
-	input := domain.AssistantActionInput{
+func schemaToInput(schema any) assistant.ActionInput {
+	input := assistant.ActionInput{
 		Type:   "object",
-		Fields: map[string]domain.AssistantActionField{},
+		Fields: map[string]assistant.ActionField{},
 	}
 
 	schemaMap, ok := anyToMap(schema)
@@ -60,9 +60,9 @@ func schemaToInput(schema any) domain.AssistantActionInput {
 	return input
 }
 
-// overrideFieldToDomain converts one assistantActionFieldOverride block into a domain AssistantActionField recursively.
-func overrideFieldToDomain(field assistantActionFieldOverride) domain.AssistantActionField {
-	result := domain.AssistantActionField{
+// overrideFieldToDomain converts one assistantActionFieldOverride block into a domain ActionField recursively.
+func overrideFieldToDomain(field assistantActionFieldOverride) assistant.ActionField {
+	result := assistant.ActionField{
 		Type:        strings.TrimSpace(field.Type),
 		Description: strings.TrimSpace(field.Description),
 		Required:    field.Required,
@@ -71,7 +71,7 @@ func overrideFieldToDomain(field assistantActionFieldOverride) domain.AssistantA
 	}
 
 	if len(field.Fields) > 0 {
-		result.Fields = make(map[string]domain.AssistantActionField, len(field.Fields))
+		result.Fields = make(map[string]assistant.ActionField, len(field.Fields))
 		for fieldName, child := range field.Fields {
 			result.Fields[fieldName] = overrideFieldToDomain(child)
 		}
@@ -85,9 +85,9 @@ func overrideFieldToDomain(field assistantActionFieldOverride) domain.AssistantA
 	return result
 }
 
-// schemaFieldToDomain converts one JSON Schema field definition into a domain AssistantActionField recursively.
-func schemaFieldToDomain(fieldSchema map[string]any, required bool) domain.AssistantActionField {
-	result := domain.AssistantActionField{
+// schemaFieldToDomain converts one JSON Schema field definition into a domain ActionField recursively.
+func schemaFieldToDomain(fieldSchema map[string]any, required bool) assistant.ActionField {
+	result := assistant.ActionField{
 		Type:        schemaFieldType(fieldSchema),
 		Description: strings.TrimSpace(asString(fieldSchema["description"])),
 		Required:    required,
@@ -99,7 +99,7 @@ func schemaFieldToDomain(fieldSchema map[string]any, required bool) domain.Assis
 	}
 
 	if props, ok := anyToMap(fieldSchema["properties"]); ok && len(props) > 0 {
-		result.Fields = make(map[string]domain.AssistantActionField, len(props))
+		result.Fields = make(map[string]assistant.ActionField, len(props))
 		requiredFields := requiredSet(fieldSchema["required"])
 		for name, raw := range props {
 			childSchema, _ := anyToMap(raw)
@@ -194,7 +194,7 @@ func requiredSet(raw any) map[string]bool {
 }
 
 // mergeAssistantActionDefinition overlays configured overrides on top of discovered tool metadata.
-func mergeAssistantActionDefinition(base, override domain.AssistantActionDefinition) domain.AssistantActionDefinition {
+func mergeAssistantActionDefinition(base, override assistant.ActionDefinition) assistant.ActionDefinition {
 	merged := base
 
 	if name := strings.TrimSpace(override.Name); name != "" {
@@ -207,9 +207,9 @@ func mergeAssistantActionDefinition(base, override domain.AssistantActionDefinit
 	if inputType := strings.TrimSpace(override.Input.Type); inputType != "" {
 		merged.Input.Type = inputType
 	}
-	baseFields := map[string]domain.AssistantActionField{}
+	baseFields := map[string]assistant.ActionField{}
 	if len(base.Input.Fields) > 0 {
-		baseFields = make(map[string]domain.AssistantActionField, len(base.Input.Fields))
+		baseFields = make(map[string]assistant.ActionField, len(base.Input.Fields))
 		maps.Copy(baseFields, base.Input.Fields)
 	}
 	merged.Input.Fields = baseFields
@@ -221,7 +221,7 @@ func mergeAssistantActionDefinition(base, override domain.AssistantActionDefinit
 	return merged
 }
 
-func hasApprovalOverride(approval domain.AssistantActionApproval) bool {
+func hasApprovalOverride(approval assistant.ActionApproval) bool {
 	return approval.Required ||
 		strings.TrimSpace(approval.Title) != "" ||
 		strings.TrimSpace(approval.Description) != "" ||

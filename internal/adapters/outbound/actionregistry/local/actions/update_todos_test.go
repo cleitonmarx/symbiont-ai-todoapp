@@ -7,41 +7,45 @@ import (
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
+	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/toon-format/toon-go"
 )
 
-func TestBulkTodoUpdaterAction(t *testing.T) {
+func TestUpdateTodosAction(t *testing.T) {
 	t.Parallel()
 
 	todoID1 := uuid.New()
 	todoID2 := uuid.New()
 
 	tests := map[string]struct {
-		setupMocks   func(*domain.MockUnitOfWork, *usecases.MockTodoUpdater)
-		functionCall domain.AssistantActionCall
-		validateResp func(t *testing.T, resp domain.AssistantMessage)
+		setupMocks   func(*transaction.MockUnitOfWork, *todouc.MockUpdater)
+		functionCall assistant.ActionCall
+		validateResp func(t *testing.T, resp assistant.Message)
 	}{
 		"update-todos-success": {
-			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
+			setupMocks: func(uow *transaction.MockUnitOfWork, updater *todouc.MockUpdater) {
+				scope := transaction.NewMockScope(t)
+
 				updater.EXPECT().
 					Update(
 						mock.Anything,
-						uow,
+						scope,
 						todoID1,
 						common.Ptr("Updated 1"),
-						common.Ptr(domain.TodoStatus_DONE),
+						common.Ptr(todo.Status_DONE),
 						(*time.Time)(nil),
 					).
 					Return(
-						domain.Todo{
+						todo.Todo{
 							ID:     todoID1,
 							Title:  "Updated 1",
-							Status: domain.TodoStatus_DONE,
+							Status: todo.Status_DONE,
 						},
 						nil,
 					).
@@ -49,17 +53,17 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 				updater.EXPECT().
 					Update(
 						mock.Anything,
-						uow,
+						scope,
 						todoID2,
 						common.Ptr("Updated 2"),
-						(*domain.TodoStatus)(nil),
+						(*todo.Status)(nil),
 						(*time.Time)(nil),
 					).
 					Return(
-						domain.Todo{
+						todo.Todo{
 							ID:     todoID2,
 							Title:  "Updated 2",
-							Status: domain.TodoStatus_OPEN,
+							Status: todo.Status_OPEN,
 						},
 						nil,
 					).
@@ -67,16 +71,16 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
-						return fn(ctx, uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
+						return fn(ctx, scope)
 					}).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "update_todos",
 				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Updated 1","status":"DONE"},{"id":"` + todoID2.String() + `","title":"Updated 2"}]}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+			validateResp: func(t *testing.T, resp assistant.Message) {
 				payload := struct {
 					Todos []struct {
 						Title string `toon:"title"`
@@ -87,53 +91,55 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 			},
 		},
 		"update-todos-invalid-arguments": {
-			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
+			setupMocks: func(uow *transaction.MockUnitOfWork, updater *todouc.MockUpdater) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "update_todos",
 				Input: `invalid json`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+			validateResp: func(t *testing.T, resp assistant.Message) {
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
 		"update-todos-invalid-status": {
-			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
+			setupMocks: func(uow *transaction.MockUnitOfWork, updater *todouc.MockUpdater) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "update_todos",
 				Input: `{"todos":[{"id":"` + todoID1.String() + `","status":"INVALID"}]}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+			validateResp: func(t *testing.T, resp assistant.Message) {
 				assert.Contains(t, resp.Content, "invalid_status")
 			},
 		},
 		"update-todos-update-error": {
-			setupMocks: func(uow *domain.MockUnitOfWork, updater *usecases.MockTodoUpdater) {
+			setupMocks: func(uow *transaction.MockUnitOfWork, updater *todouc.MockUpdater) {
+				scope := transaction.NewMockScope(t)
+
 				updater.EXPECT().
 					Update(
 						mock.Anything,
-						uow,
+						scope,
 						todoID1,
 						common.Ptr("Updated 1"),
-						(*domain.TodoStatus)(nil),
+						(*todo.Status)(nil),
 						(*time.Time)(nil),
 					).
-					Return(domain.Todo{}, errors.New("update error")).
+					Return(todo.Todo{}, errors.New("update error")).
 					Once()
 
 				uow.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, fn func(context.Context, domain.UnitOfWork) error) error {
-						return fn(ctx, uow)
+					RunAndReturn(func(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
+						return fn(ctx, scope)
 					}).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "update_todos",
 				Input: `{"todos":[{"id":"` + todoID1.String() + `","title":"Updated 1"}]}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
+			validateResp: func(t *testing.T, resp assistant.Message) {
 				assert.Contains(t, resp.Content, "update_todos_error")
 			},
 		},
@@ -141,11 +147,11 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			uow := domain.NewMockUnitOfWork(t)
-			updater := usecases.NewMockTodoUpdater(t)
+			uow := transaction.NewMockUnitOfWork(t)
+			updater := todouc.NewMockUpdater(t)
 			tt.setupMocks(uow, updater)
 
-			action := NewBulkTodoUpdaterAction(uow, updater)
+			action := NewUpdateTodosAction(uow, updater)
 			assert.NotEmpty(t, action.StatusMessage())
 
 			definition := action.Definition()
@@ -158,7 +164,7 @@ func TestBulkTodoUpdaterAction(t *testing.T) {
 			assert.Equal(t, []string{"todos[].id", "todos[].title", "todos[].status"}, definition.Approval.PreviewFields)
 			assert.Equal(t, 2*time.Minute, definition.Approval.Timeout)
 
-			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
+			resp := action.Execute(context.Background(), tt.functionCall, []assistant.Message{})
 			tt.validateResp(t, resp)
 		})
 	}

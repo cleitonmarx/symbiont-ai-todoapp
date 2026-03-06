@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/toon-format/toon-go"
 )
 
@@ -14,49 +14,49 @@ import (
 type createTodosRenderer struct{}
 
 // Render converts a successful create_todos tool result into an assistant message.
-func (createTodosRenderer) Render(_ domain.AssistantActionCall, result domain.AssistantMessage) (domain.AssistantMessage, bool) {
+func (createTodosRenderer) Render(_ assistant.ActionCall, result assistant.Message) (assistant.Message, bool) {
 	todos, ok := parseRenderedTodos(result)
 	if !ok {
-		return domain.AssistantMessage{}, false
+		return assistant.Message{}, false
 	}
-	return domain.AssistantMessage{Role: domain.ChatRole_Assistant, Content: renderTodoMutationResult("Created", todos)}, true
+	return assistant.Message{Role: assistant.ChatRole_Assistant, Content: renderTodoMutationResult("Created", todos)}, true
 }
 
 // updateTodosRenderer renders successful update_todos tool results.
 type updateTodosRenderer struct{}
 
 // Render converts a successful update_todos tool result into an assistant message.
-func (updateTodosRenderer) Render(_ domain.AssistantActionCall, result domain.AssistantMessage) (domain.AssistantMessage, bool) {
+func (updateTodosRenderer) Render(_ assistant.ActionCall, result assistant.Message) (assistant.Message, bool) {
 	todos, ok := parseRenderedTodos(result)
 	if !ok {
-		return domain.AssistantMessage{}, false
+		return assistant.Message{}, false
 	}
-	return domain.AssistantMessage{Role: domain.ChatRole_Assistant, Content: renderTodoMutationResult("Updated", todos)}, true
+	return assistant.Message{Role: assistant.ChatRole_Assistant, Content: renderTodoMutationResult("Updated", todos)}, true
 }
 
 // updateTodosDueDateRenderer renders successful update_todos_due_date tool results.
 type updateTodosDueDateRenderer struct{}
 
 // Render converts a successful update_todos_due_date tool result into an assistant message.
-func (updateTodosDueDateRenderer) Render(_ domain.AssistantActionCall, result domain.AssistantMessage) (domain.AssistantMessage, bool) {
+func (updateTodosDueDateRenderer) Render(_ assistant.ActionCall, result assistant.Message) (assistant.Message, bool) {
 	todos, ok := parseRenderedTodos(result)
 	if !ok {
-		return domain.AssistantMessage{}, false
+		return assistant.Message{}, false
 	}
-	return domain.AssistantMessage{Role: domain.ChatRole_Assistant, Content: renderTodoMutationResult("Updated due date for", todos)}, true
+	return assistant.Message{Role: assistant.ChatRole_Assistant, Content: renderTodoMutationResult("Updated due date for", todos)}, true
 }
 
 // deleteTodosRenderer renders successful delete_todos tool results.
 type deleteTodosRenderer struct{}
 
 // Render converts a successful delete_todos tool result into an assistant message.
-func (deleteTodosRenderer) Render(actionCall domain.AssistantActionCall, result domain.AssistantMessage) (domain.AssistantMessage, bool) {
+func (deleteTodosRenderer) Render(actionCall assistant.ActionCall, result assistant.Message) (assistant.Message, bool) {
 	count, ok := parseDeletedRowsCount(result)
 	if !ok {
-		return domain.AssistantMessage{}, false
+		return assistant.Message{}, false
 	}
 	titles := parseDeleteTitles(actionCall.Input)
-	return domain.AssistantMessage{Role: domain.ChatRole_Assistant, Content: renderDeleteResult(count, titles)}, true
+	return assistant.Message{Role: assistant.ChatRole_Assistant, Content: renderDeleteResult(count, titles)}, true
 }
 
 // renderedTodo is the minimal todo projection needed for deterministic rendering.
@@ -67,8 +67,8 @@ type renderedTodo struct {
 }
 
 // parseRenderedTodos extracts todo rows from the compact local action result format.
-func parseRenderedTodos(result domain.AssistantMessage) ([]renderedTodo, bool) {
-	if result.Role != domain.ChatRole_Tool || !result.IsActionCallSuccess() {
+func parseRenderedTodos(result assistant.Message) ([]renderedTodo, bool) {
+	if result.Role != assistant.ChatRole_Tool || !result.IsActionCallSuccess() {
 		return nil, false
 	}
 
@@ -94,8 +94,8 @@ func parseRenderedTodos(result domain.AssistantMessage) ([]renderedTodo, bool) {
 }
 
 // parseDeletedRowsCount extracts the deleted row count from the compact delete result format.
-func parseDeletedRowsCount(result domain.AssistantMessage) (int, bool) {
-	if result.Role != domain.ChatRole_Tool || !result.IsActionCallSuccess() {
+func parseDeletedRowsCount(result assistant.Message) (int, bool) {
+	if result.Role != assistant.ChatRole_Tool || !result.IsActionCallSuccess() {
 		return 0, false
 	}
 

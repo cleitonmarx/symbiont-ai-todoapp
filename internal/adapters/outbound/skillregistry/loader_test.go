@@ -21,6 +21,9 @@ func TestParseSkillMarkdown(t *testing.T) {
 			name: "valid-markdown",
 			content: `---
 name: todo-mutation-safety
+display_name: Todo Mutation Safety
+aliases: [mutate, MUTATE, invalid alias, todo-mutation]
+description: Safely update or delete existing todos.
 use_when: User asks to update/delete/complete todos and no explicit UUIDs are present.
 avoid_when: User is only chatting or requesting read-only summaries.
 priority: 90
@@ -34,6 +37,9 @@ Goal: execute todo mutations safely and with valid arguments.
 			assert: func(t *testing.T, got assistant.SkillDefinition, err error) {
 				require.NoError(t, err)
 				assert.Equal(t, "todo-mutation-safety", got.Name)
+				assert.Equal(t, "Todo Mutation Safety", got.DisplayName)
+				assert.Equal(t, []string{"mutate", "todo-mutation"}, got.Aliases)
+				assert.Equal(t, "Safely update or delete existing todos.", got.Description)
 				assert.Equal(t, 90, got.Priority)
 				assert.True(t, got.EmbedFirstContentLine)
 				assert.Equal(t, []string{"todos", "mutation", "safety", "uuid"}, got.Tags)

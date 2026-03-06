@@ -135,6 +135,75 @@ func latestUserInput(messages []assistant.Message, maxChars int) string {
 	return ""
 }
 
+// latestUserMessage returns the most recent user message content without truncation.
+func latestUserMessage(messages []assistant.Message) string {
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
+		if msg.Role != assistant.ChatRole_User {
+			continue
+		}
+		content := strings.TrimSpace(msg.Content)
+		if content == "" {
+			continue
+		}
+		return content
+	}
+	return ""
+}
+
+// parseSelectedSkillDirectives parses leading slash commands (for example
+// "/web-research /todo-update ...") and returns normalized skill names.
+func parseSelectedSkillDirectives(input string) []string {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return nil
+	}
+
+	tokens := strings.Fields(trimmed)
+	if len(tokens) == 0 || !strings.HasPrefix(tokens[0], "/") {
+		return nil
+	}
+
+	directives := make([]string, 0, len(tokens))
+	seen := make(map[string]struct{}, len(tokens))
+	for _, token := range tokens {
+		if !strings.HasPrefix(token, "/") {
+			break
+		}
+
+		name := strings.TrimPrefix(token, "/")
+		name = strings.TrimRight(name, ".,;:!?")
+		if !isValidSkillDirectiveName(name) {
+			continue
+		}
+
+		normalized := strings.ToLower(name)
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		directives = append(directives, normalized)
+	}
+
+	return directives
+}
+
+// isValidSkillDirectiveName checks if the directive name contains only allowed characters.
+func isValidSkillDirectiveName(name string) bool {
+	if strings.TrimSpace(name) == "" {
+		return false
+	}
+
+	for _, r := range name {
+		isAlphaNum := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+		if isAlphaNum || r == '-' || r == '_' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 // truncateToLastChars keeps only the trailing maxChars runes from the input.
 func truncateToLastChars(input string, maxChars int) string {
 	trimmed := strings.TrimSpace(input)

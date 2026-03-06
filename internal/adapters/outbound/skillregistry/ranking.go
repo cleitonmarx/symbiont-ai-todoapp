@@ -9,6 +9,10 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/semantic"
 )
 
+// defaultRequiredLeadOverSecond is the fallback minimum score gap used when
+// LatestIntentOverrideDelta is not configured.
+const defaultRequiredLeadOverSecond = 0.02
+
 // embeddedSkill stores a skill definition together with its precomputed
 // retrieval vectors.
 type embeddedSkill struct {
@@ -43,7 +47,7 @@ func (r Registry) rankSkills(ctx context.Context, currentInput, recentInputs, su
 	}
 
 	var recentVector []float64
-	recentInputs = truncateToLastChars(strings.TrimSpace(recentInputs), r.cfg.SelectionMaxChars)
+	recentInputs = truncateToLastChars(recentInputs, r.cfg.SelectionMaxChars)
 	if recentInputs != "" {
 		vec, err := r.encoder.VectorizeQuery(ctx, r.embeddingModel, recentInputs)
 		if err == nil && len(vec.Vector) > 0 {
@@ -52,7 +56,7 @@ func (r Registry) rankSkills(ctx context.Context, currentInput, recentInputs, su
 	}
 
 	var summaryVector []float64
-	summary = truncateToLastChars(strings.TrimSpace(summary), r.cfg.SelectionMaxChars)
+	summary = truncateToLastChars(summary, r.cfg.SelectionMaxChars)
 	if summary != "" {
 		vec, err := r.encoder.VectorizeQuery(ctx, r.embeddingModel, summary)
 		if err == nil && len(vec.Vector) > 0 {
@@ -66,8 +70,8 @@ func (r Registry) rankSkills(ctx context.Context, currentInput, recentInputs, su
 		{weight: r.cfg.SummaryWeight, vector: summaryVector},
 	}
 
-	scored := make([]scoredSkill, 0, len(r.embedded))
-	for _, skill := range r.embedded {
+	scored := make([]scoredSkill, 0, len(r.embeddedSkills))
+	for _, skill := range r.embeddedSkills {
 		score, ok := r.scoreSkill(queryVectors, skill, includePriority)
 		if !ok || score < minScore {
 			continue
@@ -88,48 +92,98 @@ func (r Registry) rankSkills(ctx context.Context, currentInput, recentInputs, su
 	return scored
 }
 
-// chooseRanking arbitrates between context-aware and latest-message-only
-// rankings so explicit intent changes can override stale context.
+// chooseRanking picks whether to trust conversation context or the latest
+// user message when those two signals disagree.
 func (r Registry) chooseRanking(contextRanked, latestOnly []scoredSkill, hasPriorContext bool) []scoredSkill {
 	if len(contextRanked) == 0 {
-		if len(latestOnly) == 0 || latestOnly[0].score < r.cfg.RelevantSkillsMinScore {
-			return nil
-		}
-		return trimRanked(latestOnly, r.cfg.RelevantSkillsTopK)
+		return r.chooseUsingLatestWhenNoContext(latestOnly, hasPriorContext)
 	}
+
 	if len(latestOnly) == 0 {
 		return contextRanked
 	}
 
 	contextTop := contextRanked[0]
 	latestTop := latestOnly[0]
+
+	// If both strategies agree on the same top skill, keep context ranking to
+	// preserve continuity and secondary candidates.
 	if contextTop.definition.Name == latestTop.definition.Name {
 		return contextRanked
 	}
 
-	// If the latest-only top skill is significantly higher scored than the context-aware top, prefer it.
-	if latestTop.score-contextTop.score >= r.cfg.LatestIntentOverrideDelta {
-		return trimRanked(latestOnly, r.cfg.RelevantSkillsTopK)
-	}
-
-	// If the latest-only top skill is above the minimum threshold and has a sufficient lead over the second-ranked latest-only skill, prefer it.
-	latestLeadDelta := r.cfg.LatestIntentOverrideDelta / 2
-	if latestLeadDelta <= 0 {
-		latestLeadDelta = 0.02
-	}
-
-	// Note: if the latest-only list has only one skill, we can consider it a strong signal and skip the second-skill comparison.
-	latestSecondScore := 0.0
-	if len(latestOnly) > 1 {
-		latestSecondScore = latestOnly[1].score
-	}
-
-	// The "hasPriorContext" condition is a safeguard to prevent latest-only override when we don't have any context signal at all, which would make the ranking too volatile.
-	if hasPriorContext && latestTop.score >= r.cfg.RelevantSkillsMinScore-r.cfg.LatestIntentOverrideDelta && latestTop.score-latestSecondScore >= latestLeadDelta {
+	if r.latestIsClearlyBetter(contextTop, latestTop) ||
+		r.latestLooksLikeIntentChange(latestOnly, hasPriorContext) {
 		return trimRanked(latestOnly, r.cfg.RelevantSkillsTopK)
 	}
 
 	return contextRanked
+}
+
+// chooseUsingLatestWhenNoContext handles turns where context ranking is empty.
+// It accepts borderline scores only when prior context exists and the best
+// latest candidate is clearly ahead of the runner-up.
+func (r Registry) chooseUsingLatestWhenNoContext(latestOnly []scoredSkill, hasPriorContext bool) []scoredSkill {
+	if len(latestOnly) == 0 {
+		return nil
+	}
+
+	latestTop := latestOnly[0]
+	if latestTop.score >= r.cfg.RelevantSkillsMinScore {
+		return trimRanked(latestOnly, r.cfg.RelevantSkillsTopK)
+	}
+
+	secondBestScore := scoreOfSecondLatest(latestOnly)
+	if !hasPriorContext {
+		return nil
+	}
+	if latestTop.score < r.cfg.RelevantSkillsMinScore-r.cfg.LatestIntentOverrideDelta {
+		return nil
+	}
+	if latestTop.score-secondBestScore < r.requiredLeadOverSecond() {
+		return nil
+	}
+
+	return trimRanked(latestOnly, r.cfg.RelevantSkillsTopK)
+}
+
+// latestIsClearlyBetter returns true when the latest-message top skill is far
+// enough above the context-based top skill.
+func (r Registry) latestIsClearlyBetter(contextTop, latestTop scoredSkill) bool {
+	return latestTop.score-contextTop.score >= r.cfg.LatestIntentOverrideDelta
+}
+
+// latestLooksLikeIntentChange handles softer pivots where latest top is close
+// to threshold but still clearly better than the next latest candidate.
+func (r Registry) latestLooksLikeIntentChange(latestOnly []scoredSkill, hasPriorContext bool) bool {
+	if !hasPriorContext || len(latestOnly) == 0 {
+		return false
+	}
+
+	latestTop := latestOnly[0]
+	if latestTop.score < r.cfg.RelevantSkillsMinScore-r.cfg.LatestIntentOverrideDelta {
+		return false
+	}
+
+	return latestTop.score-scoreOfSecondLatest(latestOnly) >= r.requiredLeadOverSecond()
+}
+
+// requiredLeadOverSecond defines how much better the top latest candidate must
+// be than the second latest candidate.
+func (r Registry) requiredLeadOverSecond() float64 {
+	requiredLead := r.cfg.LatestIntentOverrideDelta / 2
+	if requiredLead <= 0 {
+		return defaultRequiredLeadOverSecond
+	}
+	return requiredLead
+}
+
+// scoreOfSecondLatest returns runner-up score in latest-only ranking.
+func scoreOfSecondLatest(latestOnly []scoredSkill) float64 {
+	if len(latestOnly) <= 1 {
+		return 0
+	}
+	return latestOnly[1].score
 }
 
 // trimRanked applies the configured top-k cutoff to a scored skill list.
@@ -199,4 +253,51 @@ func priorityBoost(priority int) float64 {
 		return 0
 	}
 	return float64(priority) / 1000
+}
+
+// resolveForcedSkills checks the latest user message for slash directives that explicitly select skills and returns those skills if found.
+func (r Registry) resolveForcedSkills(messages []assistant.Message) []assistant.SkillDefinition {
+	directiveNames := parseSelectedSkillDirectives(latestUserMessage(messages))
+	if len(directiveNames) == 0 {
+		return nil
+	}
+
+	availableByName := make(map[string]assistant.SkillDefinition, len(r.definitions))
+	for _, definition := range r.definitions {
+		canonical := strings.ToLower(strings.TrimSpace(definition.Name))
+		if canonical == "" {
+			continue
+		}
+		availableByName[canonical] = definition
+	}
+	for _, definition := range r.definitions {
+		for _, alias := range definition.Aliases {
+			normalizedAlias := strings.ToLower(strings.TrimSpace(alias))
+			if normalizedAlias == "" {
+				continue
+			}
+			if _, exists := availableByName[normalizedAlias]; exists {
+				continue
+			}
+			availableByName[normalizedAlias] = definition
+		}
+	}
+
+	forced := make([]assistant.SkillDefinition, 0, len(directiveNames))
+	for _, name := range directiveNames {
+		definition, ok := availableByName[name]
+		if !ok {
+			continue
+		}
+		forced = append(forced, definition)
+	}
+
+	if len(forced) == 0 {
+		return nil
+	}
+
+	if r.cfg.RelevantSkillsTopK <= 0 || len(forced) <= r.cfg.RelevantSkillsTopK {
+		return forced
+	}
+	return forced[:r.cfg.RelevantSkillsTopK]
 }

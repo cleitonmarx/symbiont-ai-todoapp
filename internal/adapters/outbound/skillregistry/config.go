@@ -1,43 +1,45 @@
 package skillregistry
 
 const (
-	// defaultRelevantSkillsTopK limits how many skills are returned after ranking.
-	defaultRelevantSkillsTopK = 2
-	// defaultRelevantSkillsMinScore is the minimum score a skill must reach to be kept.
-	defaultRelevantSkillsMinScore = 0.23
-	// defaultAvoidPenaltyWeight scales how much avoid_when similarity reduces the final score.
-	defaultAvoidPenaltyWeight = 0.70
-	// defaultAvoidBlockThreshold blocks a skill entirely when avoid_when similarity is too strong.
-	defaultAvoidBlockThreshold = 0.45
-	// defaultStrongUseWhenScore marks a skill as strongly relevant for scoring heuristics.
-	defaultStrongUseWhenScore = 0.55
-	// defaultCurrentInputWeight gives the highest weight to the latest user request.
-	defaultCurrentInputWeight = 0.50
-	// defaultRecentInputsWeight weights recent user inputs used for continuity.
-	defaultRecentInputsWeight = 0.40
-	// defaultSummaryWeight weights conversation summary context during ranking.
-	defaultSummaryWeight = 0.10
-	// defaultRecentInputsLimit controls how many recent user inputs are included in ranking context.
-	defaultRecentInputsLimit = 4
-	// defaultSelectionMaxChars caps query text length before vectorization.
-	defaultSelectionMaxChars = 400
-	// defaultLatestIntentOverrideDelta is the minimum score gap for latest-message intent override.
-	defaultLatestIntentOverrideDelta = 0.05
+	defaultRelevantSkillsTopK        = 2
+	defaultRelevantSkillsMinScore    = 0.23
+	defaultAvoidPenaltyWeight        = 0.70
+	defaultAvoidBlockThreshold       = 0.45
+	defaultStrongUseWhenScore        = 0.55
+	defaultCurrentInputWeight        = 0.70
+	defaultRecentInputsWeight        = 0.25
+	defaultSummaryWeight             = 0.05
+	defaultRecentInputsLimit         = 4
+	defaultSelectionMaxChars         = 400
+	defaultLatestIntentOverrideDelta = 0.07
 )
 
 // Config configures how the registry ranks and filters relevant skills.
 type Config struct {
-	RelevantSkillsTopK        int
-	RelevantSkillsMinScore    float64
-	AvoidPenaltyWeight        float64
-	AvoidBlockThreshold       float64
-	StrongUseWhenScore        float64
-	CurrentInputWeight        float64
-	RecentInputsWeight        float64
-	SummaryWeight             float64
-	RecentInputsLimit         int
-	SelectionMaxChars         int
-	LogScores                 bool
+	// RelevantSkillsTopK controls how many of the top-ranked skills are returned for selection.
+	RelevantSkillsTopK int
+	// RelevantSkillsMinScore sets a minimum score threshold for skills to be considered relevant.
+	RelevantSkillsMinScore float64
+	// AvoidPenaltyWeight determines how strongly the avoid_when similarity penalizes a skill's final score.
+	AvoidPenaltyWeight float64
+	// AvoidBlockThreshold blocks a skill when avoid_when is very similar and use_when is not strong enough.
+	AvoidBlockThreshold float64
+	// StrongUseWhenScore is the use_when score required to bypass avoid_when blocking.
+	StrongUseWhenScore float64
+	// CurrentInputWeight gives the highest weight to the latest user request.
+	CurrentInputWeight float64
+	// RecentInputsWeight weights recent user inputs used for continuity.
+	RecentInputsWeight float64
+	// SummaryWeight weights conversation summary context during ranking.
+	SummaryWeight float64
+	// RecentInputsLimit controls how many recent user inputs are included in ranking context.
+	RecentInputsLimit int
+	// SelectionMaxChars keeps only trailing runes up to this size before vectorization.
+	SelectionMaxChars int
+	// LogScores enables logging of skill scores for debugging purposes.
+	LogScores bool
+	// LatestIntentOverrideDelta controls how far latest-intent scores must separate
+	// before overriding context-based ranking.
 	LatestIntentOverrideDelta float64
 }
 

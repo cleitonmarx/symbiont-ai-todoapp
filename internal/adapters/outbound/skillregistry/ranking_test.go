@@ -109,7 +109,7 @@ func TestRegistry_RankSkills(t *testing.T) {
 				encoder:        encoder,
 				embeddingModel: "embed-model",
 				cfg:            normalizeConfig(Config{}),
-				embedded:       tt.embedded,
+				embeddedSkills: tt.embedded,
 			}
 
 			got := registry.rankSkills(context.Background(), tt.currentInput, tt.recentInputs, tt.summary, tt.minScore, true)
@@ -148,6 +148,14 @@ func TestRegistry_ChooseRanking(t *testing.T) {
 			latestOnly: []scoredSkill{
 				{definition: assistant.SkillDefinition{Name: "web-research"}, score: 0.20},
 			},
+		},
+		"returns-latest-when-context-empty-and-latest-near-min-with-prior-context-and-clear-lead": {
+			latestOnly: []scoredSkill{
+				{definition: assistant.SkillDefinition{Name: "web-research"}, score: 0.19},
+				{definition: assistant.SkillDefinition{Name: "todo-summary"}, score: 0.14},
+			},
+			hasPriorContext: true,
+			wantNames:       []string{"web-research", "todo-summary"},
 		},
 		"returns-context-when-latest-empty": {
 			contextRanked: []scoredSkill{

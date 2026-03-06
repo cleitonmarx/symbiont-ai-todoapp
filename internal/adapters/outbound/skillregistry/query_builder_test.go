@@ -77,3 +77,52 @@ func TestBuildSelectionInputs(t *testing.T) {
 		})
 	}
 }
+
+func TestParseSelectedSkillDirectives(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name:  "single-directive-with-text",
+			input: "/web-research find events in maple ridge",
+			want:  []string{"web-research"},
+		},
+		{
+			name:  "multiple-directives",
+			input: "/todo-update /todo-summary check this",
+			want:  []string{"todo-update", "todo-summary"},
+		},
+		{
+			name:  "deduplicates-and-normalizes-case",
+			input: "/Todo-Update /todo-update update this",
+			want:  []string{"todo-update"},
+		},
+		{
+			name:  "ignores-invalid-leading-directive",
+			input: "/todo:update /todo-update update this",
+			want:  []string{"todo-update"},
+		},
+		{
+			name:  "returns-empty-when-no-leading-directive",
+			input: "search /web-research now",
+			want:  nil,
+		},
+		{
+			name:  "handles-punctuation-suffix",
+			input: "/web-research, find events",
+			want:  []string{"web-research"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, parseSelectedSkillDirectives(tt.input))
+		})
+	}
+}

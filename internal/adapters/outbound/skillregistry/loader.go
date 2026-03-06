@@ -14,6 +14,9 @@ import (
 // skillFrontMatter mirrors the YAML metadata supported by markdown skill files.
 type skillFrontMatter struct {
 	Name                  string   `yaml:"name"`
+	DisplayName           string   `yaml:"display_name"`
+	Aliases               []string `yaml:"aliases"`
+	Description           string   `yaml:"description"`
 	UseWhen               string   `yaml:"use_when"`
 	AvoidWhen             string   `yaml:"avoid_when"`
 	Priority              int      `yaml:"priority"`
@@ -105,6 +108,9 @@ func parseSkillMarkdown(path string, content []byte) (assistant.SkillDefinition,
 
 	return assistant.SkillDefinition{
 		Name:                  name,
+		DisplayName:           strings.TrimSpace(meta.DisplayName),
+		Aliases:               sanitizeDirectiveAliasList(meta.Aliases),
+		Description:           strings.TrimSpace(meta.Description),
 		UseWhen:               strings.TrimSpace(meta.UseWhen),
 		AvoidWhen:             strings.TrimSpace(meta.AvoidWhen),
 		Priority:              max(0, meta.Priority),
@@ -142,6 +148,33 @@ func sanitizeStringList(values []string) []string {
 	return next
 }
 
+// sanitizeDirectiveAliasList trims aliases, validates directive-safe names,
+// lowercases values for case-insensitive matching, and removes duplicates.
+func sanitizeDirectiveAliasList(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	next := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, raw := range values {
+		trimmed := strings.TrimSpace(raw)
+		if !isValidSkillDirectiveName(trimmed) {
+			continue
+		}
+		normalized := strings.ToLower(trimmed)
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		next = append(next, normalized)
+	}
+	if len(next) == 0 {
+		return nil
+	}
+	return next
+}
+
 // copySkillDefinitions deep-copies slice fields so registry state is isolated
 // from caller-owned skill definitions.
 func copySkillDefinitions(skills []assistant.SkillDefinition) []assistant.SkillDefinition {
@@ -151,6 +184,9 @@ func copySkillDefinitions(skills []assistant.SkillDefinition) []assistant.SkillD
 
 	copied := make([]assistant.SkillDefinition, 0, len(skills))
 	for _, skill := range skills {
+		aliases := make([]string, len(skill.Aliases))
+		copy(aliases, skill.Aliases)
+		skill.Aliases = aliases
 		tags := make([]string, len(skill.Tags))
 		copy(tags, skill.Tags)
 		skill.Tags = tags

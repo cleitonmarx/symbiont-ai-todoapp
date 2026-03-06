@@ -7,27 +7,27 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/types"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 )
 
 // ListTodos is the resolver for the listTodos field.
 func (s *TodoGraphQLServer) ListTodos(ctx context.Context, page int, pageSize int, status *gen.TodoStatus, search *string, searchType *gen.SearchType, dateRange *gen.DateRange, sortBy *gen.TodoSortBy) (*gen.TodoPage, error) {
-	var options []usecases.ListTodoOptions
+	var options []todouc.ListTodoOptions
 	if status != nil {
-		options = append(options, usecases.WithStatus(domain.TodoStatus(*status)))
+		options = append(options, todouc.WithStatus(todo.Status(*status)))
 	}
 	if search != nil {
-		options = append(options, usecases.WithSearchQuery(*search))
+		options = append(options, todouc.WithSearchQuery(*search))
 	}
 	if searchType != nil {
-		options = append(options, usecases.WithSearchType(usecases.SearchType(*searchType)))
+		options = append(options, todouc.WithSearchType(todouc.SearchType(*searchType)))
 	}
 	if dateRange != nil {
-		options = append(options, usecases.WithDueDateRange(time.Time(dateRange.DueAfter), time.Time(dateRange.DueBefore)))
+		options = append(options, todouc.WithDueDateRange(time.Time(dateRange.DueAfter), time.Time(dateRange.DueBefore)))
 	}
 	if sortBy != nil {
-		options = append(options, usecases.WithSortBy(string(*sortBy)))
+		options = append(options, todouc.WithSortBy(string(*sortBy)))
 	}
 
 	todos, hasMore, err := s.ListTodosUsecase.Query(ctx, page, pageSize, options...)

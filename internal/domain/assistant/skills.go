@@ -5,6 +5,9 @@ import "context"
 // SkillDefinition describes one static skill document that can be injected in prompts.
 type SkillDefinition struct {
 	Name                  string
+	DisplayName           string
+	Aliases               []string
+	Description           string
 	UseWhen               string
 	AvoidWhen             string
 	Priority              int
@@ -32,6 +35,8 @@ type SkillQueryContext struct {
 type SkillRegistry interface {
 	// ListRelevant returns relevant skill definitions for the current turn.
 	ListRelevant(ctx context.Context, query SkillQueryContext) []SkillDefinition
+	// ListSkills returns the full set of registered skill definitions.
+	ListSkills(ctx context.Context) ([]SkillDefinition, error)
 }
 
 // NewSelectedSkill creates an SelectedSkill from a definition.

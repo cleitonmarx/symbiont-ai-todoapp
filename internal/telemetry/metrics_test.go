@@ -70,4 +70,3 @@ func httptestRequest(t *testing.T, pattern string) *http.Request {
 	req.Pattern = pattern
 	return req
 }
-

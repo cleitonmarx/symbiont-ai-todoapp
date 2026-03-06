@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -14,9 +15,25 @@ import (
 
 // WithHttpMetricAttributes returns attributes for HTTP metrics based on the request.
 func WithHttpMetricAttributes(r *http.Request) []attribute.KeyValue {
-	return []attribute.KeyValue{
-		semconv.HTTPRoute(getHttpRoute(r)),
+	route := metricRouteFromPattern(r)
+	if route == "" {
+		return nil
 	}
+
+	return []attribute.KeyValue{
+		semconv.HTTPRoute(route),
+	}
+}
+
+// metricRouteFromPattern extracts the route from the HTTP request's pattern.
+func metricRouteFromPattern(r *http.Request) string {
+	if r == nil || r.Pattern == "" {
+		return ""
+	}
+	if idx := strings.IndexByte(r.Pattern, '/'); idx >= 0 {
+		return r.Pattern[idx:]
+	}
+	return ""
 }
 
 func newMeterProvider(ctx context.Context, res *resource.Resource) (*sdkmetric.MeterProvider, sdkmetric.Exporter, error) {

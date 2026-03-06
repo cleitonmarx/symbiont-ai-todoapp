@@ -24,10 +24,6 @@ var (
 // SpanNameFormatter formats span names for HTTP requests.
 // It uses the HTTP method and URL path as the span name.
 func SpanNameFormatter(_ string, r *http.Request) string {
-	return getHttpRoute(r)
-}
-
-func getHttpRoute(r *http.Request) string {
 	if r.Pattern != "" {
 		return r.Pattern
 	}
@@ -58,13 +54,22 @@ func HttpHandler(h http.Handler, operation string) http.Handler {
 
 // Middleware returns an HTTP middleware that instruments handlers with OpenTelemetry.
 func Middleware(operation string) func(http.Handler) http.Handler {
-	return otelhttp.NewMiddleware(
+	otelMiddleware := otelhttp.NewMiddleware(
 		operation,
 		otelhttp.WithSpanNameFormatter(SpanNameFormatter),
-		otelhttp.WithMetricAttributesFn(
-			WithHttpMetricAttributes,
-		),
 	)
+
+	return func(next http.Handler) http.Handler {
+		return otelMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			labeler, ok := otelhttp.LabelerFromContext(r.Context())
+			if !ok {
+				r = r.WithContext(otelhttp.ContextWithLabeler(r.Context(), labeler))
+			}
+			labeler.Add(WithHttpMetricAttributes(r)...)
+
+			next.ServeHTTP(w, r)
+		}))
+	}
 }
 
 // getCallerName retrieves the name of the function at the specified stack depth.

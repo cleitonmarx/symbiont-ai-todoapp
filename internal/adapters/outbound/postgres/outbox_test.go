@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,9 +18,9 @@ import (
 func TestOutboxRepository_CreateEvent(t *testing.T) {
 	t.Parallel()
 
-	event := domain.TodoEvent{
+	event := outbox.TodoEvent{
 		TodoID:    uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
-		Type:      domain.EventType_TODO_CREATED,
+		Type:      outbox.EventType_TODO_CREATED,
 		CreatedAt: time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC),
 	}
 	dedupeKey := fmt.Sprintf("todo:%s:%s:%d", event.Type, event.TodoID.String(), event.CreatedAt.UnixNano())
@@ -33,12 +34,12 @@ func TestOutboxRepository_CreateEvent(t *testing.T) {
 				m.ExpectExec("INSERT INTO outbox_events (id,entity_type,entity_id,topic,event_type,payload,status,retry_count,max_retries,last_error,dedupe_key,available_at,processed_at,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING").
 					WithArgs(
 						sqlmock.AnyArg(), // id
-						string(domain.OutboxEntityType_Todo),
+						string(outbox.EntityType_Todo),
 						event.TodoID,
-						string(domain.OutboxTopic_Todo),
+						string(outbox.Topic_Todo),
 						string(event.Type),
 						sqlmock.AnyArg(), // payload json
-						string(domain.OutboxStatus_Pending),
+						string(outbox.Status_Pending),
 						0,
 						5,
 						nil,
@@ -56,12 +57,12 @@ func TestOutboxRepository_CreateEvent(t *testing.T) {
 				m.ExpectExec("INSERT INTO outbox_events (id,entity_type,entity_id,topic,event_type,payload,status,retry_count,max_retries,last_error,dedupe_key,available_at,processed_at,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING").
 					WithArgs(
 						sqlmock.AnyArg(),
-						string(domain.OutboxEntityType_Todo),
+						string(outbox.EntityType_Todo),
 						event.TodoID,
-						string(domain.OutboxTopic_Todo),
+						string(outbox.Topic_Todo),
 						string(event.Type),
 						sqlmock.AnyArg(),
-						string(domain.OutboxStatus_Pending),
+						string(outbox.Status_Pending),
 						0,
 						5,
 						nil,
@@ -99,9 +100,9 @@ func TestOutboxRepository_CreateEvent(t *testing.T) {
 func TestOutboxRepository_CreateChatEvent(t *testing.T) {
 	t.Parallel()
 
-	event := domain.ChatMessageEvent{
-		Type:           domain.EventType_CHAT_MESSAGE_SENT,
-		ChatRole:       domain.ChatRole_Assistant,
+	event := outbox.ChatMessageEvent{
+		Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+		ChatRole:       assistant.ChatRole_Assistant,
 		ChatMessageID:  uuid.MustParse("223e4567-e89b-12d3-a456-426614174000"),
 		ConversationID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 	}
@@ -115,12 +116,12 @@ func TestOutboxRepository_CreateChatEvent(t *testing.T) {
 				m.ExpectExec("INSERT INTO outbox_events (id,entity_type,entity_id,topic,event_type,payload,status,retry_count,max_retries,last_error,dedupe_key,available_at,processed_at,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING").
 					WithArgs(
 						sqlmock.AnyArg(), // id
-						string(domain.OutboxEntityType_ChatMessage),
+						string(outbox.EntityType_ChatMessage),
 						event.ChatMessageID,
-						string(domain.OutboxTopic_ChatMessages),
+						string(outbox.Topic_ChatMessages),
 						string(event.Type),
 						sqlmock.AnyArg(), // payload
-						string(domain.OutboxStatus_Pending),
+						string(outbox.Status_Pending),
 						0,
 						5,
 						nil,
@@ -138,12 +139,12 @@ func TestOutboxRepository_CreateChatEvent(t *testing.T) {
 				m.ExpectExec("INSERT INTO outbox_events (id,entity_type,entity_id,topic,event_type,payload,status,retry_count,max_retries,last_error,dedupe_key,available_at,processed_at,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING").
 					WithArgs(
 						sqlmock.AnyArg(),
-						string(domain.OutboxEntityType_ChatMessage),
+						string(outbox.EntityType_ChatMessage),
 						event.ChatMessageID,
-						string(domain.OutboxTopic_ChatMessages),
+						string(outbox.Topic_ChatMessages),
 						string(event.Type),
 						sqlmock.AnyArg(),
-						string(domain.OutboxStatus_Pending),
+						string(outbox.Status_Pending),
 						0,
 						5,
 						nil,
@@ -201,7 +202,7 @@ func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
 						"Todo",
 						"TODO_CREATED",
 						[]byte(`{"id":"123"}`),
-						string(domain.OutboxStatus_Pending),
+						string(outbox.Status_Pending),
 						1,
 						5,
 						nil,
@@ -211,7 +212,7 @@ func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
 						t1,
 					)
 				m.ExpectQuery("SELECT id, entity_type, entity_id, topic, event_type, payload, status, retry_count, max_retries, last_error, dedupe_key, available_at, processed_at, created_at FROM outbox_events WHERE status = $1 AND available_at <= $2 ORDER BY available_at ASC, created_at ASC LIMIT 2 FOR UPDATE SKIP LOCKED").
-					WithArgs(string(domain.OutboxStatus_Pending), sqlmock.AnyArg()).
+					WithArgs(string(outbox.Status_Pending), sqlmock.AnyArg()).
 					WillReturnRows(rows)
 			},
 			wantLen: 1,
@@ -221,7 +222,7 @@ func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
 			limit: 1,
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectQuery("SELECT id, entity_type, entity_id, topic, event_type, payload, status, retry_count, max_retries, last_error, dedupe_key, available_at, processed_at, created_at FROM outbox_events WHERE status = $1 AND available_at <= $2 ORDER BY available_at ASC, created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED").
-					WithArgs(string(domain.OutboxStatus_Pending), sqlmock.AnyArg()).
+					WithArgs(string(outbox.Status_Pending), sqlmock.AnyArg()).
 					WillReturnError(errors.New("db error"))
 			},
 			wantLen: 0,
@@ -239,7 +240,7 @@ func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
 						"Todo",
 						"TODO_CREATED",
 						[]byte(`{}`),
-						string(domain.OutboxStatus_Pending),
+						string(outbox.Status_Pending),
 						1,
 						5,
 						nil,
@@ -249,7 +250,7 @@ func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
 						t1,
 					)
 				m.ExpectQuery("SELECT id, entity_type, entity_id, topic, event_type, payload, status, retry_count, max_retries, last_error, dedupe_key, available_at, processed_at, created_at FROM outbox_events WHERE status = $1 AND available_at <= $2 ORDER BY available_at ASC, created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED").
-					WithArgs(string(domain.OutboxStatus_Pending), sqlmock.AnyArg()).
+					WithArgs(string(outbox.Status_Pending), sqlmock.AnyArg()).
 					WillReturnRows(rows)
 			},
 			wantLen: 0,
@@ -260,7 +261,7 @@ func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(outboxEventFields)
 				m.ExpectQuery("SELECT id, entity_type, entity_id, topic, event_type, payload, status, retry_count, max_retries, last_error, dedupe_key, available_at, processed_at, created_at FROM outbox_events WHERE status = $1 AND available_at <= $2 ORDER BY available_at ASC, created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED").
-					WithArgs(string(domain.OutboxStatus_Pending), sqlmock.AnyArg()).
+					WithArgs(string(outbox.Status_Pending), sqlmock.AnyArg()).
 					WillReturnRows(rows)
 			},
 			wantLen: 0,
@@ -304,7 +305,7 @@ func TestOutboxRepository_UpdateEvent(t *testing.T) {
 		"success": {
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectExec("UPDATE outbox_events SET status = $1, retry_count = $2, last_error = $3, processed_at = $4 WHERE id = $5").
-					WithArgs(string(domain.OutboxStatus_Processed), 1, "ok", sqlmock.AnyArg(), id).
+					WithArgs(string(outbox.Status_Processed), 1, "ok", sqlmock.AnyArg(), id).
 					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
 			err: false,
@@ -312,7 +313,7 @@ func TestOutboxRepository_UpdateEvent(t *testing.T) {
 		"pending-retry-updates-available-at": {
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectExec("UPDATE outbox_events SET status = $1, retry_count = $2, last_error = $3, available_at = $4, processed_at = $5 WHERE id = $6").
-					WithArgs(string(domain.OutboxStatus_Pending), 2, "retry", sqlmock.AnyArg(), nil, id).
+					WithArgs(string(outbox.Status_Pending), 2, "retry", sqlmock.AnyArg(), nil, id).
 					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
 			err: false,
@@ -320,7 +321,7 @@ func TestOutboxRepository_UpdateEvent(t *testing.T) {
 		"db-error": {
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectExec("UPDATE outbox_events SET status = $1, retry_count = $2, last_error = $3, processed_at = $4 WHERE id = $5").
-					WithArgs(string(domain.OutboxStatus_Processed), 1, "ok", sqlmock.AnyArg(), id).
+					WithArgs(string(outbox.Status_Processed), 1, "ok", sqlmock.AnyArg(), id).
 					WillReturnError(errors.New("db error"))
 			},
 			err: true,
@@ -336,11 +337,11 @@ func TestOutboxRepository_UpdateEvent(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewOutboxRepository(db)
-			status := domain.OutboxStatus_Processed
+			status := outbox.Status_Processed
 			retryCount := 1
 			lastError := "ok"
 			if name == "pending-retry-updates-available-at" {
-				status = domain.OutboxStatus_Pending
+				status = outbox.Status_Pending
 				retryCount = 2
 				lastError = "retry"
 			}

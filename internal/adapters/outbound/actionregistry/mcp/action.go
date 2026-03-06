@@ -5,19 +5,19 @@ import (
 	"strings"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 )
 
-// mcpToolAction adapts one discovered MCP tool to the AssistantAction contract.
+// mcpToolAction adapts one discovered MCP tool to the Action contract.
 type mcpToolAction struct {
-	definition    domain.AssistantActionDefinition
+	definition    assistant.ActionDefinition
 	statusMessage string
-	renderer      domain.ActionResultRenderer
-	execute       func(context.Context, domain.AssistantActionCall, []domain.AssistantMessage) domain.AssistantMessage
+	renderer      assistant.ActionResultRenderer
+	execute       func(context.Context, assistant.ActionCall, []assistant.Message) assistant.Message
 }
 
 // Definition returns the static action definition associated with this MCP tool.
-func (a mcpToolAction) Definition() domain.AssistantActionDefinition {
+func (a mcpToolAction) Definition() assistant.ActionDefinition {
 	return a.definition
 }
 
@@ -35,7 +35,7 @@ func (a mcpToolAction) StatusMessage() string {
 }
 
 // Renderer returns the deterministic renderer configured for this MCP tool, when available.
-func (a mcpToolAction) Renderer() (domain.ActionResultRenderer, bool) {
+func (a mcpToolAction) Renderer() (assistant.ActionResultRenderer, bool) {
 	if a.renderer == nil {
 		return nil, false
 	}
@@ -43,10 +43,10 @@ func (a mcpToolAction) Renderer() (domain.ActionResultRenderer, bool) {
 }
 
 // Execute delegates execution to the registry callback bound at initialization time.
-func (a mcpToolAction) Execute(ctx context.Context, call domain.AssistantActionCall, history []domain.AssistantMessage) domain.AssistantMessage {
+func (a mcpToolAction) Execute(ctx context.Context, call assistant.ActionCall, history []assistant.Message) assistant.Message {
 	if a.execute == nil {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: common.Ptr(call.ID),
 			Content:      "errors[1]{error,details}mcp_call_error,action is not executable",
 		}

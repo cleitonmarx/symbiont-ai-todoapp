@@ -3,9 +3,8 @@ package mcp
 import (
 	"testing"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestExecuteCodeToolFormatter_FormatResult(t *testing.T) {
@@ -14,26 +13,26 @@ func TestExecuteCodeToolFormatter_FormatResult(t *testing.T) {
 	formatter := executeCodeToolFormatter{}
 	tests := map[string]struct {
 		actionResult string
-		assert       func(*testing.T, domain.AssistantMessage)
+		assert       func(*testing.T, assistant.Message)
 	}{
 		"formats-result": {
 			actionResult: `{"result":["line1","line2"]}`,
-			assert: func(t *testing.T, msg domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, msg.Role)
-				require.NotNil(t, msg.ActionCallID)
+			assert: func(t *testing.T, msg assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, msg.Role)
+				assert.NotNil(t, msg.ActionCallID)
 				assert.Equal(t, "line1\nline2", msg.Content)
 			},
 		},
 		"formats-errors": {
 			actionResult: `{"error":["boom"]}`,
-			assert: func(t *testing.T, msg domain.AssistantMessage) {
+			assert: func(t *testing.T, msg assistant.Message) {
 				assert.Contains(t, msg.Content, "code_error")
 				assert.Contains(t, msg.Content, "boom")
 			},
 		},
 		"invalid-json-produces-empty-content": {
 			actionResult: `not-json`,
-			assert: func(t *testing.T, msg domain.AssistantMessage) {
+			assert: func(t *testing.T, msg assistant.Message) {
 				assert.Equal(t, "", msg.Content)
 			},
 		},
@@ -43,8 +42,8 @@ func TestExecuteCodeToolFormatter_FormatResult(t *testing.T) {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			msg := formatter.FormatResult(tt.actionResult, domain.AssistantActionCall{ID: "call-1"})
-			require.NotNil(t, msg.ActionCallID)
+			msg := formatter.FormatResult(tt.actionResult, assistant.ActionCall{ID: "call-1"})
+			assert.NotNil(t, msg.ActionCallID)
 			assert.Equal(t, "call-1", *msg.ActionCallID)
 			tt.assert(t, msg)
 		})
@@ -88,8 +87,8 @@ func TestToolFormatters(t *testing.T) {
 	t.Parallel()
 
 	formatter, found := toolFormatters["execute_code"]
-	require.True(t, found)
-	require.NotNil(t, formatter)
+	assert.True(t, found)
+	assert.NotNil(t, formatter)
 }
 
 func TestToolFormatterRegistry_FormatResult(t *testing.T) {
@@ -99,14 +98,14 @@ func TestToolFormatterRegistry_FormatResult(t *testing.T) {
 		toolName     string
 		actionResult string
 		wantFound    bool
-		assert       func(*testing.T, domain.AssistantMessage)
+		assert       func(*testing.T, assistant.Message)
 	}{
 		"formats-known-tool": {
 			toolName:     "execute_code",
 			actionResult: `{"result":["ok"]}`,
 			wantFound:    true,
-			assert: func(t *testing.T, msg domain.AssistantMessage) {
-				require.NotNil(t, msg.ActionCallID)
+			assert: func(t *testing.T, msg assistant.Message) {
+				assert.NotNil(t, msg.ActionCallID)
 				assert.Equal(t, "ok", msg.Content)
 			},
 		},
@@ -114,8 +113,8 @@ func TestToolFormatterRegistry_FormatResult(t *testing.T) {
 			toolName:     "missing",
 			actionResult: "{}",
 			wantFound:    false,
-			assert: func(t *testing.T, msg domain.AssistantMessage) {
-				assert.Equal(t, domain.AssistantMessage{}, msg)
+			assert: func(t *testing.T, msg assistant.Message) {
+				assert.Equal(t, assistant.Message{}, msg)
 			},
 		},
 	}
@@ -125,7 +124,7 @@ func TestToolFormatterRegistry_FormatResult(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			msg, found := toolFormatters.FormatResult(tt.toolName, tt.actionResult, domain.AssistantActionCall{ID: "call-1"})
+			msg, found := toolFormatters.FormatResult(tt.toolName, tt.actionResult, assistant.ActionCall{ID: "call-1"})
 			assert.Equal(t, tt.wantFound, found)
 			tt.assert(t, msg)
 		})

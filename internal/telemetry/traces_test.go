@@ -62,8 +62,6 @@ func TestStart(t *testing.T) {
 
 }
 
-// --- Mocks ---
-
 type mockSpan struct {
 	trace.Span
 	lastError  string

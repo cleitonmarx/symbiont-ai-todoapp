@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,20 +35,20 @@ func createStreamingServer(chunks []StreamChunk) *httptest.Server {
 }
 
 // collectStreamEvents collects all events from a stream
-func collectStreamEvents(adapter AssistantClient, req domain.AssistantTurnRequest) ([]domain.AssistantEventType, []string, *domain.AssistantTurnCompleted, error) {
-	var eventTypes []domain.AssistantEventType
+func collectStreamEvents(adapter AssistantClient, req assistant.TurnRequest) ([]assistant.EventType, []string, *assistant.TurnCompleted, error) {
+	var eventTypes []assistant.EventType
 	var deltaTexts []string
-	var doneEvent *domain.AssistantTurnCompleted
+	var doneEvent *assistant.TurnCompleted
 
-	err := adapter.RunTurn(context.Background(), req, func(_ context.Context, eventType domain.AssistantEventType, data any) error {
+	err := adapter.RunTurn(context.Background(), req, func(_ context.Context, eventType assistant.EventType, data any) error {
 		eventTypes = append(eventTypes, eventType)
 
 		switch eventType {
-		case domain.AssistantEventType_MessageDelta:
-			delta := data.(domain.AssistantMessageDelta)
+		case assistant.EventType_MessageDelta:
+			delta := data.(assistant.MessageDelta)
 			deltaTexts = append(deltaTexts, delta.Text)
-		case domain.AssistantEventType_TurnCompleted:
-			done := data.(domain.AssistantTurnCompleted)
+		case assistant.EventType_TurnCompleted:
+			done := data.(assistant.TurnCompleted)
 			doneEvent = &done
 		}
 		return nil
@@ -59,18 +60,18 @@ func collectStreamEvents(adapter AssistantClient, req domain.AssistantTurnReques
 func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 	t.Parallel()
 
-	req := domain.AssistantTurnRequest{
+	req := assistant.TurnRequest{
 		Stream: true,
 		Model:  "test-model",
-		Messages: []domain.AssistantMessage{
+		Messages: []assistant.Message{
 			{Role: "user", Content: "test"},
 		},
 	}
 	tests := map[string]struct {
-		req             domain.AssistantTurnRequest
+		req             assistant.TurnRequest
 		chunks          []StreamChunk
 		expectErr       bool
-		expectedEvents  []domain.AssistantEventType
+		expectedEvents  []assistant.EventType
 		expectedContent string
 	}{
 		"multiple-deltas": {
@@ -80,12 +81,12 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: " "}}}},
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "world"}}}, Usage: &Usage{PromptTokens: 5, CompletionTokens: 5, TotalTokens: 10}},
 			},
-			expectedEvents: []domain.AssistantEventType{
-				domain.AssistantEventType_TurnStarted,
-				domain.AssistantEventType_MessageDelta,
-				domain.AssistantEventType_MessageDelta,
-				domain.AssistantEventType_MessageDelta,
-				domain.AssistantEventType_TurnCompleted,
+			expectedEvents: []assistant.EventType{
+				assistant.EventType_TurnStarted,
+				assistant.EventType_MessageDelta,
+				assistant.EventType_MessageDelta,
+				assistant.EventType_MessageDelta,
+				assistant.EventType_TurnCompleted,
 			},
 			expectedContent: "Hello world",
 		},
@@ -94,19 +95,19 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 			chunks: []StreamChunk{
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: ""}}}},
 			},
-			expectedEvents: []domain.AssistantEventType{
-				domain.AssistantEventType_TurnStarted,
-				domain.AssistantEventType_TurnCompleted,
+			expectedEvents: []assistant.EventType{
+				assistant.EventType_TurnStarted,
+				assistant.EventType_TurnCompleted,
 			},
 			expectedContent: "",
 		},
 		"with-tool-calls": {
-			req: domain.AssistantTurnRequest{
+			req: assistant.TurnRequest{
 				Model: "test-model",
-				Messages: []domain.AssistantMessage{
+				Messages: []assistant.Message{
 					{
-						Role: domain.ChatRole_Assistant,
-						ActionCalls: []domain.AssistantActionCall{
+						Role: assistant.ChatRole_Assistant,
+						ActionCalls: []assistant.ActionCall{
 							{
 								ID:    "toolcall-1",
 								Name:  "list_todos",
@@ -115,17 +116,17 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 						},
 					},
 					{
-						Role:         domain.ChatRole_Tool,
+						Role:         assistant.ChatRole_Tool,
 						ActionCallID: common.Ptr("toolcall-1"),
 						Content:      `{"todos":[{"id":1,"text":"Buy book","done":false}]}`,
 					},
 				},
-				AvailableActions: []domain.AssistantActionDefinition{
+				AvailableActions: []assistant.ActionDefinition{
 					{
 						Name: "search_web",
-						Input: domain.AssistantActionInput{
+						Input: assistant.ActionInput{
 							Type: "object",
-							Fields: map[string]domain.AssistantActionField{
+							Fields: map[string]assistant.ActionField{
 								"search_term": {Type: "string", Description: "The search query", Required: true},
 							},
 						},
@@ -151,10 +152,10 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 				},
 			},
 
-			expectedEvents: []domain.AssistantEventType{
-				domain.AssistantEventType_TurnStarted,
-				domain.AssistantEventType_ActionRequested,
-				domain.AssistantEventType_TurnCompleted,
+			expectedEvents: []assistant.EventType{
+				assistant.EventType_TurnStarted,
+				assistant.EventType_ActionRequested,
+				assistant.EventType_TurnCompleted,
 			},
 			expectedContent: "",
 		},
@@ -202,14 +203,14 @@ func TestAssistantClientAdapter_RunTurn_ServerError(t *testing.T) {
 		client,
 	)
 
-	req := domain.AssistantTurnRequest{
+	req := assistant.TurnRequest{
 		Model: "test-model",
-		Messages: []domain.AssistantMessage{
+		Messages: []assistant.Message{
 			{Role: "user", Content: "test"},
 		},
 	}
 
-	err := adapter.RunTurn(context.Background(), req, func(_ context.Context, eventType domain.AssistantEventType, data interface{}) error {
+	err := adapter.RunTurn(context.Background(), req, func(_ context.Context, eventType assistant.EventType, data interface{}) error {
 		return nil
 	})
 
@@ -226,7 +227,7 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 	tests := map[string]struct {
 		response     string
 		statusCode   int
-		req          domain.AssistantTurnRequest
+		req          assistant.TurnRequest
 		expectErr    bool
 		expectedResp string
 		validateReq  func(*testing.T, *ChatRequest)
@@ -234,9 +235,9 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 		"success": {
 			response:   `{"choices":[{"message":{"role":"assistant","content":"Hello!"}}],"usage": {"completion_tokens": 10,"prompt_tokens": 10,"total_tokens": 20}}`,
 			statusCode: http.StatusOK,
-			req: domain.AssistantTurnRequest{
+			req: assistant.TurnRequest{
 				Model: "test-model",
-				Messages: []domain.AssistantMessage{
+				Messages: []assistant.Message{
 					{Role: "user", Content: "hi"},
 				},
 			},
@@ -245,11 +246,11 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 		"with-params": {
 			response:   `{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`,
 			statusCode: http.StatusOK,
-			req: domain.AssistantTurnRequest{
+			req: assistant.TurnRequest{
 				Model:       "test-model",
 				Temperature: &temp,
 				TopP:        &topP,
-				Messages: []domain.AssistantMessage{
+				Messages: []assistant.Message{
 					{Role: "system", Content: "sys"},
 					{Role: "user", Content: "hi"},
 				},
@@ -267,9 +268,9 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 		"no-choices": {
 			response:   `{"choices":[]}`,
 			statusCode: http.StatusOK,
-			req: domain.AssistantTurnRequest{
+			req: assistant.TurnRequest{
 				Model: "test-model",
-				Messages: []domain.AssistantMessage{
+				Messages: []assistant.Message{
 					{Role: "user", Content: "hi"},
 				},
 			},
@@ -278,9 +279,9 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 		"server-error": {
 			response:   `Internal Server Error`,
 			statusCode: http.StatusInternalServerError,
-			req: domain.AssistantTurnRequest{
+			req: assistant.TurnRequest{
 				Model: "test-model",
-				Messages: []domain.AssistantMessage{
+				Messages: []assistant.Message{
 					{Role: "user", Content: "hi"},
 				},
 			},
@@ -289,9 +290,9 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 		"invalid-json": {
 			response:   `{invalid json}`,
 			statusCode: http.StatusOK,
-			req: domain.AssistantTurnRequest{
+			req: assistant.TurnRequest{
 				Model: "test-model",
-				Messages: []domain.AssistantMessage{
+				Messages: []assistant.Message{
 					{Role: "user", Content: "hi"},
 				},
 			},
@@ -347,10 +348,10 @@ func TestAssistantClientAdapter_RunTurnSync_ValidationErrors(t *testing.T) {
 	adapter := NewAssistantClientAdapter(client, client)
 
 	tests := map[string]struct {
-		req domain.AssistantTurnRequest
+		req assistant.TurnRequest
 	}{
-		"no-model":    {req: domain.AssistantTurnRequest{Messages: []domain.AssistantMessage{{Role: "user", Content: "hi"}}}},
-		"no-messages": {req: domain.AssistantTurnRequest{Model: "test"}},
+		"no-model":    {req: assistant.TurnRequest{Messages: []assistant.Message{{Role: "user", Content: "hi"}}}},
+		"no-messages": {req: assistant.TurnRequest{Model: "test"}},
 	}
 
 	for name, tt := range tests {
@@ -364,7 +365,7 @@ func TestAssistantClientAdapter_RunTurnSync_ValidationErrors(t *testing.T) {
 func TestAssistantClientAdapter_VectorizeTodo(t *testing.T) {
 	t.Parallel()
 
-	todo := domain.Todo{Title: "Test", DueDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), Status: domain.TodoStatus_OPEN}
+	todo := todo.Todo{Title: "Test", DueDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), Status: todo.Status_OPEN}
 	tests := map[string]struct {
 		response           string
 		statusCode         int
@@ -572,7 +573,7 @@ func TestAssistantClientAdapter_VectorizeQuery(t *testing.T) {
 func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 	t.Parallel()
 
-	baseSkill := domain.AssistantSkillDefinition{
+	baseSkill := assistant.SkillDefinition{
 		Name:      "todo-mutation-safety",
 		UseWhen:   "update todos",
 		AvoidWhen: "chat only",
@@ -583,7 +584,7 @@ func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 
 	tests := map[string]struct {
 		model         string
-		skill         domain.AssistantSkillDefinition
+		skill         assistant.SkillDefinition
 		expectInputs  []string
 		expectErr     bool
 		expectedUse   []float64
@@ -601,7 +602,7 @@ func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 		},
 		"default-model-with-content-line-property": {
 			model: "ai/otherembeddingmodel",
-			skill: domain.AssistantSkillDefinition{
+			skill: assistant.SkillDefinition{
 				Name:                  "todo-delete",
 				UseWhen:               "delete todos",
 				AvoidWhen:             "chat only",
@@ -619,7 +620,7 @@ func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 		},
 		"gemma-model-without-avoid-embedding": {
 			model: "ai/embeddinggemma",
-			skill: domain.AssistantSkillDefinition{
+			skill: assistant.SkillDefinition{
 				Name:    "todo-fetch",
 				UseWhen: "list todos",
 				Tools:   []string{"fetch_todos"},
@@ -689,7 +690,7 @@ func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
 		response   string
 		statusCode int
 		expectErr  bool
-		expected   []domain.ModelInfo
+		expected   []assistant.ModelInfo
 	}{
 		"success": {
 			statusCode: http.StatusOK,
@@ -700,9 +701,9 @@ func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
                     { "id": "docker.io/ai/llama3" }
                 ]
             }`,
-			expected: []domain.ModelInfo{
-				{ID: "docker.io/ai/qwen3-embedding", Name: "qwen3-embedding", Kind: domain.ModelKindEmbedding},
-				{ID: "docker.io/ai/llama3", Name: "llama3", Kind: domain.ModelKindAssistant},
+			expected: []assistant.ModelInfo{
+				{ID: "docker.io/ai/qwen3-embedding", Name: "qwen3-embedding", Kind: assistant.ModelKindEmbedding},
+				{ID: "docker.io/ai/llama3", Name: "llama3", Kind: assistant.ModelKindAssistant},
 			},
 		},
 		"empty-list": {
@@ -711,7 +712,7 @@ func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
                 "object": "list",
                 "data": []
             }`,
-			expected: []domain.ModelInfo{},
+			expected: []assistant.ModelInfo{},
 		},
 		"server-error": {
 			statusCode: http.StatusInternalServerError,
@@ -747,17 +748,4 @@ func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
 			assert.Equal(t, tt.expected, models)
 		})
 	}
-}
-
-func TestInitAssistantClient_Initialize(t *testing.T) {
-	t.Parallel()
-
-	i := InitAssistantClient{}
-
-	_, err := i.Initialize(context.Background())
-	assert.NoError(t, err)
-
-	r, err := depend.Resolve[domain.Assistant]()
-	assert.NotNil(t, r)
-	assert.NoError(t, err)
 }

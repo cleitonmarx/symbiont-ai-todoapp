@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,7 +24,7 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 
 	tests := map[string]struct {
 		expect       func(sqlmock.Sqlmock)
-		expected     domain.ConversationSummary
+		expected     assistant.ConversationSummary
 		expectedFind bool
 		expectErr    bool
 	}{
@@ -36,7 +36,7 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
-			expected: domain.ConversationSummary{
+			expected: assistant.ConversationSummary{
 				ID:                      summaryID,
 				ConversationID:          conversationID,
 				CurrentStateSummary:     "current state",
@@ -52,7 +52,7 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 					WithArgs(conversationID).
 					WillReturnError(sql.ErrNoRows)
 			},
-			expected:     domain.ConversationSummary{},
+			expected:     assistant.ConversationSummary{},
 			expectedFind: false,
 			expectErr:    false,
 		},
@@ -62,7 +62,7 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 					WithArgs(conversationID).
 					WillReturnError(errors.New("db error"))
 			},
-			expected:     domain.ConversationSummary{},
+			expected:     assistant.ConversationSummary{},
 			expectedFind: false,
 			expectErr:    true,
 		},
@@ -99,7 +99,7 @@ func TestConversationSummaryRepository_StoreConversationSummary(t *testing.T) {
 	messageID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
 	updatedAt := time.Date(2026, 2, 12, 12, 0, 0, 0, time.UTC)
 
-	summary := domain.ConversationSummary{
+	summary := assistant.ConversationSummary{
 		ID:                      summaryID,
 		ConversationID:          conversationID,
 		CurrentStateSummary:     "current state",
@@ -193,18 +193,4 @@ func TestConversationSummaryRepository_DeleteConversationSummary(t *testing.T) {
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
-}
-
-func TestInitConversationSummaryRepository_Initialize(t *testing.T) {
-	t.Parallel()
-
-	i := &InitConversationSummaryRepository{
-		DB: &sql.DB{},
-	}
-
-	_, err := i.Initialize(context.Background())
-	assert.NoError(t, err)
-
-	_, err = depend.Resolve[domain.ConversationSummaryRepository]()
-	assert.NoError(t, err)
 }

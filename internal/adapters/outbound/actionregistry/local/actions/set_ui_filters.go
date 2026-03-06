@@ -4,36 +4,37 @@ import (
 	"context"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 )
 
-// UIFiltersSetterAction is an assistant action for synchronizing UI filter state.
-type UIFiltersSetterAction struct{}
+// SetUIFiltersAction is an assistant action for synchronizing UI filter state.
+type SetUIFiltersAction struct{}
 
-// NewUIFiltersSetterAction creates a new instance of UIFiltersSetterAction.
-func NewUIFiltersSetterAction() UIFiltersSetterAction {
-	return UIFiltersSetterAction{}
+// NewSetUIFiltersAction creates a new instance of SetUIFiltersAction.
+func NewSetUIFiltersAction() SetUIFiltersAction {
+	return SetUIFiltersAction{}
 }
 
 // StatusMessage returns a status message about the tool execution.
-func (t UIFiltersSetterAction) StatusMessage() string {
+func (t SetUIFiltersAction) StatusMessage() string {
 	return "🎛️ Applying filters..."
 }
 
 // Renderer reports that set_ui_filters does not expose a deterministic renderer.
-func (t UIFiltersSetterAction) Renderer() (domain.ActionResultRenderer, bool) {
+func (t SetUIFiltersAction) Renderer() (assistant.ActionResultRenderer, bool) {
 	return nil, false
 }
 
-// Definition returns the assistant action definition for UIFiltersSetterAction.
-func (t UIFiltersSetterAction) Definition() domain.AssistantActionDefinition {
-	return domain.AssistantActionDefinition{
+// Definition returns the assistant action definition for SetUIFiltersAction.
+func (t SetUIFiltersAction) Definition() assistant.ActionDefinition {
+	return assistant.ActionDefinition{
 		Name:        "set_ui_filters",
 		Description: "Set UI filter state for read/query views.",
-		Input: domain.AssistantActionInput{
+		Input: assistant.ActionInput{
 			Type: "object",
-			Fields: map[string]domain.AssistantActionField{
+			Fields: map[string]assistant.ActionField{
 				"page": {
 					Type:        "integer",
 					Description: "page number starting from 1. Optional.",
@@ -49,7 +50,7 @@ func (t UIFiltersSetterAction) Definition() domain.AssistantActionDefinition {
 					Type:        "string",
 					Description: "status filter. Optional.",
 					Required:    false,
-					Enum:        []any{domain.TodoStatus_OPEN, domain.TodoStatus_DONE},
+					Enum:        []any{todo.Status_OPEN, todo.Status_DONE},
 				},
 				"search_by_similarity": {
 					Type:        "string",
@@ -84,8 +85,8 @@ func (t UIFiltersSetterAction) Definition() domain.AssistantActionDefinition {
 	}
 }
 
-// Execute executes UIFiltersSetterAction.
-func (t UIFiltersSetterAction) Execute(_ context.Context, call domain.AssistantActionCall, _ []domain.AssistantMessage) domain.AssistantMessage {
+// Execute executes SetUIFiltersAction.
+func (t SetUIFiltersAction) Execute(_ context.Context, call assistant.ActionCall, _ []assistant.Message) assistant.Message {
 	params := struct {
 		Status             *string `json:"status"`
 		SearchBySimilarity *string `json:"search_by_similarity"`
@@ -100,8 +101,8 @@ func (t UIFiltersSetterAction) Execute(_ context.Context, call domain.AssistantA
 	exampleArgs := `{"search_by_similarity":"buy milk","sort_by":"similarityAsc","page":1,"page_size":25}`
 
 	if err := unmarshalActionInput(call.Input, &params); err != nil {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
 		}
@@ -110,7 +111,7 @@ func (t UIFiltersSetterAction) Execute(_ context.Context, call domain.AssistantA
 	var dueAfterTime *time.Time
 	var dueBeforeTime *time.Time
 	if params.DueAfter != nil || params.DueBefore != nil {
-		var errMsg *domain.AssistantMessage
+		var errMsg *assistant.Message
 		dueAfterTime, dueBeforeTime, errMsg = parseDueDateParams(params.DueAfter, params.DueBefore, exampleArgs)
 		if errMsg != nil {
 			errMsg.ActionCallID = &call.ID
@@ -118,8 +119,8 @@ func (t UIFiltersSetterAction) Execute(_ context.Context, call domain.AssistantA
 		}
 	}
 
-	err := usecases.NewTodoSearchBuilder().
-		WithStatus((*domain.TodoStatus)(params.Status)).
+	err := todouc.NewTodoSearchBuilder().
+		WithStatus((*todo.Status)(params.Status)).
 		WithDueDateRange(dueAfterTime, dueBeforeTime).
 		WithSortBy(params.SortBy).
 		WithTitleContains(params.SearchByTitle).
@@ -127,15 +128,15 @@ func (t UIFiltersSetterAction) Execute(_ context.Context, call domain.AssistantA
 		Validate()
 	if err != nil {
 		code := mapTodoFilterBuildErrCode(err)
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError(code, err.Error(), exampleArgs),
 		}
 	}
 
-	return domain.AssistantMessage{
-		Role:         domain.ChatRole_Tool,
+	return assistant.Message{
+		Role:         assistant.ChatRole_Tool,
 		ActionCallID: &call.ID,
 		Content:      "ok",
 	}

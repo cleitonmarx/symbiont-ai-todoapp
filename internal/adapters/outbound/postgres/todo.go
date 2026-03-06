@@ -5,9 +5,9 @@ import (
 	"database/sql"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/google/uuid"
 	"github.com/pgvector/pgvector-go"
 	"go.opentelemetry.io/otel/attribute"
@@ -25,7 +25,7 @@ var (
 	}
 )
 
-// TodoRepository implements the domain.TodoRepository interface using PostgreSQL as the storage backend.
+// TodoRepository implements the todo.Repository interface using PostgreSQL as the storage backend.
 type TodoRepository struct {
 	sb sq.StatementBuilderType
 }
@@ -38,7 +38,7 @@ func NewTodoRepository(br sq.BaseRunner) TodoRepository {
 }
 
 // ListTodos lists todos with pagination and optional filters.
-func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, opts ...domain.ListTodoOption) ([]domain.Todo, bool, error) {
+func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, opts ...todo.ListOption) ([]todo.Todo, bool, error) {
 	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
 		attribute.Int("page", page),
 		attribute.Int("pageSize", pageSize),
@@ -46,10 +46,10 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 	defer span.End()
 
 	if pageSize <= 0 {
-		return nil, false, domain.NewValidationErr("page_size must be greater than 0")
+		return nil, false, core.NewValidationErr("page_size must be greater than 0")
 	}
 	if page <= 0 {
-		return nil, false, domain.NewValidationErr("page must be greater than 0")
+		return nil, false, core.NewValidationErr("page must be greater than 0")
 	}
 
 	qry := tr.sb.
@@ -59,7 +59,7 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 		Limit(uint64(pageSize + 1)). // fetch one extra to determine if there's more
 		Offset(uint64((page - 1) * pageSize))
 
-	params := &domain.ListTodosParams{}
+	params := &todo.ListParams{}
 	for _, opt := range opts {
 		opt(params)
 	}
@@ -104,21 +104,21 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var todos []domain.Todo
+	var todos []todo.Todo
 	for rows.Next() {
-		var todo domain.Todo
+		var td todo.Todo
 		err := rows.Scan(
-			&todo.ID,
-			&todo.Title,
-			&todo.Status,
-			&todo.DueDate,
-			&todo.CreatedAt,
-			&todo.UpdatedAt,
+			&td.ID,
+			&td.Title,
+			&td.Status,
+			&td.DueDate,
+			&td.CreatedAt,
+			&td.UpdatedAt,
 		)
 		if telemetry.RecordErrorAndStatus(span, err) {
 			return nil, false, err
 		}
-		todos = append(todos, todo)
+		todos = append(todos, td)
 	}
 
 	if err := rows.Err(); telemetry.RecordErrorAndStatus(span, err) {
@@ -133,7 +133,7 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 }
 
 // applySort applies sorting to the given squirrel SelectBuilder based on the provided ListTodosParams.
-func applySort(qry sq.SelectBuilder, params *domain.ListTodosParams) (sq.SelectBuilder, error) {
+func applySort(qry sq.SelectBuilder, params *todo.ListParams) (sq.SelectBuilder, error) {
 	if params.SortBy == nil {
 		return qry.OrderBy("due_date ASC"), nil
 	}
@@ -148,7 +148,7 @@ func applySort(qry sq.SelectBuilder, params *domain.ListTodosParams) (sq.SelectB
 			pgvector.NewVector(toFloat32Truncated(params.Embedding)),
 		)), nil
 	} else if params.SortBy.Field == "similarity" && len(params.Embedding) == 0 {
-		return qry, domain.NewValidationErr("embedding must be provided for similarity sorting")
+		return qry, core.NewValidationErr("embedding must be provided for similarity sorting")
 	}
 
 	orderClause := params.SortBy.Field + " " + params.SortBy.Direction
@@ -156,7 +156,7 @@ func applySort(qry sq.SelectBuilder, params *domain.ListTodosParams) (sq.SelectB
 }
 
 // CreateTodo creates a new todo.
-func (tr TodoRepository) CreateTodo(ctx context.Context, todo domain.Todo) error {
+func (tr TodoRepository) CreateTodo(ctx context.Context, td todo.Todo) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -172,13 +172,13 @@ func (tr TodoRepository) CreateTodo(ctx context.Context, todo domain.Todo) error
 			"updated_at",
 		).
 		Values(
-			todo.ID,
-			todo.Title,
-			todo.Status,
-			todo.DueDate,
-			pgvector.NewVector(toFloat32Truncated(todo.Embedding)),
-			todo.CreatedAt,
-			todo.UpdatedAt,
+			td.ID,
+			td.Title,
+			td.Status,
+			td.DueDate,
+			pgvector.NewVector(toFloat32Truncated(td.Embedding)),
+			td.CreatedAt,
+			td.UpdatedAt,
 		).
 		ExecContext(spanCtx)
 
@@ -190,18 +190,18 @@ func (tr TodoRepository) CreateTodo(ctx context.Context, todo domain.Todo) error
 }
 
 // UpdateTodo updates an existing todo.
-func (tr TodoRepository) UpdateTodo(ctx context.Context, todo domain.Todo) error {
+func (tr TodoRepository) UpdateTodo(ctx context.Context, td todo.Todo) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	_, err := tr.sb.
 		Update("todos").
-		Set("title", todo.Title).
-		Set("status", todo.Status).
-		Set("due_date", todo.DueDate).
-		Set("embedding", pgvector.NewVector(toFloat32Truncated(todo.Embedding))).
-		Set("updated_at", todo.UpdatedAt).
-		Where(sq.Eq{"id": todo.ID}).
+		Set("title", td.Title).
+		Set("status", td.Status).
+		Set("due_date", td.DueDate).
+		Set("embedding", pgvector.NewVector(toFloat32Truncated(td.Embedding))).
+		Set("updated_at", td.UpdatedAt).
+		Where(sq.Eq{"id": td.ID}).
 		ExecContext(spanCtx)
 
 	if telemetry.RecordErrorAndStatus(span, err) {
@@ -227,11 +227,11 @@ func (tr TodoRepository) DeleteTodo(ctx context.Context, id uuid.UUID) error {
 }
 
 // GetTodo retrieves a todo by its ID.
-func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo, bool, error) {
+func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (todo.Todo, bool, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
-	var todo domain.Todo
+	var td todo.Todo
 	err := tr.sb.
 		Select(
 			todoFields...,
@@ -240,35 +240,25 @@ func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (domain.Todo
 		Where(sq.Eq{"id": id}).
 		QueryRowContext(spanCtx).
 		Scan(
-			&todo.ID,
-			&todo.Title,
-			&todo.Status,
-			&todo.DueDate,
-			&todo.CreatedAt,
-			&todo.UpdatedAt,
+			&td.ID,
+			&td.Title,
+			&td.Status,
+			&td.DueDate,
+			&td.CreatedAt,
+			&td.UpdatedAt,
 		)
 
 	if telemetry.RecordErrorAndStatus(span, err) {
 		if err == sql.ErrNoRows {
-			return domain.Todo{}, false, nil
+			return todo.Todo{}, false, nil
 		}
-		return domain.Todo{}, false, err
+		return todo.Todo{}, false, err
 	}
 
-	return todo, true, nil
+	return td, true, nil
 }
 
-// InitTodoRepository is a Symbiont initializer for TodoRepository.
-type InitTodoRepository struct {
-	DB *sql.DB `resolve:""`
-}
-
-// Initialize registers the TodoRepository in the dependency container.
-func (tr InitTodoRepository) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[domain.TodoRepository](NewTodoRepository(tr.DB))
-	return ctx, nil
-}
-
+// toFloat32Truncated converts a slice of float64 to a slice of float32, truncating to 768 dimensions if necessary.
 func toFloat32Truncated(input []float64) []float32 {
 	f32 := make([]float32, len(input))
 	for i, v := range input {

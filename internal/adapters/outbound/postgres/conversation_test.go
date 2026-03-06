@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -22,25 +22,25 @@ func TestConversationRepository_CreateConversation(t *testing.T) {
 
 	tests := map[string]struct {
 		title       string
-		titleSource domain.ConversationTitleSource
+		titleSource assistant.ConversationTitleSource
 		expect      func(sqlmock.Sqlmock)
-		expected    domain.Conversation
+		expected    assistant.Conversation
 		expectErr   bool
 	}{
 		"success": {
 			title:       "Plan Japan trip",
-			titleSource: domain.ConversationTitleSource_Auto,
+			titleSource: assistant.ConversationTitleSource_Auto,
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(conversationFields).
-					AddRow(fixedID, "Plan Japan trip", domain.ConversationTitleSource_Auto, nil, fixedTime, fixedTime)
+					AddRow(fixedID, "Plan Japan trip", assistant.ConversationTitleSource_Auto, nil, fixedTime, fixedTime)
 				m.ExpectQuery("INSERT INTO conversations (id,title,title_source,last_message_at,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, title, title_source, last_message_at, created_at, updated_at").
-					WithArgs(sqlmock.AnyArg(), "Plan Japan trip", domain.ConversationTitleSource_Auto, nil, sqlmock.AnyArg(), sqlmock.AnyArg()).
+					WithArgs(sqlmock.AnyArg(), "Plan Japan trip", assistant.ConversationTitleSource_Auto, nil, sqlmock.AnyArg(), sqlmock.AnyArg()).
 					WillReturnRows(rows)
 			},
-			expected: domain.Conversation{
+			expected: assistant.Conversation{
 				ID:          fixedID,
 				Title:       "Plan Japan trip",
-				TitleSource: domain.ConversationTitleSource_Auto,
+				TitleSource: assistant.ConversationTitleSource_Auto,
 				CreatedAt:   fixedTime,
 				UpdatedAt:   fixedTime,
 			},
@@ -48,16 +48,16 @@ func TestConversationRepository_CreateConversation(t *testing.T) {
 		},
 		"validation-error-empty-title": {
 			title:       "",
-			titleSource: domain.ConversationTitleSource_Auto,
+			titleSource: assistant.ConversationTitleSource_Auto,
 			expect:      func(sqlmock.Sqlmock) {},
 			expectErr:   true,
 		},
 		"database-error": {
 			title:       "Plan Japan trip",
-			titleSource: domain.ConversationTitleSource_Auto,
+			titleSource: assistant.ConversationTitleSource_Auto,
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectQuery("INSERT INTO conversations (id,title,title_source,last_message_at,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, title, title_source, last_message_at, created_at, updated_at").
-					WithArgs(sqlmock.AnyArg(), "Plan Japan trip", domain.ConversationTitleSource_Auto, nil, sqlmock.AnyArg(), sqlmock.AnyArg()).
+					WithArgs(sqlmock.AnyArg(), "Plan Japan trip", assistant.ConversationTitleSource_Auto, nil, sqlmock.AnyArg(), sqlmock.AnyArg()).
 					WillReturnError(errors.New("db error"))
 			},
 			expectErr: true,
@@ -95,22 +95,22 @@ func TestConversationRepository_GetConversation(t *testing.T) {
 
 	tests := map[string]struct {
 		expect       func(sqlmock.Sqlmock)
-		expected     domain.Conversation
+		expected     assistant.Conversation
 		expectedFind bool
 		expectErr    bool
 	}{
 		"success": {
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(conversationFields).
-					AddRow(conversationID, "Trip", domain.ConversationTitleSource_User, lastMessageAt, fixedTime, fixedTime)
+					AddRow(conversationID, "Trip", assistant.ConversationTitleSource_User, lastMessageAt, fixedTime, fixedTime)
 				m.ExpectQuery("SELECT id, title, title_source, last_message_at, created_at, updated_at FROM conversations WHERE id = $1 LIMIT 1").
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
-			expected: domain.Conversation{
+			expected: assistant.Conversation{
 				ID:            conversationID,
 				Title:         "Trip",
-				TitleSource:   domain.ConversationTitleSource_User,
+				TitleSource:   assistant.ConversationTitleSource_User,
 				LastMessageAt: &lastMessageAt,
 				CreatedAt:     fixedTime,
 				UpdatedAt:     fixedTime,
@@ -166,16 +166,16 @@ func TestConversationRepository_UpdateConversation(t *testing.T) {
 
 	lastMessageAt := time.Date(2026, 2, 16, 13, 0, 0, 0, time.UTC)
 	updatedAt := time.Date(2026, 2, 16, 14, 0, 0, 0, time.UTC)
-	conversation := domain.Conversation{
+	conversation := assistant.Conversation{
 		ID:            uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 		Title:         "Renamed",
-		TitleSource:   domain.ConversationTitleSource_User,
+		TitleSource:   assistant.ConversationTitleSource_User,
 		LastMessageAt: &lastMessageAt,
 		UpdatedAt:     updatedAt,
 	}
 
 	tests := map[string]struct {
-		conversation domain.Conversation
+		conversation assistant.Conversation
 		expect       func(sqlmock.Sqlmock)
 		expectErr    bool
 	}{
@@ -189,10 +189,10 @@ func TestConversationRepository_UpdateConversation(t *testing.T) {
 			expectErr: false,
 		},
 		"id-mismatch": {
-			conversation: domain.Conversation{
+			conversation: assistant.Conversation{
 				ID:          uuid.MustParse("ffffffff-ffff-ffff-ffff-ffffffffffff"),
 				Title:       "Renamed",
-				TitleSource: domain.ConversationTitleSource_User,
+				TitleSource: assistant.ConversationTitleSource_User,
 			},
 			expect:    func(sqlmock.Sqlmock) {},
 			expectErr: true,
@@ -243,7 +243,7 @@ func TestConversationRepository_ListConversations(t *testing.T) {
 		page            int
 		pageSize        int
 		expect          func(sqlmock.Sqlmock)
-		expected        []domain.Conversation
+		expected        []assistant.Conversation
 		expectedHasMore bool
 		expectErr       bool
 	}{
@@ -252,17 +252,17 @@ func TestConversationRepository_ListConversations(t *testing.T) {
 			pageSize: 2,
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(conversationFields).
-					AddRow(c1, "C1", domain.ConversationTitleSource_Auto, lastMessageAt, createdAt, updatedAt).
-					AddRow(c2, "C2", domain.ConversationTitleSource_User, nil, createdAt, updatedAt).
-					AddRow(c3, "C3", domain.ConversationTitleSource_LLM, nil, createdAt, updatedAt)
+					AddRow(c1, "C1", assistant.ConversationTitleSource_Auto, lastMessageAt, createdAt, updatedAt).
+					AddRow(c2, "C2", assistant.ConversationTitleSource_User, nil, createdAt, updatedAt).
+					AddRow(c3, "C3", assistant.ConversationTitleSource_LLM, nil, createdAt, updatedAt)
 				m.ExpectQuery("SELECT id, title, title_source, last_message_at, created_at, updated_at FROM conversations ORDER BY last_message_at DESC NULLS LAST, updated_at DESC, created_at DESC LIMIT 3 OFFSET 0").
 					WillReturnRows(rows)
 			},
-			expected: []domain.Conversation{
+			expected: []assistant.Conversation{
 				{
 					ID:            c1,
 					Title:         "C1",
-					TitleSource:   domain.ConversationTitleSource_Auto,
+					TitleSource:   assistant.ConversationTitleSource_Auto,
 					LastMessageAt: &lastMessageAt,
 					CreatedAt:     createdAt,
 					UpdatedAt:     updatedAt,
@@ -270,7 +270,7 @@ func TestConversationRepository_ListConversations(t *testing.T) {
 				{
 					ID:          c2,
 					Title:       "C2",
-					TitleSource: domain.ConversationTitleSource_User,
+					TitleSource: assistant.ConversationTitleSource_User,
 					CreatedAt:   createdAt,
 					UpdatedAt:   updatedAt,
 				},
@@ -363,18 +363,4 @@ func TestConversationRepository_DeleteConversation(t *testing.T) {
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
-}
-
-func TestInitConversationRepository_Initialize(t *testing.T) {
-	t.Parallel()
-
-	i := &InitConversationRepository{
-		DB: &sql.DB{},
-	}
-
-	_, err := i.Initialize(t.Context())
-	assert.NoError(t, err)
-
-	_, err = depend.Resolve[domain.ConversationRepository]()
-	assert.NoError(t, err)
 }

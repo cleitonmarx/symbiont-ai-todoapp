@@ -4,7 +4,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +15,7 @@ func TestParseSkillMarkdown(t *testing.T) {
 	tests := []struct {
 		name    string
 		content string
-		assert  func(*testing.T, domain.AssistantSkillDefinition, error)
+		assert  func(*testing.T, assistant.SkillDefinition, error)
 	}{
 		{
 			name: "valid-markdown",
@@ -31,7 +31,7 @@ tools: [fetch_todos, update_todos, update_todos_due_date, delete_todos]
 
 Goal: execute todo mutations safely and with valid arguments.
 `,
-			assert: func(t *testing.T, got domain.AssistantSkillDefinition, err error) {
+			assert: func(t *testing.T, got assistant.SkillDefinition, err error) {
 				require.NoError(t, err)
 				assert.Equal(t, "todo-mutation-safety", got.Name)
 				assert.Equal(t, 90, got.Priority)
@@ -47,7 +47,7 @@ Goal: execute todo mutations safely and with valid arguments.
 			content: `name: todo-mutation-safety
 body only
 `,
-			assert: func(t *testing.T, _ domain.AssistantSkillDefinition, err error) {
+			assert: func(t *testing.T, _ assistant.SkillDefinition, err error) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "missing YAML frontmatter opening delimiter")
 			},
@@ -59,7 +59,7 @@ use_when: test
 ---
 body
 `,
-			assert: func(t *testing.T, _ domain.AssistantSkillDefinition, err error) {
+			assert: func(t *testing.T, _ assistant.SkillDefinition, err error) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "skill name is required")
 			},
@@ -70,7 +70,7 @@ body
 name: noop
 ---
 `,
-			assert: func(t *testing.T, _ domain.AssistantSkillDefinition, err error) {
+			assert: func(t *testing.T, _ assistant.SkillDefinition, err error) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "skill content is required")
 			},
@@ -93,7 +93,7 @@ func TestLoadSkillsFromFS(t *testing.T) {
 	tests := []struct {
 		name   string
 		fs     fstest.MapFS
-		assert func(*testing.T, []domain.AssistantSkillDefinition, error)
+		assert func(*testing.T, []assistant.SkillDefinition, error)
 	}{
 		{
 			name: "loads-markdown-and-sorts-by-priority",
@@ -114,7 +114,7 @@ High skill.
 `)},
 				"ignore.txt": {Data: []byte("ignored")},
 			},
-			assert: func(t *testing.T, got []domain.AssistantSkillDefinition, err error) {
+			assert: func(t *testing.T, got []assistant.SkillDefinition, err error) {
 				require.NoError(t, err)
 				require.Len(t, got, 2)
 				assert.Equal(t, "high-priority", got[0].Name)
@@ -128,7 +128,7 @@ High skill.
 			fs: fstest.MapFS{
 				"bad.md": {Data: []byte("no frontmatter")},
 			},
-			assert: func(t *testing.T, _ []domain.AssistantSkillDefinition, err error) {
+			assert: func(t *testing.T, _ []assistant.SkillDefinition, err error) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "failed to parse skill file")
 			},

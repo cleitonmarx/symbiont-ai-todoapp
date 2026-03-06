@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -56,13 +56,13 @@ type assistantActionApprovalConfig struct {
 }
 
 // toDomain converts one approval override block into a domain approval policy.
-func (c assistantActionApprovalConfig) toDomain() (domain.AssistantActionApproval, error) {
+func (c assistantActionApprovalConfig) toDomain() (assistant.ActionApproval, error) {
 	timeout, err := parseApprovalTimeout(c.Timeout)
 	if err != nil {
-		return domain.AssistantActionApproval{}, err
+		return assistant.ActionApproval{}, err
 	}
 
-	return domain.AssistantActionApproval{
+	return assistant.ActionApproval{
 		Required:      c.Required,
 		Title:         strings.TrimSpace(c.Title),
 		Description:   strings.TrimSpace(c.Description),
@@ -114,7 +114,7 @@ func parseApprovalTimeout(timeout string) (time.Duration, error) {
 
 // toolOverrides bundles both definition and status message overrides loaded from YAML.
 type toolOverrides struct {
-	Definitions    map[string]domain.AssistantActionDefinition
+	Definitions    map[string]assistant.ActionDefinition
 	StatusMessages map[string]string
 }
 
@@ -127,7 +127,7 @@ func loadToolOverrides() (toolOverrides, error) {
 }
 
 // parseToolOverrideDefinitions parses the embedded YAML override file into action definitions.
-func parseToolOverrideDefinitions(content []byte) (map[string]domain.AssistantActionDefinition, error) {
+func parseToolOverrideDefinitions(content []byte) (map[string]assistant.ActionDefinition, error) {
 	overrides, err := parseToolOverrides(content)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func parseToolOverrides(content []byte) (toolOverrides, error) {
 		return toolOverrides{}, err
 	}
 
-	byName := map[string]domain.AssistantActionDefinition{}
+	byName := map[string]assistant.ActionDefinition{}
 	statusByName := map[string]string{}
 	for _, override := range cfg.Tools {
 		name := strings.TrimSpace(override.Name)
@@ -163,15 +163,15 @@ func parseToolOverrides(content []byte) (toolOverrides, error) {
 			statusByName[name] = statusMessage
 		}
 
-		fields := map[string]domain.AssistantActionField{}
+		fields := map[string]assistant.ActionField{}
 		for fieldName, field := range override.Input.Fields {
 			fields[fieldName] = overrideFieldToDomain(field)
 		}
 
-		def := domain.AssistantActionDefinition{
+		def := assistant.ActionDefinition{
 			Name:        name,
 			Description: strings.TrimSpace(override.Description),
-			Input: domain.AssistantActionInput{
+			Input: assistant.ActionInput{
 				Type:   strings.TrimSpace(override.Input.Type),
 				Fields: fields,
 			},

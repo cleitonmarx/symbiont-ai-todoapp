@@ -5,10 +5,9 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/semantic"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +15,7 @@ func TestNewSkillRegistry_ValidatesDependencies(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		enc    domain.SemanticEncoder
+		enc    semantic.Encoder
 		model  string
 		assert func(*testing.T, error)
 	}{
@@ -28,7 +27,7 @@ func TestNewSkillRegistry_ValidatesDependencies(t *testing.T) {
 			},
 		},
 		"missing-embedding-model": {
-			enc:   domain.NewMockSemanticEncoder(t),
+			enc:   semantic.NewMockEncoder(t),
 			model: "",
 			assert: func(t *testing.T, err error) {
 				require.Error(t, err)
@@ -41,7 +40,7 @@ func TestNewSkillRegistry_ValidatesDependencies(t *testing.T) {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			_, err := NewSkillRegistry(context.Background(), []domain.AssistantSkillDefinition{{Name: "x", Content: "y"}}, tt.enc, tt.model, Config{})
+			_, err := NewSkillRegistry(context.Background(), []assistant.SkillDefinition{{Name: "x", Content: "y"}}, tt.enc, tt.model, Config{})
 			tt.assert(t, err)
 		})
 	}
@@ -51,26 +50,26 @@ func TestLocalRegistry_ListRelevant_EmbeddingRankingAndAvoid(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		query    domain.AssistantSkillQueryContext
+		query    assistant.SkillQueryContext
 		wantTop  string
 		wantSize int
 	}{
 		"delete-intent-prefers-mutation-skill": {
-			query: domain.AssistantSkillQueryContext{
-				Messages: []domain.AssistantMessage{{Role: domain.ChatRole_User, Content: "please delete my groceries todos"}},
+			query: assistant.SkillQueryContext{
+				Messages: []assistant.Message{{Role: assistant.ChatRole_User, Content: "please delete my groceries todos"}},
 			},
 			wantTop:  "todo-mutation-safety",
 			wantSize: 2,
 		},
 		"chat-summary-avoids-mutation-skill": {
-			query: domain.AssistantSkillQueryContext{
-				Messages: []domain.AssistantMessage{{Role: domain.ChatRole_User, Content: "just chat summary"}},
+			query: assistant.SkillQueryContext{
+				Messages: []assistant.Message{{Role: assistant.ChatRole_User, Content: "just chat summary"}},
 			},
 			wantTop:  "planning",
 			wantSize: 2,
 		},
 		"empty-query-returns-none": {
-			query:    domain.AssistantSkillQueryContext{},
+			query:    assistant.SkillQueryContext{},
 			wantTop:  "",
 			wantSize: 0,
 		},
@@ -135,27 +134,4 @@ Build a simple plan in steps.
 			assert.LessOrEqual(t, len(got), tt.wantSize)
 		})
 	}
-}
-
-func TestInitLocalSkillRegistry_Initialize(t *testing.T) {
-	t.Parallel()
-
-	enc := domain.NewMockSemanticEncoder(t)
-	enc.EXPECT().
-		VectorizeSkillDefinition(mock.Anything, "test-embedding-model", mock.Anything).
-		Return(domain.EmbeddingVector{Vector: []float64{1, 0}}, domain.EmbeddingVector{Vector: []float64{0, 1}}, nil)
-
-	i := InitLocalSkillRegistry{
-		SemanticEncoder: enc,
-		EmbeddingModel:  "test-embedding-model",
-	}
-
-	ctx, err := i.Initialize(t.Context())
-	assert.NoError(t, err)
-	assert.NotNil(t, ctx)
-
-	dep, err := depend.Resolve[domain.AssistantSkillRegistry]()
-	assert.NoError(t, err)
-	assert.NotNil(t, dep)
-
 }

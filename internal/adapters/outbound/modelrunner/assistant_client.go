@@ -3,13 +3,14 @@ package modelrunner
 import (
 	"context"
 	"errors"
-	"net/http"
+
 	"strings"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/semantic"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/google/uuid"
 )
 
@@ -25,37 +26,37 @@ func NewAssistantClientAdapter(client DRMAPIClient, embeddingClient DRMAPIClient
 	return AssistantClient{client: client, embeddingClient: embeddingClient, embeddingFactory: embeddingFactory{}}
 }
 
-// RunTurn implements domain.Assistant.
-func (a AssistantClient) RunTurn(ctx context.Context, req domain.AssistantTurnRequest, onEvent domain.AssistantEventCallback) error {
+// RunTurn implements assistant.Assistant.RunTurn.
+func (a AssistantClient) RunTurn(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	adapterReq := toChatRequest(req)
 
-	meta := domain.AssistantTurnStarted{
+	meta := assistant.TurnStarted{
 		UserMessageID:      uuid.New(),
 		AssistantMessageID: uuid.New(),
 	}
-	if err := onEvent(spanCtx, domain.AssistantEventType_TurnStarted, meta); err != nil {
+	if err := onEvent(spanCtx, assistant.EventType_TurnStarted, meta); err != nil {
 		return err
 	}
 
 	var (
-		actionCalls []*domain.AssistantActionCall
-		usage       domain.AssistantUsage
+		actionCalls []*assistant.ActionCall
+		usage       assistant.Usage
 	)
 
 	err := a.client.ChatStream(spanCtx, adapterReq, func(chunk StreamChunk) error {
 		for _, choice := range chunk.Choices {
 			if choice.Delta.Content != "" {
-				if err := onEvent(spanCtx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: choice.Delta.Content}); err != nil {
+				if err := onEvent(spanCtx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: choice.Delta.Content}); err != nil {
 					return err
 				}
 			}
 			if len(choice.Delta.ToolCalls) > 0 {
 				for _, tc := range choice.Delta.ToolCalls {
 					if tc.ID != "" {
-						actionCalls = append(actionCalls, &domain.AssistantActionCall{
+						actionCalls = append(actionCalls, &assistant.ActionCall{
 							ID:    tc.ID,
 							Name:  tc.Function.Name,
 							Input: tc.Function.Arguments,
@@ -82,37 +83,37 @@ func (a AssistantClient) RunTurn(ctx context.Context, req domain.AssistantTurnRe
 	}
 
 	for _, call := range actionCalls {
-		if err := onEvent(spanCtx, domain.AssistantEventType_ActionRequested, *call); err != nil {
+		if err := onEvent(spanCtx, assistant.EventType_ActionRequested, *call); err != nil {
 			return err
 		}
 	}
 
-	return onEvent(spanCtx, domain.AssistantEventType_TurnCompleted, domain.AssistantTurnCompleted{
+	return onEvent(spanCtx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
 		AssistantMessageID: meta.AssistantMessageID.String(),
 		CompletedAt:        time.Now().UTC().Format(time.RFC3339),
 		Usage:              usage,
 	})
 }
 
-// RunTurnSync implements domain.Assistant.
-func (a AssistantClient) RunTurnSync(ctx context.Context, req domain.AssistantTurnRequest) (domain.AssistantTurnResponse, error) {
+// RunTurnSync implements assistant.Assistant.RunTurnSync.
+func (a AssistantClient) RunTurnSync(ctx context.Context, req assistant.TurnRequest) (assistant.TurnResponse, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
 	adapterReq := toChatRequest(req)
 	resp, err := a.client.Chat(spanCtx, adapterReq)
 	if telemetry.RecordErrorAndStatus(span, err) {
-		return domain.AssistantTurnResponse{}, err
+		return assistant.TurnResponse{}, err
 	}
 	if len(resp.Choices) == 0 {
 		err := errors.New("no choices in response")
 		telemetry.RecordErrorAndStatus(span, err)
-		return domain.AssistantTurnResponse{}, err
+		return assistant.TurnResponse{}, err
 	}
 
-	res := domain.AssistantTurnResponse{Content: resp.Choices[0].Message.Content}
+	res := assistant.TurnResponse{Content: resp.Choices[0].Message.Content}
 	if resp.Usage != nil {
-		res.Usage = domain.AssistantUsage{
+		res.Usage = assistant.Usage{
 			PromptTokens:     resp.Usage.PromptTokens,
 			CompletionTokens: resp.Usage.CompletionTokens,
 			TotalTokens:      resp.Usage.TotalTokens,
@@ -121,8 +122,8 @@ func (a AssistantClient) RunTurnSync(ctx context.Context, req domain.AssistantTu
 	return res, nil
 }
 
-// VectorizeTodo implements domain.SemanticEncoder.
-func (a AssistantClient) VectorizeTodo(ctx context.Context, model string, todo domain.Todo) (domain.EmbeddingVector, error) {
+// VectorizeTodo implements semantic.Encoder.VectorizeTodo.
+func (a AssistantClient) VectorizeTodo(ctx context.Context, model string, todo todo.Todo) (semantic.EmbeddingVector, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 	gen := a.embeddingFactory.Get(model)
@@ -130,13 +131,13 @@ func (a AssistantClient) VectorizeTodo(ctx context.Context, model string, todo d
 	dimension := gen.Dimensions()
 	vec, err := a.embed(spanCtx, model, prompt, dimension)
 	if telemetry.RecordErrorAndStatus(span, err) {
-		return domain.EmbeddingVector{}, err
+		return semantic.EmbeddingVector{}, err
 	}
 	return vec, nil
 }
 
-// VectorizeQuery implements domain.SemanticEncoder.
-func (a AssistantClient) VectorizeQuery(ctx context.Context, model, query string) (domain.EmbeddingVector, error) {
+// VectorizeQuery implements semantic.Encoder.VectorizeQuery.
+func (a AssistantClient) VectorizeQuery(ctx context.Context, model, query string) (semantic.EmbeddingVector, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -145,37 +146,37 @@ func (a AssistantClient) VectorizeQuery(ctx context.Context, model, query string
 	dimension := gen.Dimensions()
 	vec, err := a.embed(spanCtx, model, prompt, dimension)
 	if telemetry.RecordErrorAndStatus(span, err) {
-		return domain.EmbeddingVector{}, err
+		return semantic.EmbeddingVector{}, err
 	}
 	return vec, nil
 }
 
-// VectorizeSkillDefinition implements domain.SemanticEncoder.
+// VectorizeSkillDefinition implements semantic.Encoder.VectorizeSkillDefinition.
 func (a AssistantClient) VectorizeSkillDefinition(
 	ctx context.Context,
 	model string,
-	skill domain.AssistantSkillDefinition,
-) (domain.EmbeddingVector, domain.EmbeddingVector, error) {
+	skill assistant.SkillDefinition,
+) (semantic.EmbeddingVector, semantic.EmbeddingVector, error) {
 	gen := a.embeddingFactory.Get(model)
 	dimension := gen.Dimensions()
 	var (
-		useVector domain.EmbeddingVector
+		useVector semantic.EmbeddingVector
 		err       error
 	)
 	if strings.TrimSpace(skill.UseWhen) != "" {
 		useText := gen.GenerateSkillPrompt(skill.Name, buildSkillUseEmbeddingText(skill))
 		useVector, err = a.embed(ctx, model, useText, dimension)
 		if err != nil {
-			return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
+			return semantic.EmbeddingVector{}, semantic.EmbeddingVector{}, err
 		}
 	}
 
-	var avoidVector domain.EmbeddingVector
+	var avoidVector semantic.EmbeddingVector
 	if strings.TrimSpace(skill.AvoidWhen) != "" {
 		avoidText := gen.GenerateSkillPrompt(skill.Name, buildSkillAvoidEmbeddingText(skill))
 		avoidVector, err = a.embed(ctx, model, avoidText, dimension)
 		if err != nil {
-			return domain.EmbeddingVector{}, domain.EmbeddingVector{}, err
+			return semantic.EmbeddingVector{}, semantic.EmbeddingVector{}, err
 		}
 	}
 	return useVector, avoidVector, nil
@@ -184,7 +185,7 @@ func (a AssistantClient) VectorizeSkillDefinition(
 // buildSkillUseEmbeddingText constructs the text to be embedded
 // for a skill's "use" conditions, including the main useWhen text,
 // an optional first line of the content, tags, and tools.
-func buildSkillUseEmbeddingText(skill domain.AssistantSkillDefinition) string {
+func buildSkillUseEmbeddingText(skill assistant.SkillDefinition) string {
 	parts := make([]string, 0, 5)
 	parts = appendIfNotEmpty(parts, strings.TrimSpace(skill.UseWhen))
 	if skill.EmbedFirstContentLine {
@@ -201,7 +202,7 @@ func buildSkillUseEmbeddingText(skill domain.AssistantSkillDefinition) string {
 
 // buildSkillAvoidEmbeddingText constructs the text to be embedded for a
 // skill's "avoid" conditions.
-func buildSkillAvoidEmbeddingText(skill domain.AssistantSkillDefinition) string {
+func buildSkillAvoidEmbeddingText(skill assistant.SkillDefinition) string {
 	avoid := strings.TrimSpace(skill.AvoidWhen)
 	if avoid == "" {
 		return ""
@@ -231,23 +232,23 @@ func firstSkillContentLine(content string) string {
 }
 
 // embed sends a request to the embedding API and returns the resulting vector in a provider-agnostic shape.
-func (a AssistantClient) embed(ctx context.Context, model, input string, dimension *int) (domain.EmbeddingVector, error) {
+func (a AssistantClient) embed(ctx context.Context, model, input string, dimension *int) (semantic.EmbeddingVector, error) {
 	req := EmbeddingsRequest{Model: model, Input: input, Dimensions: dimension}
 	resp, err := a.embeddingClient.Embeddings(ctx, req)
 	if err != nil {
-		return domain.EmbeddingVector{}, err
+		return semantic.EmbeddingVector{}, err
 	}
 	if len(resp.Data) == 0 {
-		return domain.EmbeddingVector{}, errors.New("no embedding data in response")
+		return semantic.EmbeddingVector{}, errors.New("no embedding data in response")
 	}
-	return domain.EmbeddingVector{
+	return semantic.EmbeddingVector{
 		Vector:      resp.Data[0].Embedding,
 		TotalTokens: resp.Usage.TotalTokens,
 	}, nil
 }
 
 // ListAvailableModels returns all available models in a provider-agnostic shape.
-func (a AssistantClient) ListAvailableModels(ctx context.Context) ([]domain.ModelInfo, error) {
+func (a AssistantClient) ListAvailableModels(ctx context.Context) ([]assistant.ModelInfo, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -256,15 +257,15 @@ func (a AssistantClient) ListAvailableModels(ctx context.Context) ([]domain.Mode
 		return nil, err
 	}
 
-	models := make([]domain.ModelInfo, len(resp.Data))
+	models := make([]assistant.ModelInfo, len(resp.Data))
 	for i, m := range resp.Data {
-		kind := domain.ModelKindAssistant
+		kind := assistant.ModelKindAssistant
 		if strings.Contains(m.ID, "embed") {
-			kind = domain.ModelKindEmbedding
+			kind = assistant.ModelKindEmbedding
 		}
 		nameParts := strings.Split(m.ID, "/")
 		name := nameParts[len(nameParts)-1]
-		models[i] = domain.ModelInfo{
+		models[i] = assistant.ModelInfo{
 			ID:   m.ID,
 			Name: name,
 			Kind: kind,
@@ -273,8 +274,8 @@ func (a AssistantClient) ListAvailableModels(ctx context.Context) ([]domain.Mode
 	return models, nil
 }
 
-// ListAssistantModels implements domain.AssistantModelCatalog.
-func (a AssistantClient) ListAssistantModels(ctx context.Context) ([]domain.AssistantModelInfo, error) {
+// ListModels implements assistant.ModelCatalog.ListModels.
+func (a AssistantClient) ListModels(ctx context.Context) ([]assistant.ModelCapabilities, error) {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -283,14 +284,14 @@ func (a AssistantClient) ListAssistantModels(ctx context.Context) ([]domain.Assi
 		return nil, err
 	}
 
-	res := make([]domain.AssistantModelInfo, 0, len(resp.Data))
+	res := make([]assistant.ModelCapabilities, 0, len(resp.Data))
 	for _, m := range resp.Data {
 		if strings.Contains(m.ID, "embed") {
 			continue
 		}
 		nameParts := strings.Split(m.ID, "/")
 		name := nameParts[len(nameParts)-1]
-		res = append(res, domain.AssistantModelInfo{
+		res = append(res, assistant.ModelCapabilities{
 			ID:                m.ID,
 			Name:              name,
 			SupportsStreaming: true,
@@ -300,8 +301,8 @@ func (a AssistantClient) ListAssistantModels(ctx context.Context) ([]domain.Assi
 	return res, nil
 }
 
-// toChatRequest converts a domain.AssistantTurnRequest to a ChatRequest for the API client.
-func toChatRequest(req domain.AssistantTurnRequest) ChatRequest {
+// toChatRequest converts a assistant.TurnRequest to a ChatRequest for the API client.
+func toChatRequest(req assistant.TurnRequest) ChatRequest {
 	adapterReq := ChatRequest{
 		Model:            req.Model,
 		Temperature:      req.Temperature,
@@ -362,9 +363,9 @@ func toChatRequest(req domain.AssistantTurnRequest) ChatRequest {
 	return adapterReq
 }
 
-// mapActionFieldToSchema recursively maps domain.AssistantActionField to ToolFuncParameterDetail,
+// mapActionFieldToSchema recursively maps assistant.ActionField to ToolFuncParameterDetail,
 // handling nested fields for object types.
-func mapActionFieldToSchema(field domain.AssistantActionField) ToolFuncParameterDetail {
+func mapActionFieldToSchema(field assistant.ActionField) ToolFuncParameterDetail {
 	schema := ToolFuncParameterDetail{
 		Type:        field.Type,
 		Description: field.Description,
@@ -399,25 +400,4 @@ func mapActionFieldToSchema(field domain.AssistantActionField) ToolFuncParameter
 	}
 
 	return schema
-}
-
-// InitAssistantClient initializes the assistant client dependency.
-type InitAssistantClient struct {
-	HttpClient         *http.Client `resolve:""`
-	EmbeddingModelHost string       `config:"LLM_EMBEDDING_MODEL_HOST"`
-	ModelHost          string       `config:"LLM_MODEL_HOST"`
-	APIKey             string       `config:"LLM_API_KEY" default:""`
-	EmbeddingAPIKey    string       `config:"LLM_EMBEDDING_API_KEY" default:""`
-}
-
-// Initialize registers assistant/model interfaces.
-func (i InitAssistantClient) Initialize(ctx context.Context) (context.Context, error) {
-	adapter := NewAssistantClientAdapter(
-		NewDRMAPIClient(i.ModelHost, i.APIKey, i.HttpClient),
-		NewDRMAPIClient(i.EmbeddingModelHost, i.EmbeddingAPIKey, i.HttpClient),
-	)
-	depend.Register[domain.Assistant](adapter)
-	depend.Register[domain.SemanticEncoder](adapter)
-	depend.Register[domain.AssistantModelCatalog](adapter)
-	return ctx, nil
 }

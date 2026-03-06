@@ -6,7 +6,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/types"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +19,7 @@ func (s *TodoGraphQLServer) UpdateTodo(ctx context.Context, params gen.UpdateTod
 		ctx,
 		params.ID,
 		params.Title,
-		(*domain.TodoStatus)(params.Status),
+		(*todo.Status)(params.Status),
 		(*time.Time)(params.DueDate),
 	)
 	return &gen.Todo{

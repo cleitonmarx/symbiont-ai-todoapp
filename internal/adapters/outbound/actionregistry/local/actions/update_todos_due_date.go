@@ -5,21 +5,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
+	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 	"github.com/google/uuid"
 )
 
-// BulkTodoDueDateUpdaterAction is an assistant action for updating due dates in bulk.
-type BulkTodoDueDateUpdaterAction struct {
-	uow          domain.UnitOfWork
-	updater      usecases.TodoUpdater
-	timeProvider domain.CurrentTimeProvider
+// UpdateTodosDueDateAction is an assistant action for updating due dates in bulk.
+type UpdateTodosDueDateAction struct {
+	uow          transaction.UnitOfWork
+	updater      todouc.Updater
+	timeProvider core.CurrentTimeProvider
 }
 
-// NewBulkTodoDueDateUpdaterAction creates a new instance of BulkTodoDueDateUpdaterAction.
-func NewBulkTodoDueDateUpdaterAction(uow domain.UnitOfWork, updater usecases.TodoUpdater, timeProvider domain.CurrentTimeProvider) BulkTodoDueDateUpdaterAction {
-	return BulkTodoDueDateUpdaterAction{
+// NewUpdateTodosDueDateAction creates a new instance of UpdateTodosDueDateAction.
+func NewUpdateTodosDueDateAction(uow transaction.UnitOfWork, updater todouc.Updater, timeProvider core.CurrentTimeProvider) UpdateTodosDueDateAction {
+	return UpdateTodosDueDateAction{
 		uow:          uow,
 		updater:      updater,
 		timeProvider: timeProvider,
@@ -27,31 +30,31 @@ func NewBulkTodoDueDateUpdaterAction(uow domain.UnitOfWork, updater usecases.Tod
 }
 
 // StatusMessage returns a status message about the action execution.
-func (a BulkTodoDueDateUpdaterAction) StatusMessage() string {
+func (a UpdateTodosDueDateAction) StatusMessage() string {
 	return "📅 Updating due dates..."
 }
 
 // Renderer returns the deterministic result renderer for due date updates.
-func (a BulkTodoDueDateUpdaterAction) Renderer() (domain.ActionResultRenderer, bool) {
+func (a UpdateTodosDueDateAction) Renderer() (assistant.ActionResultRenderer, bool) {
 	return updateTodosDueDateRenderer{}, true
 }
 
-// Definition returns the assistant action definition for BulkTodoDueDateUpdaterAction.
-func (a BulkTodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinition {
-	return domain.AssistantActionDefinition{
+// Definition returns the assistant action definition for UpdateTodosDueDateAction.
+func (a UpdateTodosDueDateAction) Definition() assistant.ActionDefinition {
+	return assistant.ActionDefinition{
 		Name:        "update_todos_due_date",
 		Description: "Update due dates for multiple todos.",
-		Input: domain.AssistantActionInput{
+		Input: assistant.ActionInput{
 			Type: "object",
-			Fields: map[string]domain.AssistantActionField{
+			Fields: map[string]assistant.ActionField{
 				"todos": {
 					Type:        "array",
 					Description: "List of due date updates. Each item: {id,due_date}. REQUIRED.",
 					Required:    true,
-					Items: &domain.AssistantActionField{
+					Items: &assistant.ActionField{
 						Type:        "object",
 						Description: "Todo item to update due date.",
-						Fields: map[string]domain.AssistantActionField{
+						Fields: map[string]assistant.ActionField{
 							"id": {
 								Type:        "string",
 								Description: "ID of the todo to update. REQUIRED.",
@@ -68,7 +71,7 @@ func (a BulkTodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinit
 				},
 			},
 		},
-		Approval: domain.AssistantActionApproval{
+		Approval: assistant.ActionApproval{
 			Required:    true,
 			Title:       "Confirm update of todo due dates",
 			Description: "Updating due dates will modify existing todos. Please confirm.",
@@ -81,8 +84,8 @@ func (a BulkTodoDueDateUpdaterAction) Definition() domain.AssistantActionDefinit
 	}
 }
 
-// Execute executes BulkTodoDueDateUpdaterAction.
-func (a BulkTodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.AssistantActionCall, conversationHistory []domain.AssistantMessage) domain.AssistantMessage {
+// Execute executes UpdateTodosDueDateAction.
+func (a UpdateTodosDueDateAction) Execute(ctx context.Context, call assistant.ActionCall, conversationHistory []assistant.Message) assistant.Message {
 	params := struct {
 		Todos []struct {
 			ID      string `json:"id"`
@@ -93,15 +96,15 @@ func (a BulkTodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.A
 
 	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
 		}
 	}
 	if len(params.Todos) == 0 {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError("invalid_arguments", "todos must not be empty.", exampleArgs),
 		}
@@ -116,8 +119,8 @@ func (a BulkTodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.A
 	for i, todo := range params.Todos {
 		todoID, parseErr := uuid.Parse(todo.ID)
 		if parseErr != nil {
-			return domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			return assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
 				Content:      newActionError("invalid_todo_id", fmt.Sprintf("todo at index %d has invalid id: %s", i, parseErr.Error()), exampleArgs),
 			}
@@ -125,8 +128,8 @@ func (a BulkTodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.A
 
 		dueDate, found := extractDateParam(todo.DueDate, conversationHistory, now)
 		if !found {
-			return domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			return assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
 				Content:      newActionError("invalid_due_date", fmt.Sprintf("todo at index %d has invalid due_date.", i), exampleArgs),
 			}
@@ -138,10 +141,10 @@ func (a BulkTodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.A
 		})
 	}
 
-	todos := make([]domain.Todo, 0, len(items))
-	err = a.uow.Execute(ctx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
+	todos := make([]todo.Todo, 0, len(items))
+	err = a.uow.Execute(ctx, func(uowCtx context.Context, scope transaction.Scope) error {
 		for i, item := range items {
-			todo, updateErr := a.updater.Update(uowCtx, uow, item.ID, nil, nil, &item.DueDate)
+			todo, updateErr := a.updater.Update(uowCtx, scope, item.ID, nil, nil, &item.DueDate)
 			if updateErr != nil {
 				return fmt.Errorf("todo at index %d: %w", i, updateErr)
 			}
@@ -150,15 +153,15 @@ func (a BulkTodoDueDateUpdaterAction) Execute(ctx context.Context, call domain.A
 		return nil
 	})
 	if err != nil {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError("update_todos_due_date_error", err.Error(), exampleArgs),
 		}
 	}
 
-	return domain.AssistantMessage{
-		Role:         domain.ChatRole_Tool,
+	return assistant.Message{
+		Role:         assistant.ChatRole_Tool,
 		ActionCallID: &call.ID,
 		Content:      formatTodosRows(todos),
 	}

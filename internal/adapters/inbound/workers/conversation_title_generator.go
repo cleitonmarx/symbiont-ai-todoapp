@@ -8,19 +8,19 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub/v2"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"github.com/google/uuid"
 )
 
 // ConversationTitleGenerator is a runnable that consumes chat-message events and asynchronously generates conversation titles.
 type ConversationTitleGenerator struct {
-	Logger                    *log.Logger                        `resolve:""`
-	Client                    *pubsub.Client                     `resolve:""`
-	GenerateConversationTitle usecases.GenerateConversationTitle `resolve:""`
-	Interval                  time.Duration                      `config:"CHAT_TITLE_BATCH_INTERVAL" default:"3s"`
-	BatchSize                 int                                `config:"CHAT_TITLE_BATCH_SIZE" default:"50"`
-	SubscriptionID            string                             `config:"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID"`
+	Logger                    *log.Logger                    `resolve:""`
+	Client                    *pubsub.Client                 `resolve:""`
+	GenerateConversationTitle chat.GenerateConversationTitle `resolve:""`
+	Interval                  time.Duration                  `config:"CHAT_TITLE_BATCH_INTERVAL" default:"3s"`
+	BatchSize                 int                            `config:"CHAT_TITLE_BATCH_SIZE" default:"50"`
+	SubscriptionID            string                         `config:"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID"`
 	workerExecutionChan       chan struct{}
 }
 
@@ -95,14 +95,14 @@ func (s ConversationTitleGenerator) flush(ctx context.Context, batch []*pubsub.M
 
 	conversations := make(map[uuid.UUID]conversationTitleGeneratorBatch)
 	for _, msg := range batch {
-		var event domain.ChatMessageEvent
+		var event outbox.ChatMessageEvent
 		if err := json.Unmarshal(msg.Data, &event); err != nil {
 			s.Logger.Printf("ConversationTitleGenerator: failed to decode event payload: %v", err)
 			msg.Nack()
 			continue
 		}
 
-		if event.Type != domain.EventType_CHAT_MESSAGE_SENT {
+		if event.Type != outbox.EventType_CHAT_MESSAGE_SENT {
 			msg.Ack()
 			continue
 		}
@@ -137,6 +137,6 @@ func (s ConversationTitleGenerator) flush(ctx context.Context, batch []*pubsub.M
 // conversationTitleGeneratorBatch represents a batch of chat message events for a single conversation,
 // along with the latest event for that conversation.
 type conversationTitleGeneratorBatch struct {
-	LatestEvent domain.ChatMessageEvent
+	LatestEvent outbox.ChatMessageEvent
 	Messages    []*pubsub.Message
 }

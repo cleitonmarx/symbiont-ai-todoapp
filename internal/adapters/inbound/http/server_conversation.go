@@ -8,7 +8,7 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-// List conversations for the user
+// ListConversations lists conversations for the user.
 // (GET /api/conversations)
 func (api TodoAppServer) ListConversations(w http.ResponseWriter, r *http.Request, params gen.ListConversationsParams) {
 	conversations, hasMore, err := api.ListConversationsUseCase.Query(r.Context(), params.Page, params.PageSize)
@@ -37,7 +37,7 @@ func (api TodoAppServer) ListConversations(w http.ResponseWriter, r *http.Reques
 	respondJSON(w, http.StatusOK, resp)
 }
 
-// Delete a conversation
+// DeleteConversation deletes a conversation.
 // (DELETE /api/conversations/{conversation_id})
 func (api TodoAppServer) DeleteConversation(w http.ResponseWriter, r *http.Request, conversationId openapi_types.UUID) {
 	err := api.DeleteConversationUseCase.Execute(r.Context(), conversationId)
@@ -49,7 +49,7 @@ func (api TodoAppServer) DeleteConversation(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Update conversation
+// UpdateConversation updates a conversation.
 // (PATCH /api/conversations/{conversation_id})
 func (api TodoAppServer) UpdateConversation(w http.ResponseWriter, r *http.Request, conversationId openapi_types.UUID) {
 	var req gen.UpdateConversationRequest

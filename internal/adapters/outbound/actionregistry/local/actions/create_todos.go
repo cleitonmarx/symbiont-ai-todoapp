@@ -6,20 +6,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
+	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 )
 
-// BulkTodoCreatorAction is an assistant action for creating multiple todos.
-type BulkTodoCreatorAction struct {
-	uow          domain.UnitOfWork
-	creator      usecases.TodoCreator
-	timeProvider domain.CurrentTimeProvider
+// CreateTodosAction is an assistant action for creating multiple todos.
+type CreateTodosAction struct {
+	uow          transaction.UnitOfWork
+	creator      todouc.Creator
+	timeProvider core.CurrentTimeProvider
 }
 
-// NewBulkTodoCreatorAction creates a new instance of BulkTodoCreatorAction.
-func NewBulkTodoCreatorAction(uow domain.UnitOfWork, creator usecases.TodoCreator, timeProvider domain.CurrentTimeProvider) BulkTodoCreatorAction {
-	return BulkTodoCreatorAction{
+// NewCreateTodosAction creates a new instance of CreateTodosAction.
+func NewCreateTodosAction(uow transaction.UnitOfWork, creator todouc.Creator, timeProvider core.CurrentTimeProvider) CreateTodosAction {
+	return CreateTodosAction{
 		uow:          uow,
 		creator:      creator,
 		timeProvider: timeProvider,
@@ -27,31 +30,31 @@ func NewBulkTodoCreatorAction(uow domain.UnitOfWork, creator usecases.TodoCreato
 }
 
 // StatusMessage returns a status message about the action execution.
-func (a BulkTodoCreatorAction) StatusMessage() string {
+func (a CreateTodosAction) StatusMessage() string {
 	return "📝 Creating your todos..."
 }
 
 // Renderer returns the deterministic result renderer for created todos.
-func (a BulkTodoCreatorAction) Renderer() (domain.ActionResultRenderer, bool) {
+func (a CreateTodosAction) Renderer() (assistant.ActionResultRenderer, bool) {
 	return createTodosRenderer{}, true
 }
 
-// Definition returns the assistant action definition for BulkTodoCreatorAction.
-func (a BulkTodoCreatorAction) Definition() domain.AssistantActionDefinition {
-	return domain.AssistantActionDefinition{
+// Definition returns the assistant action definition for CreateTodosAction.
+func (a CreateTodosAction) Definition() assistant.ActionDefinition {
+	return assistant.ActionDefinition{
 		Name:        "create_todos",
 		Description: "Create multiple todo items in one call (batch).",
-		Input: domain.AssistantActionInput{
+		Input: assistant.ActionInput{
 			Type: "object",
-			Fields: map[string]domain.AssistantActionField{
+			Fields: map[string]assistant.ActionField{
 				"todos": {
 					Type:        "array",
 					Description: "List of todos to create. Each item: {title, due_date}. REQUIRED.",
 					Required:    true,
-					Items: &domain.AssistantActionField{
+					Items: &assistant.ActionField{
 						Type:        "object",
 						Description: "Todo item to create.",
-						Fields: map[string]domain.AssistantActionField{
+						Fields: map[string]assistant.ActionField{
 							"title": {
 								Type:        "string",
 								Description: "Title of the todo. REQUIRED.",
@@ -71,8 +74,8 @@ func (a BulkTodoCreatorAction) Definition() domain.AssistantActionDefinition {
 	}
 }
 
-// Execute executes BulkTodoCreatorAction.
-func (a BulkTodoCreatorAction) Execute(ctx context.Context, call domain.AssistantActionCall, conversationHistory []domain.AssistantMessage) domain.AssistantMessage {
+// Execute executes CreateTodosAction.
+func (a CreateTodosAction) Execute(ctx context.Context, call assistant.ActionCall, conversationHistory []assistant.Message) assistant.Message {
 	params := struct {
 		Todos []struct {
 			Title   string `json:"title"`
@@ -83,15 +86,15 @@ func (a BulkTodoCreatorAction) Execute(ctx context.Context, call domain.Assistan
 
 	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
 		}
 	}
 	if len(params.Todos) == 0 {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError("invalid_arguments", "todos must not be empty.", exampleArgs),
 		}
@@ -103,20 +106,20 @@ func (a BulkTodoCreatorAction) Execute(ctx context.Context, call domain.Assistan
 		DueDate time.Time
 	}
 	items := make([]createItem, 0, len(params.Todos))
-	for i, todo := range params.Todos {
-		title := strings.TrimSpace(todo.Title)
+	for i, td := range params.Todos {
+		title := strings.TrimSpace(td.Title)
 		if title == "" {
-			return domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			return assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
 				Content:      newActionError("invalid_title", fmt.Sprintf("todo at index %d has an empty title.", i), exampleArgs),
 			}
 		}
 
-		dueDate, found := extractDateParam(todo.DueDate, conversationHistory, now)
+		dueDate, found := extractDateParam(td.DueDate, conversationHistory, now)
 		if !found {
-			return domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			return assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
 				Content:      newActionError("invalid_due_date", fmt.Sprintf("todo at index %d has invalid due_date.", i), exampleArgs),
 			}
@@ -125,10 +128,10 @@ func (a BulkTodoCreatorAction) Execute(ctx context.Context, call domain.Assistan
 		items = append(items, createItem{Title: title, DueDate: dueDate})
 	}
 
-	todos := make([]domain.Todo, 0, len(items))
-	err = a.uow.Execute(ctx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
+	todos := make([]todo.Todo, 0, len(items))
+	err = a.uow.Execute(ctx, func(uowCtx context.Context, scope transaction.Scope) error {
 		for i, item := range items {
-			todo, createErr := a.creator.Create(uowCtx, uow, item.Title, item.DueDate)
+			todo, createErr := a.creator.Create(uowCtx, scope, item.Title, item.DueDate)
 			if createErr != nil {
 				return fmt.Errorf("todo at index %d: %w", i, createErr)
 			}
@@ -137,15 +140,15 @@ func (a BulkTodoCreatorAction) Execute(ctx context.Context, call domain.Assistan
 		return nil
 	})
 	if err != nil {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError("create_todos_error", err.Error(), exampleArgs),
 		}
 	}
 
-	return domain.AssistantMessage{
-		Role:         domain.ChatRole_Tool,
+	return assistant.Message{
+		Role:         assistant.ChatRole_Tool,
 		ActionCallID: &call.ID,
 		Content:      formatTodosRows(todos),
 	}

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
@@ -20,21 +20,21 @@ func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, param
 		Items: []gen.Todo{},
 		Page:  params.Page,
 	}
-	var queryParams []usecases.ListTodoOptions
+	var queryParams []todouc.ListTodoOptions
 	if params.Status != nil {
-		queryParams = append(queryParams, usecases.WithStatus(domain.TodoStatus(*params.Status)))
+		queryParams = append(queryParams, todouc.WithStatus(todo.Status(*params.Status)))
 	}
 	if params.Search != nil {
-		queryParams = append(queryParams, usecases.WithSearchQuery(*params.Search))
+		queryParams = append(queryParams, todouc.WithSearchQuery(*params.Search))
 	}
 	if params.SearchType != nil {
-		queryParams = append(queryParams, usecases.WithSearchType(usecases.SearchType(*params.SearchType)))
+		queryParams = append(queryParams, todouc.WithSearchType(todouc.SearchType(*params.SearchType)))
 	}
 	if params.DateRange.DueAfter != nil && params.DateRange.DueBefore != nil {
-		queryParams = append(queryParams, usecases.WithDueDateRange(params.DateRange.DueAfter.Time, params.DateRange.DueBefore.Time))
+		queryParams = append(queryParams, todouc.WithDueDateRange(params.DateRange.DueAfter.Time, params.DateRange.DueBefore.Time))
 	}
 	if params.Sort != nil {
-		queryParams = append(queryParams, usecases.WithSortBy(string(*params.Sort)))
+		queryParams = append(queryParams, todouc.WithSortBy(string(*params.Sort)))
 	}
 
 	todos, hasMore, err := api.ListTodosUseCase.Query(r.Context(), params.Page, params.PageSize, queryParams...)
@@ -111,7 +111,7 @@ func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todo
 		r.Context(),
 		uuid.UUID(todoId),
 		req.Title,
-		(*domain.TodoStatus)(req.Status),
+		(*todo.Status)(req.Status),
 		dueDate,
 	)
 	if err != nil {

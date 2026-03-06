@@ -8,7 +8,7 @@ import (
 
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -26,24 +26,24 @@ func TestActionApprovalDispatcher_Run(t *testing.T) {
 	tests := map[string]struct {
 		payload                    []byte
 		expectDispatch             bool
-		expectedDispatchStatus     domain.ChatMessageApprovalStatus
+		expectedDispatchStatus     assistant.ChatMessageApprovalStatus
 		expectedDispatchActionName string
 		expectedDispatchReason     *string
 		dispatchReturn             bool
 	}{
 		"accepts-domain-decision-payload": {
-			payload: approvalDecisionJSON(t, domain.AssistantActionApprovalDecision{
-				Key: domain.AssistantActionApprovalKey{
+			payload: approvalDecisionJSON(t, assistant.ActionApprovalDecision{
+				Key: assistant.ActionApprovalKey{
 					ConversationID: conversationID,
 					TurnID:         turnID,
 					ActionCallID:   actionCallID,
 				},
 				ActionName: "delete_todo",
-				Status:     domain.ChatMessageApprovalStatus_Approved,
+				Status:     assistant.ChatMessageApprovalStatus_Approved,
 				Reason:     common.Ptr("approved"),
 			}),
 			expectDispatch:             true,
-			expectedDispatchStatus:     domain.ChatMessageApprovalStatus_Approved,
+			expectedDispatchStatus:     assistant.ChatMessageApprovalStatus_Approved,
 			expectedDispatchActionName: "delete_todo",
 			expectedDispatchReason:     common.Ptr("approved"),
 			dispatchReturn:             true,
@@ -58,7 +58,7 @@ func TestActionApprovalDispatcher_Run(t *testing.T) {
 				"reason":          "approved from endpoint",
 			}),
 			expectDispatch:             true,
-			expectedDispatchStatus:     domain.ChatMessageApprovalStatus_Approved,
+			expectedDispatchStatus:     assistant.ChatMessageApprovalStatus_Approved,
 			expectedDispatchActionName: "delete_todo",
 			expectedDispatchReason:     common.Ptr("approved from endpoint"),
 			dispatchReturn:             true,
@@ -85,11 +85,11 @@ func TestActionApprovalDispatcher_Run(t *testing.T) {
 			topicID := actionApprovalEventsTopicID
 			subscriptionID := "approval-sub-" + name
 			client, topicName := setupPubSubServer(t, ctx, topicID, subscriptionID)
-			dispatcher := domain.NewMockAssistantActionApprovalDispatcher(t)
+			dispatcher := assistant.NewMockActionApprovalDispatcher(t)
 
 			if tc.expectDispatch {
 				dispatcher.EXPECT().
-					Dispatch(mock.Anything, mock.MatchedBy(func(decision domain.AssistantActionApprovalDecision) bool {
+					Dispatch(mock.Anything, mock.MatchedBy(func(decision assistant.ActionApprovalDecision) bool {
 						if decision.Key.ConversationID != conversationID {
 							return false
 						}
@@ -185,7 +185,7 @@ func TestActionApprovalDispatcher_resolveSubscriptionID(t *testing.T) {
 	}
 }
 
-func approvalDecisionJSON(t *testing.T, decision domain.AssistantActionApprovalDecision) []byte {
+func approvalDecisionJSON(t *testing.T, decision assistant.ActionApprovalDecision) []byte {
 	t.Helper()
 
 	data, err := json.Marshal(decision)

@@ -5,52 +5,54 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
+	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 	"github.com/google/uuid"
 )
 
-// BulkTodoUpdaterAction is an assistant action for updating multiple todos.
-type BulkTodoUpdaterAction struct {
-	uow     domain.UnitOfWork
-	updater usecases.TodoUpdater
+// UpdateTodosAction is an assistant action for updating multiple todos.
+type UpdateTodosAction struct {
+	uow     transaction.UnitOfWork
+	updater todouc.Updater
 }
 
-// NewBulkTodoUpdaterAction creates a new instance of BulkTodoUpdaterAction.
-func NewBulkTodoUpdaterAction(uow domain.UnitOfWork, updater usecases.TodoUpdater) BulkTodoUpdaterAction {
-	return BulkTodoUpdaterAction{
+// NewUpdateTodosAction creates a new instance of UpdateTodosAction.
+func NewUpdateTodosAction(uow transaction.UnitOfWork, updater todouc.Updater) UpdateTodosAction {
+	return UpdateTodosAction{
 		uow:     uow,
 		updater: updater,
 	}
 }
 
 // StatusMessage returns a status message about the action execution.
-func (a BulkTodoUpdaterAction) StatusMessage() string {
+func (a UpdateTodosAction) StatusMessage() string {
 	return "✏️ Updating your todos..."
 }
 
 // Renderer returns the deterministic result renderer for todo updates.
-func (a BulkTodoUpdaterAction) Renderer() (domain.ActionResultRenderer, bool) {
+func (a UpdateTodosAction) Renderer() (assistant.ActionResultRenderer, bool) {
 	return updateTodosRenderer{}, true
 }
 
-// Definition returns the assistant action definition for BulkTodoUpdaterAction.
-func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
-	return domain.AssistantActionDefinition{
+// Definition returns the assistant action definition for UpdateTodosAction.
+func (a UpdateTodosAction) Definition() assistant.ActionDefinition {
+	return assistant.ActionDefinition{
 		Name:        "update_todos",
 		Description: "Update title and/or status for multiple todos.",
-		Input: domain.AssistantActionInput{
+		Input: assistant.ActionInput{
 			Type: "object",
-			Fields: map[string]domain.AssistantActionField{
+			Fields: map[string]assistant.ActionField{
 				"todos": {
 					Type:        "array",
 					Description: "List of todo updates. Each item: {id,title?,status?}. REQUIRED.",
 					Required:    true,
-					Items: &domain.AssistantActionField{
+					Items: &assistant.ActionField{
 						Type:        "object",
 						Description: "Todo item to update.",
 						Required:    true,
-						Fields: map[string]domain.AssistantActionField{
+						Fields: map[string]assistant.ActionField{
 							"id": {
 								Type:        "string",
 								Description: "ID of the todo to update. REQUIRED.",
@@ -65,14 +67,14 @@ func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 								Type:        "string",
 								Description: "New status for the todo. Allowed values: OPEN or DONE. Optional but at least one of title or status must be present.",
 								Required:    false,
-								Enum:        []any{domain.TodoStatus_OPEN, domain.TodoStatus_DONE},
+								Enum:        []any{todo.Status_OPEN, todo.Status_DONE},
 							},
 						},
 					},
 				},
 			},
 		},
-		Approval: domain.AssistantActionApproval{
+		Approval: assistant.ActionApproval{
 			Required:    true,
 			Title:       "Confirm update of todos",
 			Description: "Updating todos will modify existing items. Please confirm.",
@@ -86,8 +88,8 @@ func (a BulkTodoUpdaterAction) Definition() domain.AssistantActionDefinition {
 	}
 }
 
-// Execute executes BulkTodoUpdaterAction.
-func (a BulkTodoUpdaterAction) Execute(ctx context.Context, call domain.AssistantActionCall, _ []domain.AssistantMessage) domain.AssistantMessage {
+// Execute executes UpdateTodosAction.
+func (a UpdateTodosAction) Execute(ctx context.Context, call assistant.ActionCall, _ []assistant.Message) assistant.Message {
 	params := struct {
 		Todos []struct {
 			ID     string  `json:"id"`
@@ -99,15 +101,15 @@ func (a BulkTodoUpdaterAction) Execute(ctx context.Context, call domain.Assistan
 
 	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
 		}
 	}
 	if len(params.Todos) == 0 {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError("invalid_arguments", "todos must not be empty.", exampleArgs),
 		}
@@ -116,27 +118,27 @@ func (a BulkTodoUpdaterAction) Execute(ctx context.Context, call domain.Assistan
 	type updateItem struct {
 		ID     uuid.UUID
 		Title  *string
-		Status *domain.TodoStatus
+		Status *todo.Status
 	}
 	items := make([]updateItem, 0, len(params.Todos))
-	for i, todo := range params.Todos {
-		todoID, parseErr := uuid.Parse(todo.ID)
+	for i, td := range params.Todos {
+		todoID, parseErr := uuid.Parse(td.ID)
 		if parseErr != nil {
-			return domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			return assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
 				Content:      newActionError("invalid_todo_id", fmt.Sprintf("todo at index %d has invalid id: %s", i, parseErr.Error()), exampleArgs),
 			}
 		}
 
-		var statusPtr *domain.TodoStatus
-		if todo.Status != nil {
-			status := domain.TodoStatus(*todo.Status)
-			if status != domain.TodoStatus_OPEN && status != domain.TodoStatus_DONE {
-				return domain.AssistantMessage{
-					Role:         domain.ChatRole_Tool,
+		var statusPtr *todo.Status
+		if td.Status != nil {
+			status := todo.Status(*td.Status)
+			if status != todo.Status_OPEN && status != todo.Status_DONE {
+				return assistant.Message{
+					Role:         assistant.ChatRole_Tool,
 					ActionCallID: &call.ID,
-					Content:      newActionError("invalid_status", fmt.Sprintf("todo at index %d has invalid status: %s", i, *todo.Status), exampleArgs),
+					Content:      newActionError("invalid_status", fmt.Sprintf("todo at index %d has invalid status: %s", i, *td.Status), exampleArgs),
 				}
 			}
 			statusPtr = &status
@@ -144,15 +146,15 @@ func (a BulkTodoUpdaterAction) Execute(ctx context.Context, call domain.Assistan
 
 		items = append(items, updateItem{
 			ID:     todoID,
-			Title:  todo.Title,
+			Title:  td.Title,
 			Status: statusPtr,
 		})
 	}
 
-	todos := make([]domain.Todo, 0, len(items))
-	err = a.uow.Execute(ctx, func(uowCtx context.Context, uow domain.UnitOfWork) error {
+	todos := make([]todo.Todo, 0, len(items))
+	err = a.uow.Execute(ctx, func(uowCtx context.Context, scope transaction.Scope) error {
 		for i, item := range items {
-			todo, updateErr := a.updater.Update(uowCtx, uow, item.ID, item.Title, item.Status, nil)
+			todo, updateErr := a.updater.Update(uowCtx, scope, item.ID, item.Title, item.Status, nil)
 			if updateErr != nil {
 				return fmt.Errorf("todo at index %d: %w", i, updateErr)
 			}
@@ -161,15 +163,15 @@ func (a BulkTodoUpdaterAction) Execute(ctx context.Context, call domain.Assistan
 		return nil
 	})
 	if err != nil {
-		return domain.AssistantMessage{
-			Role:         domain.ChatRole_Tool,
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
 			Content:      newActionError("update_todos_error", err.Error(), exampleArgs),
 		}
 	}
 
-	return domain.AssistantMessage{
-		Role:         domain.ChatRole_Tool,
+	return assistant.Message{
+		Role:         assistant.ChatRole_Tool,
 		ActionCallID: &call.ID,
 		Content:      formatTodosRows(todos),
 	}

@@ -10,6 +10,7 @@ import (
 // Date is a custom GraphQL scalar type for date values (without time).
 type Date time.Time
 
+// UnmarshalGQL parses a GraphQL scalar value into a Date.
 func (d *Date) UnmarshalGQL(v any) error {
 	str, ok := v.(string)
 	if !ok {
@@ -23,11 +24,13 @@ func (d *Date) UnmarshalGQL(v any) error {
 	return nil
 }
 
+// MarshalGQL writes the Date as a GraphQL scalar value.
 func (d Date) MarshalGQL(w io.Writer) {
 	t := time.Time(d)
 	fmt.Fprintf(w, `"%s"`, t.Format(time.DateOnly)) //nolint:errcheck
 }
 
+// UnmarshalJSON parses a JSON date string into a Date.
 func (d *Date) UnmarshalJSON(b []byte) error {
 	s, err := strconv.Unquote(string(b))
 	if err != nil {
@@ -36,6 +39,7 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 	return d.UnmarshalGQL(s)
 }
 
+// MarshalJSON serializes the Date as a JSON date string.
 func (d Date) MarshalJSON() ([]byte, error) {
 	t := time.Time(d)
 	return fmt.Appendf(nil, `"%s"`, t.Format(time.DateOnly)), nil

@@ -16,8 +16,8 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/assert"
@@ -33,28 +33,28 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 	turnID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
 	actionExecuted := true
 
-	domainMessage := domain.ChatMessage{
+	domainMessage := assistant.ChatMessage{
 		ID:             fixedID,
 		TurnID:         turnID,
 		ChatRole:       "user",
 		Content:        "Hello, how are you?",
 		CreatedAt:      fixedTime,
 		ActionExecuted: &actionExecuted,
-		SelectedSkills: []domain.AssistantSelectedSkill{
+		SelectedSkills: []assistant.SelectedSkill{
 			{
 				Name:   "update_todos",
 				Source: "skills/update_todos.md",
 				Tools:  []string{"fetch_todos", "update_todos"},
 			},
 		},
-		ActionDetails: []domain.ChatMessageActionDetail{
+		ActionDetails: []assistant.ChatMessageActionDetail{
 			{
 				ActionCallID:   "call-1",
 				Name:           "update_todos",
 				Input:          `{"todos":[{"id":"1"}]}`,
 				Text:           "Updating todos...",
 				Output:         "todo updated",
-				MessageState:   domain.ChatMessageState_Completed,
+				MessageState:   assistant.ChatMessageState_Completed,
 				ActionExecuted: &actionExecuted,
 			},
 		},
@@ -81,7 +81,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 				Input:          `{"todos":[{"id":"1"}]}`,
 				Text:           "Updating todos...",
 				Output:         "todo updated",
-				MessageState:   gen.ChatMessageActionDetailMessageState(domain.ChatMessageState_Completed),
+				MessageState:   gen.ChatMessageActionDetailMessageState(assistant.ChatMessageState_Completed),
 				ActionExecuted: &actionExecuted,
 			},
 		},
@@ -90,7 +90,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 	tests := map[string]struct {
 		page           int
 		pageSize       int
-		setupUsecases  func(*usecases.MockListChatMessages)
+		setupUsecases  func(*chat.MockListChatMessages)
 		expectedStatus int
 		expectedBody   *gen.ChatHistoryResp
 		expectedError  *gen.ErrorResp
@@ -98,10 +98,10 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 		"success-with-messages": {
 			page:     1,
 			pageSize: 10,
-			setupUsecases: func(m *usecases.MockListChatMessages) {
+			setupUsecases: func(m *chat.MockListChatMessages) {
 				m.EXPECT().
 					Query(mock.Anything, conversationID, 1, 10).
-					Return([]domain.ChatMessage{domainMessage}, false, nil)
+					Return([]assistant.ChatMessage{domainMessage}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ChatHistoryResp{
@@ -113,10 +113,10 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 		"success-with-no-messages": {
 			page:     1,
 			pageSize: 10,
-			setupUsecases: func(m *usecases.MockListChatMessages) {
+			setupUsecases: func(m *chat.MockListChatMessages) {
 				m.EXPECT().
 					Query(mock.Anything, conversationID, 1, 10).
-					Return([]domain.ChatMessage{}, false, nil)
+					Return([]assistant.ChatMessage{}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ChatHistoryResp{
@@ -128,10 +128,10 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 		"success-with-next-and-previous-page": {
 			page:     2,
 			pageSize: 10,
-			setupUsecases: func(m *usecases.MockListChatMessages) {
+			setupUsecases: func(m *chat.MockListChatMessages) {
 				m.EXPECT().
 					Query(mock.Anything, conversationID, 2, 10).
-					Return([]domain.ChatMessage{domainMessage}, true, nil)
+					Return([]assistant.ChatMessage{domainMessage}, true, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ChatHistoryResp{
@@ -145,7 +145,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 		"use-case-error": {
 			page:     1,
 			pageSize: 10,
-			setupUsecases: func(m *usecases.MockListChatMessages) {
+			setupUsecases: func(m *chat.MockListChatMessages) {
 				m.EXPECT().
 					Query(mock.Anything, conversationID, 1, 10).
 					Return(nil, false, errors.New("database error"))
@@ -162,7 +162,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockListChatMessages := usecases.NewMockListChatMessages(t)
+			mockListChatMessages := chat.NewMockListChatMessages(t)
 			tt.setupUsecases(mockListChatMessages)
 
 			server := &TodoAppServer{
@@ -208,20 +208,20 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 
 	tests := map[string]struct {
 		requestBody    any
-		setupUsecases  func(*usecases.MockStreamChat)
-		options        []usecases.StreamChatOption
+		setupUsecases  func(*chat.MockStreamChat)
+		options        []chat.StreamChatOption
 		expectedStatus int
 		expectedEvents []string
 		expectedError  *gen.ErrorResp
 	}{
 		"success": {
 			requestBody: gen.StreamChatJSONRequestBody{Message: "Hello", Model: "qwen2.5:7B-Q4_0"},
-			setupUsecases: func(m *usecases.MockStreamChat) {
+			setupUsecases: func(m *chat.MockStreamChat) {
 				m.EXPECT().
 					Execute(mock.Anything, "Hello", "qwen2.5:7B-Q4_0", mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, userMessage string, model string, cb domain.AssistantEventCallback, opts ...usecases.StreamChatOption) {
-						_ = cb(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{})
-						_ = cb(ctx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Hi!"})
+					Run(func(ctx context.Context, userMessage string, model string, cb assistant.EventCallback, opts ...chat.StreamChatOption) {
+						_ = cb(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{})
+						_ = cb(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "Hi!"})
 					}).
 					Return(nil)
 			},
@@ -234,20 +234,20 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 				Model:          "qwen2.5:7B-Q4_0",
 				ConversationId: common.Ptr(uuid.MustParse("00000000-0000-0000-0000-000000000001")),
 			},
-			setupUsecases: func(m *usecases.MockStreamChat) {
+			setupUsecases: func(m *chat.MockStreamChat) {
 				m.EXPECT().
 					Execute(mock.Anything, "Hello", "qwen2.5:7B-Q4_0", mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, userMessage string, model string, cb domain.AssistantEventCallback, opts ...usecases.StreamChatOption) {
+					Run(func(ctx context.Context, userMessage string, model string, cb assistant.EventCallback, opts ...chat.StreamChatOption) {
 						// Verify that the conversation ID option is passed correctly
-						params := &usecases.StreamChatParams{}
+						params := &chat.StreamChatParams{}
 						for _, opt := range opts {
 							opt(params)
 						}
 						assert.NotNil(t, params.ConversationID)
 						assert.Equal(t, uuid.MustParse("00000000-0000-0000-0000-000000000001"), *params.ConversationID)
 
-						_ = cb(ctx, domain.AssistantEventType_TurnStarted, domain.AssistantTurnStarted{})
-						_ = cb(ctx, domain.AssistantEventType_MessageDelta, domain.AssistantMessageDelta{Text: "Hi!"})
+						_ = cb(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{})
+						_ = cb(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "Hi!"})
 					}).
 					Return(nil)
 			},
@@ -256,7 +256,7 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 		},
 		"invalid-json": {
 			requestBody:    []byte(`{invalid json}`),
-			setupUsecases:  func(m *usecases.MockStreamChat) {},
+			setupUsecases:  func(m *chat.MockStreamChat) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &gen.ErrorResp{
 				Error: gen.Error{
@@ -267,7 +267,7 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 		},
 		"use-case-error": {
 			requestBody: gen.StreamChatJSONRequestBody{Message: "fail", Model: "qwen2.5:7B-Q4_0"},
-			setupUsecases: func(m *usecases.MockStreamChat) {
+			setupUsecases: func(m *chat.MockStreamChat) {
 				m.EXPECT().
 					Execute(mock.Anything, "fail", "qwen2.5:7B-Q4_0", mock.Anything).
 					Return(errors.New("stream error"))
@@ -284,7 +284,7 @@ func TestTodoAppServer_StreamChat(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockStreamChat := usecases.NewMockStreamChat(t)
+			mockStreamChat := chat.NewMockStreamChat(t)
 			if tt.setupUsecases != nil {
 				tt.setupUsecases(mockStreamChat)
 			}
@@ -345,19 +345,19 @@ func TestTodoAppServer_ListAvailableModels(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		setupUsecase   func(*usecases.MockListAvailableModels)
+		setupUsecase   func(*chat.MockListAvailableModels)
 		expectedStatus int
 		expectedBody   *gen.ModelListResp
 		expectedError  *gen.ErrorResp
 	}{
 		"filters-only-chat-models": {
-			setupUsecase: func(m *usecases.MockListAvailableModels) {
+			setupUsecase: func(m *chat.MockListAvailableModels) {
 				m.EXPECT().
 					Query(mock.Anything).
-					Return([]domain.ModelInfo{
-						{ID: "gpt-4", Name: "gpt-4", Kind: domain.ModelKindAssistant},
-						{ID: "text-embed", Name: "text-embed", Kind: domain.ModelKindEmbedding},
-						{ID: "gpt-3.5", Name: "gpt-3.5", Kind: domain.ModelKindAssistant},
+					Return([]assistant.ModelInfo{
+						{ID: "gpt-4", Name: "gpt-4", Kind: assistant.ModelKindAssistant},
+						{ID: "text-embed", Name: "text-embed", Kind: assistant.ModelKindEmbedding},
+						{ID: "gpt-3.5", Name: "gpt-3.5", Kind: assistant.ModelKindAssistant},
 					}, nil)
 			},
 			expectedStatus: http.StatusOK,
@@ -369,7 +369,7 @@ func TestTodoAppServer_ListAvailableModels(t *testing.T) {
 			},
 		},
 		"returns-error-on-usecase-failure": {
-			setupUsecase: func(m *usecases.MockListAvailableModels) {
+			setupUsecase: func(m *chat.MockListAvailableModels) {
 				m.EXPECT().
 					Query(mock.Anything).
 					Return(nil, errors.New("database error"))
@@ -386,7 +386,7 @@ func TestTodoAppServer_ListAvailableModels(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockListAvailable := usecases.NewMockListAvailableModels(t)
+			mockListAvailable := chat.NewMockListAvailableModels(t)
 			if tt.setupUsecase != nil {
 				tt.setupUsecase(mockListAvailable)
 			}

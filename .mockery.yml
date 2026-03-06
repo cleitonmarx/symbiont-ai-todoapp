@@ -11,12 +11,33 @@ require-template-schema-exists: true
 template: testify
 template-schema: '{{.Template}}.schema.json'
 packages:
-  github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain:
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant:
     config:
       all: true
-  github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases:
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core:
     config:
       all: true
-  github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/actionregistry:
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox:
+    config:
+      all: true
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/semantic:
+    config:
+      all: true
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo:
+    config:
+      all: true
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction:
+    config:
+      all: true
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/board:
+    config:
+      all: true
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat:
+    config:
+      all: true
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/outbox:
+    config:
+      all: true
+  github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo:
     config:
       all: true

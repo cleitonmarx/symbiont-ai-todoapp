@@ -29,6 +29,7 @@ type EmbeddingFactory interface {
 type embeddingFactory struct {
 }
 
+// Get returns an embedding generator based on the model identifier.
 func (f embeddingFactory) Get(model string) EmbeddingGenerator {
 	if strings.Contains(model, "embeddinggemma") {
 		return gemmaEmbedding{}
@@ -39,10 +40,12 @@ func (f embeddingFactory) Get(model string) EmbeddingGenerator {
 // gemmaEmbedding implements the EmbeddingGenerator interface for the Gemma embedding model.
 type gemmaEmbedding struct{}
 
+// GenerateIndexingPrompt returns the Gemma-specific indexing prompt.
 func (a gemmaEmbedding) GenerateIndexingPrompt(document string) string {
 	return fmt.Sprintf("title: none | text: %s", document)
 }
 
+// GenerateSkillPrompt returns the Gemma-specific skill embedding prompt.
 func (a gemmaEmbedding) GenerateSkillPrompt(title, document string) string {
 	title = strings.TrimSpace(title)
 	if title == "" {
@@ -51,10 +54,12 @@ func (a gemmaEmbedding) GenerateSkillPrompt(title, document string) string {
 	return fmt.Sprintf("title: %s | text: %s", title, document)
 }
 
+// GenerateSearchPrompt returns the Gemma-specific search embedding prompt.
 func (a gemmaEmbedding) GenerateSearchPrompt(searchInput string) string {
 	return fmt.Sprintf("task: search result | query: %s", searchInput)
 }
 
+// Dimensions returns the embedding dimensions for Gemma models.
 func (a gemmaEmbedding) Dimensions() *int {
 	return nil
 }
@@ -63,10 +68,12 @@ func (a gemmaEmbedding) Dimensions() *int {
 // that generates simple prompts without model-specific formatting.
 type defaultEmbeddingGenerator struct{}
 
+// GenerateIndexingPrompt returns the default indexing prompt.
 func (a defaultEmbeddingGenerator) GenerateIndexingPrompt(document string) string {
 	return document
 }
 
+// GenerateSkillPrompt returns the default skill embedding prompt.
 func (a defaultEmbeddingGenerator) GenerateSkillPrompt(title, document string) string {
 	title = strings.TrimSpace(title)
 	document = strings.TrimSpace(document)
@@ -79,10 +86,12 @@ func (a defaultEmbeddingGenerator) GenerateSkillPrompt(title, document string) s
 	return title + "\n" + document
 }
 
+// GenerateSearchPrompt returns the default search embedding prompt.
 func (a defaultEmbeddingGenerator) GenerateSearchPrompt(searchInput string) string {
 	return searchInput
 }
 
+// Dimensions returns the embedding dimensions for default models.
 func (a defaultEmbeddingGenerator) Dimensions() *int {
 	return common.Ptr(768)
 }

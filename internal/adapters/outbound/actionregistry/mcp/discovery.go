@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/toon-format/toon-go"
 )
@@ -114,9 +114,9 @@ func renderContent(content mcp.Content) string {
 }
 
 // actionErrorMessage formats a structured tool error payload consumed by the assistant loop.
-func actionErrorMessage(callID, code, details string) domain.AssistantMessage {
-	return domain.AssistantMessage{
-		Role:         domain.ChatRole_Tool,
+func actionErrorMessage(callID, code, details string) assistant.Message {
+	return assistant.Message{
+		Role:         assistant.ChatRole_Tool,
 		ActionCallID: common.Ptr(callID),
 		Content:      fmt.Sprintf("errors[1]{error,details}%s,%s", code, details),
 	}

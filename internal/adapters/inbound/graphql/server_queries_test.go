@@ -9,8 +9,8 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/types"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -26,7 +26,7 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 		searchType    *gen.SearchType
 		dateRange     *gen.DateRange
 		sortBy        *gen.TodoSortBy
-		setupUsecases func(*usecases.MockListTodos)
+		setupUsecases func(*todouc.MockList)
 		expected      *gen.TodoPage
 		expectError   bool
 	}{
@@ -34,10 +34,10 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			status:   (*gen.TodoStatus)(&testStatus),
 			page:     2,
 			pageSize: 1,
-			setupUsecases: func(m *usecases.MockListTodos) {
+			setupUsecases: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 2, 1, mock.Anything).
-					Return([]domain.Todo{testTodo}, true, nil)
+					Return([]todo.Todo{testTodo}, true, nil)
 			},
 			expected: &gen.TodoPage{
 				Items:        []*gen.Todo{&testGenTodo},
@@ -53,20 +53,20 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			pageSize:   2,
 			search:     common.Ptr("groceries"),
 			searchType: common.Ptr(gen.SearchTypeSimilarity),
-			setupUsecases: func(m *usecases.MockListTodos) {
+			setupUsecases: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 2, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
-						p := usecases.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
+						p := todouc.ListTodoParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
 						assert.NotNil(t, p.Search)
 						assert.Equal(t, "groceries", *p.Search)
 						assert.NotNil(t, p.SearchType)
-						assert.Equal(t, usecases.SearchType_Similarity, *p.SearchType)
+						assert.Equal(t, todouc.SearchType_Similarity, *p.SearchType)
 					}).
-					Return([]domain.Todo{testTodo}, false, nil)
+					Return([]todo.Todo{testTodo}, false, nil)
 			},
 			expected: &gen.TodoPage{
 				Items: []*gen.Todo{&testGenTodo},
@@ -80,20 +80,20 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			pageSize:   2,
 			search:     common.Ptr("meeting"),
 			searchType: common.Ptr(gen.SearchTypeTitle),
-			setupUsecases: func(m *usecases.MockListTodos) {
+			setupUsecases: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 2, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
-						p := usecases.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
+						p := todouc.ListTodoParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
 						assert.NotNil(t, p.Search)
 						assert.Equal(t, "meeting", *p.Search)
 						assert.NotNil(t, p.SearchType)
-						assert.Equal(t, usecases.SearchType_Title, *p.SearchType)
+						assert.Equal(t, todouc.SearchType_Title, *p.SearchType)
 					}).
-					Return([]domain.Todo{testTodo}, false, nil)
+					Return([]todo.Todo{testTodo}, false, nil)
 			},
 			expected: &gen.TodoPage{
 				Items: []*gen.Todo{&testGenTodo},
@@ -109,11 +109,11 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 				DueAfter:  types.Date(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 				DueBefore: types.Date(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
 			},
-			setupUsecases: func(m *usecases.MockListTodos) {
+			setupUsecases: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 2, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
-						p := usecases.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
+						p := todouc.ListTodoParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
@@ -122,7 +122,7 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 						assert.Equal(t, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), *p.DueAfter)
 						assert.Equal(t, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC), *p.DueBefore)
 					}).
-					Return([]domain.Todo{testTodo}, false, nil)
+					Return([]todo.Todo{testTodo}, false, nil)
 			},
 			expected: &gen.TodoPage{
 				Items: []*gen.Todo{&testGenTodo},
@@ -135,18 +135,18 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			page:     1,
 			pageSize: 2,
 			sortBy:   (*gen.TodoSortBy)(common.Ptr(gen.TodoSortByDueDateDesc)),
-			setupUsecases: func(m *usecases.MockListTodos) {
+			setupUsecases: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 2, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
-						p := usecases.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
+						p := todouc.ListTodoParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
 
 						assert.Equal(t, p.SortBy, common.Ptr("dueDateDesc"))
 					}).
-					Return([]domain.Todo{testTodo}, false, nil)
+					Return([]todo.Todo{testTodo}, false, nil)
 			},
 			expected: &gen.TodoPage{
 				Items: []*gen.Todo{&testGenTodo},
@@ -158,7 +158,7 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			status:   nil,
 			page:     1,
 			pageSize: 2,
-			setupUsecases: func(m *usecases.MockListTodos) {
+			setupUsecases: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 2, mock.Anything).
 					Return(nil, false, errors.New("fail"))
@@ -170,7 +170,7 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockUC := usecases.NewMockListTodos(t)
+			mockUC := todouc.NewMockList(t)
 			tt.setupUsecases(mockUC)
 			server := &TodoGraphQLServer{ListTodosUsecase: mockUC}
 

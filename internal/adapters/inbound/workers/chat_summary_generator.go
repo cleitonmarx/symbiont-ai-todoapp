@@ -8,20 +8,20 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub/v2"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"github.com/google/uuid"
 )
 
 // ChatSummaryGenerator is a runnable that consumes chat-message events
 // and triggers conversation summary generation.
 type ChatSummaryGenerator struct {
-	Logger              *log.Logger                  `resolve:""`
-	Client              *pubsub.Client               `resolve:""`
-	Interval            time.Duration                `config:"CHAT_SUMMARY_BATCH_INTERVAL" default:"3s"`
-	BatchSize           int                          `config:"CHAT_SUMMARY_BATCH_SIZE" default:"50"`
-	SubscriptionID      string                       `config:"CHAT_EVENTS_SUBSCRIPTION_ID"`
-	GenerateChatSummary usecases.GenerateChatSummary `resolve:""`
+	Logger              *log.Logger              `resolve:""`
+	Client              *pubsub.Client           `resolve:""`
+	Interval            time.Duration            `config:"CHAT_SUMMARY_BATCH_INTERVAL" default:"3s"`
+	BatchSize           int                      `config:"CHAT_SUMMARY_BATCH_SIZE" default:"50"`
+	SubscriptionID      string                   `config:"CHAT_EVENTS_SUBSCRIPTION_ID"`
+	GenerateChatSummary chat.GenerateChatSummary `resolve:""`
 	workerExecutionChan chan struct{}
 }
 
@@ -90,7 +90,7 @@ func (s ChatSummaryGenerator) Run(ctx context.Context) error {
 // It keeps all Pub/Sub messages for ack/nack handling and the latest chat event
 // to avoid triggering summary generation multiple times for the same conversation.
 type chatSummaryConversationBatch struct {
-	LatestEvent domain.ChatMessageEvent
+	LatestEvent outbox.ChatMessageEvent
 	Messages    []*pubsub.Message
 }
 
@@ -104,7 +104,7 @@ func (s ChatSummaryGenerator) flush(ctx context.Context, batch []*pubsub.Message
 
 	conversations := make(map[uuid.UUID]chatSummaryConversationBatch)
 	for _, msg := range batch {
-		var event domain.ChatMessageEvent
+		var event outbox.ChatMessageEvent
 		if err := json.Unmarshal(msg.Data, &event); err != nil {
 			s.Logger.Printf("ChatSummaryGenerator: failed to decode event payload: %v", err)
 			msg.Nack()
@@ -112,7 +112,7 @@ func (s ChatSummaryGenerator) flush(ctx context.Context, batch []*pubsub.Message
 		}
 
 		// Ignore unrelated events that may be delivered to this subscription.
-		if event.Type != domain.EventType_CHAT_MESSAGE_SENT {
+		if event.Type != outbox.EventType_CHAT_MESSAGE_SENT {
 			msg.Ack()
 			continue
 		}

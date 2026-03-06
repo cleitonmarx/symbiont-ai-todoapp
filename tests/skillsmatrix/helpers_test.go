@@ -9,22 +9,22 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/modelrunner"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/skillregistry"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type skillMatrixCase struct {
-	messages    []domain.AssistantMessage
+	messages    []assistant.Message
 	summary     string
 	wantTop     string
 	wantContain []string
 }
 
-func runSkillMatrixCase(t *testing.T, registry domain.AssistantSkillRegistry, tc skillMatrixCase) {
+func runSkillMatrixCase(t *testing.T, registry assistant.SkillRegistry, tc skillMatrixCase) {
 	t.Helper()
 
-	got := registry.ListRelevant(t.Context(), domain.AssistantSkillQueryContext{
+	got := registry.ListRelevant(t.Context(), assistant.SkillQueryContext{
 		Messages:            tc.messages,
 		ConversationSummary: tc.summary,
 	})
@@ -46,7 +46,7 @@ func runSkillMatrixCase(t *testing.T, registry domain.AssistantSkillRegistry, tc
 	}
 }
 
-func newSkillMatrixRegistry(t *testing.T) domain.AssistantSkillRegistry {
+func newSkillMatrixRegistry(t *testing.T) assistant.SkillRegistry {
 	t.Helper()
 
 	ctx := t.Context()

@@ -6,33 +6,35 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/semantic"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoFetcherAction(t *testing.T) {
+func TestFetchTodosAction(t *testing.T) {
 	t.Parallel()
 
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
-	testTodo := domain.Todo{
+	testTodo := todo.Todo{
 		ID:      uuid.New(),
 		Title:   "Test Todo",
 		DueDate: fixedTime,
-		Status:  domain.TodoStatus_OPEN,
+		Status:  todo.Status_OPEN,
 	}
 
 	tests := map[string]struct {
 		setupMocks func(
-			*domain.MockTodoRepository,
-			*domain.MockSemanticEncoder,
+			*todo.MockRepository,
+			*semantic.MockEncoder,
 		)
-		functionCall domain.AssistantActionCall
-		validateResp func(t *testing.T, resp domain.AssistantMessage)
+		functionCall assistant.ActionCall
+		validateResp func(t *testing.T, resp assistant.Message)
 	}{
 		"fetch-todos-success": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -40,23 +42,23 @@ func TestTodoFetcherAction(t *testing.T) {
 						10,
 						mock.Anything,
 					).
-					Return([]domain.Todo{testTodo}, false, nil).
+					Return([]todo.Todo{testTodo}, false, nil).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}:")
 			},
 		},
 		"fetch-todos-with-status-and-similarity": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 				semanticEncoder.EXPECT().
 					VectorizeQuery(mock.Anything, "embedding-model", "urgent").
-					Return(domain.EmbeddingVector{Vector: []float64{0.3, 0.4}}, nil).
+					Return(semantic.EmbeddingVector{Vector: []float64{0.3, 0.4}}, nil).
 					Once()
 
 				todoRepo.EXPECT().
@@ -66,29 +68,29 @@ func TestTodoFetcherAction(t *testing.T) {
 						10,
 						mock.Anything,
 					).
-					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOption) {
-						param := domain.ListTodosParams{}
+					Run(func(ctx context.Context, page, pageSize int, opts ...todo.ListOption) {
+						param := todo.ListParams{}
 						for _, opt := range opts {
 							opt(&param)
 						}
-						assert.Equal(t, domain.TodoStatus_OPEN, *param.Status)
+						assert.Equal(t, todo.Status_OPEN, *param.Status)
 						assert.Equal(t, []float64{0.3, 0.4}, param.Embedding)
 					}).
-					Return([]domain.Todo{testTodo}, false, nil).
+					Return([]todo.Todo{testTodo}, false, nil).
 					Once()
 
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10, "status": "OPEN", "search_by_similarity": "urgent"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}:")
 			},
 		},
 		"fetch-todos-by-title": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -96,28 +98,28 @@ func TestTodoFetcherAction(t *testing.T) {
 						10,
 						mock.Anything,
 					).
-					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOption) {
-						param := domain.ListTodosParams{}
+					Run(func(ctx context.Context, page, pageSize int, opts ...todo.ListOption) {
+						param := todo.ListParams{}
 						for _, opt := range opts {
 							opt(&param)
 						}
 						assert.NotNil(t, param.TitleContains)
 						assert.Equal(t, "report", *param.TitleContains)
 					}).
-					Return([]domain.Todo{testTodo}, false, nil).
+					Return([]todo.Todo{testTodo}, false, nil).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10, "search_by_title": "report"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}:")
 			},
 		},
 		"fetch-todos-with-sortby": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -125,26 +127,26 @@ func TestTodoFetcherAction(t *testing.T) {
 						10,
 						mock.Anything,
 					).
-					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOption) {
-						param := domain.ListTodosParams{}
+					Run(func(ctx context.Context, page, pageSize int, opts ...todo.ListOption) {
+						param := todo.ListParams{}
 						for _, opt := range opts {
 							opt(&param)
 						}
-						assert.Equal(t, &domain.TodoSortBy{Field: "dueDate", Direction: "ASC"}, param.SortBy)
+						assert.Equal(t, &todo.SortBy{Field: "dueDate", Direction: "ASC"}, param.SortBy)
 					}).
-					Return([]domain.Todo{}, false, nil)
+					Return([]todo.Todo{}, false, nil)
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10, "sort_by": "dueDateAsc"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "todos[0]:")
 			},
 		},
 		"fetch-todos-with-due-date-filters": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(
 						mock.Anything,
@@ -152,8 +154,8 @@ func TestTodoFetcherAction(t *testing.T) {
 						10,
 						mock.Anything,
 					).
-					Run(func(ctx context.Context, page, pageSize int, opts ...domain.ListTodoOption) {
-						param := domain.ListTodosParams{}
+					Run(func(ctx context.Context, page, pageSize int, opts ...todo.ListOption) {
+						param := todo.ListParams{}
 						for _, opt := range opts {
 							opt(&param)
 						}
@@ -162,166 +164,166 @@ func TestTodoFetcherAction(t *testing.T) {
 						assert.Equal(t, expectedDueAfter, *param.DueAfter)
 						assert.Equal(t, expectedDueBefore, *param.DueBefore)
 					}).
-					Return([]domain.Todo{testTodo}, false, nil).
+					Return([]todo.Todo{testTodo}, false, nil).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10, "due_after": "2026-01-20", "due_before": "2026-01-30"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "todos[1]{id,title,due_date,status}:")
 			},
 		},
 		"fetch-todos-invalid-due-after": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10, "due_after": "invalid-date", "due_before": "2026-01-30"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_due_after")
 			},
 		},
 		"fetch-todos-invalid-due-before": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10, "due_after": "2026-01-20", "due_before": "invalid-date"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_due_before")
 			},
 		},
 
 		"fetch-todos-invalid-arguments": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `invalid json`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_arguments")
 			},
 		},
 		"fetch-todos-invalid-status-with-concatenated-field": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page":1,"page_size":10,"search_by_similarity":"abul dinner","sort_by":"similarityAsc","status":"OPEN','sort_by':'dueDateAsc"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_status")
 				assert.Contains(t, resp.Content, "status must be either OPEN or DONE")
 			},
 		},
 		"fetch-todos-invalid-partial-due-range": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10, "due_after": "2026-01-20"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_due_range")
 			},
 		},
 		"fetch-todos-invalid-due-range-order": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10, "due_after": "2026-01-30", "due_before": "2026-01-20"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "invalid_due_range")
 				assert.Contains(t, resp.Content, "due_after must be less than or equal to due_before")
 			},
 		},
 		"fetch-todos-similarity-sort-without-search-term": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10, "sort_by": "similarityAsc"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "missing_search_by_similarity_for_similarity_sort")
 			},
 		},
 		"fetch-todos-embedding-error": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 				semanticEncoder.EXPECT().
 					VectorizeQuery(mock.Anything, "embedding-model", "search").
-					Return(domain.EmbeddingVector{}, errors.New("embedding failed")).
+					Return(semantic.EmbeddingVector{}, errors.New("embedding failed")).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10, "search_by_similarity": "search"}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "embedding_error")
 			},
 		},
 		"fetch-todos-list-error": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, 1, 10, mock.Anything).
 					Return(nil, false, errors.New("db error")).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "list_todos_error")
 			},
 		},
 		"fetch-todos-has-more": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, 1, 10, mock.Anything).
-					Return([]domain.Todo{testTodo}, true, nil).
+					Return([]todo.Todo{testTodo}, true, nil).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "next_page: 2\ntodos[1]")
 			},
 		},
 		"fetch-todos-no-results": {
-			setupMocks: func(todoRepo *domain.MockTodoRepository, semanticEncoder *domain.MockSemanticEncoder) {
+			setupMocks: func(todoRepo *todo.MockRepository, semanticEncoder *semantic.MockEncoder) {
 				todoRepo.EXPECT().
 					ListTodos(mock.Anything, 1, 10, mock.Anything).
-					Return([]domain.Todo{}, false, nil).
+					Return([]todo.Todo{}, false, nil).
 					Once()
 			},
-			functionCall: domain.AssistantActionCall{
+			functionCall: assistant.ActionCall{
 				Name:  "fetch_todos",
 				Input: `{"page": 1, "page_size": 10}`,
 			},
-			validateResp: func(t *testing.T, resp domain.AssistantMessage) {
-				assert.Equal(t, domain.ChatRole_Tool, resp.Role)
+			validateResp: func(t *testing.T, resp assistant.Message) {
+				assert.Equal(t, assistant.ChatRole_Tool, resp.Role)
 				assert.Contains(t, resp.Content, "todos[0]")
 			},
 		},
@@ -329,11 +331,11 @@ func TestTodoFetcherAction(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			todoRepo := domain.NewMockTodoRepository(t)
-			semanticEncoder := domain.NewMockSemanticEncoder(t)
+			todoRepo := todo.NewMockRepository(t)
+			semanticEncoder := semantic.NewMockEncoder(t)
 			tt.setupMocks(todoRepo, semanticEncoder)
 
-			action := NewTodoFetcherAction(todoRepo, semanticEncoder, "embedding-model")
+			action := NewFetchTodosAction(todoRepo, semanticEncoder, "embedding-model")
 			assert.NotEmpty(t, action.StatusMessage())
 
 			definition := action.Definition()
@@ -341,7 +343,7 @@ func TestTodoFetcherAction(t *testing.T) {
 			assert.NotEmpty(t, definition.Description)
 			assert.NotEmpty(t, definition.Input)
 
-			resp := action.Execute(context.Background(), tt.functionCall, []domain.AssistantMessage{})
+			resp := action.Execute(context.Background(), tt.functionCall, []assistant.Message{})
 			tt.validateResp(t, resp)
 		})
 	}

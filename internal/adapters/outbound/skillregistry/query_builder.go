@@ -3,12 +3,12 @@ package skillregistry
 import (
 	"strings"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 )
 
 // buildSelectionInputs derives the primary current-turn text and auxiliary
 // recent-user context used for skill retrieval.
-func buildSelectionInputs(messages []domain.AssistantMessage, maxChars int, recentLimit int) (string, string) {
+func buildSelectionInputs(messages []assistant.Message, maxChars int, recentLimit int) (string, string) {
 	if len(messages) == 0 {
 		return "", ""
 	}
@@ -17,7 +17,7 @@ func buildSelectionInputs(messages []domain.AssistantMessage, maxChars int, rece
 	currentInput := ""
 	for i := len(messages) - 1; i >= 0; i-- {
 		msg := messages[i]
-		if msg.Role != domain.ChatRole_User {
+		if msg.Role != assistant.ChatRole_User {
 			continue
 		}
 		content := strings.TrimSpace(msg.Content)
@@ -53,7 +53,7 @@ func buildSelectionInputs(messages []domain.AssistantMessage, maxChars int, rece
 	recent := make([]string, 0, recentLimit)
 	for i := currentIndex - 1; i >= 0 && len(recent) < recentLimit; i-- {
 		msg := messages[i]
-		if msg.Role != domain.ChatRole_User {
+		if msg.Role != assistant.ChatRole_User {
 			continue
 		}
 		content := strings.TrimSpace(msg.Content)
@@ -88,10 +88,10 @@ func shouldAugmentCurrentInput(input string) bool {
 }
 
 // previousAssistantMessage returns the nearest preceding assistant message.
-func previousAssistantMessage(messages []domain.AssistantMessage, currentIndex int, maxChars int) string {
+func previousAssistantMessage(messages []assistant.Message, currentIndex int, maxChars int) string {
 	for i := currentIndex - 1; i >= 0; i-- {
 		msg := messages[i]
-		if msg.Role != domain.ChatRole_Assistant {
+		if msg.Role != assistant.ChatRole_Assistant {
 			continue
 		}
 		content := strings.TrimSpace(msg.Content)
@@ -104,10 +104,10 @@ func previousAssistantMessage(messages []domain.AssistantMessage, currentIndex i
 }
 
 // previousUserMessage returns the nearest preceding user message.
-func previousUserMessage(messages []domain.AssistantMessage, currentIndex int, maxChars int) string {
+func previousUserMessage(messages []assistant.Message, currentIndex int, maxChars int) string {
 	for i := currentIndex - 1; i >= 0; i-- {
 		msg := messages[i]
-		if msg.Role != domain.ChatRole_User {
+		if msg.Role != assistant.ChatRole_User {
 			continue
 		}
 		content := strings.TrimSpace(msg.Content)
@@ -120,10 +120,10 @@ func previousUserMessage(messages []domain.AssistantMessage, currentIndex int, m
 }
 
 // latestUserInput returns the most recent user message content.
-func latestUserInput(messages []domain.AssistantMessage, maxChars int) string {
+func latestUserInput(messages []assistant.Message, maxChars int) string {
 	for i := len(messages) - 1; i >= 0; i-- {
 		msg := messages[i]
-		if msg.Role != domain.ChatRole_User {
+		if msg.Role != assistant.ChatRole_User {
 			continue
 		}
 		content := strings.TrimSpace(msg.Content)

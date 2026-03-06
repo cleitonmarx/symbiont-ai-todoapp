@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,17 +21,17 @@ func TestBoardSummaryRepository_StoreSummary(t *testing.T) {
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	generatedAt := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	summary := domain.BoardSummary{
+	summary := todo.BoardSummary{
 		ID:            fixedUUID,
 		Model:         "mistral",
 		GeneratedAt:   generatedAt,
 		SourceVersion: 1,
-		Content: domain.BoardSummaryContent{
-			Counts: domain.TodoStatusCounts{
+		Content: todo.BoardSummaryContent{
+			Counts: todo.StatusCounts{
 				Open: 3,
 				Done: 5,
 			},
-			NextUp: []domain.NextUpTodoItem{
+			NextUp: []todo.NextUpItem{
 				{
 					Title:  "Pay electricity bill",
 					Reason: "Overdue by 6 days",
@@ -52,7 +52,7 @@ func TestBoardSummaryRepository_StoreSummary(t *testing.T) {
 
 	tests := map[string]struct {
 		setExpectations func(mock sqlmock.Sqlmock)
-		summary         domain.BoardSummary
+		summary         todo.BoardSummary
 		shouldError     bool
 	}{
 		"success-insert": {
@@ -129,17 +129,17 @@ func TestBoardSummaryRepository_GetLatestSummary(t *testing.T) {
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	generatedAt := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	summary := domain.BoardSummary{
+	summary := todo.BoardSummary{
 		ID:            fixedUUID,
 		Model:         "mistral",
 		GeneratedAt:   generatedAt,
 		SourceVersion: 1,
-		Content: domain.BoardSummaryContent{
-			Counts: domain.TodoStatusCounts{
+		Content: todo.BoardSummaryContent{
+			Counts: todo.StatusCounts{
 				Open: 3,
 				Done: 5,
 			},
-			NextUp: []domain.NextUpTodoItem{
+			NextUp: []todo.NextUpItem{
 				{
 					Title:  "Pay electricity bill",
 					Reason: "Overdue by 6 days",
@@ -160,7 +160,7 @@ func TestBoardSummaryRepository_GetLatestSummary(t *testing.T) {
 
 	tests := map[string]struct {
 		setExpectations func(mock sqlmock.Sqlmock)
-		expectedSummary domain.BoardSummary
+		expectedSummary todo.BoardSummary
 		expectedFound   bool
 		shouldError     bool
 	}{
@@ -186,7 +186,7 @@ func TestBoardSummaryRepository_GetLatestSummary(t *testing.T) {
 				mock.ExpectQuery(`SELECT id, summary, model, generated_at, source_version FROM board_summary ORDER BY generated_at DESC LIMIT 1`).
 					WillReturnError(sql.ErrNoRows)
 			},
-			expectedSummary: domain.BoardSummary{},
+			expectedSummary: todo.BoardSummary{},
 			expectedFound:   false,
 			shouldError:     false,
 		},
@@ -195,7 +195,7 @@ func TestBoardSummaryRepository_GetLatestSummary(t *testing.T) {
 				mock.ExpectQuery(`SELECT id, summary, model, generated_at, source_version FROM board_summary ORDER BY generated_at DESC LIMIT 1`).
 					WillReturnError(sql.ErrConnDone)
 			},
-			expectedSummary: domain.BoardSummary{},
+			expectedSummary: todo.BoardSummary{},
 			expectedFound:   false,
 			shouldError:     true,
 		},
@@ -212,7 +212,7 @@ func TestBoardSummaryRepository_GetLatestSummary(t *testing.T) {
 				mock.ExpectQuery(`SELECT id, summary, model, generated_at, source_version FROM board_summary ORDER BY generated_at DESC LIMIT 1`).
 					WillReturnRows(rows)
 			},
-			expectedSummary: domain.BoardSummary{},
+			expectedSummary: todo.BoardSummary{},
 			expectedFound:   false,
 			shouldError:     true,
 		},
@@ -249,7 +249,7 @@ func TestBoardSummaryRepository_CalculateSummaryContent(t *testing.T) {
 
 	tests := map[string]struct {
 		setExpectations func(mock sqlmock.Sqlmock)
-		expectedSummary domain.BoardSummaryContent
+		expectedSummary todo.BoardSummaryContent
 		expectedFound   bool
 		shouldError     bool
 	}{
@@ -266,12 +266,12 @@ func TestBoardSummaryRepository_CalculateSummaryContent(t *testing.T) {
 				mock.ExpectQuery(boardSummaryCTEQry + ` SELECT stats.counts, near_deadline.overdue, near_deadline.near_deadline, next_tasks.next_up FROM stats, near_deadline, next_tasks`).
 					WillReturnRows(rows)
 			},
-			expectedSummary: domain.BoardSummaryContent{
-				Counts: domain.TodoStatusCounts{
+			expectedSummary: todo.BoardSummaryContent{
+				Counts: todo.StatusCounts{
 					Open: 4,
 					Done: 6,
 				},
-				NextUp: []domain.NextUpTodoItem{
+				NextUp: []todo.NextUpItem{
 					{
 						Title:  "Submit tax documents",
 						Reason: "Due in 2 days",
@@ -292,7 +292,7 @@ func TestBoardSummaryRepository_CalculateSummaryContent(t *testing.T) {
 				mock.ExpectQuery(boardSummaryCTEQry + ` SELECT stats.counts, near_deadline.overdue, near_deadline.near_deadline, next_tasks.next_up FROM stats, near_deadline, next_tasks`).
 					WillReturnError(sql.ErrConnDone)
 			},
-			expectedSummary: domain.BoardSummaryContent{},
+			expectedSummary: todo.BoardSummaryContent{},
 			shouldError:     true,
 		},
 	}
@@ -316,18 +316,4 @@ func TestBoardSummaryRepository_CalculateSummaryContent(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
-}
-
-func TestInitBoardSummaryRepository_Initialize(t *testing.T) {
-	t.Parallel()
-
-	i := &InitBoardSummaryRepository{
-		DB: &sql.DB{},
-	}
-
-	_, err := i.Initialize(context.Background())
-	assert.NoError(t, err)
-
-	_, err = depend.Resolve[domain.BoardSummaryRepository]()
-	assert.NoError(t, err)
 }

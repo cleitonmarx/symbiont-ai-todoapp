@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,33 +24,33 @@ func TestChatSummaryGenerator_Run(t *testing.T) {
 
 	tests := map[string]struct {
 		payloads       [][]byte
-		expectedEvents []domain.ChatMessageEvent
+		expectedEvents []outbox.ChatMessageEvent
 	}{
 		"coalesces-events-per-conversation": {
 			payloads: [][]byte{
-				chatEventPayload(t, domain.ChatMessageEvent{
-					Type:           domain.EventType_CHAT_MESSAGE_SENT,
-					ChatRole:       domain.ChatRole_Assistant,
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
 					ChatMessageID:  firstMessageID,
 					ConversationID: conversationID,
 				}),
-				chatEventPayload(t, domain.ChatMessageEvent{
-					Type:           domain.EventType_CHAT_MESSAGE_SENT,
-					ChatRole:       domain.ChatRole_Assistant,
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
 					ChatMessageID:  secondMessageID,
 					ConversationID: conversationID,
 				}),
-				chatEventPayload(t, domain.ChatMessageEvent{
-					Type:           domain.EventType_CHAT_MESSAGE_SENT,
-					ChatRole:       domain.ChatRole_Assistant,
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
 					ChatMessageID:  thirdMessageID,
 					ConversationID: conversationID,
 				}),
 			},
-			expectedEvents: []domain.ChatMessageEvent{
+			expectedEvents: []outbox.ChatMessageEvent{
 				{
-					Type:           domain.EventType_CHAT_MESSAGE_SENT,
-					ChatRole:       domain.ChatRole_Assistant,
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
 					ChatMessageID:  thirdMessageID,
 					ConversationID: conversationID,
 				},
@@ -57,35 +58,35 @@ func TestChatSummaryGenerator_Run(t *testing.T) {
 		},
 		"calls-summary-once-per-conversation": {
 			payloads: [][]byte{
-				chatEventPayload(t, domain.ChatMessageEvent{
-					Type:           domain.EventType_CHAT_MESSAGE_SENT,
-					ChatRole:       domain.ChatRole_User,
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_User,
 					ChatMessageID:  firstMessageID,
 					ConversationID: conversationID,
 				}),
-				chatEventPayload(t, domain.ChatMessageEvent{
-					Type:           domain.EventType_CHAT_MESSAGE_SENT,
-					ChatRole:       domain.ChatRole_Assistant,
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
 					ChatMessageID:  secondMessageID,
 					ConversationID: uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 				}),
-				chatEventPayload(t, domain.ChatMessageEvent{
-					Type:           domain.EventType_CHAT_MESSAGE_SENT,
-					ChatRole:       domain.ChatRole_Assistant,
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
 					ChatMessageID:  thirdMessageID,
 					ConversationID: conversationID,
 				}),
 			},
-			expectedEvents: []domain.ChatMessageEvent{
+			expectedEvents: []outbox.ChatMessageEvent{
 				{
-					Type:           domain.EventType_CHAT_MESSAGE_SENT,
-					ChatRole:       domain.ChatRole_Assistant,
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
 					ChatMessageID:  thirdMessageID,
 					ConversationID: conversationID,
 				},
 				{
-					Type:           domain.EventType_CHAT_MESSAGE_SENT,
-					ChatRole:       domain.ChatRole_Assistant,
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
 					ChatMessageID:  secondMessageID,
 					ConversationID: uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 				},
@@ -99,8 +100,8 @@ func TestChatSummaryGenerator_Run(t *testing.T) {
 		},
 		"ignore-unrelated-event-type": {
 			payloads: [][]byte{
-				chatEventPayload(t, domain.ChatMessageEvent{
-					Type:           domain.EventType_TODO_CREATED,
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_TODO_CREATED,
 					ChatMessageID:  firstMessageID,
 					ConversationID: conversationID,
 				}),
@@ -120,12 +121,12 @@ func TestChatSummaryGenerator_Run(t *testing.T) {
 				subscriptionID,
 			)
 
-			receivedEvents := make([]domain.ChatMessageEvent, 0, len(tt.expectedEvents))
-			gcs := usecases.NewMockGenerateChatSummary(t)
+			receivedEvents := make([]outbox.ChatMessageEvent, 0, len(tt.expectedEvents))
+			gcs := chat.NewMockGenerateChatSummary(t)
 			for range tt.expectedEvents {
 				gcs.EXPECT().
 					Execute(mock.Anything, mock.Anything).
-					Run(func(_ context.Context, event domain.ChatMessageEvent) {
+					Run(func(_ context.Context, event outbox.ChatMessageEvent) {
 						receivedEvents = append(receivedEvents, event)
 					}).
 					Return(nil).
@@ -155,7 +156,7 @@ func TestChatSummaryGenerator_Run(t *testing.T) {
 
 			assert.Equal(t, len(tt.expectedEvents), len(receivedEvents))
 
-			expectedIndex := make(map[string]domain.ChatMessageEvent, len(tt.expectedEvents))
+			expectedIndex := make(map[string]outbox.ChatMessageEvent, len(tt.expectedEvents))
 			for _, event := range tt.expectedEvents {
 				expectedIndex[chatEventKey(event)] = event
 			}

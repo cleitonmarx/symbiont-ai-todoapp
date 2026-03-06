@@ -12,7 +12,7 @@ import (
 
 	"cloud.google.com/go/pubsub/v2"
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -23,11 +23,11 @@ const actionApprovalEventsTopicID = "ActionApprovals"
 // ActionApprovalDispatcher consumes approval decision messages and dispatches them
 // into the in-memory approval dispatcher used by stream chat.
 type ActionApprovalDispatcher struct {
-	Logger              *log.Logger                              `resolve:""`
-	Client              *pubsub.Client                           `resolve:""`
-	Dispatcher          domain.AssistantActionApprovalDispatcher `resolve:""`
-	SubscriptionID      string                                   `config:"ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID"`
-	ProjectID           string                                   `config:"PUBSUB_PROJECT_ID"`
+	Logger              *log.Logger                        `resolve:""`
+	Client              *pubsub.Client                     `resolve:""`
+	Dispatcher          assistant.ActionApprovalDispatcher `resolve:""`
+	SubscriptionID      string                             `config:"ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID"`
+	ProjectID           string                             `config:"PUBSUB_PROJECT_ID"`
 	ServerID            string
 	workerExecutionChan chan struct{}
 }
@@ -97,6 +97,7 @@ func (w ActionApprovalDispatcher) Run(ctx context.Context) error {
 	}
 }
 
+// resolveSubscriptionID determines the effective subscription ID to use, applying server ID suffix if configured.
 func (w ActionApprovalDispatcher) resolveSubscriptionID() string {
 	base := strings.TrimSpace(w.SubscriptionID)
 	if base == "" {
@@ -105,7 +106,7 @@ func (w ActionApprovalDispatcher) resolveSubscriptionID() string {
 
 	serverID := strings.TrimSpace(w.ServerID)
 	if serverID == "" {
-		serverID = generateServerID()
+		serverID = uuid.NewString()
 	}
 	serverID = sanitizeSubscriptionPart(serverID)
 	if serverID == "" {
@@ -114,10 +115,8 @@ func (w ActionApprovalDispatcher) resolveSubscriptionID() string {
 	return base + "-" + serverID
 }
 
-func generateServerID() string {
-	return uuid.NewString()
-}
-
+// sanitizeSubscriptionPart cleans a string to be safely used as part of a Pub/Sub subscription ID,
+// ensuring it meets character and length requirements.
 func sanitizeSubscriptionPart(part string) string {
 	trimmed := strings.TrimSpace(strings.ToLower(part))
 	if trimmed == "" {
@@ -214,9 +213,8 @@ type actionApprovalDecisionPayload struct {
 	Reason         *string   `json:"reason,omitempty"`
 }
 
-func decodeApprovalDecision(payload []byte) (domain.AssistantActionApprovalDecision, error) {
-	// Accept direct marshaling of domain.AssistantActionApprovalDecision.
-	var direct domain.AssistantActionApprovalDecision
+func decodeApprovalDecision(payload []byte) (assistant.ActionApprovalDecision, error) {
+	var direct assistant.ActionApprovalDecision
 	if err := json.Unmarshal(payload, &direct); err == nil {
 		direct.Status = normalizeApprovalStatus(string(direct.Status))
 		if err := validateApprovalDecision(direct); err == nil {
@@ -226,11 +224,11 @@ func decodeApprovalDecision(payload []byte) (domain.AssistantActionApprovalDecis
 
 	var msg actionApprovalDecisionPayload
 	if err := json.Unmarshal(payload, &msg); err != nil {
-		return domain.AssistantActionApprovalDecision{}, err
+		return assistant.ActionApprovalDecision{}, err
 	}
 
-	decision := domain.AssistantActionApprovalDecision{
-		Key: domain.AssistantActionApprovalKey{
+	decision := assistant.ActionApprovalDecision{
+		Key: assistant.ActionApprovalKey{
 			ConversationID: msg.ConversationID,
 			TurnID:         msg.TurnID,
 			ActionCallID:   strings.TrimSpace(msg.ActionCallID),
@@ -241,12 +239,12 @@ func decodeApprovalDecision(payload []byte) (domain.AssistantActionApprovalDecis
 	}
 
 	if err := validateApprovalDecision(decision); err != nil {
-		return domain.AssistantActionApprovalDecision{}, err
+		return assistant.ActionApprovalDecision{}, err
 	}
 	return decision, nil
 }
 
-func validateApprovalDecision(decision domain.AssistantActionApprovalDecision) error {
+func validateApprovalDecision(decision assistant.ActionApprovalDecision) error {
 	switch {
 	case decision.Key.ConversationID == uuid.Nil:
 		return errors.New("conversation_id is required")
@@ -257,17 +255,17 @@ func validateApprovalDecision(decision domain.AssistantActionApprovalDecision) e
 	}
 
 	switch decision.Status {
-	case domain.ChatMessageApprovalStatus_Approved,
-		domain.ChatMessageApprovalStatus_Rejected,
-		domain.ChatMessageApprovalStatus_AutoRejected,
-		domain.ChatMessageApprovalStatus_Expired:
+	case assistant.ChatMessageApprovalStatus_Approved,
+		assistant.ChatMessageApprovalStatus_Rejected,
+		assistant.ChatMessageApprovalStatus_AutoRejected,
+		assistant.ChatMessageApprovalStatus_Expired:
 		return nil
 	default:
 		return fmt.Errorf("invalid approval status: %q", decision.Status)
 	}
 }
 
-func normalizeApprovalStatus(raw string) domain.ChatMessageApprovalStatus {
+func normalizeApprovalStatus(raw string) assistant.ChatMessageApprovalStatus {
 	status := strings.ToUpper(strings.TrimSpace(raw))
-	return domain.ChatMessageApprovalStatus(status)
+	return assistant.ChatMessageApprovalStatus(status)
 }

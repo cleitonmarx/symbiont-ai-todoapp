@@ -11,7 +11,7 @@ import (
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"cloud.google.com/go/pubsub/v2/pstest"
 	"github.com/cleitonmarx/symbiont"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -118,7 +118,7 @@ func waitForBatchSignals(t *testing.T, signalChan chan struct{}, expectedBatches
 }
 
 // chatEventPayload marshals a ChatMessageEvent into JSON bytes for Pub/Sub publishing.
-func chatEventPayload(t *testing.T, event domain.ChatMessageEvent) []byte {
+func chatEventPayload(t *testing.T, event outbox.ChatMessageEvent) []byte {
 	t.Helper()
 	data, err := json.Marshal(event)
 	assert.NoError(t, err)
@@ -126,7 +126,7 @@ func chatEventPayload(t *testing.T, event domain.ChatMessageEvent) []byte {
 }
 
 // chatEventKey generates a deterministic key to assert expected summary event parameters.
-func chatEventKey(event domain.ChatMessageEvent) string {
+func chatEventKey(event outbox.ChatMessageEvent) string {
 	return fmt.Sprintf(
 		"%s|%s|%s|%s",
 		event.ConversationID,

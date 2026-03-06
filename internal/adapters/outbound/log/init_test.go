@@ -1,0 +1,22 @@
+package log
+
+import (
+	"context"
+	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/stretchr/testify/assert"
+	"log"
+	"testing"
+)
+
+func TestInitLogger_Initialize(t *testing.T) {
+	t.Parallel()
+
+	init := InitLogger{}
+
+	_, err := init.Initialize(context.Background())
+	assert.NoError(t, err)
+
+	_, err = depend.Resolve[*log.Logger]()
+	assert.NoError(t, err)
+
+}

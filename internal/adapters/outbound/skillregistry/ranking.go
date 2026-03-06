@@ -5,21 +5,21 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/semantic"
 )
 
 // embeddedSkill stores a skill definition together with its precomputed
 // retrieval vectors.
 type embeddedSkill struct {
-	definition  domain.AssistantSkillDefinition
+	definition  assistant.SkillDefinition
 	useVector   []float64
 	avoidVector []float64
 }
 
 // scoredSkill represents one ranked skill candidate.
 type scoredSkill struct {
-	definition domain.AssistantSkillDefinition
+	definition assistant.SkillDefinition
 	score      float64
 }
 
@@ -178,7 +178,7 @@ func weightedSimilarity(queryVectors []weightedQueryVector, skillVector []float6
 		if q.weight <= 0 || len(q.vector) == 0 {
 			continue
 		}
-		sim, ok := common.CosineSimilarity(q.vector, skillVector)
+		sim, ok := semantic.CosineSimilarity(q.vector, skillVector)
 		if !ok {
 			continue
 		}

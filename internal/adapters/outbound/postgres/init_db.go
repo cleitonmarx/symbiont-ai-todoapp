@@ -98,6 +98,7 @@ func (di *InitDB) Initialize(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
+// runMigrations applies database migrations from the embedded filesystem using golang-migrate.
 func (di *InitDB) runMigrations() error {
 	source, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
@@ -129,6 +130,7 @@ func (di *InitDB) runMigrations() error {
 	return nil
 }
 
+// Close terminates the database connection and unregisters metrics, logging any errors encountered during shutdown.
 func (di *InitDB) Close() {
 	if di.db != nil {
 		if err := di.db.Close(); err != nil {
@@ -143,6 +145,7 @@ func (di *InitDB) Close() {
 	}
 }
 
+// withQueryAttributes returns a function that extracts SQL operation and table information from queries for telemetry attributes.
 func withQueryAttributes(logger *log.Logger) func(ctx context.Context, method otelsql.Method, query string, args []driver.NamedValue) []attribute.KeyValue {
 	return func(ctx context.Context, method otelsql.Method, query string, args []driver.NamedValue) []attribute.KeyValue {
 		if method != otelsql.MethodConnQuery && method != otelsql.MethodConnExec {

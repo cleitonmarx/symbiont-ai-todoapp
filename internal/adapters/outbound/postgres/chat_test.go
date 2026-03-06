@@ -2,7 +2,7 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
+
 	"database/sql/driver"
 	"errors"
 	"testing"
@@ -10,8 +10,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,23 +24,23 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 	turnSequence := int64(7)
 	fixedTime := time.Date(2026, 1, 24, 12, 0, 0, 0, time.UTC)
 	updatedAt := fixedTime.Add(2 * time.Second)
-	msg := domain.ChatMessage{
+	msg := assistant.ChatMessage{
 		ID:             fixedID,
 		ConversationID: conversationID,
 		TurnID:         turnID,
 		TurnSequence:   turnSequence,
-		ChatRole:       domain.ChatRole("user"),
+		ChatRole:       assistant.ChatRole("user"),
 		Content:        "hello",
 		Model:          "ai/gpt-oss",
-		MessageState:   domain.ChatMessageState_Completed,
-		ActionCalls: []domain.AssistantActionCall{
+		MessageState:   assistant.ChatMessageState_Completed,
+		ActionCalls: []assistant.ActionCall{
 			{
 				ID:    "id",
 				Name:  "test_func",
 				Input: "{\"arg1\":0}",
 			},
 		},
-		SelectedSkills: []domain.AssistantSelectedSkill{
+		SelectedSkills: []assistant.SelectedSkill{
 			{
 				Name:   "update_todos",
 				Source: "skills/update_todos.md",
@@ -128,7 +127,7 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewChatMessageRepository(db)
-			gotErr := repo.CreateChatMessages(context.Background(), []domain.ChatMessage{msg})
+			gotErr := repo.CreateChatMessages(context.Background(), []assistant.ChatMessage{msg})
 			assert.Equal(t, tt.err, gotErr)
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -157,12 +156,12 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			conversationID.String(),
 			turnID.String(),
 			turnSequence,
-			domain.ChatRole("user"),
+			assistant.ChatRole("user"),
 			"content",
 			nil,
 			nil,
 			"ai/gpt-oss",
-			string(domain.ChatMessageState_Completed),
+			string(assistant.ChatMessageState_Completed),
 			nil,
 			0,
 			0,
@@ -181,7 +180,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 		page            int
 		pageSize        int
 		expect          func(sqlmock.Sqlmock)
-		expectedMsgs    []domain.ChatMessage
+		expectedMsgs    []assistant.ChatMessage
 		expectedHasMore bool
 		expectErr       bool
 	}{
@@ -197,10 +196,10 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
-			expectedMsgs: []domain.ChatMessage{
-				{ID: fixedID1, ConversationID: conversationID, TurnID: turnID1, TurnSequence: 0, ChatRole: domain.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t1, UpdatedAt: t1},
-				{ID: fixedID2, ConversationID: conversationID, TurnID: turnID2, TurnSequence: 1, ChatRole: domain.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t2, UpdatedAt: t2},
-				{ID: fixedID3, ConversationID: conversationID, TurnID: turnID3, TurnSequence: 2, ChatRole: domain.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t3, UpdatedAt: t3},
+			expectedMsgs: []assistant.ChatMessage{
+				{ID: fixedID1, ConversationID: conversationID, TurnID: turnID1, TurnSequence: 0, ChatRole: assistant.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: assistant.ChatMessageState_Completed, CreatedAt: t1, UpdatedAt: t1},
+				{ID: fixedID2, ConversationID: conversationID, TurnID: turnID2, TurnSequence: 1, ChatRole: assistant.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: assistant.ChatMessageState_Completed, CreatedAt: t2, UpdatedAt: t2},
+				{ID: fixedID3, ConversationID: conversationID, TurnID: turnID3, TurnSequence: 2, ChatRole: assistant.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: assistant.ChatMessageState_Completed, CreatedAt: t3, UpdatedAt: t3},
 			},
 			expectedHasMore: false,
 			expectErr:       false,
@@ -215,17 +214,17 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 						conversationID.String(),
 						turnID1.String(),
 						int64(0),
-						domain.ChatRole("tool"),
+						assistant.ChatRole("tool"),
 						"content",
 						"call-1",
 						nil,
 						"ai/gpt-oss",
-						string(domain.ChatMessageState_Completed),
+						string(assistant.ChatMessageState_Completed),
 						nil,
 						0,
 						0,
 						0,
-						string(domain.ChatMessageApprovalStatus_Approved),
+						string(assistant.ChatMessageApprovalStatus_Approved),
 						approvalReason,
 						approvalDecidedAt,
 						[]byte(`[{"Name":"delete_todos","Source":"skills/delete_todos.md","Tools":["fetch_todos","delete_todos"]}]`),
@@ -237,21 +236,21 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
-			expectedMsgs: []domain.ChatMessage{
+			expectedMsgs: []assistant.ChatMessage{
 				{
 					ID:                     fixedID1,
 					ConversationID:         conversationID,
 					TurnID:                 turnID1,
 					TurnSequence:           0,
-					ChatRole:               domain.ChatRole("tool"),
+					ChatRole:               assistant.ChatRole("tool"),
 					Content:                "content",
 					ActionCallID:           common.Ptr("call-1"),
 					Model:                  "ai/gpt-oss",
-					MessageState:           domain.ChatMessageState_Completed,
-					ApprovalStatus:         common.Ptr(domain.ChatMessageApprovalStatus_Approved),
+					MessageState:           assistant.ChatMessageState_Completed,
+					ApprovalStatus:         common.Ptr(assistant.ChatMessageApprovalStatus_Approved),
 					ApprovalDecisionReason: common.Ptr(approvalReason),
 					ApprovalDecidedAt:      common.Ptr(approvalDecidedAt),
-					SelectedSkills: []domain.AssistantSelectedSkill{
+					SelectedSkills: []assistant.SelectedSkill{
 						{
 							Name:   "delete_todos",
 							Source: "skills/delete_todos.md",
@@ -279,9 +278,9 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
-			expectedMsgs: []domain.ChatMessage{
-				{ID: fixedID2, ConversationID: conversationID, TurnID: turnID2, TurnSequence: 1, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t2, UpdatedAt: t2},
-				{ID: fixedID3, ConversationID: conversationID, TurnID: turnID3, TurnSequence: 2, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t3, UpdatedAt: t3},
+			expectedMsgs: []assistant.ChatMessage{
+				{ID: fixedID2, ConversationID: conversationID, TurnID: turnID2, TurnSequence: 1, ChatRole: assistant.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", MessageState: assistant.ChatMessageState_Completed, CreatedAt: t2, UpdatedAt: t2},
+				{ID: fixedID3, ConversationID: conversationID, TurnID: turnID3, TurnSequence: 2, ChatRole: assistant.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", MessageState: assistant.ChatMessageState_Completed, CreatedAt: t3, UpdatedAt: t3},
 			},
 			expectedHasMore: true,
 			expectErr:       false,
@@ -297,8 +296,8 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
-			expectedMsgs: []domain.ChatMessage{
-				{ID: fixedID1, ConversationID: conversationID, TurnID: turnID1, TurnSequence: 0, ChatRole: domain.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: t1, UpdatedAt: t1},
+			expectedMsgs: []assistant.ChatMessage{
+				{ID: fixedID1, ConversationID: conversationID, TurnID: turnID1, TurnSequence: 0, ChatRole: assistant.ChatRole("user"), Content: "content", Model: "ai/gpt-oss", MessageState: assistant.ChatMessageState_Completed, CreatedAt: t1, UpdatedAt: t1},
 			},
 			expectedHasMore: false,
 			expectErr:       false,
@@ -369,12 +368,12 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 			conversationID.String(),
 			turnID.String(),
 			turnSequence,
-			domain.ChatRole("user"),
+			assistant.ChatRole("user"),
 			"content",
 			nil,
 			nil,
 			"ai/gpt-oss",
-			string(domain.ChatMessageState_Completed),
+			string(assistant.ChatMessageState_Completed),
 			nil,
 			0,
 			0,
@@ -392,17 +391,17 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 	tests := map[string]struct {
 		page            int
 		pageSize        int
-		options         []domain.ListChatMessagesOption
+		options         []assistant.ListChatMessagesOption
 		expect          func(sqlmock.Sqlmock)
-		expectedMsgs    []domain.ChatMessage
+		expectedMsgs    []assistant.ChatMessage
 		expectedHasMore bool
 		expectErr       bool
 	}{
 		"success-with-after-message-option": {
 			page:     1,
 			pageSize: 2,
-			options: []domain.ListChatMessagesOption{
-				domain.WithChatMessagesAfterMessageID(fixedID1),
+			options: []assistant.ListChatMessagesOption{
+				assistant.WithChatMessagesAfterMessageID(fixedID1),
 			},
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(chatFields).
@@ -413,9 +412,9 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 					WithArgs(conversationID, fixedID1, conversationID).
 					WillReturnRows(rows)
 			},
-			expectedMsgs: []domain.ChatMessage{
-				{ID: fixedID2, ConversationID: conversationID, TurnID: turnID, TurnSequence: 1, ChatRole: domain.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: fixedTime, UpdatedAt: fixedTime},
-				{ID: fixedID3, ConversationID: conversationID, TurnID: turnID, TurnSequence: 2, ChatRole: domain.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: domain.ChatMessageState_Completed, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			expectedMsgs: []assistant.ChatMessage{
+				{ID: fixedID2, ConversationID: conversationID, TurnID: turnID, TurnSequence: 1, ChatRole: assistant.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: assistant.ChatMessageState_Completed, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+				{ID: fixedID3, ConversationID: conversationID, TurnID: turnID, TurnSequence: 2, ChatRole: assistant.ChatRole("user"), Content: "content", ActionCallID: nil, ActionCalls: nil, Model: "ai/gpt-oss", MessageState: assistant.ChatMessageState_Completed, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: true,
 			expectErr:       false,
@@ -423,8 +422,8 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 		"after-message-query-error": {
 			page:     1,
 			pageSize: 10,
-			options: []domain.ListChatMessagesOption{
-				domain.WithChatMessagesAfterMessageID(fixedID1),
+			options: []assistant.ListChatMessagesOption{
+				assistant.WithChatMessagesAfterMessageID(fixedID1),
 			},
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages LEFT JOIN ( SELECT created_at AS checkpoint_created_at, id AS checkpoint_id FROM chat_messages WHERE conversation_id = $1 AND id = $2 LIMIT 1 ) checkpoint ON TRUE WHERE conversation_id = $3 AND (checkpoint.checkpoint_id IS NULL OR chat_messages.created_at > checkpoint.checkpoint_created_at OR (chat_messages.created_at = checkpoint.checkpoint_created_at AND chat_messages.id > checkpoint.checkpoint_id)) ORDER BY created_at ASC, id ASC LIMIT 11").
@@ -499,18 +498,4 @@ func TestChatMessageRepository_DeleteConversationMessages(t *testing.T) {
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
-}
-
-func TestInitChatMessageRepository_Initialize(t *testing.T) {
-	t.Parallel()
-
-	i := &InitChatMessageRepository{
-		DB: &sql.DB{},
-	}
-
-	_, err := i.Initialize(context.Background())
-	assert.NoError(t, err)
-
-	_, err = depend.Resolve[domain.ChatMessageRepository]()
-	assert.NoError(t, err)
 }

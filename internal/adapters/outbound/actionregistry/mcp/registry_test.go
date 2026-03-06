@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,19 +15,19 @@ func TestMCPRegistry_Execute(t *testing.T) {
 
 	tests := map[string]struct {
 		session       *fakeSession
-		call          domain.AssistantActionCall
+		call          assistant.ActionCall
 		initialize    bool
-		assertMessage func(*testing.T, domain.AssistantMessage)
+		assertMessage func(*testing.T, assistant.Message)
 		assertSession func(*testing.T, *fakeSession)
 	}{
 		"calls-tool": {
 			session:    &fakeSession{listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{{Name: "fetch", Description: "Fetches content", InputSchema: map[string]any{"type": "object"}}}}}, callResult: &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "done"}}}},
-			call:       domain.AssistantActionCall{ID: "call-1", Name: "fetch", Input: `{"url":"https://example.com"}`},
+			call:       assistant.ActionCall{ID: "call-1", Name: "fetch", Input: `{"url":"https://example.com"}`},
 			initialize: true,
-			assertMessage: func(t *testing.T, msg domain.AssistantMessage) {
+			assertMessage: func(t *testing.T, msg assistant.Message) {
 				require.NotNil(t, msg.ActionCallID)
 				assert.Equal(t, "call-1", *msg.ActionCallID)
-				assert.Equal(t, domain.ChatRole_Tool, msg.Role)
+				assert.Equal(t, assistant.ChatRole_Tool, msg.Role)
 				assert.Equal(t, "done", msg.Content)
 			},
 			assertSession: func(t *testing.T, session *fakeSession) {
@@ -37,25 +37,27 @@ func TestMCPRegistry_Execute(t *testing.T) {
 			},
 		},
 		"invalid-arguments": {
-			session:       &fakeSession{listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{{Name: "fetch", Description: "Fetches content", InputSchema: map[string]any{"type": "object"}}}}}},
-			call:          domain.AssistantActionCall{ID: "call-2", Name: "fetch", Input: `[]`},
-			initialize:    true,
-			assertMessage: func(t *testing.T, msg domain.AssistantMessage) { assert.Contains(t, msg.Content, "invalid_arguments") },
+			session:    &fakeSession{listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{{Name: "fetch", Description: "Fetches content", InputSchema: map[string]any{"type": "object"}}}}}},
+			call:       assistant.ActionCall{ID: "call-2", Name: "fetch", Input: `[]`},
+			initialize: true,
+			assertMessage: func(t *testing.T, msg assistant.Message) {
+				assert.Contains(t, msg.Content, "invalid_arguments")
+			},
 		},
 		"error-prefixes-content": {
 			session:       &fakeSession{listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{{Name: "fetch", Description: "Fetches content", InputSchema: map[string]any{"type": "object"}}}}}, callResult: &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "failed"}}}},
-			call:          domain.AssistantActionCall{ID: "call-3", Name: "fetch", Input: `{}`},
+			call:          assistant.ActionCall{ID: "call-3", Name: "fetch", Input: `{}`},
 			initialize:    true,
-			assertMessage: func(t *testing.T, msg domain.AssistantMessage) { assert.Equal(t, "error: failed", msg.Content) },
+			assertMessage: func(t *testing.T, msg assistant.Message) { assert.Equal(t, "error: failed", msg.Content) },
 		},
 		"execute-code-normalizes-escaped-newlines": {
 			session: &fakeSession{
 				listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{{Name: "execute_code", Description: "Executes code", InputSchema: map[string]any{"type": "object"}}}}},
 				callResult:  &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: `{"result":["ok"]}`}}},
 			},
-			call:       domain.AssistantActionCall{ID: "call-exec", Name: "execute_code", Input: `{"code":"result = 1\\nresult"}`},
+			call:       assistant.ActionCall{ID: "call-exec", Name: "execute_code", Input: `{"code":"result = 1\\nresult"}`},
 			initialize: true,
-			assertMessage: func(t *testing.T, msg domain.AssistantMessage) {
+			assertMessage: func(t *testing.T, msg assistant.Message) {
 				assert.Equal(t, "ok", msg.Content)
 			},
 			assertSession: func(t *testing.T, session *fakeSession) {
@@ -65,9 +67,11 @@ func TestMCPRegistry_Execute(t *testing.T) {
 			},
 		},
 		"unknown-action": {
-			session:       &fakeSession{},
-			call:          domain.AssistantActionCall{ID: "call-unknown", Name: "missing_tool", Input: `{}`},
-			assertMessage: func(t *testing.T, msg domain.AssistantMessage) { assert.Contains(t, msg.Content, "unknown_action") },
+			session: &fakeSession{},
+			call:    assistant.ActionCall{ID: "call-unknown", Name: "missing_tool", Input: `{}`},
+			assertMessage: func(t *testing.T, msg assistant.Message) {
+				assert.Contains(t, msg.Content, "unknown_action")
+			},
 		},
 	}
 
@@ -96,7 +100,7 @@ func TestMCPRegistry_Methods(t *testing.T) {
 		assert   func(*testing.T, *MCPRegistry)
 	}{
 		"get-definition-found": {
-			registry: &MCPRegistry{actionsByName: map[string]domain.AssistantAction{"search": mcpToolAction{definition: domain.AssistantActionDefinition{Name: "search"}}}},
+			registry: &MCPRegistry{actionsByName: map[string]assistant.Action{"search": mcpToolAction{definition: assistant.ActionDefinition{Name: "search"}}}},
 			assert: func(t *testing.T, registry *MCPRegistry) {
 				def, found := registry.GetDefinition("search")
 				require.True(t, found)
@@ -104,7 +108,7 @@ func TestMCPRegistry_Methods(t *testing.T) {
 			},
 		},
 		"get-renderer-found": {
-			registry: &MCPRegistry{actionsByName: map[string]domain.AssistantAction{"execute_code": mcpToolAction{renderer: fakeRenderer{ok: true}}}},
+			registry: &MCPRegistry{actionsByName: map[string]assistant.Action{"execute_code": mcpToolAction{renderer: fakeRenderer{ok: true}}}},
 			assert: func(t *testing.T, registry *MCPRegistry) {
 				renderer, found := registry.GetRenderer("execute_code")
 				require.True(t, found)
@@ -112,7 +116,7 @@ func TestMCPRegistry_Methods(t *testing.T) {
 			},
 		},
 		"status-message-found": {
-			registry: &MCPRegistry{actionsByName: map[string]domain.AssistantAction{"search": mcpToolAction{statusMessage: "Searching..."}}},
+			registry: &MCPRegistry{actionsByName: map[string]assistant.Action{"search": mcpToolAction{statusMessage: "Searching..."}}},
 			assert: func(t *testing.T, registry *MCPRegistry) {
 				assert.Equal(t, "Searching...", registry.StatusMessage("search"))
 			},

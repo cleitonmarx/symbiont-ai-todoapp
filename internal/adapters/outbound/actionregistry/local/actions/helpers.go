@@ -8,26 +8,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 	"github.com/google/uuid"
 	"github.com/toon-format/toon-go"
 )
 
 // extractDateParam tries to extract a date from the provided parameter
 // or from the user message history.
-func extractDateParam(param string, history []domain.AssistantMessage, referenceDate time.Time) (time.Time, bool) {
+func extractDateParam(param string, history []assistant.Message, referenceDate time.Time) (time.Time, bool) {
 	// First, try to extract from the provided parameter
-	if dueDate, ok := domain.ExtractTimeFromText(param, referenceDate, referenceDate.Location()); ok {
+	if dueDate, ok := core.ExtractTimeFromText(param, referenceDate, referenceDate.Location()); ok {
 		return dueDate, true
 	}
 
 	// Next, scan the message history for date phrases
 	for i := len(history) - 1; i >= 0; i-- {
 		msg := history[i]
-		if msg.Role != domain.ChatRole_User {
+		if msg.Role != assistant.ChatRole_User {
 			continue
 		}
-		if dueDate, ok := domain.ExtractTimeFromText(msg.Content, referenceDate, referenceDate.Location()); ok {
+		if dueDate, ok := core.ExtractTimeFromText(msg.Content, referenceDate, referenceDate.Location()); ok {
 			return dueDate, true
 		}
 	}
@@ -60,7 +62,7 @@ func newActionError(errorType, details, example string) string {
 }
 
 // parseDueDateParams parses and validates due date parameters, returning pointers to parsed times.
-func parseDueDateParams(dueAfter, dueBefore *string, exampleArgs string) (*time.Time, *time.Time, *domain.AssistantMessage) {
+func parseDueDateParams(dueAfter, dueBefore *string, exampleArgs string) (*time.Time, *time.Time, *assistant.Message) {
 	var (
 		dueAfterTime  *time.Time
 		dueBeforeTime *time.Time
@@ -68,10 +70,10 @@ func parseDueDateParams(dueAfter, dueBefore *string, exampleArgs string) (*time.
 	)
 
 	if dueAfter != nil {
-		parsedTime, ok := domain.ExtractTimeFromText(*dueAfter, now, now.Location())
+		parsedTime, ok := core.ExtractTimeFromText(*dueAfter, now, now.Location())
 		if !ok {
-			errMsg := domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			errMsg := assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: nil,
 				Content:      newActionError("invalid_due_after", "could not parse due_after date", exampleArgs),
 			}
@@ -81,10 +83,10 @@ func parseDueDateParams(dueAfter, dueBefore *string, exampleArgs string) (*time.
 	}
 
 	if dueBefore != nil {
-		parsedTime, ok := domain.ExtractTimeFromText(*dueBefore, now, now.Location())
+		parsedTime, ok := core.ExtractTimeFromText(*dueBefore, now, now.Location())
 		if !ok {
-			errMsg := domain.AssistantMessage{
-				Role:         domain.ChatRole_Tool,
+			errMsg := assistant.Message{
+				Role:         assistant.ChatRole_Tool,
 				ActionCallID: nil,
 				Content:      newActionError("invalid_due_before", "could not parse due_before date", exampleArgs),
 			}
@@ -98,7 +100,7 @@ func parseDueDateParams(dueAfter, dueBefore *string, exampleArgs string) (*time.
 
 // mapTodoFilterBuildErrCode maps errors from building todo search options to specific error codes for better client handling.
 func mapTodoFilterBuildErrCode(err error) string {
-	var validationErr *domain.ValidationErr
+	var validationErr *core.ValidationErr
 	if errors.As(err, &validationErr) {
 		switch err.Error() {
 		case "due_after and due_before must be provided together":
@@ -121,7 +123,7 @@ func mapTodoFilterBuildErrCode(err error) string {
 }
 
 // formatTodosRows formats todos as a compact table-like payload consumed by the assistant.
-func formatTodosRows(todos []domain.Todo) string {
+func formatTodosRows(todos []todo.Todo) string {
 	type todoRow struct {
 		ID      string `toon:"id"`
 		Title   string `toon:"title"`

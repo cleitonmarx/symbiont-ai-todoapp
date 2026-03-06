@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/assert"
@@ -24,12 +25,12 @@ func TestTodoAppServer_DeleteConversation(t *testing.T) {
 
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	tests := map[string]struct {
-		setupUsecases  func(*usecases.MockDeleteConversation)
+		setupUsecases  func(*chat.MockDeleteConversation)
 		expectedStatus int
 		expectedError  *gen.ErrorResp
 	}{
 		"success": {
-			setupUsecases: func(m *usecases.MockDeleteConversation) {
+			setupUsecases: func(m *chat.MockDeleteConversation) {
 				m.EXPECT().
 					Execute(mock.Anything, conversationID).
 					Return(nil)
@@ -37,7 +38,7 @@ func TestTodoAppServer_DeleteConversation(t *testing.T) {
 			expectedStatus: http.StatusNoContent,
 		},
 		"use-case-error": {
-			setupUsecases: func(m *usecases.MockDeleteConversation) {
+			setupUsecases: func(m *chat.MockDeleteConversation) {
 				m.EXPECT().
 					Execute(mock.Anything, conversationID).
 					Return(errors.New("database error"))
@@ -54,7 +55,7 @@ func TestTodoAppServer_DeleteConversation(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockDeleteConversation := usecases.NewMockDeleteConversation(t)
+			mockDeleteConversation := chat.NewMockDeleteConversation(t)
 			tt.setupUsecases(mockDeleteConversation)
 
 			server := &TodoAppServer{
@@ -90,7 +91,7 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 	tests := map[string]struct {
 		conversationID       openapi_types.UUID
 		requestBody          []byte
-		setExpectations      func(uc *usecases.MockUpdateConversation)
+		setExpectations      func(uc *chat.MockUpdateConversation)
 		expectedStatusCode   int
 		expectedResponseBody interface{}
 		expectedErr          bool
@@ -98,12 +99,12 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 		"success-update-title": {
 			conversationID: openapi_types.UUID(fixedUUID),
 			requestBody:    serializeJSON(t, gen.UpdateConversationRequest{Title: newTitle}),
-			setExpectations: func(uc *usecases.MockUpdateConversation) {
+			setExpectations: func(uc *chat.MockUpdateConversation) {
 				uc.EXPECT().Execute(mock.Anything, fixedUUID, newTitle).Return(
-					domain.Conversation{
+					assistant.Conversation{
 						ID:          fixedUUID,
 						Title:       newTitle,
-						TitleSource: domain.ConversationTitleSource_User,
+						TitleSource: assistant.ConversationTitleSource_User,
 						CreatedAt:   fixedTime,
 						UpdatedAt:   fixedTime,
 					}, nil)
@@ -114,24 +115,24 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 		"malformed-json": {
 			conversationID:     openapi_types.UUID(fixedUUID),
 			requestBody:        []byte(`{invalid json}`),
-			setExpectations:    func(uc *usecases.MockUpdateConversation) {},
+			setExpectations:    func(uc *chat.MockUpdateConversation) {},
 			expectedStatusCode: http.StatusBadRequest,
 			expectedErr:        false,
 		},
 		"empty-request-body": {
 			conversationID:     openapi_types.UUID(fixedUUID),
 			requestBody:        []byte(``),
-			setExpectations:    func(uc *usecases.MockUpdateConversation) {},
+			setExpectations:    func(uc *chat.MockUpdateConversation) {},
 			expectedStatusCode: http.StatusBadRequest,
 			expectedErr:        false,
 		},
 		"conversation-not-found": {
 			conversationID: openapi_types.UUID(fixedUUID),
 			requestBody:    serializeJSON(t, gen.UpdateConversationRequest{Title: newTitle}),
-			setExpectations: func(uc *usecases.MockUpdateConversation) {
+			setExpectations: func(uc *chat.MockUpdateConversation) {
 				uc.EXPECT().Execute(mock.Anything, fixedUUID, newTitle).Return(
-					domain.Conversation{},
-					domain.NewNotFoundErr("conversation not found"))
+					assistant.Conversation{},
+					core.NewNotFoundErr("conversation not found"))
 			},
 			expectedStatusCode: http.StatusNotFound,
 			expectedErr:        false,
@@ -139,10 +140,10 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 		"validation-error": {
 			conversationID: openapi_types.UUID(fixedUUID),
 			requestBody:    serializeJSON(t, gen.UpdateConversationRequest{Title: ""}),
-			setExpectations: func(uc *usecases.MockUpdateConversation) {
+			setExpectations: func(uc *chat.MockUpdateConversation) {
 				uc.EXPECT().Execute(mock.Anything, fixedUUID, "").Return(
-					domain.Conversation{},
-					domain.NewValidationErr("conversation title cannot be empty"))
+					assistant.Conversation{},
+					core.NewValidationErr("conversation title cannot be empty"))
 			},
 			expectedStatusCode: http.StatusBadRequest,
 			expectedErr:        false,
@@ -150,9 +151,9 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 		"use-case-error": {
 			conversationID: openapi_types.UUID(fixedUUID),
 			requestBody:    serializeJSON(t, gen.UpdateConversationRequest{Title: newTitle}),
-			setExpectations: func(uc *usecases.MockUpdateConversation) {
+			setExpectations: func(uc *chat.MockUpdateConversation) {
 				uc.EXPECT().Execute(mock.Anything, fixedUUID, newTitle).Return(
-					domain.Conversation{},
+					assistant.Conversation{},
 					errors.New("internal server error"))
 			},
 			expectedStatusCode: http.StatusInternalServerError,
@@ -162,7 +163,7 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockUC := usecases.NewMockUpdateConversation(t)
+			mockUC := chat.NewMockUpdateConversation(t)
 			if tt.setExpectations != nil {
 				tt.setExpectations(mockUC)
 			}
@@ -190,7 +191,7 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 	tests := map[string]struct {
 		page                int
 		pageSize            int
-		setExpectations     func(uc *usecases.MockListConversations)
+		setExpectations     func(uc *chat.MockListConversations)
 		expectedStatusCode  int
 		expectedHasNextPage bool
 		expectedHasPrevPage bool
@@ -199,12 +200,12 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 		"success-first-page": {
 			page:     1,
 			pageSize: 10,
-			setExpectations: func(uc *usecases.MockListConversations) {
-				uc.EXPECT().Query(mock.Anything, 1, 10).Return([]domain.Conversation{
+			setExpectations: func(uc *chat.MockListConversations) {
+				uc.EXPECT().Query(mock.Anything, 1, 10).Return([]assistant.Conversation{
 					{
 						ID:          uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 						Title:       "Conversation 1",
-						TitleSource: domain.ConversationTitleSource_User,
+						TitleSource: assistant.ConversationTitleSource_User,
 						CreatedAt:   fixedTime,
 						UpdatedAt:   fixedTime,
 					},
@@ -218,12 +219,12 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 		"success-middle-page": {
 			page:     2,
 			pageSize: 10,
-			setExpectations: func(uc *usecases.MockListConversations) {
-				uc.EXPECT().Query(mock.Anything, 2, 10).Return([]domain.Conversation{
+			setExpectations: func(uc *chat.MockListConversations) {
+				uc.EXPECT().Query(mock.Anything, 2, 10).Return([]assistant.Conversation{
 					{
 						ID:          uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 						Title:       "Conversation 2",
-						TitleSource: domain.ConversationTitleSource_LLM,
+						TitleSource: assistant.ConversationTitleSource_LLM,
 						CreatedAt:   fixedTime,
 						UpdatedAt:   fixedTime,
 					},
@@ -237,12 +238,12 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 		"success-last-page": {
 			page:     3,
 			pageSize: 10,
-			setExpectations: func(uc *usecases.MockListConversations) {
-				uc.EXPECT().Query(mock.Anything, 3, 10).Return([]domain.Conversation{
+			setExpectations: func(uc *chat.MockListConversations) {
+				uc.EXPECT().Query(mock.Anything, 3, 10).Return([]assistant.Conversation{
 					{
 						ID:          uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 						Title:       "Conversation 3",
-						TitleSource: domain.ConversationTitleSource_Auto,
+						TitleSource: assistant.ConversationTitleSource_Auto,
 						CreatedAt:   fixedTime,
 						UpdatedAt:   fixedTime,
 					},
@@ -256,8 +257,8 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 		"success-empty-list": {
 			page:     1,
 			pageSize: 10,
-			setExpectations: func(uc *usecases.MockListConversations) {
-				uc.EXPECT().Query(mock.Anything, 1, 10).Return([]domain.Conversation{}, false, nil)
+			setExpectations: func(uc *chat.MockListConversations) {
+				uc.EXPECT().Query(mock.Anything, 1, 10).Return([]assistant.Conversation{}, false, nil)
 			},
 			expectedStatusCode:  http.StatusOK,
 			expectedHasNextPage: false,
@@ -267,7 +268,7 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 		"use-case-error": {
 			page:     1,
 			pageSize: 10,
-			setExpectations: func(uc *usecases.MockListConversations) {
+			setExpectations: func(uc *chat.MockListConversations) {
 				uc.EXPECT().Query(mock.Anything, 1, 10).Return(nil, false, errors.New("database error"))
 			},
 			expectedStatusCode:  http.StatusInternalServerError,
@@ -279,7 +280,7 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockUC := usecases.NewMockListConversations(t)
+			mockUC := chat.NewMockListConversations(t)
 			if tt.setExpectations != nil {
 				tt.setExpectations(mockUC)
 			}

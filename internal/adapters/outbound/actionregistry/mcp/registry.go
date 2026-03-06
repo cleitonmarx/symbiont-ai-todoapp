@@ -3,27 +3,25 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"log"
+
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.opentelemetry.io/otel/attribute"
 )
 
-var _ domain.AssistantActionRegistry = (*MCPRegistry)(nil)
+var _ assistant.ActionRegistry = (*MCPRegistry)(nil)
 
-// MCPRegistry implements domain.AssistantActionRegistry using a remote MCP gateway.
+// MCPRegistry implements assistant.ActionRegistry using a remote MCP gateway.
 type MCPRegistry struct {
 	cfg           Config
 	connector     mcpConnector
 	session       mcpSession
-	actionsByName map[string]domain.AssistantAction
+	actionsByName map[string]assistant.Action
 }
 
 // NewMCPRegistry creates an MCP-backed assistant action registry.
@@ -38,7 +36,7 @@ func NewMCPRegistry(
 	return &MCPRegistry{
 		cfg:           cfg,
 		connector:     streamableConnector{endpoint: cfg.Endpoint, httpClient: httpClient},
-		actionsByName: map[string]domain.AssistantAction{},
+		actionsByName: map[string]assistant.Action{},
 	}
 }
 
@@ -48,12 +46,12 @@ func newMCPRegistryWithConnector(cfg Config, connector mcpConnector) *MCPRegistr
 	return &MCPRegistry{
 		cfg:           cfg,
 		connector:     connector,
-		actionsByName: map[string]domain.AssistantAction{},
+		actionsByName: map[string]assistant.Action{},
 	}
 }
 
 // Execute runs one MCP tool call and returns the result as a tool message.
-func (r *MCPRegistry) Execute(ctx context.Context, call domain.AssistantActionCall, _ []domain.AssistantMessage) domain.AssistantMessage {
+func (r *MCPRegistry) Execute(ctx context.Context, call assistant.ActionCall, _ []assistant.Message) assistant.Message {
 	spanCtx, span := telemetry.Start(ctx)
 	span.SetAttributes(
 		attribute.String("mcp.tool_name", call.Name),
@@ -100,24 +98,24 @@ func (r *MCPRegistry) Execute(ctx context.Context, call domain.AssistantActionCa
 		content = "ok"
 	}
 
-	return domain.AssistantMessage{
-		Role:         domain.ChatRole_Tool,
+	return assistant.Message{
+		Role:         assistant.ChatRole_Tool,
 		ActionCallID: common.Ptr(call.ID),
 		Content:      content,
 	}
 }
 
 // GetDefinition returns one action definition by name.
-func (r *MCPRegistry) GetDefinition(actionName string) (domain.AssistantActionDefinition, bool) {
+func (r *MCPRegistry) GetDefinition(actionName string) (assistant.ActionDefinition, bool) {
 	action, found := r.actionsByName[actionName]
 	if !found {
-		return domain.AssistantActionDefinition{}, false
+		return assistant.ActionDefinition{}, false
 	}
 	return action.Definition(), true
 }
 
 // GetRenderer returns one deterministic action result renderer by action name.
-func (r *MCPRegistry) GetRenderer(actionName string) (domain.ActionResultRenderer, bool) {
+func (r *MCPRegistry) GetRenderer(actionName string) (assistant.ActionResultRenderer, bool) {
 	action, found := r.actionsByName[actionName]
 	if !found {
 		return nil, false
@@ -175,7 +173,7 @@ func (r *MCPRegistry) initializeActions(ctx context.Context) error {
 		return err
 	}
 
-	actions := make(map[string]domain.AssistantAction, len(tools))
+	actions := make(map[string]assistant.Action, len(tools))
 	for _, tool := range tools {
 		def := toolToActionDefinition(tool)
 		if strings.TrimSpace(def.Name) == "" {
@@ -203,46 +201,4 @@ func (r *MCPRegistry) Close() error {
 		return r.session.Close()
 	}
 	return nil
-}
-
-// InitMCPActionRegistry registers the MCP-backed assistant action registry.
-type InitMCPActionRegistry struct {
-	Logger         *log.Logger   `resolve:""`
-	HttpClient     *http.Client  `resolve:""`
-	Endpoint       string        `config:"MCP_GATEWAY_ENDPOINT"`
-	APIKey         string        `config:"MCP_GATEWAY_API_KEY" default:""`
-	APIKeyHeader   string        `config:"MCP_GATEWAY_API_KEY_HEADER" default:""`
-	RequestTimeout time.Duration `config:"MCP_GATEWAY_REQUEST_TIMEOUT" default:"20s"`
-	registry       *MCPRegistry
-}
-
-// Initialize registers this implementation as domain.AssistantActionRegistry.
-func (i InitMCPActionRegistry) Initialize(ctx context.Context) (context.Context, error) {
-	_, span := telemetry.Start(ctx)
-	defer span.End()
-
-	registry := NewMCPRegistry(
-		Config{
-			Endpoint:       i.Endpoint,
-			APIKey:         i.APIKey,
-			APIKeyHeader:   i.APIKeyHeader,
-			RequestTimeout: i.RequestTimeout,
-		},
-		i.HttpClient,
-	)
-	if err := registry.initializeActions(ctx); err != nil {
-		return ctx, fmt.Errorf("failed to initialize mcp actions: %w", err)
-	}
-	depend.RegisterNamed[domain.AssistantActionRegistry](registry, "mcp")
-	return ctx, nil
-}
-
-// Close terminates the MCP session and logs any errors encountered during shutdown.
-func (i InitMCPActionRegistry) Close() {
-	if i.registry == nil {
-		return
-	}
-	if err := i.registry.Close(); err != nil {
-		i.Logger.Printf("InitMCPActionRegistry: failed to close MCP registry: %v", err)
-	}
 }

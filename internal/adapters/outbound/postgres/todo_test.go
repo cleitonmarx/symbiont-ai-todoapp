@@ -8,8 +8,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 	"github.com/google/uuid"
 	"github.com/pgvector/pgvector-go"
 	"github.com/stretchr/testify/assert"
@@ -21,10 +20,10 @@ func TestTodoRepository_CreateTodo(t *testing.T) {
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	fixedDueDate := time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
-	todo := domain.Todo{
+	openTodo := todo.Todo{
 		ID:        fixedUUID,
 		Title:     "My new todo",
-		Status:    domain.TodoStatus_OPEN,
+		Status:    todo.Status_OPEN,
 		DueDate:   fixedDueDate,
 		CreatedAt: fixedTime,
 		UpdatedAt: fixedTime,
@@ -32,38 +31,38 @@ func TestTodoRepository_CreateTodo(t *testing.T) {
 
 	tests := map[string]struct {
 		setExpectations func(mock sqlmock.Sqlmock)
-		todo            domain.Todo
+		td              todo.Todo
 		expectedErr     error
 	}{
 		"success": {
-			todo: todo,
+			td: openTodo,
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("INSERT INTO todos (id,title,status,due_date,embedding,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7)").
 					WithArgs(
-						todo.ID,
-						todo.Title,
-						todo.Status,
-						todo.DueDate,
-						pgvector.NewVector(toFloat32Truncated(todo.Embedding)),
-						todo.CreatedAt,
-						todo.UpdatedAt,
+						openTodo.ID,
+						openTodo.Title,
+						openTodo.Status,
+						openTodo.DueDate,
+						pgvector.NewVector(toFloat32Truncated(openTodo.Embedding)),
+						openTodo.CreatedAt,
+						openTodo.UpdatedAt,
 					).
 					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
 			expectedErr: nil,
 		},
 		"database-error": {
-			todo: todo,
+			td: openTodo,
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("INSERT INTO todos (id,title,status,due_date,embedding,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7)").
 					WithArgs(
-						todo.ID,
-						todo.Title,
-						todo.Status,
-						todo.DueDate,
-						pgvector.NewVector(toFloat32Truncated(todo.Embedding)),
-						todo.CreatedAt,
-						todo.UpdatedAt,
+						openTodo.ID,
+						openTodo.Title,
+						openTodo.Status,
+						openTodo.DueDate,
+						pgvector.NewVector(toFloat32Truncated(openTodo.Embedding)),
+						openTodo.CreatedAt,
+						openTodo.UpdatedAt,
 					).
 					WillReturnError(errors.New("database error"))
 			},
@@ -80,7 +79,7 @@ func TestTodoRepository_CreateTodo(t *testing.T) {
 			tt.setExpectations(mock)
 
 			repo := NewTodoRepository(db)
-			gotErr := repo.CreateTodo(context.Background(), tt.todo)
+			gotErr := repo.CreateTodo(context.Background(), tt.td)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -93,10 +92,10 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	fixedDueDate := time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
-	todo := domain.Todo{
+	openTodo := todo.Todo{
 		ID:        fixedUUID,
 		Title:     "My todo",
-		Status:    domain.TodoStatus_OPEN,
+		Status:    todo.Status_OPEN,
 		DueDate:   fixedDueDate,
 		CreatedAt: fixedTime,
 		UpdatedAt: fixedTime,
@@ -105,7 +104,7 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 	tests := map[string]struct {
 		setExpectations func(mock sqlmock.Sqlmock)
 		id              uuid.UUID
-		expectedTodo    domain.Todo
+		expectedTodo    todo.Todo
 		expectedFound   bool
 		expectedErr     bool
 	}{
@@ -114,18 +113,18 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(todoFields).
 					AddRow(
-						todo.ID,
-						todo.Title,
-						todo.Status,
-						todo.DueDate,
-						todo.CreatedAt,
-						todo.UpdatedAt,
+						openTodo.ID,
+						openTodo.Title,
+						openTodo.Status,
+						openTodo.DueDate,
+						openTodo.CreatedAt,
+						openTodo.UpdatedAt,
 					)
 				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE id = $1").
 					WithArgs(fixedUUID).
 					WillReturnRows(rows)
 			},
-			expectedTodo:  todo,
+			expectedTodo:  openTodo,
 			expectedFound: true,
 		},
 		"not-found": {
@@ -135,7 +134,7 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 					WithArgs(fixedUUID).
 					WillReturnError(sql.ErrNoRows)
 			},
-			expectedTodo: domain.Todo{},
+			expectedTodo: todo.Todo{},
 		},
 		"database-error": {
 			id: fixedUUID,
@@ -144,7 +143,7 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 					WithArgs(fixedUUID).
 					WillReturnError(errors.New("database error"))
 			},
-			expectedTodo: domain.Todo{},
+			expectedTodo: todo.Todo{},
 			expectedErr:  true,
 		},
 	}
@@ -177,10 +176,10 @@ func TestTodoRepository_UpdateTodo(t *testing.T) {
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	fixedDueDate := time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
-	todo := domain.Todo{
+	doneTodo := todo.Todo{
 		ID:        fixedUUID,
 		Title:     "Updated todo",
-		Status:    domain.TodoStatus_DONE,
+		Status:    todo.Status_DONE,
 		DueDate:   fixedDueDate,
 		CreatedAt: fixedTime,
 		UpdatedAt: fixedTime,
@@ -188,36 +187,36 @@ func TestTodoRepository_UpdateTodo(t *testing.T) {
 
 	tests := map[string]struct {
 		setExpectations func(mock sqlmock.Sqlmock)
-		todo            domain.Todo
+		td              todo.Todo
 		expectedErr     error
 	}{
 		"success": {
-			todo: todo,
+			td: doneTodo,
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("UPDATE todos SET title = $1, status = $2, due_date = $3, embedding = $4, updated_at = $5 WHERE id = $6").
 					WithArgs(
-						todo.Title,
-						todo.Status,
-						todo.DueDate,
-						pgvector.NewVector(toFloat32Truncated(todo.Embedding)),
-						todo.UpdatedAt,
-						todo.ID,
+						doneTodo.Title,
+						doneTodo.Status,
+						doneTodo.DueDate,
+						pgvector.NewVector(toFloat32Truncated(doneTodo.Embedding)),
+						doneTodo.UpdatedAt,
+						doneTodo.ID,
 					).
 					WillReturnResult(sqlmock.NewResult(0, 1))
 			},
 			expectedErr: nil,
 		},
 		"database-error": {
-			todo: todo,
+			td: doneTodo,
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("UPDATE todos SET title = $1, status = $2, due_date = $3, embedding = $4, updated_at = $5 WHERE id = $6").
 					WithArgs(
-						todo.Title,
-						todo.Status,
-						todo.DueDate,
-						pgvector.NewVector(toFloat32Truncated(todo.Embedding)),
-						todo.UpdatedAt,
-						todo.ID,
+						doneTodo.Title,
+						doneTodo.Status,
+						doneTodo.DueDate,
+						pgvector.NewVector(toFloat32Truncated(doneTodo.Embedding)),
+						doneTodo.UpdatedAt,
+						doneTodo.ID,
 					).
 					WillReturnError(errors.New("database error"))
 			},
@@ -234,7 +233,7 @@ func TestTodoRepository_UpdateTodo(t *testing.T) {
 			tt.setExpectations(mock)
 
 			repo := NewTodoRepository(db)
-			gotErr := repo.UpdateTodo(context.Background(), tt.todo)
+			gotErr := repo.UpdateTodo(context.Background(), tt.td)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -254,8 +253,8 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		setExpectations func(mock sqlmock.Sqlmock)
 		page            int
 		pageSize        int
-		opts            []domain.ListTodoOption
-		expectedTodos   []domain.Todo
+		opts            []todo.ListOption
+		expectedTodos   []todo.Todo
 		expectedHasMore bool
 		expectedErr     bool
 	}{
@@ -267,7 +266,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					AddRow(
 						fixedUUID1,
 						"Todo 1",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -275,7 +274,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					AddRow(
 						fixedUUID2,
 						"Todo 2",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -283,9 +282,9 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY due_date ASC LIMIT 11 OFFSET 0").
 					WillReturnRows(rows)
 			},
-			expectedTodos: []domain.Todo{
-				{ID: fixedUUID1, Title: "Todo 1", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
-				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			expectedTodos: []todo.Todo{
+				{ID: fixedUUID1, Title: "Todo 1", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+				{ID: fixedUUID2, Title: "Todo 2", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: false,
 			expectedErr:     false,
@@ -309,7 +308,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					AddRow(
 						fixedUUID3,
 						"Todo 3",
-						domain.TodoStatus_DONE,
+						todo.Status_DONE,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -317,8 +316,8 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY due_date ASC LIMIT 11 OFFSET 10").
 					WillReturnRows(rows)
 			},
-			expectedTodos: []domain.Todo{
-				{ID: fixedUUID3, Title: "Todo 3", Status: domain.TodoStatus_DONE, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			expectedTodos: []todo.Todo{
+				{ID: fixedUUID3, Title: "Todo 3", Status: todo.Status_DONE, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: false,
 			expectedErr:     false,
@@ -349,7 +348,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					AddRow(
 						fixedUUID1,
 						"Todo 1",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -357,7 +356,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					AddRow(
 						fixedUUID2,
 						"Todo 2",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -365,7 +364,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					AddRow(
 						fixedUUID3,
 						"Todo 3",
-						domain.TodoStatus_DONE,
+						todo.Status_DONE,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -373,9 +372,9 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY due_date ASC LIMIT 3 OFFSET 0").
 					WillReturnRows(rows)
 			},
-			expectedTodos: []domain.Todo{
-				{ID: fixedUUID1, Title: "Todo 1", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
-				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			expectedTodos: []todo.Todo{
+				{ID: fixedUUID1, Title: "Todo 1", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+				{ID: fixedUUID2, Title: "Todo 2", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: true,
 			expectedErr:     false,
@@ -383,25 +382,25 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"filter-by-status": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOption{
-				domain.WithStatus(domain.TodoStatus_DONE),
+			opts: []todo.ListOption{
+				todo.WithStatus(todo.Status_DONE),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(todoFields).
 					AddRow(
 						fixedUUID3,
 						"Todo 3",
-						domain.TodoStatus_DONE,
+						todo.Status_DONE,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
 					)
 				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos WHERE status = $1 ORDER BY due_date ASC LIMIT 11 OFFSET 0").
-					WithArgs(domain.TodoStatus_DONE).
+					WithArgs(todo.Status_DONE).
 					WillReturnRows(rows)
 			},
-			expectedTodos: []domain.Todo{
-				{ID: fixedUUID3, Title: "Todo 3", Status: domain.TodoStatus_DONE, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			expectedTodos: []todo.Todo{
+				{ID: fixedUUID3, Title: "Todo 3", Status: todo.Status_DONE, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: false,
 			expectedErr:     false,
@@ -409,8 +408,8 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"invalid-status-filter": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOption{
-				domain.WithStatus("IN_PROGRESS"),
+			opts: []todo.ListOption{
+				todo.WithStatus("IN_PROGRESS"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 			},
@@ -421,15 +420,15 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"filter-by-embedding": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOption{
-				domain.WithEmbedding([]float64{0.1, 0.2, 0.3}),
+			opts: []todo.ListOption{
+				todo.WithEmbedding([]float64{0.1, 0.2, 0.3}),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(todoFields).
 					AddRow(
 						fixedUUID2,
 						"Todo 2",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -440,8 +439,8 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					).
 					WillReturnRows(rows)
 			},
-			expectedTodos: []domain.Todo{
-				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			expectedTodos: []todo.Todo{
+				{ID: fixedUUID2, Title: "Todo 2", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: false,
 			expectedErr:     false,
@@ -449,15 +448,15 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"filter-by-title-contains": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOption{
-				domain.WithTitleContains("report"),
+			opts: []todo.ListOption{
+				todo.WithTitleContains("report"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(todoFields).
 					AddRow(
 						fixedUUID1,
 						"Finish report",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -466,15 +465,15 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					WithArgs("%report%").
 					WillReturnRows(rows)
 			},
-			expectedTodos: []domain.Todo{
-				{ID: fixedUUID1, Title: "Finish report", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			expectedTodos: []todo.Todo{
+				{ID: fixedUUID1, Title: "Finish report", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 		},
 		"filter-by-due-date-range": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOption{
-				domain.WithDueDateRange(
+			opts: []todo.ListOption{
+				todo.WithDueDateRange(
 					time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
 					time.Date(2024, 2, 15, 0, 0, 0, 0, time.UTC),
 				),
@@ -484,7 +483,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					AddRow(
 						fixedUUID2,
 						"Todo 2",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -496,8 +495,8 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					).
 					WillReturnRows(rows)
 			},
-			expectedTodos: []domain.Todo{
-				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			expectedTodos: []todo.Todo{
+				{ID: fixedUUID2, Title: "Todo 2", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: false,
 			expectedErr:     false,
@@ -505,15 +504,15 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"sort-by-createdat-asc": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOption{
-				domain.WithSortBy("createdAtAsc"),
+			opts: []todo.ListOption{
+				todo.WithSortBy("createdAtAsc"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(todoFields).
 					AddRow(
 						fixedUUID2,
 						"Todo 2",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -521,7 +520,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					AddRow(
 						fixedUUID1,
 						"Todo 1",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -529,9 +528,9 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 				mock.ExpectQuery("SELECT id, title, status, due_date, created_at, updated_at FROM todos ORDER BY created_at ASC LIMIT 11 OFFSET 0").
 					WillReturnRows(rows)
 			},
-			expectedTodos: []domain.Todo{
-				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
-				{ID: fixedUUID1, Title: "Todo 1", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			expectedTodos: []todo.Todo{
+				{ID: fixedUUID2, Title: "Todo 2", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+				{ID: fixedUUID1, Title: "Todo 1", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: false,
 			expectedErr:     false,
@@ -539,16 +538,16 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"sort-by-similarity": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOption{
-				domain.WithEmbedding([]float64{0.1, 0.2, 0.3}),
-				domain.WithSortBy("similarityAsc"),
+			opts: []todo.ListOption{
+				todo.WithEmbedding([]float64{0.1, 0.2, 0.3}),
+				todo.WithSortBy("similarityAsc"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(todoFields).
 					AddRow(
 						fixedUUID2,
 						"Todo 2",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -556,7 +555,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					AddRow(
 						fixedUUID1,
 						"Todo 1",
-						domain.TodoStatus_OPEN,
+						todo.Status_OPEN,
 						fixedDueDate,
 						fixedTime,
 						fixedTime,
@@ -568,9 +567,9 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 					).
 					WillReturnRows(rows)
 			},
-			expectedTodos: []domain.Todo{
-				{ID: fixedUUID2, Title: "Todo 2", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
-				{ID: fixedUUID1, Title: "Todo 1", Status: domain.TodoStatus_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+			expectedTodos: []todo.Todo{
+				{ID: fixedUUID2, Title: "Todo 2", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
+				{ID: fixedUUID1, Title: "Todo 1", Status: todo.Status_OPEN, DueDate: fixedDueDate, CreatedAt: fixedTime, UpdatedAt: fixedTime},
 			},
 			expectedHasMore: false,
 			expectedErr:     false,
@@ -578,8 +577,8 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"no-embedding-for-similarity-sort": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOption{
-				domain.WithSortBy("similarityAsc"),
+			opts: []todo.ListOption{
+				todo.WithSortBy("similarityAsc"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 			},
@@ -590,8 +589,8 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 		"invalid-sort-by": {
 			page:     1,
 			pageSize: 10,
-			opts: []domain.ListTodoOption{
-				domain.WithSortBy("invalidSort"),
+			opts: []todo.ListOption{
+				todo.WithSortBy("invalidSort"),
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 			},
@@ -670,18 +669,4 @@ func TestTodoRepository_DeleteTodo(t *testing.T) {
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
-}
-
-func TestInitTodoRepository_Initialize(t *testing.T) {
-	t.Parallel()
-
-	i := &InitTodoRepository{
-		DB: &sql.DB{},
-	}
-
-	_, err := i.Initialize(context.Background())
-	assert.NoError(t, err)
-
-	_, err = depend.Resolve[domain.TodoRepository]()
-	assert.NoError(t, err)
 }

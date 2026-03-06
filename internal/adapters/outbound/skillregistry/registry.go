@@ -8,18 +8,18 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/semantic"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont/depend"
 	"go.opentelemetry.io/otel/attribute"
 )
 
 // Registry owns the embedded skill index and resolves the most relevant skills
 // for a conversation turn.
 type Registry struct {
-	definitions    []domain.AssistantSkillDefinition
+	definitions    []assistant.SkillDefinition
 	embedded       []embeddedSkill
-	encoder        domain.SemanticEncoder
+	encoder        semantic.Encoder
 	embeddingModel string
 	cfg            Config
 }
@@ -28,7 +28,7 @@ type Registry struct {
 var skillDirectory embed.FS
 
 // NewSkillRegistryFromFS builds a skill registry by loading markdown files from the given filesystem.
-func NewSkillRegistryFromFS(ctx context.Context, encoder domain.SemanticEncoder, embeddingModel string, cfg Config) (Registry, error) {
+func NewSkillRegistryFromFS(ctx context.Context, encoder semantic.Encoder, embeddingModel string, cfg Config) (Registry, error) {
 	skills, err := LoadSkillsFromFS(skillDirectory)
 	if err != nil {
 		return Registry{}, err
@@ -37,7 +37,7 @@ func NewSkillRegistryFromFS(ctx context.Context, encoder domain.SemanticEncoder,
 }
 
 // NewSkillRegistry builds an embedding-backed registry from pre-loaded skill definitions.
-func NewSkillRegistry(ctx context.Context, skills []domain.AssistantSkillDefinition, encoder domain.SemanticEncoder, embeddingModel string, cfg Config) (Registry, error) {
+func NewSkillRegistry(ctx context.Context, skills []assistant.SkillDefinition, encoder semantic.Encoder, embeddingModel string, cfg Config) (Registry, error) {
 	if encoder == nil {
 		return Registry{}, errors.New("semantic encoder is required")
 	}
@@ -70,7 +70,7 @@ func NewSkillRegistry(ctx context.Context, skills []domain.AssistantSkillDefinit
 }
 
 // ListRelevant returns only the top relevant skills for the given turn context.
-func (r Registry) ListRelevant(ctx context.Context, query domain.AssistantSkillQueryContext) []domain.AssistantSkillDefinition {
+func (r Registry) ListRelevant(ctx context.Context, query assistant.SkillQueryContext) []assistant.SkillDefinition {
 	spanCtx, span := telemetry.Start(ctx)
 	defer span.End()
 
@@ -97,7 +97,7 @@ func (r Registry) ListRelevant(ctx context.Context, query domain.AssistantSkillQ
 	}
 
 	limit := min(len(scored), r.cfg.RelevantSkillsTopK)
-	relevant := make([]domain.AssistantSkillDefinition, 0, limit)
+	relevant := make([]assistant.SkillDefinition, 0, limit)
 	relevantNames := make([]string, 0, limit)
 	for i := range limit {
 		relevant = append(relevant, scored[i].definition)
@@ -112,21 +112,4 @@ func (r Registry) ListRelevant(ctx context.Context, query domain.AssistantSkillQ
 
 	span.SetAttributes(attribute.StringSlice("skillregistry.relevant_skill_names", relevantNames))
 	return relevant
-}
-
-// InitLocalSkillRegistry registers a local skill registry backed by static markdown files.
-type InitLocalSkillRegistry struct {
-	SemanticEncoder domain.SemanticEncoder `resolve:""`
-	EmbeddingModel  string                 `config:"LLM_EMBEDDING_MODEL"`
-}
-
-// Initialize loads skills and registers the domain skill registry.
-func (i InitLocalSkillRegistry) Initialize(ctx context.Context) (context.Context, error) {
-	registry, err := NewSkillRegistryFromFS(ctx, i.SemanticEncoder, i.EmbeddingModel, Config{})
-	if err != nil {
-		return ctx, fmt.Errorf("failed to initialize skill registry: %w", err)
-	}
-
-	depend.Register[domain.AssistantSkillRegistry](registry)
-	return ctx, nil
 }

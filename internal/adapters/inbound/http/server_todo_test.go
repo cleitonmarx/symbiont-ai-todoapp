@@ -16,8 +16,9 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/assert"
@@ -26,10 +27,10 @@ import (
 
 var (
 	dueDate    = time.Date(2026, 1, 25, 0, 0, 0, 0, time.UTC)
-	domainTodo = domain.Todo{
+	domainTodo = todo.Todo{
 		ID:        uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 		Title:     "Buy groceries",
-		Status:    domain.TodoStatus_DONE,
+		Status:    todo.Status_DONE,
 		DueDate:   dueDate,
 		CreatedAt: time.Date(2026, 1, 22, 10, 30, 0, 0, time.UTC),
 		UpdatedAt: time.Date(2026, 1, 22, 10, 30, 0, 0, time.UTC),
@@ -49,7 +50,7 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 
 	tests := map[string]struct {
 		requestBody    []byte
-		setupUsecases  func(*usecases.MockCreateTodo)
+		setupUsecases  func(*todouc.MockCreate)
 		expectedStatus int
 		expectedBody   *gen.Todo
 		expectedError  *gen.ErrorResp
@@ -59,7 +60,7 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 				Title:   "Buy groceries",
 				DueDate: openapi_types.Date{Time: dueDate},
 			}),
-			setupUsecases: func(m *usecases.MockCreateTodo) {
+			setupUsecases: func(m *todouc.MockCreate) {
 				m.EXPECT().
 					Execute(mock.Anything, "Buy groceries", dueDate).Return(domainTodo, nil)
 			},
@@ -70,10 +71,10 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 			requestBody: serializeJSON(t, gen.CreateTodoJSONRequestBody{
 				DueDate: openapi_types.Date{Time: dueDate},
 			}),
-			setupUsecases: func(m *usecases.MockCreateTodo) {
+			setupUsecases: func(m *todouc.MockCreate) {
 				m.EXPECT().
 					Execute(mock.Anything, "", dueDate).
-					Return(domain.Todo{}, domain.NewValidationErr("title is required"))
+					Return(todo.Todo{}, core.NewValidationErr("title is required"))
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &gen.ErrorResp{
@@ -85,7 +86,7 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 		},
 		"invalid-json-body": {
 			requestBody:    []byte(`{"title": "Test todo", "due_date": "invalid-date"}`),
-			setupUsecases:  func(m *usecases.MockCreateTodo) {},
+			setupUsecases:  func(m *todouc.MockCreate) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &gen.ErrorResp{
 				Error: gen.Error{
@@ -99,10 +100,10 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 				Title:   "Test todo",
 				DueDate: openapi_types.Date{Time: time.Time{}},
 			}),
-			setupUsecases: func(m *usecases.MockCreateTodo) {
+			setupUsecases: func(m *todouc.MockCreate) {
 				m.EXPECT().
 					Execute(mock.Anything, "Test todo", time.Time{}).
-					Return(domain.Todo{}, errors.New("database error"))
+					Return(todo.Todo{}, errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
 			expectedError: &gen.ErrorResp{
@@ -116,7 +117,7 @@ func TestTodoAppServer_CreateTodo(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockCreateTodo := usecases.NewMockCreateTodo(t)
+			mockCreateTodo := todouc.NewMockCreate(t)
 			if tt.setupUsecases != nil {
 				tt.setupUsecases(mockCreateTodo)
 			}
@@ -166,7 +167,7 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 		searchType      *gen.ListTodosParamsSearchType
 		dateRange       *gen.DateRange
 		sortBy          *string
-		setExpectations func(*usecases.MockListTodos)
+		setExpectations func(*todouc.MockList)
 		expectedStatus  int
 		expectedBody    *gen.ListTodosResp
 		expectedError   *gen.ErrorResp
@@ -174,10 +175,10 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 		"success-with-todos": {
 			page:     1,
 			pageSize: 1,
-			setExpectations: func(m *usecases.MockListTodos) {
+			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 1, mock.Anything).
-					Return([]domain.Todo{domainTodo}, false, nil)
+					Return([]todo.Todo{domainTodo}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ListTodosResp{
@@ -188,10 +189,10 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 		"success-with-no-todos": {
 			page:     1,
 			pageSize: 1,
-			setExpectations: func(m *usecases.MockListTodos) {
+			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 1, mock.Anything).
-					Return([]domain.Todo{}, false, nil)
+					Return([]todo.Todo{}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ListTodosResp{
@@ -202,10 +203,10 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 		"success-with-next-and-previous-page": {
 			page:     2,
 			pageSize: 1,
-			setExpectations: func(m *usecases.MockListTodos) {
+			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 2, 1, mock.Anything).
-					Return([]domain.Todo{domainTodo}, true, nil)
+					Return([]todo.Todo{domainTodo}, true, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ListTodosResp{
@@ -222,17 +223,17 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 				s := gen.DONE
 				return &s
 			}(),
-			setExpectations: func(m *usecases.MockListTodos) {
+			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
-						p := usecases.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
+						p := todouc.ListTodoParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
-						assert.Equal(t, domain.TodoStatus_DONE, *p.Status)
+						assert.Equal(t, todo.Status_DONE, *p.Status)
 					}).
-					Return([]domain.Todo{domainTodo}, false, nil)
+					Return([]todo.Todo{domainTodo}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ListTodosResp{
@@ -245,18 +246,18 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 			pageSize:   10,
 			search:     common.Ptr("groceries"),
 			searchType: common.Ptr(gen.SIMILARITY),
-			setExpectations: func(m *usecases.MockListTodos) {
+			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
-						p := usecases.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
+						p := todouc.ListTodoParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
 						assert.Equal(t, "groceries", *p.Search)
-						assert.Equal(t, usecases.SearchType_Similarity, *p.SearchType)
+						assert.Equal(t, todouc.SearchType_Similarity, *p.SearchType)
 					}).
-					Return([]domain.Todo{domainTodo}, false, nil)
+					Return([]todo.Todo{domainTodo}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ListTodosResp{
@@ -269,18 +270,18 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 			pageSize:   10,
 			search:     common.Ptr("groceries"),
 			searchType: common.Ptr(gen.TITLE),
-			setExpectations: func(m *usecases.MockListTodos) {
+			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
-						p := usecases.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
+						p := todouc.ListTodoParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
 						assert.Equal(t, "groceries", *p.Search)
-						assert.Equal(t, usecases.SearchType_Title, *p.SearchType)
+						assert.Equal(t, todouc.SearchType_Title, *p.SearchType)
 					}).
-					Return([]domain.Todo{domainTodo}, false, nil)
+					Return([]todo.Todo{domainTodo}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: &gen.ListTodosResp{
@@ -295,18 +296,18 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 				DueAfter:  &openapi_types.Date{Time: time.Date(2026, 1, 20, 0, 0, 0, 0, time.UTC)},
 				DueBefore: &openapi_types.Date{Time: time.Date(2026, 1, 30, 0, 0, 0, 0, time.UTC)},
 			},
-			setExpectations: func(m *usecases.MockListTodos) {
+			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
-						p := usecases.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
+						p := todouc.ListTodoParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
 						assert.Equal(t, time.Date(2026, 1, 20, 0, 0, 0, 0, time.UTC), *p.DueAfter)
 						assert.Equal(t, time.Date(2026, 1, 30, 0, 0, 0, 0, time.UTC), *p.DueBefore)
 					}).
-					Return([]domain.Todo{domainTodo}, false, nil)
+					Return([]todo.Todo{domainTodo}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -314,24 +315,24 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 			page:     1,
 			pageSize: 10,
 			sortBy:   common.Ptr("dueDateDesc"),
-			setExpectations: func(m *usecases.MockListTodos) {
+			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...usecases.ListTodoOptions) {
-						p := usecases.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
+						p := todouc.ListTodoParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
 						assert.Equal(t, "dueDateDesc", *p.SortBy)
 					}).
-					Return([]domain.Todo{domainTodo}, false, nil)
+					Return([]todo.Todo{domainTodo}, false, nil)
 			},
 			expectedStatus: http.StatusOK,
 		},
 		"use-case-error": {
 			page:     1,
 			pageSize: 10,
-			setExpectations: func(m *usecases.MockListTodos) {
+			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
 					Return(nil, false, errors.New("database error"))
@@ -348,7 +349,7 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockListTodos := usecases.NewMockListTodos(t)
+			mockListTodos := todouc.NewMockList(t)
 			tt.setExpectations(mockListTodos)
 
 			server := &TodoAppServer{
@@ -411,7 +412,7 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 	tests := map[string]struct {
 		todoID         string
 		requestBody    []byte
-		setupUsecases  func(*usecases.MockUpdateTodo)
+		setupUsecases  func(*todouc.MockUpdate)
 		expectedStatus int
 		expectedBody   *gen.Todo
 		expectedError  *gen.ErrorResp
@@ -423,9 +424,9 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 				Status:  common.Ptr(gen.DONE),
 				DueDate: &openapi_types.Date{Time: dueDate},
 			}),
-			setupUsecases: func(m *usecases.MockUpdateTodo) {
+			setupUsecases: func(m *todouc.MockUpdate) {
 				m.EXPECT().
-					Execute(mock.Anything, domainTodo.ID, common.Ptr("Buy groceries"), common.Ptr(domain.TodoStatus_DONE), &dueDate).
+					Execute(mock.Anything, domainTodo.ID, common.Ptr("Buy groceries"), common.Ptr(todo.Status_DONE), &dueDate).
 					Return(domainTodo, nil)
 			},
 			expectedStatus: http.StatusOK,
@@ -436,10 +437,10 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 			requestBody: serializeJSON(t, gen.UpdateTodoJSONRequestBody{
 				Status: common.Ptr(gen.DONE),
 			}),
-			setupUsecases: func(m *usecases.MockUpdateTodo) {
+			setupUsecases: func(m *todouc.MockUpdate) {
 				m.EXPECT().
-					Execute(mock.Anything, domainTodo.ID, (*string)(nil), common.Ptr(domain.TodoStatus_DONE), (*time.Time)(nil)).
-					Return(domain.Todo{}, domain.NewNotFoundErr("todo not found"))
+					Execute(mock.Anything, domainTodo.ID, (*string)(nil), common.Ptr(todo.Status_DONE), (*time.Time)(nil)).
+					Return(todo.Todo{}, core.NewNotFoundErr("todo not found"))
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedError: &gen.ErrorResp{
@@ -452,7 +453,7 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 		"invalid-status": {
 			todoID:         domainTodo.ID.String(),
 			requestBody:    []byte(`{"status": "INVALID_STATUS"}`),
-			setupUsecases:  func(m *usecases.MockUpdateTodo) {},
+			setupUsecases:  func(m *todouc.MockUpdate) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &gen.ErrorResp{
 				Error: gen.Error{
@@ -464,7 +465,7 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 		"invalid-json-body": {
 			todoID:         domainTodo.ID.String(),
 			requestBody:    []byte(`{"title": "Test todo", "due_date": "invalid-date"}`),
-			setupUsecases:  func(m *usecases.MockUpdateTodo) {},
+			setupUsecases:  func(m *todouc.MockUpdate) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &gen.ErrorResp{
 				Error: gen.Error{
@@ -478,10 +479,10 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 			requestBody: serializeJSON(t, gen.UpdateTodoJSONRequestBody{
 				Status: common.Ptr(gen.DONE),
 			}),
-			setupUsecases: func(m *usecases.MockUpdateTodo) {
+			setupUsecases: func(m *todouc.MockUpdate) {
 				m.EXPECT().
-					Execute(mock.Anything, domainTodo.ID, (*string)(nil), common.Ptr(domain.TodoStatus_DONE), (*time.Time)(nil)).
-					Return(domain.Todo{}, errors.New("database error"))
+					Execute(mock.Anything, domainTodo.ID, (*string)(nil), common.Ptr(todo.Status_DONE), (*time.Time)(nil)).
+					Return(todo.Todo{}, errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
 			expectedError: &gen.ErrorResp{
@@ -495,7 +496,7 @@ func TestTodoAppServer_UpdateTodo(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockUpdateTodo := usecases.NewMockUpdateTodo(t)
+			mockUpdateTodo := todouc.NewMockUpdate(t)
 			tt.setupUsecases(mockUpdateTodo)
 			server := &TodoAppServer{
 				UpdateTodoUseCase: mockUpdateTodo,
@@ -531,13 +532,13 @@ func TestTodoAppServer_DeleteTodo(t *testing.T) {
 
 	tests := map[string]struct {
 		todoID         string
-		setupMocks     func(*usecases.MockDeleteTodo)
+		setupMocks     func(*todouc.MockDelete)
 		expectedStatus int
 		expectedError  *gen.ErrorResp
 	}{
 		"success": {
 			todoID: domainTodo.ID.String(),
-			setupMocks: func(m *usecases.MockDeleteTodo) {
+			setupMocks: func(m *todouc.MockDelete) {
 				m.EXPECT().
 					Execute(mock.Anything, openapi_types.UUID(domainTodo.ID)).
 					Return(nil)
@@ -546,10 +547,10 @@ func TestTodoAppServer_DeleteTodo(t *testing.T) {
 		},
 		"todo-not-found": {
 			todoID: domainTodo.ID.String(),
-			setupMocks: func(m *usecases.MockDeleteTodo) {
+			setupMocks: func(m *todouc.MockDelete) {
 				m.EXPECT().
 					Execute(mock.Anything, openapi_types.UUID(domainTodo.ID)).
-					Return(domain.NewNotFoundErr("todo not found"))
+					Return(core.NewNotFoundErr("todo not found"))
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedError: &gen.ErrorResp{
@@ -561,7 +562,7 @@ func TestTodoAppServer_DeleteTodo(t *testing.T) {
 		},
 		"use-case-error": {
 			todoID: domainTodo.ID.String(),
-			setupMocks: func(m *usecases.MockDeleteTodo) {
+			setupMocks: func(m *todouc.MockDelete) {
 				m.EXPECT().
 					Execute(mock.Anything, openapi_types.UUID(domainTodo.ID)).
 					Return(errors.New("database error"))
@@ -578,7 +579,7 @@ func TestTodoAppServer_DeleteTodo(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockDeleteTodo := usecases.NewMockDeleteTodo(t)
+			mockDeleteTodo := todouc.NewMockDelete(t)
 			tt.setupMocks(mockDeleteTodo)
 			server := &TodoAppServer{
 				DeleteTodoUseCase: mockDeleteTodo,

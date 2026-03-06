@@ -17,7 +17,10 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/skillregistry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/time"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/board"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/outbox"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 )
 
 // NewTodoApp creates and returns a new instance of the TodoApp application.
@@ -43,29 +46,29 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&modelrunner.InitAssistantClient{},
 			&skillregistry.InitLocalSkillRegistry{},
 
-			&usecases.InitTodoCreator{},
-			&usecases.InitTodoDeleter{},
-			&usecases.InitTodoUpdater{},
+			&todo.InitCreator{},
+			&todo.InitDeleter{},
+			&todo.InitUpdater{},
 			&local.InitLocalActionRegistry{},
 			&mcp.InitMCPActionRegistry{},
 			&composite.InitCompositeActionRegistry{},
 
-			&usecases.InitListTodos{},
-			&usecases.InitCreateTodo{},
-			&usecases.InitUpdateTodo{},
-			&usecases.InitDeleteTodo{},
-			&usecases.InitGenerateBoardSummary{},
-			&usecases.InitGenerateChatSummary{},
-			&usecases.InitGenerateConversationTitle{},
-			&usecases.InitGetBoardSummary{},
-			&usecases.InitListConversations{},
-			&usecases.InitUpdateConversation{},
-			&usecases.InitListChatMessages{},
-			&usecases.InitSubmitActionApproval{},
-			&usecases.InitDeleteConversation{},
-			&usecases.InitStreamChat{},
-			&usecases.InitListAvailableModels{},
-			&usecases.InitRelayOutbox{},
+			&todo.InitListTodos{},
+			&todo.InitCreateTodo{},
+			&todo.InitUpdateTodo{},
+			&todo.InitDeleteTodo{},
+			&board.InitGenerateBoardSummary{},
+			&chat.InitGenerateChatSummary{},
+			&chat.InitGenerateConversationTitle{},
+			&board.InitGetBoardSummary{},
+			&chat.InitListConversations{},
+			&chat.InitUpdateConversation{},
+			&chat.InitListChatMessages{},
+			&chat.InitSubmitActionApproval{},
+			&chat.InitDeleteConversation{},
+			&chat.InitStreamChat{},
+			&chat.InitListAvailableModels{},
+			&outbox.InitRelay{},
 		).
 		Host(
 			&http.TodoAppServer{},

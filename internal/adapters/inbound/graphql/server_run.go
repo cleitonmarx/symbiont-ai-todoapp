@@ -13,17 +13,17 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 	"github.com/rs/cors"
 )
 
 // TodoGraphQLServer is the GraphQL Server for the TodoApp application.
 type TodoGraphQLServer struct {
-	Logger            *log.Logger         `resolve:""`
-	ListTodosUsecase  usecases.ListTodos  `resolve:""`
-	DeleteTodoUsecase usecases.DeleteTodo `resolve:""`
-	UpdateTodoUsecase usecases.UpdateTodo `resolve:""`
-	Port              int                 `config:"GRAPHQL_SERVER_PORT" default:"8085"`
+	Logger            *log.Logger `resolve:""`
+	ListTodosUsecase  todo.List   `resolve:""`
+	DeleteTodoUsecase todo.Delete `resolve:""`
+	UpdateTodoUsecase todo.Update `resolve:""`
+	Port              int         `config:"GRAPHQL_SERVER_PORT" default:"8085"`
 }
 
 // Run starts the GraphQL server for the TodoApp application.
@@ -72,6 +72,7 @@ func (s *TodoGraphQLServer) Run(ctx context.Context) error {
 	}
 }
 
+// IsReady verifies the GraphQL server is reachable and responding with HTTP 200.
 func (s *TodoGraphQLServer) IsReady(ctx context.Context) error {
 	resp, err := http.Get(fmt.Sprintf("http://:%d", s.Port))
 	if err != nil {

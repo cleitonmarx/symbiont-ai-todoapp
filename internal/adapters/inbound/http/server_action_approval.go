@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 )
 
 // SubmitActionApproval handles one human approval decision for an assistant action call.
@@ -28,12 +28,12 @@ func (api TodoAppServer) SubmitActionApproval(w http.ResponseWriter, r *http.Req
 		actionName = *req.ActionName
 	}
 
-	err := api.SubmitActionApprovalUseCase.Execute(r.Context(), usecases.SubmitActionApprovalInput{
+	err := api.SubmitActionApprovalUseCase.Execute(r.Context(), chat.SubmitActionApprovalInput{
 		ConversationID: req.ConversationId,
 		TurnID:         req.TurnId,
 		ActionCallID:   req.ActionCallId,
 		ActionName:     actionName,
-		Status:         domain.ChatMessageApprovalStatus(req.Status),
+		Status:         assistant.ChatMessageApprovalStatus(req.Status),
 		Reason:         req.Reason,
 	})
 	if err != nil {

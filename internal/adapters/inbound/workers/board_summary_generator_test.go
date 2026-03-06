@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/board"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -19,14 +19,14 @@ func TestBoardSummaryGenerator_Run(t *testing.T) {
 		interval        time.Duration
 		publishCount    int
 		expectedBatches int
-		setExpectations func(*usecases.MockGenerateBoardSummary)
+		setExpectations func(*board.MockGenerateBoardSummary)
 	}{
 		"batch-full-triggers-processing": {
 			batchSize:       5,
 			interval:        300 * time.Millisecond,
 			publishCount:    20,
 			expectedBatches: 4,
-			setExpectations: func(gbs *usecases.MockGenerateBoardSummary) {
+			setExpectations: func(gbs *board.MockGenerateBoardSummary) {
 				gbs.EXPECT().Execute(mock.Anything).Return(nil).Times(4)
 			},
 		},
@@ -35,7 +35,7 @@ func TestBoardSummaryGenerator_Run(t *testing.T) {
 			interval:        100 * time.Millisecond,
 			publishCount:    3,
 			expectedBatches: 1,
-			setExpectations: func(gbs *usecases.MockGenerateBoardSummary) {
+			setExpectations: func(gbs *board.MockGenerateBoardSummary) {
 				gbs.EXPECT().Execute(mock.Anything).Return(nil).Once()
 			},
 		},
@@ -47,7 +47,7 @@ func TestBoardSummaryGenerator_Run(t *testing.T) {
 			defer cancel()
 			client, topicName := setupPubSubServer(t, ctx, "test-topic-"+name, "test-subscription-"+name)
 
-			gbs := usecases.NewMockGenerateBoardSummary(t)
+			gbs := board.NewMockGenerateBoardSummary(t)
 			if tt.setExpectations != nil {
 				tt.setExpectations(gbs)
 			}

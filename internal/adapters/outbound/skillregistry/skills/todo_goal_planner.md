@@ -1,5 +1,8 @@
 ---
 name: todo-goal-planner
+display_name: Planner
+aliases: [plan, planner]
+description: Turn a broader goal into a practical, step-by-step todo plan.
 use_when: User asks to plan something from scratch and turn a broader goal into multiple related todos, a complete todo plan, a checklist, a roadmap, a study plan, a trip plan, or step-by-step work toward a deadline. Also use when research, requirements, or recommendations are requested but the final deliverable should still be a plan or multiple created todos/tasks, including requests like "research something and create tasks", "research and create tasks", or "research and create tasks for me", and when a follow-up reply only provides missing planning parameters after a planning question, such as a date range, budget, location, scope, destination, or deadline.
 avoid_when: User asks to create only one concrete todo or reminder, asks to list/find/search/filter/sort/paginate/confirm existing todos, asks to find existing todos and then summarize/recap/count them, requests summary/recap/overview output as the final deliverable, asks to mark done, reopen, reschedule, delete, fetch, or otherwise update known existing todos, asks to inspect/open/fetch/read one explicit external website, webpage, or URL as the final deliverable, or is only greeting, thanking, or chatting.
 priority: 94
@@ -14,6 +17,7 @@ Rules:
 1. Confirm goal scope and target date; ask one short question only if critical details are missing.
 2. If user asks for both planning and todo creation, do not stop at research-only output.
 3. After gathering enough information, call `create_todos` in the same turn.
+3.1. A plan/list in plain text is not completion; completion requires at least one successful `create_todos` call.
 4. If user explicitly says "research first", always run `search` before creating todos.
 5. Use `fetch_content` only for selected URLs that add concrete details to the plan.
 6. Convert findings into actionable todos with realistic due dates; every created todo must include a valid due date.
@@ -24,8 +28,14 @@ Rules:
 11. If minor details are missing, assume sensible defaults and continue with task creation instead of blocking.
 12. Create todos with `create_todos` using strict JSON schema.
 13. If `create_todos` fails due to argument shape, fix and retry once.
+13.1. Never claim todos were created unless the tool result confirms creation.
+13.2. If creation still fails, report failure clearly and ask only the minimum follow-up needed to retry creation.
 14. Use `fetch_todos` only when needed to confirm created results or avoid duplicates.
+14.1. If this planner workflow updates or deletes existing todos (`update_todos`, `update_todos_due_date`, `delete_todos`), completion requires a successful mutation tool call.
+14.2. Never claim updates/deletions happened unless the corresponding tool result confirms it.
+14.3. If update/delete fails due to argument shape, correct and retry once; if it still fails, report failure clearly and ask only the minimum follow-up needed to retry.
 15. Keep the response concise and practical; do not output internal tool details.
+15.1. After successful creation, summarize what was created (count + scope + due window) instead of only listing suggestions.
 16. If the request can be satisfied by reading/filtering existing todos, do not use this skill.
 
 Date guidance:
@@ -38,4 +48,5 @@ Preferred flow:
 - Run web research when explicitly requested or required for recommendations.
 - Build phased tasks (discovery/research, preparation, execution, verification/follow-up).
 - Call `create_todos` in one or more valid batches (typically at least 5 todos for end-to-end planning, unless user asks for fewer).
-- Confirm what was created and highlight immediate next steps.
+- If existing todos are modified as part of the plan, apply update/delete tools and confirm those results using tool-confirmed outcomes.
+- Confirm what was created/updated/deleted using tool-confirmed results and highlight immediate next steps.

@@ -1,5 +1,8 @@
 ---
 name: todo-summary
+display_name: Summary
+aliases: [summary, summarize, recap]
+description: Summarize your todos with concise totals and key status insights.
 use_when: User asks for a concise summary, recap, overview, total, count, or "how many" answer about existing todos, including when the summary is scoped by topic, status, or date window.
 avoid_when: User asks to create, plan, build, generate, update, reschedule, or delete todos, asks to research something and then create tasks or a plan, explicitly asks to list/show/display individual todos, or asks to access external websites, webpages, URLs, or internet content.
 priority: 100

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -109,10 +110,12 @@ func (r ConversationRepository) GetConversation(
 			&conversation.CreatedAt,
 			&conversation.UpdatedAt,
 		)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return assistant.Conversation{}, false, nil
+	}
+
 	if telemetry.RecordErrorAndStatus(span, err) {
-		if err == sql.ErrNoRows {
-			return assistant.Conversation{}, false, nil
-		}
 		return assistant.Conversation{}, false, err
 	}
 

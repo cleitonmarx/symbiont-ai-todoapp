@@ -107,6 +107,18 @@ export interface ModelListResponse {
   models: ModelInfo[];
 }
 
+export interface AvailableSkill {
+  name: string;
+  display_name: string;
+  aliases: string[];
+  description: string;
+  tools: string[];
+}
+
+export interface SkillListResponse {
+  skills: AvailableSkill[];
+}
+
 export type ConversationTitleSource = 'user' | 'llm' | 'auto';
 
 export interface Conversation {

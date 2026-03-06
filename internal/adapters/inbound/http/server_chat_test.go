@@ -421,3 +421,128 @@ func TestTodoAppServer_ListAvailableModels(t *testing.T) {
 		})
 	}
 }
+
+func TestTodoAppServer_ListAvailableSkills(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		setupUsecase   func(*chat.MockListAvailableSkills)
+		expectedStatus int
+		expectedBody   *gen.SkillListResp
+		expectedError  *gen.ErrorResp
+	}{
+		"success": {
+			setupUsecase: func(m *chat.MockListAvailableSkills) {
+				m.EXPECT().
+					Query(mock.Anything).
+					Return([]assistant.SkillDefinition{
+						{
+							Name:        "web_research",
+							DisplayName: "Web Research",
+							Aliases:     []string{"research", "web"},
+							Description: "Research online sources",
+							Tools:       []string{"search_web"},
+						},
+						{
+							Name:        "update_todos",
+							DisplayName: "Update Todos",
+							Aliases:     []string{"update", "edit"},
+							Description: "Update existing todos",
+							Tools:       []string{"fetch_todos", "update_todos"},
+						},
+					}, nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: &gen.SkillListResp{
+				Skills: []gen.AvailableSkill{
+					{
+						Name:        "web_research",
+						DisplayName: "Web Research",
+						Aliases:     []string{"research", "web"},
+						Description: "Research online sources",
+						Tools:       []string{"search_web"},
+					},
+					{
+						Name:        "update_todos",
+						DisplayName: "Update Todos",
+						Aliases:     []string{"update", "edit"},
+						Description: "Update existing todos",
+						Tools:       []string{"fetch_todos", "update_todos"},
+					},
+				},
+			},
+		},
+		"returns-error-on-usecase-failure": {
+			setupUsecase: func(m *chat.MockListAvailableSkills) {
+				m.EXPECT().
+					Query(mock.Anything).
+					Return(nil, errors.New("catalog unavailable"))
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedError: &gen.ErrorResp{
+				Error: gen.Error{
+					Code:    gen.INTERNALERROR,
+					Message: "internal server error",
+				},
+			},
+		},
+		"falls-back-to-use-when-when-description-missing": {
+			setupUsecase: func(m *chat.MockListAvailableSkills) {
+				m.EXPECT().
+					Query(mock.Anything).
+					Return([]assistant.SkillDefinition{
+						{Name: "todo_read_view", UseWhen: "List and filter existing todos", Tools: []string{"fetch_todos"}},
+					}, nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: &gen.SkillListResp{
+				Skills: []gen.AvailableSkill{
+					{
+						Name:        "todo_read_view",
+						DisplayName: "todo_read_view",
+						Aliases:     []string{},
+						Description: "List and filter existing todos",
+						Tools:       []string{"fetch_todos"},
+					},
+				},
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			mockListAvailable := chat.NewMockListAvailableSkills(t)
+			if tt.setupUsecase != nil {
+				tt.setupUsecase(mockListAvailable)
+			}
+
+			api := TodoAppServer{
+				ListAvailableSkillsUseCase: mockListAvailable,
+				Logger:                     log.New(io.Discard, "", 0),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/chat/skills", nil)
+			rr := httptest.NewRecorder()
+
+			api.ListAvailableSkills(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code)
+
+			if tt.expectedBody != nil {
+				var response gen.SkillListResp
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Equal(t, *tt.expectedBody, response)
+			}
+
+			if tt.expectedError != nil {
+				var response gen.ErrorResp
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Equal(t, *tt.expectedError, response)
+			}
+		})
+	}
+}

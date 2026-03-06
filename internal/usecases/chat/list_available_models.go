@@ -32,7 +32,7 @@ func (uc ListAvailableModelsImpl) Query(ctx context.Context) ([]assistant.ModelI
 	defer span.End()
 
 	assistantModels, err := uc.assistantCatalog.ListModels(spanCtx)
-	if err != nil {
+	if telemetry.RecordErrorAndStatus(span, err) {
 		return nil, err
 	}
 

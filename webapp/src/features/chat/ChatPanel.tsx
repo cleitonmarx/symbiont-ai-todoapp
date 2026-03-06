@@ -3,7 +3,9 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useChat } from '../../hooks/useChat';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { fetchAvailableSkills } from '../../services/chatApi';
 import type {
+  AvailableSkill,
   AssistantTodoFilters,
   ChatMessage,
   ChatMessageActionDetail,
@@ -288,6 +290,121 @@ const formatSkillSource = (source: string): string => {
   return segments[segments.length - 1] ?? trimmed;
 };
 
+interface SkillDirectiveQuery {
+  query: string;
+  replaceStart: number;
+  replaceEnd: number;
+}
+
+const isWhitespace = (value: string): boolean => /\s/.test(value);
+const normalizeInlineWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim();
+const normalizeSkillName = (value: string): string => normalizeInlineWhitespace(value).replace(/^\/+/, '');
+const normalizeSkillAliases = (values: string[] | undefined): string[] => {
+  if (!values || values.length === 0) {
+    return [];
+  }
+
+  const next: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of values) {
+    const normalized = normalizeSkillName(raw).toLowerCase();
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    next.push(normalized);
+  }
+  return next;
+};
+
+const preferredSkillCommand = (skill: AvailableSkill): string => {
+  const aliases = normalizeSkillAliases(skill.aliases);
+  if (aliases.length > 0) {
+    return aliases[0];
+  }
+  return normalizeSkillName(skill.name).toLowerCase();
+};
+
+const selectedSkillLabel = (canonicalName: string, skills: AvailableSkill[]): string => {
+  const normalized = normalizeSkillName(canonicalName).toLowerCase();
+  const matched = skills.find((skill) => normalizeSkillName(skill.name).toLowerCase() === normalized);
+  if (!matched) {
+    return canonicalName;
+  }
+  return preferredSkillCommand(matched);
+};
+
+const normalizeAvailableSkills = (skills: AvailableSkill[]): AvailableSkill[] => {
+  const normalized: AvailableSkill[] = [];
+  const seenNames = new Set<string>();
+
+  for (const skill of skills) {
+    const name = normalizeSkillName(skill.name).toLowerCase();
+    if (!name || seenNames.has(name)) {
+      continue;
+    }
+
+    seenNames.add(name);
+    const aliases = normalizeSkillAliases(skill.aliases).filter((alias) => alias !== name);
+    normalized.push({
+      ...skill,
+      name,
+      display_name: normalizeInlineWhitespace(skill.display_name ?? name),
+      aliases,
+      description: normalizeInlineWhitespace(skill.description ?? ''),
+    });
+  }
+
+  return normalized;
+};
+
+const parseSkillDirectiveQuery = (value: string, cursor: number): SkillDirectiveQuery | null => {
+  if (!value) {
+    return null;
+  }
+
+  const safeCursor = Math.max(0, Math.min(cursor, value.length));
+
+  let tokenStart = safeCursor;
+  while (tokenStart > 0 && !isWhitespace(value[tokenStart - 1])) {
+    tokenStart--;
+  }
+
+  let tokenEnd = safeCursor;
+  while (tokenEnd < value.length && !isWhitespace(value[tokenEnd])) {
+    tokenEnd++;
+  }
+
+  const token = value.slice(tokenStart, tokenEnd);
+  if (!token.startsWith('/')) {
+    return null;
+  }
+
+  return {
+    query: token.slice(1).toLowerCase(),
+    replaceStart: tokenStart,
+    replaceEnd: tokenEnd,
+  };
+};
+
+const filterSkillOptions = (skills: AvailableSkill[], query: string): AvailableSkill[] => {
+  if (!query.trim()) {
+    return skills.slice(0, 8);
+  }
+  const normalized = query.toLowerCase();
+  return skills
+    .filter((skill) => {
+      if (normalizeSkillName(skill.name).toLowerCase().includes(normalized)) {
+        return true;
+      }
+      if (normalizeInlineWhitespace(skill.display_name ?? '').toLowerCase().includes(normalized)) {
+        return true;
+      }
+      return normalizeSkillAliases(skill.aliases).some((alias) => alias.includes(normalized));
+    })
+    .slice(0, 8);
+};
+
 const getActionStatusMeta = (
   detail: ChatMessageActionDetail,
 ): { label: string; tone: 'completed' | 'failed' | 'pending' | 'blocked' } => {
@@ -375,6 +492,11 @@ export const ChatPanel = ({
     onApplyAssistantFilters,
   });
   const [input, setInput] = useState('');
+  const [availableSkills, setAvailableSkills] = useState<AvailableSkill[]>([]);
+  const [selectedSkillNames, setSelectedSkillNames] = useState<string[]>([]);
+  const [loadingAvailableSkills, setLoadingAvailableSkills] = useState(false);
+  const [skillCursorIndex, setSkillCursorIndex] = useState(0);
+  const [activeSkillSuggestionIndex, setActiveSkillSuggestionIndex] = useState(0);
   const [renderedMessages, setRenderedMessages] = useState<Record<string, string>>({});
   const [renameConversationId, setRenameConversationId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -385,6 +507,9 @@ export const ChatPanel = ({
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement>(null);
+  const skillDropdownRef = useRef<HTMLDivElement>(null);
+  const skillOptionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const isInitialLoad = useRef(true);
   const shouldAutoScrollRef = useRef(true);
 
@@ -422,6 +547,35 @@ export const ChatPanel = ({
     void loadConversations();
     void loadModels();
   }, [loadConversations, loadModels]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSkills = async () => {
+      setLoadingAvailableSkills(true);
+      try {
+        const skills = await fetchAvailableSkills();
+        if (!active) {
+          return;
+        }
+        setAvailableSkills(normalizeAvailableSkills(skills));
+      } catch {
+        if (!active) {
+          return;
+        }
+        setAvailableSkills([]);
+      } finally {
+        if (active) {
+          setLoadingAvailableSkills(false);
+        }
+      }
+    };
+
+    void loadSkills();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -510,11 +664,15 @@ export const ChatPanel = ({
   }, [messages]);
 
   const handleSend = async () => {
-    const message = input.trim();
+    const messageBody = input.trim();
+    const selectedSkillDirectives = selectedSkillNames.map((name) => `/${name}`).join(' ');
+    const message = [selectedSkillDirectives, messageBody].filter(Boolean).join(' ').trim();
     if (!message) {
       return;
     }
     setInput('');
+    setSelectedSkillNames([]);
+    setSkillCursorIndex(0);
     await sendMessage(message);
   };
 
@@ -555,6 +713,100 @@ export const ChatPanel = ({
   const chatGuideText = activeConversationId
     ? 'Break down work and I can apply filters, sort tasks, or run batch updates.'
     : "Tell me what you need to do and I'll turn it into todos, then help you find, sort, and batch-update them.";
+  const composerPlaceholder = activeConversationId
+    ? 'Ask for follow-up changes. Type / to choose a skill.'
+    : 'Start a new conversation. Type / to choose a skill.';
+  const skillHelpText =
+    selectedSkillNames.length > 0
+      ? 'Selected skills apply to the next message. Click a skill pill to remove it.'
+      : 'Tip: type / to open skills, then pick one from the list.';
+  const skillDirectiveQuery = useMemo(
+    () => parseSkillDirectiveQuery(input, skillCursorIndex),
+    [input, skillCursorIndex],
+  );
+  const skillSuggestions = useMemo(() => {
+    if (!skillDirectiveQuery) {
+      return [];
+    }
+    const unselectedSkills = availableSkills.filter((skill) => !selectedSkillNames.includes(skill.name));
+    return filterSkillOptions(unselectedSkills, skillDirectiveQuery.query);
+  }, [availableSkills, skillDirectiveQuery, selectedSkillNames]);
+  const showSkillDropdown = skillDirectiveQuery !== null;
+  const hasSkillSuggestions = skillSuggestions.length > 0;
+
+  useEffect(() => {
+    setActiveSkillSuggestionIndex(0);
+  }, [input, skillDirectiveQuery?.query, hasSkillSuggestions]);
+
+  useEffect(() => {
+    skillOptionRefs.current = skillOptionRefs.current.slice(0, skillSuggestions.length);
+  }, [skillSuggestions.length]);
+
+  useEffect(() => {
+    if (!showSkillDropdown || !hasSkillSuggestions) {
+      return;
+    }
+    const container = skillDropdownRef.current;
+    const option = skillOptionRefs.current[activeSkillSuggestionIndex];
+    if (!container || !option) {
+      return;
+    }
+
+    const containerTop = container.scrollTop;
+    const containerBottom = containerTop + container.clientHeight;
+    const optionTop = option.offsetTop;
+    const optionBottom = optionTop + option.offsetHeight;
+
+    if (optionTop < containerTop) {
+      container.scrollTop = optionTop;
+      return;
+    }
+    if (optionBottom > containerBottom) {
+      container.scrollTop = optionBottom - container.clientHeight;
+    }
+  }, [activeSkillSuggestionIndex, hasSkillSuggestions, showSkillDropdown, skillSuggestions]);
+
+  const handleSkillSuggestionSelect = (skill: AvailableSkill) => {
+    if (!skillDirectiveQuery) {
+      return;
+    }
+    const normalizedName = normalizeSkillName(skill.name);
+    if (!normalizedName) {
+      return;
+    }
+
+    const before = input.slice(0, skillDirectiveQuery.replaceStart);
+    const after = input.slice(skillDirectiveQuery.replaceEnd);
+    const mergedInput = `${before}${after}`.replace(/\s{2,}/g, ' ');
+    const normalizedInput = mergedInput.trimStart();
+    const trimmedPrefixChars = mergedInput.length - normalizedInput.length;
+    const nextCursor = Math.max(0, before.length - trimmedPrefixChars);
+
+    setSelectedSkillNames((current) => {
+      if (current.includes(normalizedName)) {
+        return current;
+      }
+      return [...current, normalizedName];
+    });
+    setInput(normalizedInput);
+    setSkillCursorIndex(nextCursor);
+
+    requestAnimationFrame(() => {
+      const composer = composerInputRef.current;
+      if (!composer) {
+        return;
+      }
+      composer.focus();
+      composer.setSelectionRange(nextCursor, nextCursor);
+    });
+  };
+
+  const handleRemoveSelectedSkill = (skillName: string) => {
+    setSelectedSkillNames((current) => current.filter((name) => name !== skillName));
+    requestAnimationFrame(() => {
+      composerInputRef.current?.focus();
+    });
+  };
 
   const handleApprovalSubmit = async (status: 'APPROVED' | 'REJECTED') => {
     if (!pendingApproval || approvalExpired) {
@@ -1014,19 +1266,123 @@ export const ChatPanel = ({
 
             <footer className="ui-chat-composer">
               <div className="ui-chat-input-shell">
-                <textarea
-                  className="ui-chat-input"
-                  value={input}
-                  disabled={loading}
-                  placeholder={activeConversationId ? 'Ask for follow-up changes' : 'Start a new conversation'}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault();
-                      void handleSend();
+                <div className="ui-chat-input-wrapper">
+                  {selectedSkillNames.length > 0 ? (
+                    <div className="ui-chat-selected-skills" aria-label="Selected skills">
+                      {selectedSkillNames.map((skillName) => (
+                        <button
+                          key={skillName}
+                          type="button"
+                          className="ui-chat-skill-pill"
+                          onClick={() => handleRemoveSelectedSkill(skillName)}
+                          title={`Remove /${selectedSkillLabel(skillName, availableSkills)}`}
+                          aria-label={`Remove /${selectedSkillLabel(skillName, availableSkills)}`}
+                        >
+                          <span className="ui-chat-skill-pill-label">/{selectedSkillLabel(skillName, availableSkills)}</span>
+                          <span className="ui-chat-skill-pill-remove" aria-hidden="true">
+                            ×
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <textarea
+                    ref={composerInputRef}
+                    className="ui-chat-input"
+                    value={input}
+                    disabled={loading}
+                    placeholder={composerPlaceholder}
+                    onChange={(event) => {
+                      setInput(event.target.value);
+                      setSkillCursorIndex(event.target.selectionStart ?? event.target.value.length);
+                    }}
+                    onClick={(event) => setSkillCursorIndex(event.currentTarget.selectionStart ?? event.currentTarget.value.length)}
+                    onSelect={(event) =>
+                      setSkillCursorIndex(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
                     }
-                  }}
-                />
+                    onKeyUp={(event) => setSkillCursorIndex(event.currentTarget.selectionStart ?? event.currentTarget.value.length)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Backspace' && input.trim() === '' && selectedSkillNames.length > 0) {
+                        event.preventDefault();
+                        const lastSkill = selectedSkillNames[selectedSkillNames.length - 1];
+                        if (lastSkill) {
+                          handleRemoveSelectedSkill(lastSkill);
+                        }
+                        return;
+                      }
+
+                      if (showSkillDropdown && hasSkillSuggestions) {
+                        if (event.key === 'ArrowDown') {
+                          event.preventDefault();
+                          setActiveSkillSuggestionIndex((current) => (current + 1) % skillSuggestions.length);
+                          return;
+                        }
+                        if (event.key === 'ArrowUp') {
+                          event.preventDefault();
+                          setActiveSkillSuggestionIndex((current) =>
+                            (current - 1 + skillSuggestions.length) % skillSuggestions.length,
+                          );
+                          return;
+                        }
+                        if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
+                          event.preventDefault();
+                          const selected =
+                            skillSuggestions[Math.min(activeSkillSuggestionIndex, Math.max(0, skillSuggestions.length - 1))];
+                          if (selected) {
+                            handleSkillSuggestionSelect(selected);
+                          }
+                          return;
+                        }
+                      }
+
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        void handleSend();
+                      }
+                    }}
+                  />
+
+                  {showSkillDropdown ? (
+                    <div ref={skillDropdownRef} className="ui-chat-skill-dropdown" role="listbox" aria-label="Available skills">
+                      {loadingAvailableSkills ? (
+                        <div className="ui-chat-skill-empty">Loading skills...</div>
+                      ) : hasSkillSuggestions ? (
+                        skillSuggestions.map((skill, index) => {
+                          const normalizedName = normalizeSkillName(skill.name);
+                          const command = preferredSkillCommand(skill);
+                          const displayName = normalizeInlineWhitespace(skill.display_name ?? '');
+                          const description = normalizeInlineWhitespace(skill.description ?? '');
+                          return (
+                            <button
+                              key={normalizedName}
+                              ref={(element) => {
+                                skillOptionRefs.current[index] = element;
+                              }}
+                              type="button"
+                              className={`ui-chat-skill-option ${index === activeSkillSuggestionIndex ? 'active' : ''}`}
+                              role="option"
+                              aria-selected={index === activeSkillSuggestionIndex}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => handleSkillSuggestionSelect(skill)}
+                            >
+                              <span className="ui-chat-skill-option-name">/{command}</span>
+                              {description ? (
+                                <span className="ui-chat-skill-option-hint">{description}</span>
+                              ) : displayName ? (
+                                <span className="ui-chat-skill-option-hint">{displayName}</span>
+                              ) : null}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="ui-chat-skill-empty">No matching skills.</div>
+                      )}
+                    </div>
+                  ) : null}
+
+                  <p className="ui-chat-skill-help">{skillHelpText}</p>
+                </div>
 
                 <div className="ui-chat-input-controls">
                   <div className="ui-chat-input-meta">
@@ -1058,7 +1414,7 @@ export const ChatPanel = ({
                       type="button"
                       className="ui-chat-send-btn"
                       onClick={() => void handleSend()}
-                      disabled={!input.trim()}
+                      disabled={!input.trim() && selectedSkillNames.length === 0}
                       aria-label="Send message"
                     >
                       ↑

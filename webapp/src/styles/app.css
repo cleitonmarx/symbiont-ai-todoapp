@@ -1796,6 +1796,139 @@
   cursor: not-allowed;
 }
 
+.ui-chat-input-wrapper {
+  position: relative;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ui-chat-selected-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+}
+
+.ui-chat-skill-pill {
+  border: 1px solid #a7c1e8;
+  border-radius: 999px;
+  background: #e6f0ff;
+  color: #12396b;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  padding: 0.2rem 0.52rem;
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.15;
+  cursor: pointer;
+}
+
+.ui-chat-skill-pill:hover {
+  background: #dbe9ff;
+}
+
+.ui-chat-skill-pill-label {
+  font-weight: 700;
+}
+
+.ui-chat-skill-pill-remove {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.ui-chat-skill-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 0.45rem);
+  max-height: 14rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border-radius: 12px;
+  border: 1px solid #b9cdee;
+  background: #f8fbff;
+  box-shadow: 0 12px 24px rgba(11, 40, 84, 0.16);
+  padding: 0.32rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+  z-index: 3;
+}
+
+.ui-chat-skill-option {
+  all: unset;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  margin: 0;
+  border-radius: 9px;
+  background: transparent;
+  width: 100%;
+  text-indent: 0;
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.18rem;
+  font: inherit;
+  line-height: 1.32;
+}
+
+.ui-chat-skill-option:hover,
+.ui-chat-skill-option.active {
+  background: #e7f0ff;
+}
+
+.ui-chat-skill-option-name {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  text-indent: 0;
+  text-align: left;
+  white-space: normal;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #12396b;
+}
+
+.ui-chat-skill-option-hint {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  text-indent: 0;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  color: #4a6386;
+  line-height: 1.35;
+}
+
+.ui-chat-skill-option:focus-visible {
+  outline: 2px solid rgba(15, 97, 215, 0.45);
+  outline-offset: 1px;
+}
+
+.ui-chat-skill-empty {
+  font-size: 0.8rem;
+  color: #4a6386;
+  padding: 0.48rem 0.58rem;
+}
+
+.ui-chat-skill-help {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #5f7494;
+}
+
 .ui-chat-input-controls {
   display: flex;
   align-items: center;

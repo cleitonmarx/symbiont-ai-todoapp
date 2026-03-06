@@ -1900,3 +1900,65 @@ func (_c *MockSkillRegistry_ListRelevant_Call) RunAndReturn(run func(ctx context
 	_c.Call.Return(run)
 	return _c
 }
+
+// ListSkills provides a mock function for the type MockSkillRegistry
+func (_mock *MockSkillRegistry) ListSkills(ctx context.Context) ([]SkillDefinition, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListSkills")
+	}
+
+	var r0 []SkillDefinition
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]SkillDefinition, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []SkillDefinition); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]SkillDefinition)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockSkillRegistry_ListSkills_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListSkills'
+type MockSkillRegistry_ListSkills_Call struct {
+	*mock.Call
+}
+
+// ListSkills is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockSkillRegistry_Expecter) ListSkills(ctx interface{}) *MockSkillRegistry_ListSkills_Call {
+	return &MockSkillRegistry_ListSkills_Call{Call: _e.mock.On("ListSkills", ctx)}
+}
+
+func (_c *MockSkillRegistry_ListSkills_Call) Run(run func(ctx context.Context)) *MockSkillRegistry_ListSkills_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockSkillRegistry_ListSkills_Call) Return(skillDefinitions []SkillDefinition, err error) *MockSkillRegistry_ListSkills_Call {
+	_c.Call.Return(skillDefinitions, err)
+	return _c
+}
+
+func (_c *MockSkillRegistry_ListSkills_Call) RunAndReturn(run func(ctx context.Context) ([]SkillDefinition, error)) *MockSkillRegistry_ListSkills_Call {
+	_c.Call.Return(run)
+	return _c
+}

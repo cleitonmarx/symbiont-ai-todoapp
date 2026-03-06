@@ -1,5 +1,5 @@
 import { apiClient, API_BASE_URL } from './httpClient';
-import type { Conversation, ConversationListResp, ModelInfo, ModelListResponse } from '../types';
+import type { AvailableSkill, Conversation, ConversationListResp, ModelInfo, ModelListResponse, SkillListResponse } from '../types';
 
 export const streamChat = async (
   message: string,
@@ -55,6 +55,11 @@ export const clearChatMessages = async (conversationId: string): Promise<void> =
 export const fetchAvailableModels = async (): Promise<ModelInfo[]> => {
   const response = await apiClient.get<ModelListResponse>('/api/v1/models');
   return response.data?.models ?? [];
+};
+
+export const fetchAvailableSkills = async (): Promise<AvailableSkill[]> => {
+  const response = await apiClient.get<SkillListResponse>('/api/v1/chat/skills');
+  return response.data?.skills ?? [];
 };
 
 export type ActionApprovalStatus = 'APPROVED' | 'REJECTED';

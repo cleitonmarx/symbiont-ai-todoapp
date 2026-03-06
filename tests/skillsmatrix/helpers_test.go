@@ -63,9 +63,9 @@ func newSkillMatrixRegistry(t *testing.T) assistant.SkillRegistry {
 		AvoidPenaltyWeight:     0.70,
 		AvoidBlockThreshold:    0.45,
 		StrongUseWhenScore:     0.55,
-		CurrentInputWeight:     0.50,
-		RecentInputsWeight:     0.40,
-		SummaryWeight:          0.10,
+		CurrentInputWeight:     0.70,
+		RecentInputsWeight:     0.25,
+		SummaryWeight:          0.05,
 		RecentInputsLimit:      4,
 		LogScores:              true,
 	})

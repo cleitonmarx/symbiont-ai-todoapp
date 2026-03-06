@@ -502,6 +502,45 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResp"
 
+  /api/v1/chat/skills:
+    get:
+      operationId: listAvailableSkills
+      summary: List available skills
+      description: >
+        Lists the available chat skills that users can explicitly select with slash commands.
+      tags: [AI Chat]
+      responses:
+        "200":
+          description: Available skills
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillListResp"
+              examples:
+                example:
+                  summary: Example skill list
+                  value:
+                    skills:
+                      - name: "web_research"
+                        display_name: "Web Research"
+                        aliases: ["research", "web"]
+                        description: "Search the web and gather reliable sources."
+                        tools:
+                          - "search_web"
+                      - name: "update_todos"
+                        display_name: "Update"
+                        aliases: ["update", "edit"]
+                        description: "Edit existing todos such as title, status, or due date."
+                        tools:
+                          - "fetch_todos"
+                          - "update_todos"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResp"
+
 components:
   responses:
     BadRequest:
@@ -532,6 +571,48 @@ components:
                   message: "todo not found"
 
   schemas:
+    SkillListResp:
+      type: object
+      additionalProperties: false
+      required: [skills]
+      description: List of available skills.
+      properties:
+        skills:
+          type: array
+          description: Available skill definitions.
+          items:
+            $ref: '#/components/schemas/AvailableSkill'
+
+    AvailableSkill:
+      type: object
+      additionalProperties: false
+      required: [name, display_name, aliases, description, tools]
+      description: Skill metadata displayed for slash-command selection.
+      properties:
+        name:
+          type: string
+          description: Unique skill name used in slash commands.
+          example: "web_research"
+        display_name:
+          type: string
+          description: User-facing label shown in skill selectors.
+          example: "Summary"
+        aliases:
+          type: array
+          description: Hidden slash aliases that map to this canonical skill.
+          items:
+            type: string
+          example: ["summary", "summarize"]
+        description:
+          type: string
+          description: User-facing guidance shown in the skills dropdown.
+          example: "Search the web and gather reliable sources."
+        tools:
+          type: array
+          description: Action tools commonly used by this skill.
+          items:
+            type: string
+
     ModelListResp:
       type: object
       additionalProperties: false

@@ -135,3 +135,97 @@ Build a simple plan in steps.
 		})
 	}
 }
+
+func TestLocalRegistry_ListRelevant_ForcedSkillDirectives(t *testing.T) {
+	t.Parallel()
+
+	skillsFS := fstest.MapFS{
+		"planning.md": {Data: []byte(`---
+name: planning
+aliases: [plan]
+use_when: user asks to plan
+priority: 40
+tags: [planning]
+tools: [create_todos]
+---
+Build a simple plan.
+`)},
+		"mutation.md": {Data: []byte(`---
+name: todo-mutation-safety
+aliases: [update]
+use_when: update delete complete todos
+priority: 90
+tags: [todos, mutation]
+tools: [update_todos]
+---
+Use safe mutation flow.
+`)},
+	}
+
+	skills, err := LoadSkillsFromFS(skillsFS)
+	require.NoError(t, err)
+
+	encoder := newSemanticEncoder(t, "embed-model", semanticEncoderParams{
+		QueryVectors: map[string][]float64{
+			"/unknown delete my todos": {1, 0},
+		},
+		SkillVectors: map[string]skillVector{
+			"planning":             {Use: []float64{0, 1}},
+			"todo-mutation-safety": {Use: []float64{1, 0}},
+		},
+	})
+
+	registry, err := NewSkillRegistry(context.Background(), skills, encoder, "embed-model", Config{
+		RelevantSkillsTopK:     2,
+		RelevantSkillsMinScore: 0.10,
+	})
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		messages  []assistant.Message
+		wantNames []string
+	}{
+		"forces-single-skill-from-directive": {
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: "/planning create a travel plan"},
+			},
+			wantNames: []string{"planning"},
+		},
+		"forces-multiple-skills-preserving-order": {
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: "/todo-mutation-safety /planning do this"},
+			},
+			wantNames: []string{"todo-mutation-safety", "planning"},
+		},
+		"forces-skill-using-alias": {
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: "/plan create a trip plan"},
+			},
+			wantNames: []string{"planning"},
+		},
+		"falls-back-to-ranking-when-directive-unknown": {
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: "/unknown delete my todos"},
+			},
+			wantNames: []string{"todo-mutation-safety"},
+		},
+	}
+
+	for name, tt := range tests {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			got := registry.ListRelevant(context.Background(), assistant.SkillQueryContext{
+				Messages: tt.messages,
+			})
+
+			require.NotEmpty(t, got)
+			names := make([]string, 0, len(got))
+			for _, skill := range got {
+				names = append(names, skill.Name)
+			}
+			assert.Equal(t, tt.wantNames, names)
+		})
+	}
+}

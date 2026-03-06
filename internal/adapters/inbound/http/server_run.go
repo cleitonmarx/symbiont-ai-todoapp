@@ -23,7 +23,7 @@ var _ gen.ServerInterface = (*TodoAppServer)(nil)
 
 // TodoAppServer is the REST API and UI HTTP server for the TodoApp application.
 type TodoAppServer struct {
-	Port                        int                       `config:"HTTP_PORT" default:"8080"`
+	Port                        int                       `config:"API_SERVER_PORT" default:"8080"`
 	Logger                      *log.Logger               `resolve:""`
 	ListTodosUseCase            todo.List                 `resolve:""`
 	CreateTodoUseCase           todo.Create               `resolve:""`
@@ -36,6 +36,7 @@ type TodoAppServer struct {
 	SubmitActionApprovalUseCase chat.SubmitActionApproval `resolve:""`
 	DeleteConversationUseCase   chat.DeleteConversation   `resolve:""`
 	ListAvailableModelsUseCase  chat.ListAvailableModels  `resolve:""`
+	ListAvailableSkillsUseCase  chat.ListAvailableSkills  `resolve:""`
 	StreamChatUseCase           chat.StreamChat           `resolve:""`
 	introspectionReport         introspection.Report
 }

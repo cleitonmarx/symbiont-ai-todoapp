@@ -5,14 +5,14 @@ import (
 	"log"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/outbox"
 )
 
 // MessageRelay is a runnable that processes outbox events and publishes them to Pub/Sub.
 type MessageRelay struct {
-	MessageDispatcher   usecases.RelayOutbox `resolve:""`
-	Logger              *log.Logger          `resolve:""`
-	Interval            time.Duration        `config:"FETCH_OUTBOX_INTERVAL" default:"500ms"`
+	MessageDispatcher   outbox.Relay  `resolve:""`
+	Logger              *log.Logger   `resolve:""`
+	Interval            time.Duration `config:"FETCH_OUTBOX_INTERVAL" default:"500ms"`
 	workerExecutionChan chan struct{}
 }
 

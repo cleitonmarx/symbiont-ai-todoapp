@@ -7,18 +7,18 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub/v2"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/board"
 )
 
 // BoardSummaryGenerator is a runnable that consumes Todo domain events from Pub/Sub
 // and triggers AI summary generation.
 type BoardSummaryGenerator struct {
-	Logger               *log.Logger                   `resolve:""`
-	Client               *pubsub.Client                `resolve:""`
-	Interval             time.Duration                 `config:"SUMMARY_BATCH_INTERVAL" default:"3s"`
-	BatchSize            int                           `config:"SUMMARY_BATCH_SIZE" default:"20"`
-	SubscriptionID       string                        `config:"TODO_EVENTS_SUBSCRIPTION_ID"`
-	GenerateBoardSummary usecases.GenerateBoardSummary `resolve:""`
+	Logger               *log.Logger                `resolve:""`
+	Client               *pubsub.Client             `resolve:""`
+	Interval             time.Duration              `config:"SUMMARY_BATCH_INTERVAL" default:"3s"`
+	BatchSize            int                        `config:"SUMMARY_BATCH_SIZE" default:"20"`
+	SubscriptionID       string                     `config:"TODO_EVENTS_SUBSCRIPTION_ID"`
+	GenerateBoardSummary board.GenerateBoardSummary `resolve:""`
 	workerExecutionChan  chan struct{}
 }
 

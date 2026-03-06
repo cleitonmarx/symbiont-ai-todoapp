@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/outbox"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -13,7 +13,7 @@ import (
 func TestMessageRelay_Run(t *testing.T) {
 	t.Parallel()
 
-	md := usecases.NewMockRelayOutbox(t)
+	md := outbox.NewMockRelay(t)
 
 	md.EXPECT().Execute(mock.Anything).Return(assert.AnError).Once()
 	md.EXPECT().Execute(mock.Anything).Return(nil).Once()

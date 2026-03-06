@@ -83,6 +83,19 @@ func (i InitListAvailableModels) Initialize(ctx context.Context) (context.Contex
 	return ctx, nil
 }
 
+// InitListAvailableSkills is the initializer for the ListAvailableSkills use case.
+type InitListAvailableSkills struct {
+	SkillRegistry assistant.SkillRegistry `resolve:""`
+}
+
+// Initialize registers the ListAvailableSkills use case in the dependency container.
+func (i InitListAvailableSkills) Initialize(ctx context.Context) (context.Context, error) {
+	depend.Register[ListAvailableSkills](NewListAvailableSkillsImpl(
+		i.SkillRegistry,
+	))
+	return ctx, nil
+}
+
 // InitListChatMessages is the initializer for the ListChatMessages use case
 type InitListChatMessages struct {
 	Repo assistant.ChatMessageRepository `resolve:""`

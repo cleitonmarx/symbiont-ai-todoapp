@@ -2,11 +2,10 @@ package log
 
 import (
 	"context"
-	"log"
-	"testing"
-
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/stretchr/testify/assert"
+	"log"
+	"testing"
 )
 
 func TestInitLogger_Initialize(t *testing.T) {

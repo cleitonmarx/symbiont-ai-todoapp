@@ -87,6 +87,24 @@ const (
 // ActionApprovalStatus Human approval decision status for a requested action execution.
 type ActionApprovalStatus string
 
+// AvailableSkill Skill metadata displayed for slash-command selection.
+type AvailableSkill struct {
+	// Aliases Hidden slash aliases that map to this canonical skill.
+	Aliases []string `json:"aliases"`
+
+	// Description User-facing guidance shown in the skills dropdown.
+	Description string `json:"description"`
+
+	// DisplayName User-facing label shown in skill selectors.
+	DisplayName string `json:"display_name"`
+
+	// Name Unique skill name used in slash commands.
+	Name string `json:"name"`
+
+	// Tools Action tools commonly used by this skill.
+	Tools []string `json:"tools"`
+}
+
 // BoardSummary defines model for BoardSummary.
 type BoardSummary struct {
 	// Counts Count of todos per status.
@@ -291,6 +309,12 @@ type SelectedSkill struct {
 	Name   string   `json:"name"`
 	Source string   `json:"source"`
 	Tools  []string `json:"tools"`
+}
+
+// SkillListResp List of available skills.
+type SkillListResp struct {
+	// Skills Available skill definitions.
+	Skills []AvailableSkill `json:"skills"`
 }
 
 // SubmitActionApprovalRequest defines model for SubmitActionApprovalRequest.
@@ -790,6 +814,9 @@ type ClientInterface interface {
 	// ListChatMessages request
 	ListChatMessages(ctx context.Context, params *ListChatMessagesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAvailableSkills request
+	ListAvailableSkills(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListConversations request
 	ListConversations(ctx context.Context, params *ListConversationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -883,6 +910,18 @@ func (c *Client) SubmitActionApproval(ctx context.Context, body SubmitActionAppr
 
 func (c *Client) ListChatMessages(ctx context.Context, params *ListChatMessagesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListChatMessagesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListAvailableSkills(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAvailableSkillsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1191,6 +1230,33 @@ func NewListChatMessagesRequest(server string, params *ListChatMessagesParams) (
 		}
 
 		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAvailableSkillsRequest generates requests for ListAvailableSkills
+func NewListAvailableSkillsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/chat/skills")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -1683,6 +1749,9 @@ type ClientWithResponsesInterface interface {
 	// ListChatMessagesWithResponse request
 	ListChatMessagesWithResponse(ctx context.Context, params *ListChatMessagesParams, reqEditors ...RequestEditorFn) (*ListChatMessagesResponse, error)
 
+	// ListAvailableSkillsWithResponse request
+	ListAvailableSkillsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAvailableSkillsResponse, error)
+
 	// ListConversationsWithResponse request
 	ListConversationsWithResponse(ctx context.Context, params *ListConversationsParams, reqEditors ...RequestEditorFn) (*ListConversationsResponse, error)
 
@@ -1800,6 +1869,29 @@ func (r ListChatMessagesResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListChatMessagesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListAvailableSkillsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SkillListResp
+	JSON500      *ErrorResp
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAvailableSkillsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAvailableSkillsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2040,6 +2132,15 @@ func (c *ClientWithResponses) ListChatMessagesWithResponse(ctx context.Context, 
 	return ParseListChatMessagesResponse(rsp)
 }
 
+// ListAvailableSkillsWithResponse request returning *ListAvailableSkillsResponse
+func (c *ClientWithResponses) ListAvailableSkillsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAvailableSkillsResponse, error) {
+	rsp, err := c.ListAvailableSkills(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAvailableSkillsResponse(rsp)
+}
+
 // ListConversationsWithResponse request returning *ListConversationsResponse
 func (c *ClientWithResponses) ListConversationsWithResponse(ctx context.Context, params *ListConversationsParams, reqEditors ...RequestEditorFn) (*ListConversationsResponse, error) {
 	rsp, err := c.ListConversations(ctx, params, reqEditors...)
@@ -2251,6 +2352,39 @@ func ParseListChatMessagesResponse(rsp *http.Response) (*ListChatMessagesRespons
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ChatHistoryResp
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResp
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAvailableSkillsResponse parses an HTTP response from a ListAvailableSkillsWithResponse call
+func ParseListAvailableSkillsResponse(rsp *http.Response) (*ListAvailableSkillsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAvailableSkillsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SkillListResp
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2532,6 +2666,9 @@ type ServerInterface interface {
 	// Fetch chat history (single global chat)
 	// (GET /api/v1/chat/messages)
 	ListChatMessages(w http.ResponseWriter, r *http.Request, params ListChatMessagesParams)
+	// List available skills
+	// (GET /api/v1/chat/skills)
+	ListAvailableSkills(w http.ResponseWriter, r *http.Request)
 	// List conversations
 	// (GET /api/v1/conversations)
 	ListConversations(w http.ResponseWriter, r *http.Request, params ListConversationsParams)
@@ -2664,6 +2801,20 @@ func (siw *ServerInterfaceWrapper) ListChatMessages(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListChatMessages(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAvailableSkills operation middleware
+func (siw *ServerInterfaceWrapper) ListAvailableSkills(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAvailableSkills(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3063,6 +3214,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/chat", wrapper.StreamChat)
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/chat/approvals", wrapper.SubmitActionApproval)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/chat/messages", wrapper.ListChatMessages)
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/chat/skills", wrapper.ListAvailableSkills)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/conversations", wrapper.ListConversations)
 	m.HandleFunc("DELETE "+options.BaseURL+"/api/v1/conversations/{conversation_id}", wrapper.DeleteConversation)
 	m.HandleFunc("PATCH "+options.BaseURL+"/api/v1/conversations/{conversation_id}", wrapper.UpdateConversation)

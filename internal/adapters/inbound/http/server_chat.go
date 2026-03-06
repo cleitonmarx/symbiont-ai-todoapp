@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
@@ -127,4 +128,40 @@ func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Requ
 	}
 
 	respondJSON(w, http.StatusOK, rp)
+}
+
+// ListAvailableSkills returns the list of available skills that users can select with slash commands.
+func (api TodoAppServer) ListAvailableSkills(w http.ResponseWriter, r *http.Request) {
+	skills, err := api.ListAvailableSkillsUseCase.Query(r.Context())
+	if err != nil {
+		respondError(w, toError(err))
+		return
+	}
+
+	resp := gen.SkillListResp{
+		Skills: make([]gen.AvailableSkill, 0, len(skills)),
+	}
+	for _, skill := range skills {
+		tools := make([]string, len(skill.Tools))
+		copy(tools, skill.Tools)
+		aliases := make([]string, len(skill.Aliases))
+		copy(aliases, skill.Aliases)
+		description := strings.TrimSpace(skill.Description)
+		if description == "" {
+			description = strings.TrimSpace(skill.UseWhen)
+		}
+		displayName := strings.TrimSpace(skill.DisplayName)
+		if displayName == "" {
+			displayName = strings.TrimSpace(skill.Name)
+		}
+		resp.Skills = append(resp.Skills, gen.AvailableSkill{
+			Name:        skill.Name,
+			DisplayName: displayName,
+			Aliases:     aliases,
+			Description: description,
+			Tools:       tools,
+		})
+	}
+
+	respondJSON(w, http.StatusOK, resp)
 }

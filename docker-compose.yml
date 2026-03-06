@@ -10,7 +10,6 @@ services:
       - "8080:8080"
       - "8085:8085"
     environment:
-      - PORT=8080
       - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://jaeger:4318/v1/traces
       - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://prometheus:9090/api/v1/otlp/v1/metrics
       - OTEL_SEMCONV_STABILITY_OPT_IN=database

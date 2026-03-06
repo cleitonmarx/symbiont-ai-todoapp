@@ -92,6 +92,7 @@ type InitHttpClient struct {
 	Logger *log.Logger `resolve:""`
 }
 
+// Initialize registers an instrumented retryable HTTP client in the dependency container.
 func (i InitHttpClient) Initialize(ctx context.Context) (context.Context, error) {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryWaitMax = 5 * time.Second

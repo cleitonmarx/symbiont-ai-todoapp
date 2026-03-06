@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
@@ -248,10 +249,11 @@ func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (todo.Todo, 
 			&td.UpdatedAt,
 		)
 
+	if errors.Is(err, sql.ErrNoRows) {
+		return todo.Todo{}, false, nil
+	}
+
 	if telemetry.RecordErrorAndStatus(span, err) {
-		if err == sql.ErrNoRows {
-			return todo.Todo{}, false, nil
-		}
 		return todo.Todo{}, false, err
 	}
 

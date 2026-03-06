@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
@@ -52,10 +53,12 @@ func (r ConversationSummaryRepository) GetConversationSummary(
 			&summary.LastSummarizedMessageID,
 			&summary.UpdatedAt,
 		)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return assistant.ConversationSummary{}, false, nil
+	}
+
 	if telemetry.RecordErrorAndStatus(span, err) {
-		if err == sql.ErrNoRows {
-			return assistant.ConversationSummary{}, false, nil
-		}
 		return assistant.ConversationSummary{}, false, err
 	}
 

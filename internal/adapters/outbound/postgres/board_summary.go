@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/squirrel"
@@ -102,10 +103,11 @@ func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (todo.Bo
 			&summary.SourceVersion,
 		)
 
+	if errors.Is(err, sql.ErrNoRows) {
+		return todo.BoardSummary{}, false, nil
+	}
+
 	if telemetry.RecordErrorAndStatus(span, err) {
-		if err == sql.ErrNoRows {
-			return todo.BoardSummary{}, false, nil
-		}
 		return todo.BoardSummary{}, false, err
 	}
 
@@ -137,6 +139,7 @@ func (bsr BoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (
 		Prefix(boardSummaryCTEQry).
 		QueryRowContext(spanCtx).
 		Scan(&countsJSON, &overdueJSON, &nearDeadlineJSON, &nextUpJSON)
+
 	if telemetry.RecordErrorAndStatus(span, err) {
 		return todo.BoardSummaryContent{}, err
 	}

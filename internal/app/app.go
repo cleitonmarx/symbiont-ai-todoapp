@@ -68,6 +68,7 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&chat.InitDeleteConversation{},
 			&chat.InitStreamChat{},
 			&chat.InitListAvailableModels{},
+			&chat.InitListAvailableSkills{},
 			&outbox.InitRelay{},
 		).
 		Host(

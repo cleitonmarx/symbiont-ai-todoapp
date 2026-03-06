@@ -5,7 +5,7 @@ package skillsmatrix
 import (
 	"testing"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 )
 
 func TestSkillRelevancePromptMatrix_TodoDelete(t *testing.T) {
@@ -13,22 +13,22 @@ func TestSkillRelevancePromptMatrix_TodoDelete(t *testing.T) {
 	registry := newSkillMatrixRegistry(t)
 	tests := map[string]skillMatrixCase{
 		"delete-by-title": {
-			messages: []domain.AssistantMessage{
-				{Role: domain.ChatRole_User, Content: `Delete my todo "Integration Test Todo".`},
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: `Delete my todo "Integration Test Todo".`},
 			},
 			wantTop:     "todo-delete",
 			wantContain: []string{"todo-delete"},
 		},
 		"delete-fuzzy-set": {
-			messages: []domain.AssistantMessage{
-				{Role: domain.ChatRole_User, Content: "Delete old job application todos."},
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: "Delete old job application todos."},
 			},
 			wantTop:     "todo-delete",
 			wantContain: []string{"todo-delete"},
 		},
 		"delete-completed-set": {
-			messages: []domain.AssistantMessage{
-				{Role: domain.ChatRole_User, Content: "Remove completed todos from my list."},
+			messages: []assistant.Message{
+				{Role: assistant.ChatRole_User, Content: "Remove completed todos from my list."},
 			},
 			wantTop:     "todo-delete",
 			wantContain: []string{"todo-delete"},

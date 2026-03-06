@@ -3,17 +3,18 @@ package integration
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+// InitDockerCompose is responsible for starting and stopping the Docker Compose environment for integration tests.
 type InitDockerCompose struct {
 	compose *compose.DockerCompose
 }
 
+// Initialize starts the Docker Compose environment and waits for the specified services to be healthy.
 func (i *InitDockerCompose) Initialize(ctx context.Context) (context.Context, error) {
 	dc, err := compose.NewDockerCompose("../../docker-compose.deps.yml")
 	if err != nil {
@@ -32,6 +33,7 @@ func (i *InitDockerCompose) Initialize(ctx context.Context) (context.Context, er
 	return ctx, nil
 }
 
+// Close stops the Docker Compose environment and cleans up resources.
 func (i InitDockerCompose) Close() {
 	if i.compose != nil {
 		cancelCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
@@ -46,22 +48,5 @@ func (i InitDockerCompose) Close() {
 		if err != nil {
 			log.Printf("failed to stop docker compose: %v", err)
 		}
-	}
-}
-
-type initEnvVars struct {
-	envVars map[string]string
-}
-
-func (i *initEnvVars) Initialize(ctx context.Context) (context.Context, error) {
-	for key, value := range i.envVars {
-		_ = os.Setenv(key, value)
-	}
-	return ctx, nil
-}
-
-func (i *initEnvVars) Close() {
-	for key := range i.envVars {
-		_ = os.Unsetenv(key)
 	}
 }

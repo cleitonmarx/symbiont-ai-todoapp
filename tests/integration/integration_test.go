@@ -19,28 +19,28 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql"
 	gqlmodels "github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/gen"
 	rest "github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/app"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/board"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/google/uuid"
-
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/app"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases"
 	"github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/require"
 )
 
 // boardSummaryQueue is used to receive completed board summaries for verification in tests.
 var (
-	boardSummaryQueue        usecases.CompletedBoardSummaryChannel
-	conversationSummaryQueue usecases.CompletedConversationSummaryChannel
-	conversationTitleQueue   usecases.CompletedConversationTitleUpdateChannel
+	boardSummaryQueue        board.CompletedBoardSummaryChannel
+	conversationSummaryQueue chat.CompletedConversationSummaryChannel
+	conversationTitleQueue   chat.CompletedConversationTitleUpdateChannel
 	restCli                  *rest.ClientWithResponses
 )
 
 func TestMain(m *testing.M) {
 	todoApp := app.NewTodoApp(
-		&initEnvVars{
+		&InitEnvVars{
 			envVars: map[string]string{
 				"VAULT_ADDR":                             "http://localhost:8200",
 				"VAULT_TOKEN":                            "root-token",
@@ -69,13 +69,13 @@ func TestMain(m *testing.M) {
 		&InitDockerCompose{},
 	)
 
-	boardSummaryQueue = make(usecases.CompletedBoardSummaryChannel)
+	boardSummaryQueue = make(board.CompletedBoardSummaryChannel)
 	depend.Register(boardSummaryQueue)
 
-	conversationSummaryQueue = make(usecases.CompletedConversationSummaryChannel)
+	conversationSummaryQueue = make(chat.CompletedConversationSummaryChannel)
 	depend.Register(conversationSummaryQueue)
 
-	conversationTitleQueue = make(usecases.CompletedConversationTitleUpdateChannel)
+	conversationTitleQueue = make(chat.CompletedConversationTitleUpdateChannel)
 	depend.Register(conversationTitleQueue)
 
 	var err error
@@ -291,7 +291,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		require.NotNil(t, resp.JSON200, "expected non-nil response for ListConversations")
 		require.Len(t, resp.JSON200.Conversations, 1, "expected 1 conversation in the list")
 
-		autoTitle := domain.GenerateAutoConversationTitle(createTodoPrompt)
+		autoTitle := assistant.GenerateAutoConversationTitle(createTodoPrompt)
 
 		for _, conv := range resp.JSON200.Conversations {
 			if conv.Id == conversationID {
@@ -356,7 +356,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		require.Equal(t, approvalRequest.ActionCallID, approvalResolved.ActionCallID, "expected resolved action_call_id to match required event")
 		require.Equal(t, approvalRequest.ConversationID, approvalResolved.ConversationID, "expected resolved conversation_id to match required event")
 		require.Equal(t, approvalRequest.TurnID, approvalResolved.TurnID, "expected resolved turn_id to match required event")
-		require.Equal(t, domain.ChatMessageApprovalStatus_Approved, approvalResolved.Status, "expected resolved status to be APPROVED")
+		require.Equal(t, assistant.ChatMessageApprovalStatus_Approved, approvalResolved.Status, "expected resolved status to be APPROVED")
 		fmt.Printf("\nReceived action approval resolved event: %+v\n", approvalResolved)
 
 		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsTextFromScanner(t, scanner)
@@ -401,7 +401,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		require.Equal(t, approvalRequest.ActionCallID, approvalResolved.ActionCallID, "expected resolved action_call_id to match required event")
 		require.Equal(t, approvalRequest.ConversationID, approvalResolved.ConversationID, "expected resolved conversation_id to match required event")
 		require.Equal(t, approvalRequest.TurnID, approvalResolved.TurnID, "expected resolved turn_id to match required event")
-		require.Equal(t, domain.ChatMessageApprovalStatus_Approved, approvalResolved.Status, "expected resolved status to be APPROVED")
+		require.Equal(t, assistant.ChatMessageApprovalStatus_Approved, approvalResolved.Status, "expected resolved status to be APPROVED")
 		fmt.Printf("\nReceived action approval resolved event: %+v\n", approvalResolved)
 
 		deltaText, actionStartedText, actionCompletedCount, _ := readChatEventsTextFromScanner(t, scanner)
@@ -556,7 +556,7 @@ func readChatEventsTextFromScanner(t *testing.T, scanner *bufio.Scanner) (string
 			isMeta = false
 			dataLine := scanner.Text()
 			dataPayload := strings.TrimSpace(strings.TrimPrefix(dataLine, "data:"))
-			var metaEvent domain.AssistantTurnStarted
+			var metaEvent assistant.TurnStarted
 			err := json.Unmarshal([]byte(dataPayload), &metaEvent)
 			require.NoError(t, err, "failed to unmarshal chat meta event payload")
 			conversationID = metaEvent.ConversationID
@@ -569,7 +569,7 @@ func readChatEventsTextFromScanner(t *testing.T, scanner *bufio.Scanner) (string
 			isDelta = false
 			dataLine := scanner.Text()
 			dataPayload := strings.TrimSpace(strings.TrimPrefix(dataLine, "data:"))
-			var delta domain.AssistantMessageDelta
+			var delta assistant.MessageDelta
 			err := json.Unmarshal([]byte(dataPayload), &delta)
 			require.NoError(t, err, "failed to unmarshal chat delta payload")
 			deltaText.WriteString(delta.Text)
@@ -583,7 +583,7 @@ func readChatEventsTextFromScanner(t *testing.T, scanner *bufio.Scanner) (string
 			isActionStarted = false
 			dataline := scanner.Text()
 			dataPayload := strings.TrimSpace(strings.TrimPrefix(dataline, "data:"))
-			var actionStarted domain.AssistantActionCall
+			var actionStarted assistant.ActionCall
 			err := json.Unmarshal([]byte(dataPayload), &actionStarted)
 			require.NoError(t, err, "failed to unmarshal chat action started payload")
 			actionStartedText.WriteString(actionStarted.Text)
@@ -597,7 +597,7 @@ func readChatEventsTextFromScanner(t *testing.T, scanner *bufio.Scanner) (string
 			isActionCompleted = false
 			dataline := scanner.Text()
 			dataPayload := strings.TrimSpace(strings.TrimPrefix(dataline, "data:"))
-			var actionCompleted domain.AssistantActionCompleted
+			var actionCompleted assistant.ActionCompleted
 			err := json.Unmarshal([]byte(dataPayload), &actionCompleted)
 			require.NoError(t, err, "failed to unmarshal chat action completed payload")
 			actionCompletedCount++
@@ -613,21 +613,21 @@ func readChatEventsTextFromScanner(t *testing.T, scanner *bufio.Scanner) (string
 	return deltaText.String(), actionStartedText.String(), actionCompletedCount, conversationID
 }
 
-func readChatApprovalRequiredEvent(t *testing.T, scanner *bufio.Scanner) domain.AssistantActionApprovalRequired {
+func readChatApprovalRequiredEvent(t *testing.T, scanner *bufio.Scanner) assistant.ActionApprovalRequired {
 	t.Helper()
 
 	dataPayload := readFirstSSEEventData(t, scanner, "action_approval_required")
-	var event domain.AssistantActionApprovalRequired
+	var event assistant.ActionApprovalRequired
 	err := json.Unmarshal([]byte(dataPayload), &event)
 	require.NoError(t, err, "failed to unmarshal chat action approval required payload")
 	return event
 }
 
-func readChatApprovalResolvedEvent(t *testing.T, scanner *bufio.Scanner) domain.AssistantActionApprovalResolved {
+func readChatApprovalResolvedEvent(t *testing.T, scanner *bufio.Scanner) assistant.ActionApprovalResolved {
 	t.Helper()
 
 	dataPayload := readFirstSSEEventData(t, scanner, "action_approval_resolved")
-	var event domain.AssistantActionApprovalResolved
+	var event assistant.ActionApprovalResolved
 	err := json.Unmarshal([]byte(dataPayload), &event)
 	require.NoError(t, err, "failed to unmarshal chat action approval resolved payload")
 	return event

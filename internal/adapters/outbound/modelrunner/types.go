@@ -166,6 +166,7 @@ type ToolCallChunkFunction struct {
 	Arguments string `json:"arguments"`
 }
 
+// Usage contains token usage reported by the model API.
 type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`

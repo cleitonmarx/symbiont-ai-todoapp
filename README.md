@@ -22,7 +22,7 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 
 ### Components
 
-- **HTTP API** (`internal/adapters/inbound/http`): Serves REST endpoints and static web assets on `HTTP_PORT` (default `8080`)
+- **HTTP API** (`internal/adapters/inbound/http`): Serves REST endpoints and static web assets on `API_SERVER_PORT` (default `8080`)
 - **GraphQL API** (`internal/adapters/inbound/graphql`): Serves `/v1/query` and GraphQL playground (`/`) on `GRAPHQL_SERVER_PORT` (default `8085`)
 - **Message Relay Worker** (`internal/adapters/inbound/workers/message_relay.go`): Publishes persisted outbox events to Pub/Sub
 - **Board Summary Worker** (`internal/adapters/inbound/workers/board_summary_generator.go`): Batches todo events and triggers board-summary generation
@@ -114,19 +114,36 @@ tools:
 
 ## Skill-Based Routing
 
-The assistant can use skills as lightweight runbooks to improve action/tool selection.
+The assistant uses a **skill registry** (markdown runbooks) for action/tool routing.
 
 - Skill files live in: `internal/adapters/outbound/skillregistry/skills/*.md`
-- Each skill has YAML frontmatter (`name`, `use_when`, `avoid_when`, `priority`, `tags`, `tools`) plus workflow instructions in markdown body
-- At runtime, selected skills are converted into:
-  - Action/tool allowlist for the turn (`tools` field)
-  - System guidance prompt for action/tool workflow
+- Each skill has YAML frontmatter plus workflow instructions in markdown body
+- Core frontmatter fields:
+  - `name`: canonical skill ID (stable identifier used by backend)
+  - `display_name`: user-facing label for UI
+  - `aliases`: optional slash-command synonyms that map to the same canonical skill
+  - `use_when`, `avoid_when`, `priority`, `tags`, `tools`
 
-Current selector uses weighted context:
+At runtime, selected skills are converted into:
 
-- Current user input (highest weight)
-- Recent user inputs
-- Conversation summary (optional, lower weight)
+- An action/tool allowlist for the turn (`tools`)
+- Additional system guidance for execution behavior
+
+### Skill Selection Modes
+
+1. **Automatic selection (ranking)**
+   - Uses semantic relevance from current input, recent user inputs, and optional conversation summary.
+   - Best for normal natural-language requests without explicit slash commands.
+2. **Explicit selection (forced)**
+   - Users can select a skill with slash commands (for example `/summary` or `/todo-summary`).
+   - Explicit selection takes precedence over automatic ranking for that turn.
+
+### Slash Commands and UI Discovery
+
+- Skills are discoverable via `GET /api/v1/chat/skills`.
+- The chat composer supports slash-command autocomplete when the user types `/`.
+- UI shows one item per canonical skill (using `display_name`/description), while aliases are accepted as hidden synonyms.
+- Canonical name is still used internally for stable routing and observability.
 
 ## Prompt Examples
 
@@ -306,7 +323,7 @@ go test -tags=integration -v -timeout 30m ./tests/integration/...
 
 Required or commonly tuned variables:
 
-- `HTTP_PORT` (default: `8080`)
+- `API_SERVER_PORT` (default: `8080`)
 - `GRAPHQL_SERVER_PORT` (default: `8085`)
 - `DB_HOST`, `DB_PORT` (default: `5432`), `DB_NAME`
 - `DB_USER`, `DB_PASS` (can be sourced from Vault)

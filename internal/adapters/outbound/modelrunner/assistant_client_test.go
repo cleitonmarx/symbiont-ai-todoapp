@@ -35,12 +35,12 @@ func createStreamingServer(chunks []StreamChunk) *httptest.Server {
 }
 
 // collectStreamEvents collects all events from a stream
-func collectStreamEvents(adapter AssistantClient, req assistant.TurnRequest) ([]assistant.EventType, []string, *assistant.TurnCompleted, error) {
+func collectStreamEvents(ctx context.Context, adapter AssistantClient, req assistant.TurnRequest) ([]assistant.EventType, []string, *assistant.TurnCompleted, error) {
 	var eventTypes []assistant.EventType
 	var deltaTexts []string
 	var doneEvent *assistant.TurnCompleted
 
-	err := adapter.RunTurn(context.Background(), req, func(_ context.Context, eventType assistant.EventType, data any) error {
+	err := adapter.RunTurn(ctx, req, func(_ context.Context, eventType assistant.EventType, data any) error {
 		eventTypes = append(eventTypes, eventType)
 
 		switch eventType {
@@ -172,7 +172,7 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 				client,
 			)
 
-			eventTypes, deltaTexts, _, err := collectStreamEvents(adapter, tt.req)
+			eventTypes, deltaTexts, _, err := collectStreamEvents(t.Context(), adapter, tt.req)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -210,7 +210,7 @@ func TestAssistantClientAdapter_RunTurn_ServerError(t *testing.T) {
 		},
 	}
 
-	err := adapter.RunTurn(context.Background(), req, func(_ context.Context, eventType assistant.EventType, data interface{}) error {
+	err := adapter.RunTurn(t.Context(), req, func(_ context.Context, eventType assistant.EventType, data any) error {
 		return nil
 	})
 
@@ -319,7 +319,7 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 			client := NewDRMAPIClient(server.URL, "", server.Client())
 			adapter := NewAssistantClientAdapter(client, client)
 
-			resp, err := adapter.RunTurnSync(context.Background(), tt.req)
+			resp, err := adapter.RunTurnSync(t.Context(), tt.req)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -356,7 +356,7 @@ func TestAssistantClientAdapter_RunTurnSync_ValidationErrors(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := adapter.RunTurnSync(context.Background(), tt.req)
+			_, err := adapter.RunTurnSync(t.Context(), tt.req)
 			assert.Error(t, err)
 		})
 	}
@@ -453,7 +453,7 @@ func TestAssistantClientAdapter_VectorizeTodo(t *testing.T) {
 			client := NewDRMAPIClient(server.URL, "", server.Client())
 			adapter := NewAssistantClientAdapter(client, client)
 
-			vec, err := adapter.VectorizeTodo(context.Background(), tt.model, todo)
+			vec, err := adapter.VectorizeTodo(t.Context(), tt.model, todo)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -557,7 +557,7 @@ func TestAssistantClientAdapter_VectorizeQuery(t *testing.T) {
 			client := NewDRMAPIClient(server.URL, "", server.Client())
 			adapter := NewAssistantClientAdapter(client, client)
 
-			vec, err := adapter.VectorizeQuery(context.Background(), tt.model, searchInput)
+			vec, err := adapter.VectorizeQuery(t.Context(), tt.model, searchInput)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -669,7 +669,7 @@ func TestAssistantClientAdapter_VectorizeSkillDefinition(t *testing.T) {
 			client := NewDRMAPIClient(server.URL, "", server.Client())
 			adapter := NewAssistantClientAdapter(client, client)
 
-			useVec, avoidVec, err := adapter.VectorizeSkillDefinition(context.Background(), tt.model, tt.skill)
+			useVec, avoidVec, err := adapter.VectorizeSkillDefinition(t.Context(), tt.model, tt.skill)
 			if tt.expectErr {
 				assert.Error(t, err)
 				return
@@ -737,7 +737,7 @@ func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
 			client := NewDRMAPIClient(server.URL, "", server.Client())
 			adapter := NewAssistantClientAdapter(client, client)
 
-			models, err := adapter.ListAvailableModels(context.Background())
+			models, err := adapter.ListAvailableModels(t.Context())
 
 			if tt.expectErr {
 				assert.Error(t, err)

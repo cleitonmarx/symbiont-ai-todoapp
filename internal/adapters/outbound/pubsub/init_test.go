@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"context"
 	"testing"
 
 	pubsubV2 "cloud.google.com/go/pubsub/v2"
@@ -22,7 +21,7 @@ func TestInitClient_Initialize(t *testing.T) {
 
 	conn, err := grpc.NewClient(server.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NoError(t, err)
-	ctx := context.Background()
+	ctx := t.Context()
 	client, err := pubsubV2.NewClient(
 		ctx,
 		"test-project",
@@ -50,7 +49,7 @@ func TestInitPublisher_Initialize(t *testing.T) {
 		Client: &pubsubV2.Client{},
 	}
 
-	_, err := init.Initialize(context.Background())
+	_, err := init.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	res, err := depend.Resolve[outbox.EventPublisher]()

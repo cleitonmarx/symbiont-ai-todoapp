@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -470,7 +469,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				nil,
 			)
 
-			err := uc.Execute(context.Background(), tt.event)
+			err := uc.Execute(t.Context(), tt.event)
 			if tt.expectedErr != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tt.expectedErr.Error(), err.Error())

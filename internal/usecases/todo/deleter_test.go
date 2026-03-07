@@ -1,7 +1,6 @@
 package todo
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 func TestDeleterImpl_Delete(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	todoID := uuid.New()
 	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
 

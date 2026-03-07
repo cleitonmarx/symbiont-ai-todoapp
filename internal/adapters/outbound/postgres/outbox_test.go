@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -86,7 +85,7 @@ func TestOutboxRepository_CreateEvent(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewOutboxRepository(db)
-			gotErr := repo.CreateTodoEvent(context.Background(), event)
+			gotErr := repo.CreateTodoEvent(t.Context(), event)
 			if tt.err {
 				assert.Error(t, gotErr)
 			} else {
@@ -168,7 +167,7 @@ func TestOutboxRepository_CreateChatEvent(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewOutboxRepository(db)
-			gotErr := repo.CreateChatEvent(context.Background(), event)
+			gotErr := repo.CreateChatEvent(t.Context(), event)
 			if tt.err {
 				assert.Error(t, gotErr)
 			} else {
@@ -278,7 +277,7 @@ func TestOutboxRepository_FetchPendingEvents(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewOutboxRepository(db)
-			got, err := repo.FetchPendingEvents(context.Background(), tt.limit)
+			got, err := repo.FetchPendingEvents(t.Context(), tt.limit)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -345,7 +344,7 @@ func TestOutboxRepository_UpdateEvent(t *testing.T) {
 				retryCount = 2
 				lastError = "retry"
 			}
-			gotErr := repo.UpdateEvent(context.Background(), id, status, retryCount, lastError)
+			gotErr := repo.UpdateEvent(t.Context(), id, status, retryCount, lastError)
 			if tt.err {
 				assert.Error(t, gotErr)
 			} else {
@@ -392,7 +391,7 @@ func TestOutboxRepository_DeleteEvent(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewOutboxRepository(db)
-			gotErr := repo.DeleteEvent(context.Background(), id)
+			gotErr := repo.DeleteEvent(t.Context(), id)
 			if tt.err {
 				assert.Error(t, gotErr)
 			} else {

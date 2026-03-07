@@ -1,8 +1,6 @@
 package postgres
 
 import (
-	"context"
-
 	"database/sql/driver"
 	"errors"
 	"testing"
@@ -127,7 +125,7 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewChatMessageRepository(db)
-			gotErr := repo.CreateChatMessages(context.Background(), []assistant.ChatMessage{msg})
+			gotErr := repo.CreateChatMessages(t.Context(), []assistant.ChatMessage{msg})
 			assert.Equal(t, tt.err, gotErr)
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -338,7 +336,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewChatMessageRepository(db)
-			got, hasMore, gotErr := repo.ListChatMessages(context.Background(), conversationID, tt.page, tt.pageSize)
+			got, hasMore, gotErr := repo.ListChatMessages(t.Context(), conversationID, tt.page, tt.pageSize)
 			if tt.expectErr {
 				assert.Error(t, gotErr)
 			} else {
@@ -445,7 +443,7 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 			tt.expect(mock)
 
 			repo := NewChatMessageRepository(db)
-			got, hasMore, gotErr := repo.ListChatMessages(context.Background(), conversationID, tt.page, tt.pageSize, tt.options...)
+			got, hasMore, gotErr := repo.ListChatMessages(t.Context(), conversationID, tt.page, tt.pageSize, tt.options...)
 			if tt.expectErr {
 				assert.Error(t, gotErr)
 			} else {
@@ -493,7 +491,7 @@ func TestChatMessageRepository_DeleteConversationMessages(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewChatMessageRepository(db)
-			gotErr := repo.DeleteConversationMessages(context.Background(), conversationID)
+			gotErr := repo.DeleteConversationMessages(t.Context(), conversationID)
 			assert.Equal(t, tt.err, gotErr)
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})

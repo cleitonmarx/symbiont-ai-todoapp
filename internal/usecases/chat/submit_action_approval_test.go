@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -90,7 +89,7 @@ func TestSubmitActionApprovalImpl_Execute(t *testing.T) {
 			}
 
 			uc := NewSubmitActionApprovalImpl(publisher)
-			err := uc.Execute(context.Background(), tt.input)
+			err := uc.Execute(t.Context(), tt.input)
 
 			if !tt.expectErr {
 				assert.NoError(t, err)

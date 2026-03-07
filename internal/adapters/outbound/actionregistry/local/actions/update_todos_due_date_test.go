@@ -186,7 +186,7 @@ func TestUpdateTodosDueDateAction(t *testing.T) {
 			assert.Equal(t, []string{"todos[].id", "todos[].due_date"}, definition.Approval.PreviewFields)
 			assert.Equal(t, 2*time.Minute, definition.Approval.Timeout)
 
-			resp := action.Execute(context.Background(), tt.functionCall, tt.history)
+			resp := action.Execute(t.Context(), tt.functionCall, tt.history)
 			tt.validateResp(t, resp)
 		})
 	}

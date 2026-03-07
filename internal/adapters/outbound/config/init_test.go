@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,7 +10,7 @@ import (
 func TestInitVaultProvider_Initialize(t *testing.T) {
 	i := InitVaultProvider{}
 
-	ctx, err := i.Initialize(context.Background())
+	ctx, err := i.Initialize(t.Context())
 	require.Error(t, err)
 	assert.NotNil(t, ctx)
 	assert.Contains(t, err.Error(), "failed to initialize Vault provider")

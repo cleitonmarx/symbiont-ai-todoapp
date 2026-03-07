@@ -1,10 +1,10 @@
 package outbox
 
 import (
-	"context"
+	"testing"
+
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestInitRelayOutbox_Initialize(t *testing.T) {
@@ -12,7 +12,7 @@ func TestInitRelayOutbox_Initialize(t *testing.T) {
 
 	iro := InitRelay{}
 
-	ctx, err := iro.Initialize(context.Background())
+	ctx, err := iro.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 

@@ -58,7 +58,7 @@ func TestDispatcher_WaitCanceled(t *testing.T) {
 		ActionCallID:   "call-2",
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := dispatcher.Wait(ctx, key)

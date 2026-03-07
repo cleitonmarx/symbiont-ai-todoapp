@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -52,7 +51,7 @@ func TestListAvailableModelsImpl_Query(t *testing.T) {
 			uc := NewListAvailableModelsImpl(
 				assistantCatalog,
 			)
-			got, err := uc.Query(context.Background())
+			got, err := uc.Query(t.Context())
 
 			assert.Equal(t, tt.expectedErr, err)
 			assert.Equal(t, tt.expectedModels, got)

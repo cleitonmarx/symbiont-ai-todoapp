@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"database/sql"
 	"log"
 	"os"
@@ -22,7 +21,7 @@ func TestInitBoardSummaryRepository_Initialize(t *testing.T) {
 		DB: &sql.DB{},
 	}
 
-	_, err := i.Initialize(context.Background())
+	_, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	_, err = depend.Resolve[todo.BoardSummaryRepository]()
@@ -36,7 +35,7 @@ func TestInitChatMessageRepository_Initialize(t *testing.T) {
 		DB: &sql.DB{},
 	}
 
-	_, err := i.Initialize(context.Background())
+	_, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	_, err = depend.Resolve[assistant.ChatMessageRepository]()
@@ -50,7 +49,7 @@ func TestInitConversationSummaryRepository_Initialize(t *testing.T) {
 		DB: &sql.DB{},
 	}
 
-	_, err := i.Initialize(context.Background())
+	_, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	_, err = depend.Resolve[assistant.ConversationSummaryRepository]()
@@ -86,7 +85,7 @@ func TestInitDB_Initialize(t *testing.T) {
 		skipMigration: true,
 	}
 
-	_, err := dbInit.Initialize(context.Background())
+	_, err := dbInit.Initialize(t.Context())
 	assert.NoError(t, err)
 	resolveDB, err := depend.Resolve[*sql.DB]()
 	assert.NoError(t, err)
@@ -160,7 +159,7 @@ func TestInitTodoRepository_Initialize(t *testing.T) {
 		DB: &sql.DB{},
 	}
 
-	_, err := i.Initialize(context.Background())
+	_, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	_, err = depend.Resolve[todo.Repository]()
@@ -174,7 +173,7 @@ func TestInitUnitOfWork_Initialize(t *testing.T) {
 		DB: &sql.DB{},
 	}
 
-	_, err := i.Initialize(context.Background())
+	_, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	_, err = depend.Resolve[transaction.UnitOfWork]()

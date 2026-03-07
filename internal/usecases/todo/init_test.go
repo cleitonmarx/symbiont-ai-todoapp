@@ -1,7 +1,6 @@
 package todo
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
@@ -14,7 +13,7 @@ func TestInitCreateTodo_Initialize(t *testing.T) {
 
 	ict := InitCreateTodo{}
 
-	ctx, err := ict.Initialize(context.Background())
+	ctx, err := ict.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
@@ -28,7 +27,7 @@ func TestInitDeleteTodo_Initialize(t *testing.T) {
 
 	idt := InitDeleteTodo{}
 
-	ctx, err := idt.Initialize(context.Background())
+	ctx, err := idt.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
@@ -42,7 +41,7 @@ func TestInitListTodos_Initialize(t *testing.T) {
 
 	ilt := InitListTodos{}
 
-	ctx, err := ilt.Initialize(context.Background())
+	ctx, err := ilt.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
@@ -56,7 +55,7 @@ func TestInitCreator_Initialize(t *testing.T) {
 
 	ict := InitCreator{}
 
-	ctx, err := ict.Initialize(context.Background())
+	ctx, err := ict.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
@@ -88,7 +87,7 @@ func TestInitUpdater_Initialize(t *testing.T) {
 
 	iut := InitUpdater{}
 
-	ctx, err := iut.Initialize(context.Background())
+	ctx, err := iut.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
@@ -102,7 +101,7 @@ func TestInitUpdateTodo_Initialize(t *testing.T) {
 
 	iut := InitUpdateTodo{}
 
-	ctx, err := iut.Initialize(context.Background())
+	ctx, err := iut.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 

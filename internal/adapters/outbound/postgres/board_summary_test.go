@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"testing"
@@ -111,7 +110,7 @@ func TestBoardSummaryRepository_StoreSummary(t *testing.T) {
 			tt.setExpectations(mock)
 
 			repo := NewBoardSummaryRepository(db)
-			gotErr := repo.StoreSummary(context.Background(), tt.summary)
+			gotErr := repo.StoreSummary(t.Context(), tt.summary)
 
 			if tt.shouldError {
 				assert.Error(t, gotErr)
@@ -227,7 +226,7 @@ func TestBoardSummaryRepository_GetLatestSummary(t *testing.T) {
 			tt.setExpectations(mock)
 
 			repo := NewBoardSummaryRepository(db)
-			got, found, gotErr := repo.GetLatestSummary(context.Background())
+			got, found, gotErr := repo.GetLatestSummary(t.Context())
 
 			if tt.shouldError {
 				assert.Error(t, gotErr)
@@ -305,7 +304,7 @@ func TestBoardSummaryRepository_CalculateSummaryContent(t *testing.T) {
 			tt.setExpectations(mock)
 
 			repo := NewBoardSummaryRepository(db)
-			got, gotErr := repo.CalculateSummaryContent(context.Background())
+			got, gotErr := repo.CalculateSummaryContent(t.Context())
 
 			if tt.shouldError {
 				assert.Error(t, gotErr)

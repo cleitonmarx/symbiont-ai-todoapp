@@ -95,7 +95,7 @@ func TestUnitOfWork_Execute(t *testing.T) {
 			tt.setupMock(mock)
 
 			uow := NewUnitOfWork(db)
-			err = uow.Execute(context.Background(), tt.fn)
+			err = uow.Execute(t.Context(), tt.fn)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -246,7 +246,7 @@ func TestUnitOfWork_TransactionIsolation(t *testing.T) {
 	mock.ExpectCommit()
 
 	uow := NewUnitOfWork(db)
-	err = uow.Execute(context.Background(), func(ctx context.Context, scope transaction.Scope) error {
+	err = uow.Execute(t.Context(), func(ctx context.Context, scope transaction.Scope) error {
 		// Delete todo
 		if err := uow.Todo().DeleteTodo(ctx, todoID); err != nil {
 			return err

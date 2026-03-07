@@ -164,7 +164,7 @@ func TestUpdateTodosAction(t *testing.T) {
 			assert.Equal(t, []string{"todos[].id", "todos[].title", "todos[].status"}, definition.Approval.PreviewFields)
 			assert.Equal(t, 2*time.Minute, definition.Approval.Timeout)
 
-			resp := action.Execute(context.Background(), tt.functionCall, []assistant.Message{})
+			resp := action.Execute(t.Context(), tt.functionCall, []assistant.Message{})
 			tt.validateResp(t, resp)
 		})
 	}

@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
@@ -180,7 +179,7 @@ func TestListAllTools(t *testing.T) {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			got, err := listAllTools(context.Background(), tt.session)
+			got, err := listAllTools(t.Context(), tt.session)
 			tt.assert(t, got, err)
 		})
 	}

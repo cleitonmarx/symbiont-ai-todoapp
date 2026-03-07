@@ -1,7 +1,6 @@
 package actions
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
@@ -145,7 +144,7 @@ func TestSetUIFiltersAction(t *testing.T) {
 			assert.NotEmpty(t, definition.Description)
 			assert.NotEmpty(t, definition.Input)
 
-			resp := action.Execute(context.Background(), tt.functionCall, []assistant.Message{})
+			resp := action.Execute(t.Context(), tt.functionCall, []assistant.Message{})
 			tt.validateResp(t, resp)
 		})
 	}

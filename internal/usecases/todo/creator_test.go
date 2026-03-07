@@ -1,7 +1,6 @@
 package todo
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -166,7 +165,7 @@ func TestCreatorImpl_Create(t *testing.T) {
 			cti := NewCreatorImpl(timeProvider, semanticEncoder, "model-name")
 			cti.createUUID = fixedUUID
 
-			got, gotErr := cti.Create(context.Background(), scope, tt.title, tt.dueDate)
+			got, gotErr := cti.Create(t.Context(), scope, tt.title, tt.dueDate)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			assert.Equal(t, tt.expectedTodo, got)
 		})

@@ -259,7 +259,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 			}
 
 			relay := NewRelayImpl(uow, publisher, nil)
-			gotErr := relay.Execute(context.Background())
+			gotErr := relay.Execute(t.Context())
 
 			assert.Equal(t, tt.expectedErr, gotErr)
 		})

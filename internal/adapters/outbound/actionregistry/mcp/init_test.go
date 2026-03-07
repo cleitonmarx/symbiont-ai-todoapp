@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"context"
 	"io"
 	"log"
 	"net/http"
@@ -24,7 +23,7 @@ func TestInitMCPActionRegistry_Initialize(t *testing.T) {
 		RequestTimeout: 50 * time.Millisecond,
 	}
 
-	ctx, err := i.Initialize(context.Background())
+	ctx, err := i.Initialize(t.Context())
 	require.Error(t, err)
 	assert.NotNil(t, ctx)
 	assert.Contains(t, err.Error(), "failed to initialize mcp actions")

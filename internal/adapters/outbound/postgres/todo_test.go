@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -79,7 +78,7 @@ func TestTodoRepository_CreateTodo(t *testing.T) {
 			tt.setExpectations(mock)
 
 			repo := NewTodoRepository(db)
-			gotErr := repo.CreateTodo(context.Background(), tt.td)
+			gotErr := repo.CreateTodo(t.Context(), tt.td)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -157,7 +156,7 @@ func TestTodoRepository_GetTodo(t *testing.T) {
 			tt.setExpectations(mock)
 
 			repo := NewTodoRepository(db)
-			got, gotFound, gotErr := repo.GetTodo(context.Background(), tt.id)
+			got, gotFound, gotErr := repo.GetTodo(t.Context(), tt.id)
 			if tt.expectedErr {
 				assert.Error(t, gotErr)
 			} else {
@@ -233,7 +232,7 @@ func TestTodoRepository_UpdateTodo(t *testing.T) {
 			tt.setExpectations(mock)
 
 			repo := NewTodoRepository(db)
-			gotErr := repo.UpdateTodo(context.Background(), tt.td)
+			gotErr := repo.UpdateTodo(t.Context(), tt.td)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -609,7 +608,7 @@ func TestTodoRepository_ListTodos(t *testing.T) {
 			tt.setExpectations(mock)
 
 			repo := NewTodoRepository(db)
-			got, hasMore, gotErr := repo.ListTodos(context.Background(), tt.page, tt.pageSize, tt.opts...)
+			got, hasMore, gotErr := repo.ListTodos(t.Context(), tt.page, tt.pageSize, tt.opts...)
 			if tt.expectedErr {
 				assert.Error(t, gotErr)
 			} else {
@@ -658,7 +657,7 @@ func TestTodoRepository_DeleteTodo(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewTodoRepository(db)
-			gotErr := repo.DeleteTodo(context.Background(), id)
+			gotErr := repo.DeleteTodo(t.Context(), id)
 
 			if tt.err {
 				assert.Error(t, gotErr)

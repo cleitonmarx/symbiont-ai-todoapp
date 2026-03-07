@@ -1,7 +1,6 @@
 package skillregistry
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -112,7 +111,7 @@ func TestRegistry_RankSkills(t *testing.T) {
 				embeddedSkills: tt.embedded,
 			}
 
-			got := registry.rankSkills(context.Background(), tt.currentInput, tt.recentInputs, tt.summary, tt.minScore, true)
+			got := registry.rankSkills(t.Context(), tt.currentInput, tt.recentInputs, tt.summary, tt.minScore, true)
 			require.Len(t, got, len(tt.wantNames))
 			for i, want := range tt.wantNames {
 				assert.Equal(t, want, got[i].definition.Name)

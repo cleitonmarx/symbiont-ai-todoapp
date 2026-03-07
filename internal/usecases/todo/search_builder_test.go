@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTodoSearchBuilder_Build(t *testing.T) {
+func TestSearchBuilder_Build(t *testing.T) {
 	t.Parallel()
 
 	dueAfter := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
@@ -41,7 +41,7 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 		searches   []searchInput
 		setupMocks func(t *testing.T, semanticEncoder *semantic.MockEncoder)
 		wantErr    string
-		assertRes  func(t *testing.T, semanticEncoder *semantic.MockEncoder, res TodoSearchBuildResult)
+		assertRes  func(t *testing.T, semanticEncoder *semantic.MockEncoder, res SearchBuildResult)
 	}
 
 	tests := map[string]testCase{
@@ -53,7 +53,7 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 			searches: []searchInput{
 				{query: &searchGroceries, searchType: common.Ptr(SearchType_Title)},
 			},
-			assertRes: func(t *testing.T, _ *semantic.MockEncoder, res TodoSearchBuildResult) {
+			assertRes: func(t *testing.T, _ *semantic.MockEncoder, res SearchBuildResult) {
 				assert.Equal(t, 0, res.EmbeddingTotalTokens)
 				params := domain.ListParams{}
 				for _, opt := range res.Options {
@@ -91,7 +91,7 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 					}, nil).
 					Once()
 			},
-			assertRes: func(t *testing.T, _ *semantic.MockEncoder, res TodoSearchBuildResult) {
+			assertRes: func(t *testing.T, _ *semantic.MockEncoder, res SearchBuildResult) {
 				assert.Equal(t, 17, res.EmbeddingTotalTokens)
 				params := domain.ListParams{}
 				for _, opt := range res.Options {
@@ -105,7 +105,7 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 			searches: []searchInput{
 				{query: &searchBlank, searchType: common.Ptr(SearchType_Similarity)},
 			},
-			assertRes: func(t *testing.T, semanticEncoder *semantic.MockEncoder, res TodoSearchBuildResult) {
+			assertRes: func(t *testing.T, semanticEncoder *semantic.MockEncoder, res SearchBuildResult) {
 				assert.Equal(t, 0, res.EmbeddingTotalTokens)
 				semanticEncoder.AssertNotCalled(t, "VectorizeQuery", mock.Anything, "embedding-model", mock.Anything)
 			},
@@ -164,7 +164,7 @@ func TestTodoSearchBuilder_Build(t *testing.T) {
 				tt.setupMocks(t, semanticEncoder)
 			}
 
-			builder := NewTodoSearchBuilder().
+			builder := NewSearchBuilder().
 				WithStatus(tt.status).
 				WithDueDateRange(tt.dueAfter, tt.dueBefore).
 				WithSortBy(tt.sortBy)

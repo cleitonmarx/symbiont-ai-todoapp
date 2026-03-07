@@ -21,7 +21,7 @@ func TestListImpl_Query(t *testing.T) {
 		setExpectations func(repo *domain.MockRepository, semanticEncoder *semantic.MockEncoder)
 		page            int
 		pageSize        int
-		queryParams     []ListTodoOptions
+		queryParams     []ListOptions
 		expectedTodos   []domain.Todo
 		expectedHasMore bool
 		expectedErr     error
@@ -45,7 +45,7 @@ func TestListImpl_Query(t *testing.T) {
 		"success-with-status-filter": {
 			page:     1,
 			pageSize: 10,
-			queryParams: []ListTodoOptions{
+			queryParams: []ListOptions{
 				WithStatus(domain.Status_DONE),
 			},
 			setExpectations: func(repo *domain.MockRepository, semanticEncoder *semantic.MockEncoder) {
@@ -70,7 +70,7 @@ func TestListImpl_Query(t *testing.T) {
 		"success-search-similarity-filters": {
 			page:     2,
 			pageSize: 5,
-			queryParams: []ListTodoOptions{
+			queryParams: []ListOptions{
 				WithSearchQuery("meeting"),
 				WithSearchType(SearchType_Similarity),
 			},
@@ -96,7 +96,7 @@ func TestListImpl_Query(t *testing.T) {
 		"success-search-title-filter": {
 			page:     1,
 			pageSize: 5,
-			queryParams: []ListTodoOptions{
+			queryParams: []ListOptions{
 				WithSearchQuery("report"),
 				WithSearchType(SearchType_Title),
 			},
@@ -119,7 +119,7 @@ func TestListImpl_Query(t *testing.T) {
 		"success-with-due-date-range-filter": {
 			page:     1,
 			pageSize: 10,
-			queryParams: []ListTodoOptions{
+			queryParams: []ListOptions{
 				WithDueDateRange(
 					time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 					time.Date(2024, 12, 31, 23, 59, 59, 0, time.UTC),
@@ -144,7 +144,7 @@ func TestListImpl_Query(t *testing.T) {
 		"sort-by-created-at-desc": {
 			page:     1,
 			pageSize: 10,
-			queryParams: []ListTodoOptions{
+			queryParams: []ListOptions{
 				WithSortBy("createdAtDesc"),
 			},
 			setExpectations: func(repo *domain.MockRepository, semanticEncoder *semantic.MockEncoder) {
@@ -166,7 +166,7 @@ func TestListImpl_Query(t *testing.T) {
 		"error-when-due-range-is-invalid": {
 			page:     1,
 			pageSize: 10,
-			queryParams: []ListTodoOptions{
+			queryParams: []ListOptions{
 				WithDueDateRange(
 					time.Date(2026, 2, 28, 0, 0, 0, 0, time.UTC),
 					time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
@@ -181,7 +181,7 @@ func TestListImpl_Query(t *testing.T) {
 		"error-when-search-type-is-not-provided": {
 			page:     1,
 			pageSize: 5,
-			queryParams: []ListTodoOptions{
+			queryParams: []ListOptions{
 				WithSearchQuery("meeting"),
 			},
 			setExpectations: func(repo *domain.MockRepository, semanticEncoder *semantic.MockEncoder) {
@@ -212,7 +212,7 @@ func TestListImpl_Query(t *testing.T) {
 
 			lti := NewListImpl(repo, semanticEncoder, "test-model")
 
-			got, hasMore, gotErr := lti.Query(context.Background(), tt.page, tt.pageSize, tt.queryParams...)
+			got, hasMore, gotErr := lti.Query(t.Context(), tt.page, tt.pageSize, tt.queryParams...)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			assert.Equal(t, tt.expectedTodos, got)
 			assert.Equal(t, tt.expectedHasMore, hasMore)

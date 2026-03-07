@@ -21,8 +21,8 @@ const (
 	SearchType_Similarity SearchType = "similarity"
 )
 
-// ListTodoParams holds the parameters for listing todos.
-type ListTodoParams struct {
+// ListParams holds the parameters for listing todos.
+type ListParams struct {
 	Status     *domain.Status
 	Search     *string
 	SearchType *SearchType
@@ -31,26 +31,26 @@ type ListTodoParams struct {
 	SortBy     *string
 }
 
-// ListTodoOptions defines a function type for specifying options when listing todos.
-type ListTodoOptions func(*ListTodoParams)
+// ListOptions defines a function type for specifying options when listing todos.
+type ListOptions func(*ListParams)
 
-// WithStatus creates a ListTodoOptions to filter todos by status.
-func WithStatus(status domain.Status) ListTodoOptions {
-	return func(params *ListTodoParams) {
+// WithStatus creates a ListOptions to filter todos by status.
+func WithStatus(status domain.Status) ListOptions {
+	return func(params *ListParams) {
 		params.Status = &status
 	}
 }
 
-// WithSearchQuery creates a ListTodoOptions to filter todos by a search query.
-func WithSearchQuery(query string) ListTodoOptions {
-	return func(params *ListTodoParams) {
+// WithSearchQuery creates a ListOptions to filter todos by a search query.
+func WithSearchQuery(query string) ListOptions {
+	return func(params *ListParams) {
 		params.Search = &query
 	}
 }
 
-// WithSearchType creates a ListTodoOptions to specify the type of search (e.g., title, similarity).
-func WithSearchType(searchType SearchType) ListTodoOptions {
-	return func(params *ListTodoParams) {
+// WithSearchType creates a ListOptions to specify the type of search (e.g., title, similarity).
+func WithSearchType(searchType SearchType) ListOptions {
+	return func(params *ListParams) {
 		switch strings.ToLower(string(searchType)) {
 		case string(SearchType_Title):
 			searchType = SearchType_Title
@@ -61,24 +61,24 @@ func WithSearchType(searchType SearchType) ListTodoOptions {
 	}
 }
 
-// WithDueDateRange creates a ListTodoOptions to filter todos by due date range.
-func WithDueDateRange(dueAfter, dueBefore time.Time) ListTodoOptions {
-	return func(params *ListTodoParams) {
+// WithDueDateRange creates a ListOptions to filter todos by due date range.
+func WithDueDateRange(dueAfter, dueBefore time.Time) ListOptions {
+	return func(params *ListParams) {
 		params.DueAfter = &dueAfter
 		params.DueBefore = &dueBefore
 	}
 }
 
-// WithSortBy creates a ListTodoOptions to specify sorting criteria.
-func WithSortBy(sortBy string) ListTodoOptions {
-	return func(params *ListTodoParams) {
+// WithSortBy creates a ListOptions to specify sorting criteria.
+func WithSortBy(sortBy string) ListOptions {
+	return func(params *ListParams) {
 		params.SortBy = &sortBy
 	}
 }
 
 // List defines the interface for the list use case.
 type List interface {
-	Query(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions) ([]domain.Todo, bool, error)
+	Query(ctx context.Context, page int, pageSize int, opts ...ListOptions) ([]domain.Todo, bool, error)
 }
 
 // ListImpl is the implementation of the list use case.
@@ -98,23 +98,23 @@ func NewListImpl(todoRepo domain.Repository, semanticEncoder semantic.Encoder, e
 }
 
 // Query retrieves a list of todo items with pagination support.
-func (lti ListImpl) Query(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions) ([]domain.Todo, bool, error) {
-	spanCtx, span := telemetry.Start(ctx)
+func (lti ListImpl) Query(ctx context.Context, page int, pageSize int, opts ...ListOptions) ([]domain.Todo, bool, error) {
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
-	params := ListTodoParams{}
+	params := ListParams{}
 	for _, opt := range opts {
 		opt(&params)
 	}
 
-	builder := NewTodoSearchBuilder().
+	builder := NewSearchBuilder().
 		WithStatus(params.Status).
 		WithDueDateRange(params.DueAfter, params.DueBefore).
 		WithSortBy(params.SortBy).
 		WithSearch(params.Search, params.SearchType)
 
 	buildResult, err := builder.Build(spanCtx, lti.semanticEncoder, lti.embeddingModel)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 	if buildResult.EmbeddingTotalTokens > 0 {
@@ -122,7 +122,7 @@ func (lti ListImpl) Query(ctx context.Context, page int, pageSize int, opts ...L
 	}
 
 	todos, hasMore, err := lti.todoRepo.ListTodos(spanCtx, page, pageSize, buildResult.Options...)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 	return todos, hasMore, nil

@@ -420,7 +420,7 @@ func (_m *MockList) EXPECT() *MockList_Expecter {
 }
 
 // Query provides a mock function for the type MockList
-func (_mock *MockList) Query(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions) ([]todo.Todo, bool, error) {
+func (_mock *MockList) Query(ctx context.Context, page int, pageSize int, opts ...ListOptions) ([]todo.Todo, bool, error) {
 	var tmpRet mock.Arguments
 	if len(opts) > 0 {
 		tmpRet = _mock.Called(ctx, page, pageSize, opts)
@@ -436,22 +436,22 @@ func (_mock *MockList) Query(ctx context.Context, page int, pageSize int, opts .
 	var r0 []todo.Todo
 	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...ListTodoOptions) ([]todo.Todo, bool, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...ListOptions) ([]todo.Todo, bool, error)); ok {
 		return returnFunc(ctx, page, pageSize, opts...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...ListTodoOptions) []todo.Todo); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int, ...ListOptions) []todo.Todo); ok {
 		r0 = returnFunc(ctx, page, pageSize, opts...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]todo.Todo)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, int, int, ...ListTodoOptions) bool); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int, int, ...ListOptions) bool); ok {
 		r1 = returnFunc(ctx, page, pageSize, opts...)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, int, int, ...ListTodoOptions) error); ok {
+	if returnFunc, ok := ret.Get(2).(func(context.Context, int, int, ...ListOptions) error); ok {
 		r2 = returnFunc(ctx, page, pageSize, opts...)
 	} else {
 		r2 = ret.Error(2)
@@ -474,7 +474,7 @@ func (_e *MockList_Expecter) Query(ctx interface{}, page interface{}, pageSize i
 		append([]interface{}{ctx, page, pageSize}, opts...)...)}
 }
 
-func (_c *MockList_Query_Call) Run(run func(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions)) *MockList_Query_Call {
+func (_c *MockList_Query_Call) Run(run func(ctx context.Context, page int, pageSize int, opts ...ListOptions)) *MockList_Query_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -488,10 +488,10 @@ func (_c *MockList_Query_Call) Run(run func(ctx context.Context, page int, pageS
 		if args[2] != nil {
 			arg2 = args[2].(int)
 		}
-		var arg3 []ListTodoOptions
-		var variadicArgs []ListTodoOptions
+		var arg3 []ListOptions
+		var variadicArgs []ListOptions
 		if len(args) > 3 {
-			variadicArgs = args[3].([]ListTodoOptions)
+			variadicArgs = args[3].([]ListOptions)
 		}
 		arg3 = variadicArgs
 		run(
@@ -509,7 +509,7 @@ func (_c *MockList_Query_Call) Return(todos []todo.Todo, b bool, err error) *Moc
 	return _c
 }
 
-func (_c *MockList_Query_Call) RunAndReturn(run func(ctx context.Context, page int, pageSize int, opts ...ListTodoOptions) ([]todo.Todo, bool, error)) *MockList_Query_Call {
+func (_c *MockList_Query_Call) RunAndReturn(run func(ctx context.Context, page int, pageSize int, opts ...ListOptions) ([]todo.Todo, bool, error)) *MockList_Query_Call {
 	_c.Call.Return(run)
 	return _c
 }

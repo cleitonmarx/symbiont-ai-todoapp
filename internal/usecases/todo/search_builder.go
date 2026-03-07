@@ -11,41 +11,42 @@ import (
 	domain "github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 )
 
-// TodoSearchBuildResult is the output of TodoSearchBuilder.Build.
-type TodoSearchBuildResult struct {
+// SearchBuildResult is the output of SearchBuilder.Build.
+type SearchBuildResult struct {
 	Options              []domain.ListOption
 	EmbeddingTotalTokens int
 }
 
-type todoSearchClause struct {
+// searchClause represents a single search query and its type (e.g., title substring or similarity).
+type searchClause struct {
 	query      *string
 	searchType *SearchType
 }
 
-// TodoSearchBuilder builds todo list options and centralizes validation plus
+// SearchBuilder builds todo list options and centralizes validation plus
 // optional similarity embedding generation for usecases.
-type TodoSearchBuilder struct {
+type SearchBuilder struct {
 	status       *domain.Status
 	dueAfter     *time.Time
 	dueBefore    *time.Time
 	sortBy       *string
-	searchClause []todoSearchClause
+	searchClause []searchClause
 }
 
-// NewTodoSearchBuilder creates a new TodoSearchBuilder.
-func NewTodoSearchBuilder() *TodoSearchBuilder {
-	return &TodoSearchBuilder{}
+// NewSearchBuilder creates a new SearchBuilder.
+func NewSearchBuilder() *SearchBuilder {
+	return &SearchBuilder{}
 }
 
 // WithStatus sets an optional status filter.
-func (b *TodoSearchBuilder) WithStatus(status *domain.Status) *TodoSearchBuilder {
+func (b *SearchBuilder) WithStatus(status *domain.Status) *SearchBuilder {
 	b.status = status
 	return b
 }
 
 // WithSearch sets an optional search query and search type.
-func (b *TodoSearchBuilder) WithSearch(query *string, searchType *SearchType) *TodoSearchBuilder {
-	b.searchClause = append(b.searchClause, todoSearchClause{
+func (b *SearchBuilder) WithSearch(query *string, searchType *SearchType) *SearchBuilder {
+	b.searchClause = append(b.searchClause, searchClause{
 		query:      query,
 		searchType: searchType,
 	})
@@ -53,8 +54,8 @@ func (b *TodoSearchBuilder) WithSearch(query *string, searchType *SearchType) *T
 }
 
 // WithTitleContains sets the search query for a title substring match.
-func (b *TodoSearchBuilder) WithTitleContains(query *string) *TodoSearchBuilder {
-	b.searchClause = append(b.searchClause, todoSearchClause{
+func (b *SearchBuilder) WithTitleContains(query *string) *SearchBuilder {
+	b.searchClause = append(b.searchClause, searchClause{
 		query:      query,
 		searchType: common.Ptr(SearchType_Title),
 	})
@@ -62,8 +63,8 @@ func (b *TodoSearchBuilder) WithTitleContains(query *string) *TodoSearchBuilder 
 }
 
 // WithSimilaritySearch sets the search query for a similarity search.
-func (b *TodoSearchBuilder) WithSimilaritySearch(query *string) *TodoSearchBuilder {
-	b.searchClause = append(b.searchClause, todoSearchClause{
+func (b *SearchBuilder) WithSimilaritySearch(query *string) *SearchBuilder {
+	b.searchClause = append(b.searchClause, searchClause{
 		query:      query,
 		searchType: common.Ptr(SearchType_Similarity),
 	})
@@ -71,20 +72,20 @@ func (b *TodoSearchBuilder) WithSimilaritySearch(query *string) *TodoSearchBuild
 }
 
 // WithDueDateRange sets an optional due-date range filter.
-func (b *TodoSearchBuilder) WithDueDateRange(dueAfter, dueBefore *time.Time) *TodoSearchBuilder {
+func (b *SearchBuilder) WithDueDateRange(dueAfter, dueBefore *time.Time) *SearchBuilder {
 	b.dueAfter = dueAfter
 	b.dueBefore = dueBefore
 	return b
 }
 
 // WithSortBy sets an optional sort filter.
-func (b *TodoSearchBuilder) WithSortBy(sortBy *string) *TodoSearchBuilder {
+func (b *SearchBuilder) WithSortBy(sortBy *string) *SearchBuilder {
 	b.sortBy = sortBy
 	return b
 }
 
 // Validate checks that all configured filters and search options are consistent.
-func (b *TodoSearchBuilder) Validate() error {
+func (b *SearchBuilder) Validate() error {
 	if (b.dueAfter == nil) != (b.dueBefore == nil) {
 		return core.NewValidationErr("due_after and due_before must be provided together")
 	}
@@ -136,9 +137,9 @@ func (b *TodoSearchBuilder) Validate() error {
 }
 
 // Build validates configured filters and returns repository options.
-func (b *TodoSearchBuilder) Build(ctx context.Context, semanticEncoder semantic.Encoder, embeddingModel string) (TodoSearchBuildResult, error) {
+func (b *SearchBuilder) Build(ctx context.Context, semanticEncoder semantic.Encoder, embeddingModel string) (SearchBuildResult, error) {
 	if err := b.Validate(); err != nil {
-		return TodoSearchBuildResult{}, err
+		return SearchBuildResult{}, err
 	}
 
 	opts := []domain.ListOption{}
@@ -177,22 +178,22 @@ func (b *TodoSearchBuilder) Build(ctx context.Context, semanticEncoder semantic.
 		opts = append(opts, domain.WithTitleContains(*titleSearch))
 	}
 
-	result := TodoSearchBuildResult{Options: opts}
+	result := SearchBuildResult{Options: opts}
 
 	if similarityQuery == "" {
 		return result, nil
 	}
 
 	if semanticEncoder == nil {
-		return TodoSearchBuildResult{}, core.NewValidationErr("semantic encoder is required for similarity search")
+		return SearchBuildResult{}, core.NewValidationErr("semantic encoder is required for similarity search")
 	}
 	if strings.TrimSpace(embeddingModel) == "" {
-		return TodoSearchBuildResult{}, core.NewValidationErr("embedding model cannot be empty for similarity search")
+		return SearchBuildResult{}, core.NewValidationErr("embedding model cannot be empty for similarity search")
 	}
 
 	resp, err := semanticEncoder.VectorizeQuery(ctx, embeddingModel, similarityQuery)
 	if err != nil {
-		return TodoSearchBuildResult{}, err
+		return SearchBuildResult{}, err
 	}
 	result.Options = append(result.Options, domain.WithEmbedding(resp.Vector))
 	result.EmbeddingTotalTokens = resp.TotalTokens

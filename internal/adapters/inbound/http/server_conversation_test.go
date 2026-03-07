@@ -2,9 +2,10 @@ package http
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -60,6 +61,7 @@ func TestTodoAppServer_DeleteConversation(t *testing.T) {
 
 			server := &TodoAppServer{
 				DeleteConversationUseCase: mockDeleteConversation,
+				Logger:                    log.New(io.Discard, "", 0),
 			}
 
 			req := httptest.NewRequest(http.MethodDelete, "/api/v1/chat/messages", nil)
@@ -93,7 +95,7 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 		requestBody          []byte
 		setExpectations      func(uc *chat.MockUpdateConversation)
 		expectedStatusCode   int
-		expectedResponseBody interface{}
+		expectedResponseBody any
 		expectedErr          bool
 	}{
 		"success-update-title": {
@@ -170,6 +172,7 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 
 			server := TodoAppServer{
 				UpdateConversationUseCase: mockUC,
+				Logger:                    log.New(io.Discard, "", 0),
 			}
 
 			req := httptest.NewRequest(http.MethodPatch, "/api/conversations/"+tt.conversationID.String(), bytes.NewBuffer(tt.requestBody))
@@ -287,10 +290,11 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 
 			server := TodoAppServer{
 				ListConversationsUseCase: mockUC,
+				Logger:                   log.New(io.Discard, "", 0),
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/api/conversations", nil)
-			req = req.WithContext(context.Background())
+			req = req.WithContext(t.Context())
 
 			params := gen.ListConversationsParams{
 				Page:     tt.page,

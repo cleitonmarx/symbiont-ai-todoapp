@@ -6,7 +6,9 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // SubmitActionApproval handles one human approval decision for an assistant action call.
@@ -28,7 +30,8 @@ func (api TodoAppServer) SubmitActionApproval(w http.ResponseWriter, r *http.Req
 		actionName = *req.ActionName
 	}
 
-	err := api.SubmitActionApprovalUseCase.Execute(r.Context(), chat.SubmitActionApprovalInput{
+	ctx := r.Context()
+	err := api.SubmitActionApprovalUseCase.Execute(ctx, chat.SubmitActionApprovalInput{
 		ConversationID: req.ConversationId,
 		TurnID:         req.TurnId,
 		ActionCallID:   req.ActionCallId,
@@ -36,7 +39,8 @@ func (api TodoAppServer) SubmitActionApproval(w http.ResponseWriter, r *http.Req
 		Status:         assistant.ChatMessageApprovalStatus(req.Status),
 		Reason:         req.Reason,
 	})
-	if err != nil {
+	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) {
+		api.Logger.Printf("Error submitting action approval: %v", err)
 		respondError(w, toError(err))
 		return
 	}

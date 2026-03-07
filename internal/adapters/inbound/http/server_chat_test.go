@@ -167,6 +167,7 @@ func TestTodoAppServer_ListChatMessages(t *testing.T) {
 
 			server := &TodoAppServer{
 				ListChatMessagesUseCase: mockListChatMessages,
+				Logger:                  log.New(io.Discard, "", 0),
 			}
 
 			u, err := url.Parse("http://localhost/api/v1/chat/messages")

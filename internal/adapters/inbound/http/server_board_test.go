@@ -3,6 +3,8 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -108,6 +110,7 @@ func TestTodoAppServer_GetBoardSummary(t *testing.T) {
 
 			server := &TodoAppServer{
 				GetBoardSummaryUseCase: mockGetBoardSummary,
+				Logger:                 log.New(io.Discard, "", 0),
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/board/summary", nil)

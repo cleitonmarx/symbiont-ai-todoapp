@@ -226,8 +226,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
-						p := todouc.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListOptions) {
+						p := todouc.ListParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
@@ -249,8 +249,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
-						p := todouc.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListOptions) {
+						p := todouc.ListParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
@@ -273,8 +273,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
-						p := todouc.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListOptions) {
+						p := todouc.ListParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
@@ -299,8 +299,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
-						p := todouc.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListOptions) {
+						p := todouc.ListParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
@@ -318,8 +318,8 @@ func TestTodoAppServer_ListTodos(t *testing.T) {
 			setExpectations: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 10, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
-						p := todouc.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListOptions) {
+						p := todouc.ListParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}

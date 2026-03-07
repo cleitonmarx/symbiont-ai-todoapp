@@ -16,10 +16,11 @@ import (
 )
 
 // ListChatMessages lists chat messages for a conversation with pagination.
-// (GET /api/conversations/{conversation_id}/messages)
+// (GET /api/v1/conversations/{conversation_id}/messages)
 func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request, params gen.ListChatMessagesParams) {
 	messages, hasMore, err := api.ListChatMessagesUseCase.Query(r.Context(), params.ConversationId, params.Page, params.PageSize)
 	if err != nil {
+		api.Logger.Printf("Error listing chat messages: %v", err)
 		respondError(w, toError(err))
 		return
 	}
@@ -47,7 +48,7 @@ func (api TodoAppServer) ListChatMessages(w http.ResponseWriter, r *http.Request
 }
 
 // StreamChat handles streaming assistant chat responses.
-// (POST /api/chat/stream)
+// (POST /api/v1/chat/stream)
 func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 	req := gen.StreamChatJSONRequestBody{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -82,17 +83,13 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 		options = append(options, chat.WithConversationID(*req.ConversationId))
 	}
 
-	err := api.StreamChatUseCase.Execute(r.Context(), req.Message, req.Model, func(ctx context.Context, eventType assistant.EventType, data any) error {
+	ctx := r.Context()
+	err := api.StreamChatUseCase.Execute(ctx, req.Message, req.Model, func(ctx context.Context, eventType assistant.EventType, data any) error {
 		dataBytes, err := json.Marshal(data)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(w, "event: %s\n", eventType)
-		if err != nil {
-			return err
-		}
-
-		_, err = fmt.Fprintf(w, "data: %s\n\n", string(dataBytes))
+		_, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", eventType, string(dataBytes))
 		if err != nil {
 			return err
 		}
@@ -100,7 +97,7 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 		return nil
 	}, options...)
-	if telemetry.RecordErrorAndStatus(trace.SpanFromContext(r.Context()), err) &&
+	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) &&
 		!errors.Is(err, context.Canceled) {
 		api.Logger.Printf("StreamChat: error during streaming: %v", err)
 		respondError(w, toError(err))
@@ -108,10 +105,12 @@ func (api TodoAppServer) StreamChat(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListAvailableModels returns the list of available assistant models for chat.
-// (GET /api/models)
+// (GET /api/v1/models)
 func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Request) {
-	models, err := api.ListAvailableModelsUseCase.Query(r.Context())
-	if err != nil {
+	ctx := r.Context()
+	models, err := api.ListAvailableModelsUseCase.Query(ctx)
+	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) {
+		api.Logger.Printf("Error listing available models: %v", err)
 		respondError(w, toError(err))
 		return
 	}
@@ -131,9 +130,12 @@ func (api TodoAppServer) ListAvailableModels(w http.ResponseWriter, r *http.Requ
 }
 
 // ListAvailableSkills returns the list of available skills that users can select with slash commands.
+// (GET /api/v1/skills)
 func (api TodoAppServer) ListAvailableSkills(w http.ResponseWriter, r *http.Request) {
-	skills, err := api.ListAvailableSkillsUseCase.Query(r.Context())
-	if err != nil {
+	ctx := r.Context()
+	skills, err := api.ListAvailableSkillsUseCase.Query(ctx)
+	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) {
+		api.Logger.Printf("Error listing available skills: %v", err)
 		respondError(w, toError(err))
 		return
 	}

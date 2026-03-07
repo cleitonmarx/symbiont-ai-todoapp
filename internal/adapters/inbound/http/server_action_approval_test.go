@@ -2,9 +2,10 @@ package http
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,15 +17,8 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
-
-type submitActionApprovalStub struct {
-	execute func(ctx context.Context, input chat.SubmitActionApprovalInput) error
-}
-
-func (s submitActionApprovalStub) Execute(ctx context.Context, input chat.SubmitActionApprovalInput) error {
-	return s.execute(ctx, input)
-}
 
 func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 	t.Parallel()
@@ -34,7 +28,7 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 
 	tests := map[string]struct {
 		body           []byte
-		setupUsecase   func(t *testing.T) chat.SubmitActionApproval
+		setupUsecase   func(*chat.MockSubmitActionApproval)
 		expectedStatus int
 		expectedError  *gen.ErrorResp
 	}{
@@ -47,32 +41,23 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 				Status:         gen.ActionApprovalStatusAPPROVED,
 				Reason:         common.Ptr("approved"),
 			}),
-			setupUsecase: func(t *testing.T) chat.SubmitActionApproval {
-				t.Helper()
-				return submitActionApprovalStub{
-					execute: func(ctx context.Context, input chat.SubmitActionApprovalInput) error {
-						assert.Equal(t, conversationID, input.ConversationID)
-						assert.Equal(t, turnID, input.TurnID)
-						assert.Equal(t, "call-1", input.ActionCallID)
-						assert.Equal(t, "delete_todo", input.ActionName)
-						assert.Equal(t, assistant.ChatMessageApprovalStatus_Approved, input.Status)
-						assert.Equal(t, common.Ptr("approved"), input.Reason)
-						return nil
-					},
-				}
+			setupUsecase: func(m *chat.MockSubmitActionApproval) {
+				m.EXPECT().
+					Execute(mock.Anything, chat.SubmitActionApprovalInput{
+						ConversationID: conversationID,
+						TurnID:         turnID,
+						ActionCallID:   "call-1",
+						ActionName:     "delete_todo",
+						Status:         assistant.ChatMessageApprovalStatus_Approved,
+						Reason:         common.Ptr("approved"),
+					}).
+					Return(nil)
 			},
 			expectedStatus: http.StatusAccepted,
 		},
 		"invalid-json": {
 			body: []byte(`{"invalid"`),
-			setupUsecase: func(t *testing.T) chat.SubmitActionApproval {
-				t.Helper()
-				return submitActionApprovalStub{
-					execute: func(ctx context.Context, input chat.SubmitActionApprovalInput) error {
-						t.Fatal("usecase should not be called")
-						return nil
-					},
-				}
+			setupUsecase: func(m *chat.MockSubmitActionApproval) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &gen.ErrorResp{
@@ -89,13 +74,15 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 				ActionCallId:   "call-3",
 				Status:         gen.ActionApprovalStatusREJECTED,
 			}),
-			setupUsecase: func(t *testing.T) chat.SubmitActionApproval {
-				t.Helper()
-				return submitActionApprovalStub{
-					execute: func(ctx context.Context, input chat.SubmitActionApprovalInput) error {
-						return core.NewValidationErr("status must be APPROVED or REJECTED")
-					},
-				}
+			setupUsecase: func(m *chat.MockSubmitActionApproval) {
+				m.EXPECT().
+					Execute(mock.Anything, chat.SubmitActionApprovalInput{
+						ConversationID: conversationID,
+						TurnID:         turnID,
+						ActionCallID:   "call-3",
+						Status:         assistant.ChatMessageApprovalStatus_Rejected,
+					}).
+					Return(core.NewValidationErr("status must be APPROVED or REJECTED"))
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &gen.ErrorResp{
@@ -112,13 +99,15 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 				ActionCallId:   "call-4",
 				Status:         gen.ActionApprovalStatusREJECTED,
 			}),
-			setupUsecase: func(t *testing.T) chat.SubmitActionApproval {
-				t.Helper()
-				return submitActionApprovalStub{
-					execute: func(ctx context.Context, input chat.SubmitActionApprovalInput) error {
-						return errors.New("pubsub down")
-					},
-				}
+			setupUsecase: func(m *chat.MockSubmitActionApproval) {
+				m.EXPECT().
+					Execute(mock.Anything, chat.SubmitActionApprovalInput{
+						ConversationID: conversationID,
+						TurnID:         turnID,
+						ActionCallID:   "call-4",
+						Status:         assistant.ChatMessageApprovalStatus_Rejected,
+					}).
+					Return(errors.New("pubsub down"))
 			},
 			expectedStatus: http.StatusInternalServerError,
 			expectedError: &gen.ErrorResp{
@@ -132,8 +121,11 @@ func TestTodoAppServer_SubmitActionApproval(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			mockUC := chat.NewMockSubmitActionApproval(t)
+			tt.setupUsecase(mockUC)
 			server := &TodoAppServer{
-				SubmitActionApprovalUseCase: tt.setupUsecase(t),
+				SubmitActionApprovalUseCase: mockUC,
+				Logger:                      log.New(io.Discard, "", 0),
 			}
 
 			req := httptest.NewRequest(

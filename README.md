@@ -8,7 +8,7 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - 🤖 **LLM Chat & Actions/Tools**: Streamed AI chat (SSE) with action/tool-calling for local and external actions/tools
 - 🧩 **Skill-Based Action/Tool Routing**: Markdown runbooks (`skills/*.md`) used to decide which actions/tools are injected each turn
 - ✅ **Action/Tools Approval Flow**: Human approval for sensitive/destructive action/tool execution (local actions and MCP tools)
-- 🔗 **MCP Gateway Integration**: MCP-based external tools via `docker/mcp-gateway` (default setup includes DuckDuckGo tools)
+- 🔗 **MCP Gateway Integration**: MCP-based external tools via `docker/mcp-gateway`
 - 💬 **Conversation Management**: Conversation history with rename/delete and auto/LLM title generation
 - 📌 **Board Summary**: AI-generated board summary from todo domain events
 - 🧠 **Conversation/Context Compression**: Conversation-aware AI summaries from chat-message events
@@ -31,7 +31,7 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - **Action Approval Dispatcher Worker** (`internal/adapters/inbound/workers/action_approval_dispatcher.go`): Consumes approval decisions from Pub/Sub and forwards them to the in-memory action approval dispatcher, using a server-scoped subscription suffix for horizontal distribution
 - **PostgreSQL** (`internal/adapters/outbound/postgres`): Primary data store with migrations and vector extension support
 - **Vault Provider** (`internal/adapters/outbound/config/vault_provider.go`): Loads secret-backed config values (`DB_USER`, `DB_PASS`)
-- **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI/DRM-compatible client for chat, summarization, embeddings, and model listing
+- **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI compatible client for chat, embeddings, and model listing
 - **Assistant Action/Tool Registries** (`internal/adapters/outbound/actionregistry`):
   - `local`: Built-in app actions (UI filters, fetch todos, and batch todo mutations)
   - `mcp`: MCP gateway-backed action/tool registry using `github.com/modelcontextprotocol/go-sdk/mcp`
@@ -234,11 +234,18 @@ Prerequisites:
 
 - Docker + Docker Compose
 - Docker Model Runner for `qwen3` and `embeddinggemma`
+- Run commands from the repo root (where `docker-compose.yml` exists), or pass `-f ./docker-compose.yml`.
 
-Run everything:
+Run default stack (monolithic app + dependencies):
 
 ```bash
-docker compose up --build
+docker compose --profile monolithic up --build
+```
+
+Check running services:
+
+```bash
+docker compose --profile monolithic ps
 ```
 
 Useful local URLs:
@@ -255,6 +262,31 @@ Stop:
 ```bash
 docker compose down
 ```
+
+Run split deployables (second profile):
+
+```bash
+docker compose --profile split up --build \
+  http-api graphql-api message-relay \
+  board-summary-generator chat-summary-generator conversation-title-generator
+```
+
+Check running split services:
+
+```bash
+docker compose --profile split ps
+```
+
+If you see `no configuration file provided: not found`, run commands from this repository root or use:
+
+```bash
+docker compose -f ./docker-compose.yml --profile split ps
+```
+
+Split profile URLs:
+
+- HTTP API + embedded UI: `http://localhost:18080`
+- GraphQL playground: `http://localhost:18085`
 
 ## Local Development
 
@@ -290,8 +322,55 @@ LLM_CHAT_SUMMARY_MODEL=qwen3:4B-F16 \
 LLM_CHAT_TITLE_MODEL=qwen3:4B-F16 \
 LLM_EMBEDDING_MODEL=embeddinggemma:300M-Q8_0 \
 MCP_GATEWAY_ENDPOINT=http://localhost:8811 \
-go run ./cmd/todoapp
+go run ./cmd/monolithic
 ```
+
+### Deployable profiles reference
+
+Docker Compose commands are documented in `Quick Start (Docker Compose)` above.
+Use this section as a deployable command/env reference.
+
+Command matrix:
+
+| Deployable | Command |
+| --- | --- |
+| Monolithic (default) | `go run ./cmd/monolithic` |
+| HTTP API (+ approval dispatcher) | `go run ./cmd/http-api` |
+| GraphQL API | `go run ./cmd/graphql-api` |
+| Message Relay worker | `go run ./cmd/message-relay` |
+| Board Summary Generator worker | `go run ./cmd/board-summary-generator` |
+| Chat Summary Generator worker | `go run ./cmd/chat-summary-generator` |
+| Conversation Title Generator worker | `go run ./cmd/conversation-title-generator` |
+
+Required env subsets per deployable:
+
+- Common (all deployables in this repo):
+  - `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_MOUNT_PATH`, `VAULT_SECRET_PATH`
+  - `DB_HOST`, `DB_PORT`, `DB_NAME`
+- HTTP API (`cmd/http-api`) additional:
+  - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (local emulator)
+  - `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID`
+  - `LLM_MODEL_HOST`, `LLM_EMBEDDING_MODEL_HOST`, `LLM_EMBEDDING_MODEL`
+  - `MCP_GATEWAY_ENDPOINT`
+  - Optional: `LLM_API_KEY`, `LLM_EMBEDDING_API_KEY`, `MCP_GATEWAY_API_KEY`, `MCP_GATEWAY_API_KEY_HEADER`, `MCP_GATEWAY_REQUEST_TIMEOUT`, `LLM_MAX_ACTION_CYCLES`
+- GraphQL API (`cmd/graphql-api`) additional:
+  - `LLM_EMBEDDING_MODEL_HOST`, `LLM_EMBEDDING_MODEL`
+  - Optional: `LLM_EMBEDDING_API_KEY`
+- Message Relay worker (`cmd/message-relay`) additional:
+  - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (local emulator)
+  - Optional: `FETCH_OUTBOX_INTERVAL`
+- Board Summary Generator (`cmd/board-summary-generator`) additional:
+  - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (local emulator), `TODO_EVENTS_SUBSCRIPTION_ID`
+  - `LLM_MODEL_HOST`, `LLM_SUMMARY_MODEL`
+  - Optional: `LLM_API_KEY`, `SUMMARY_BATCH_INTERVAL`, `SUMMARY_BATCH_SIZE`
+- Chat Summary Generator (`cmd/chat-summary-generator`) additional:
+  - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (local emulator), `CHAT_EVENTS_SUBSCRIPTION_ID`
+  - `LLM_MODEL_HOST`, `LLM_CHAT_SUMMARY_MODEL`
+  - Optional: `LLM_API_KEY`, `CHAT_SUMMARY_BATCH_INTERVAL`, `CHAT_SUMMARY_BATCH_SIZE`
+- Conversation Title Generator (`cmd/conversation-title-generator`) additional:
+  - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (local emulator), `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`
+  - `LLM_MODEL_HOST`, `LLM_CHAT_TITLE_MODEL`
+  - Optional: `LLM_API_KEY`, `CHAT_TITLE_BATCH_INTERVAL`, `CHAT_TITLE_BATCH_SIZE`
 
 ### Web app in Vite dev mode
 
@@ -319,6 +398,14 @@ Run integration tests:
 go test -tags=integration -v -timeout 30m ./tests/integration/...
 ```
 
+Run skill matrix tests:
+
+```bash
+go test -tags=skillmatrix -v -timeout 30m ./tests/skillsmatrix/...
+```
+
+Skill matrix tests require an embedding-compatible model endpoint at `http://localhost:12434` (for example Docker Model Runner with `embeddinggemma:300M-Q8_0`).
+
 ## Key Configuration
 
 Required or commonly tuned variables:
@@ -340,6 +427,8 @@ Required or commonly tuned variables:
 - `SUMMARY_BATCH_INTERVAL` (default: `3s`), `SUMMARY_BATCH_SIZE` (default: `20`)
 - `CHAT_SUMMARY_BATCH_INTERVAL` (default: `3s`), `CHAT_SUMMARY_BATCH_SIZE` (default: `50`)
 - `CHAT_TITLE_BATCH_INTERVAL` (default: `3s`), `CHAT_TITLE_BATCH_SIZE` (default: `50`)
+- `OTEL_SERVICE_NAME` (set per deployable in split profile)
+- `OTEL_RESOURCE_ATTRIBUTES` (for example `service.instance.id=<instance-id>`; if `service.instance.id` is not set, app falls back to container hostname)
 - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`
 
 ## Codegen

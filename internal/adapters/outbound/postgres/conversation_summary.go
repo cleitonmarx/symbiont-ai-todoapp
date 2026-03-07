@@ -36,7 +36,7 @@ func (r ConversationSummaryRepository) GetConversationSummary(
 	ctx context.Context,
 	conversationID uuid.UUID,
 ) (assistant.ConversationSummary, bool, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	var summary assistant.ConversationSummary
@@ -58,7 +58,7 @@ func (r ConversationSummaryRepository) GetConversationSummary(
 		return assistant.ConversationSummary{}, false, nil
 	}
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return assistant.ConversationSummary{}, false, err
 	}
 
@@ -67,7 +67,7 @@ func (r ConversationSummaryRepository) GetConversationSummary(
 
 // StoreConversationSummary stores the latest conversation summary.
 func (r ConversationSummaryRepository) StoreConversationSummary(ctx context.Context, summary assistant.ConversationSummary) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	_, err := r.sb.
@@ -85,7 +85,7 @@ func (r ConversationSummaryRepository) StoreConversationSummary(ctx context.Cont
 			last_summarized_message_id = EXCLUDED.last_summarized_message_id,
 			updated_at = EXCLUDED.updated_at`).
 		ExecContext(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
@@ -94,14 +94,14 @@ func (r ConversationSummaryRepository) StoreConversationSummary(ctx context.Cont
 
 // DeleteConversationSummary deletes the conversation summary for a conversation (used for testing).
 func (r ConversationSummaryRepository) DeleteConversationSummary(ctx context.Context, conversationID uuid.UUID) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	_, err := r.sb.
 		Delete("conversations_summary").
 		Where(squirrel.Eq{"conversation_id": conversationID}).
 		ExecContext(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 

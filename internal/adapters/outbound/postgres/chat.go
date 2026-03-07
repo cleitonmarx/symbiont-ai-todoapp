@@ -52,7 +52,7 @@ func NewChatMessageRepository(br sq.BaseRunner) ChatMessageRepository {
 
 // CreateChatMessages persists chat messages for the global conversation.
 func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages []assistant.ChatMessage) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	insertQry := r.sb.
@@ -61,11 +61,11 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 
 	for _, message := range messages {
 		actionCallsJSON, err := json.Marshal(message.ActionCalls)
-		if telemetry.RecordErrorAndStatus(span, err) {
+		if telemetry.IsErrorRecorded(span, err) {
 			return err
 		}
 		selectedSkillsJSON, err := json.Marshal(message.SelectedSkills)
-		if telemetry.RecordErrorAndStatus(span, err) {
+		if telemetry.IsErrorRecorded(span, err) {
 			return err
 		}
 
@@ -95,7 +95,7 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 	}
 
 	_, err := insertQry.ExecContext(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 	return nil
@@ -110,7 +110,7 @@ func (r ChatMessageRepository) ListChatMessages(
 	pageSize int,
 	options ...assistant.ListChatMessagesOption,
 ) ([]assistant.ChatMessage, bool, error) {
-	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
+	spanCtx, span := telemetry.StartSpan(ctx, trace.WithAttributes(
 		attribute.Int("page", page),
 		attribute.Int("page_size", pageSize),
 		attribute.String("conversation_id", conversationID.String()),
@@ -173,7 +173,7 @@ func (r ChatMessageRepository) ListChatMessages(
 	}
 
 	rows, err := qry.QueryContext(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -208,23 +208,23 @@ func (r ChatMessageRepository) ListChatMessages(
 			&m.ActionExecuted,
 			&m.CreatedAt,
 			&m.UpdatedAt,
-		); telemetry.RecordErrorAndStatus(span, err) {
+		); telemetry.IsErrorRecorded(span, err) {
 			return nil, false, err
 		}
 
 		if len(tcJSON) > 0 {
-			if err := json.Unmarshal(tcJSON, &m.ActionCalls); telemetry.RecordErrorAndStatus(span, err) {
+			if err := json.Unmarshal(tcJSON, &m.ActionCalls); telemetry.IsErrorRecorded(span, err) {
 				return nil, false, err
 			}
 		}
 		if len(selectedSkillsJSON) > 0 {
-			if err := json.Unmarshal(selectedSkillsJSON, &m.SelectedSkills); telemetry.RecordErrorAndStatus(span, err) {
+			if err := json.Unmarshal(selectedSkillsJSON, &m.SelectedSkills); telemetry.IsErrorRecorded(span, err) {
 				return nil, false, err
 			}
 		}
 		msgs = append(msgs, m)
 	}
-	if err := rows.Err(); telemetry.RecordErrorAndStatus(span, err) {
+	if err := rows.Err(); telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 
@@ -247,7 +247,7 @@ func (r ChatMessageRepository) ListChatMessages(
 
 // DeleteConversationMessages removes all messages for a specific conversation.
 func (r ChatMessageRepository) DeleteConversationMessages(ctx context.Context, conversationID uuid.UUID) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	_, err := r.sb.
@@ -255,7 +255,7 @@ func (r ChatMessageRepository) DeleteConversationMessages(ctx context.Context, c
 		Where(sq.Eq{"conversation_id": conversationID}).
 		ExecContext(spanCtx)
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 	return nil

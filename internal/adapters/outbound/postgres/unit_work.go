@@ -28,7 +28,7 @@ func NewUnitOfWork(db *sql.DB) *UnitOfWork {
 
 // Execute opens a transaction, runs fn, and commits or rolls back.
 func (u *UnitOfWork) Execute(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	tx, err := u.db.BeginTx(spanCtx, nil)

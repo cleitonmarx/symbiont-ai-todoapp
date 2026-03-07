@@ -42,7 +42,7 @@ func (r ConversationRepository) CreateConversation(
 	title string,
 	source assistant.ConversationTitleSource,
 ) (assistant.Conversation, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	now := time.Now().UTC()
@@ -54,7 +54,7 @@ func (r ConversationRepository) CreateConversation(
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	if err := input.Validate(); telemetry.RecordErrorAndStatus(span, err) {
+	if err := input.Validate(); telemetry.IsErrorRecorded(span, err) {
 		return assistant.Conversation{}, err
 	}
 
@@ -80,7 +80,7 @@ func (r ConversationRepository) CreateConversation(
 			&created.CreatedAt,
 			&created.UpdatedAt,
 		)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return assistant.Conversation{}, err
 	}
 
@@ -92,7 +92,7 @@ func (r ConversationRepository) GetConversation(
 	ctx context.Context,
 	conversationID uuid.UUID,
 ) (assistant.Conversation, bool, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	var conversation assistant.Conversation
@@ -115,7 +115,7 @@ func (r ConversationRepository) GetConversation(
 		return assistant.Conversation{}, false, nil
 	}
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return assistant.Conversation{}, false, err
 	}
 
@@ -127,7 +127,7 @@ func (r ConversationRepository) UpdateConversation(
 	ctx context.Context,
 	conversation assistant.Conversation,
 ) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	_, err := r.sb.
@@ -138,7 +138,7 @@ func (r ConversationRepository) UpdateConversation(
 		Set("updated_at", conversation.UpdatedAt).
 		Where(squirrel.Eq{"id": conversation.ID}).
 		ExecContext(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
@@ -151,7 +151,7 @@ func (r ConversationRepository) ListConversations(
 	page int,
 	pageSize int,
 ) ([]assistant.Conversation, bool, error) {
-	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
+	spanCtx, span := telemetry.StartSpan(ctx, trace.WithAttributes(
 		attribute.Int("page", page),
 		attribute.Int("page_size", pageSize),
 	))
@@ -159,12 +159,12 @@ func (r ConversationRepository) ListConversations(
 
 	if page <= 0 {
 		err := core.NewValidationErr("page must be greater than 0")
-		telemetry.RecordErrorAndStatus(span, err)
+		telemetry.IsErrorRecorded(span, err)
 		return nil, false, err
 	}
 	if pageSize <= 0 {
 		err := core.NewValidationErr("page_size must be greater than 0")
-		telemetry.RecordErrorAndStatus(span, err)
+		telemetry.IsErrorRecorded(span, err)
 		return nil, false, err
 	}
 
@@ -175,7 +175,7 @@ func (r ConversationRepository) ListConversations(
 		Limit(uint64(pageSize + 1)).
 		Offset(uint64((page - 1) * pageSize)).
 		QueryContext(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -191,13 +191,13 @@ func (r ConversationRepository) ListConversations(
 			&conversation.CreatedAt,
 			&conversation.UpdatedAt,
 		)
-		if telemetry.RecordErrorAndStatus(span, err) {
+		if telemetry.IsErrorRecorded(span, err) {
 			return nil, false, err
 		}
 
 		conversations = append(conversations, conversation)
 	}
-	if err := rows.Err(); telemetry.RecordErrorAndStatus(span, err) {
+	if err := rows.Err(); telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 
@@ -212,14 +212,14 @@ func (r ConversationRepository) ListConversations(
 
 // DeleteConversation deletes a conversation by ID.
 func (r ConversationRepository) DeleteConversation(ctx context.Context, conversationID uuid.UUID) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	_, err := r.sb.
 		Delete("conversations").
 		Where(squirrel.Eq{"id": conversationID}).
 		ExecContext(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 

@@ -45,7 +45,7 @@ func NewOutboxRepository(br squirrel.BaseRunner) Repository {
 
 // CreateTodoEvent records a new event in the outbox.
 func (op Repository) CreateTodoEvent(ctx context.Context, event outbox.TodoEvent) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	createdAt := event.CreatedAt.UTC()
@@ -55,7 +55,7 @@ func (op Repository) CreateTodoEvent(ctx context.Context, event outbox.TodoEvent
 
 	// Marshal the content to JSON
 	contentJSON, err := json.Marshal(event)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to marshal summary content: %w", err)
 	}
 
@@ -89,7 +89,7 @@ func (op Repository) CreateTodoEvent(ctx context.Context, event outbox.TodoEvent
 		Suffix("ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING").
 		ExecContext(spanCtx)
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to insert outbox event: %w", err)
 	}
 
@@ -98,13 +98,13 @@ func (op Repository) CreateTodoEvent(ctx context.Context, event outbox.TodoEvent
 
 // CreateChatEvent records a new chat message event in the outbox.
 func (op Repository) CreateChatEvent(ctx context.Context, event outbox.ChatMessageEvent) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	createdAt := time.Now().UTC()
 
 	contentJSON, err := json.Marshal(event)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to marshal chat event content: %w", err)
 	}
 
@@ -136,7 +136,7 @@ func (op Repository) CreateChatEvent(ctx context.Context, event outbox.ChatMessa
 		).
 		Suffix("ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING").
 		ExecContext(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to insert chat outbox event: %w", err)
 	}
 

@@ -23,8 +23,12 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 )
 
-// NewTodoApp creates and returns a new instance of the TodoApp application.
-func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
+// NewMonolithic builds the all-in-one deployable.
+// It hosts the HTTP server (REST API + embedded webapp static files), GraphQL API,
+// action approval dispatcher, message relay, board summary generator,
+// chat summary generator, and conversation title generator in a single process.
+// Optional initializers are executed before the default wiring initializers.
+func NewMonolithic(initializers ...symbiont.Initializer) *symbiont.App {
 	return symbiont.NewApp().
 		Initialize(initializers...).
 		Initialize(
@@ -33,6 +37,9 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&telemetry.InitHttpClient{},
 			&config.InitVaultProvider{},
 			&postgres.InitDB{},
+			&modelrunner.InitAssistantClient{},
+			&modelrunner.InitEncoderClient{},
+			&pubsub.InitClient{},
 			&postgres.InitUnitOfWork{},
 			&postgres.InitTodoRepository{},
 			&postgres.InitBoardSummaryRepository{},
@@ -41,18 +48,14 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&postgres.InitConversationSummaryRepository{},
 			&time.InitCurrentTimeProvider{},
 			&approvaldispatcher.InitDispatcher{},
-			&pubsub.InitClient{},
 			&pubsub.InitPublisher{},
-			&modelrunner.InitAssistantClient{},
 			&skillregistry.InitLocalSkillRegistry{},
-
 			&todo.InitCreator{},
 			&todo.InitDeleter{},
 			&todo.InitUpdater{},
 			&local.InitLocalActionRegistry{},
 			&mcp.InitMCPActionRegistry{},
 			&composite.InitCompositeActionRegistry{},
-
 			&todo.InitListTodos{},
 			&todo.InitCreateTodo{},
 			&todo.InitUpdateTodo{},
@@ -79,5 +82,165 @@ func NewTodoApp(initializers ...symbiont.Initializer) *symbiont.App {
 			&workers.ConversationTitleGenerator{},
 			&workers.ActionApprovalDispatcher{},
 			&workers.MessageRelay{},
+		)
+}
+
+// NewHTTPAPI builds the HTTP API deployable.
+// It hosts the HTTP server (REST API + embedded webapp static files)
+// and action approval dispatcher in one process.
+func NewHTTPAPI() *symbiont.App {
+	return symbiont.NewApp().
+		Initialize(
+			&log.InitLogger{},
+			&telemetry.InitOpenTelemetry{},
+			&telemetry.InitHttpClient{},
+			&config.InitVaultProvider{},
+			&postgres.InitDB{},
+			&modelrunner.InitAssistantClient{},
+			&modelrunner.InitEncoderClient{},
+			&pubsub.InitClient{},
+			&postgres.InitUnitOfWork{},
+			&postgres.InitTodoRepository{},
+			&postgres.InitBoardSummaryRepository{},
+			&postgres.InitChatMessageRepository{},
+			&postgres.InitConversationRepository{},
+			&postgres.InitConversationSummaryRepository{},
+			&time.InitCurrentTimeProvider{},
+			&approvaldispatcher.InitDispatcher{},
+			&pubsub.InitPublisher{},
+			&skillregistry.InitLocalSkillRegistry{},
+			&todo.InitCreator{},
+			&todo.InitDeleter{},
+			&todo.InitUpdater{},
+			&local.InitLocalActionRegistry{},
+			&mcp.InitMCPActionRegistry{},
+			&composite.InitCompositeActionRegistry{},
+			&todo.InitListTodos{},
+			&todo.InitCreateTodo{},
+			&todo.InitUpdateTodo{},
+			&todo.InitDeleteTodo{},
+			&board.InitGetBoardSummary{},
+			&chat.InitListConversations{},
+			&chat.InitUpdateConversation{},
+			&chat.InitListChatMessages{},
+			&chat.InitSubmitActionApproval{},
+			&chat.InitDeleteConversation{},
+			&chat.InitStreamChat{},
+			&chat.InitListAvailableModels{},
+			&chat.InitListAvailableSkills{},
+		).
+		Host(
+			&http.TodoAppServer{},
+			&workers.ActionApprovalDispatcher{},
+		)
+}
+
+// NewGraphQLAPI builds the GraphQL API deployable.
+// It hosts only the GraphQL server in a dedicated process.
+func NewGraphQLAPI() *symbiont.App {
+	return symbiont.NewApp().
+		Initialize(
+			&log.InitLogger{},
+			&telemetry.InitOpenTelemetry{},
+			&telemetry.InitHttpClient{},
+			&config.InitVaultProvider{},
+			&postgres.InitDB{SkipMigration: true},
+			&modelrunner.InitEncoderClient{},
+			&postgres.InitUnitOfWork{},
+			&postgres.InitTodoRepository{},
+			&time.InitCurrentTimeProvider{},
+			&todo.InitDeleter{},
+			&todo.InitUpdater{},
+			&todo.InitListTodos{},
+			&todo.InitUpdateTodo{},
+			&todo.InitDeleteTodo{},
+		).
+		Host(
+			&graphql.TodoGraphQLServer{},
+		)
+}
+
+// NewMessageRelay builds the outbox relay worker deployable.
+// It hosts the message relay worker in a dedicated process.
+func NewMessageRelay() *symbiont.App {
+	return symbiont.NewApp().
+		Initialize(
+			&log.InitLogger{},
+			&telemetry.InitOpenTelemetry{},
+			&config.InitVaultProvider{},
+			&postgres.InitDB{SkipMigration: true},
+			&pubsub.InitClient{},
+			&postgres.InitUnitOfWork{},
+			&pubsub.InitPublisher{},
+			&outbox.InitRelay{},
+		).
+		Host(
+			&workers.MessageRelay{},
+		)
+}
+
+// NewBoardSummaryGenerator builds the board summary generator deployable.
+// It hosts the board summary generator in a dedicated process.
+func NewBoardSummaryGenerator() *symbiont.App {
+	return symbiont.NewApp().
+		Initialize(
+			&log.InitLogger{},
+			&telemetry.InitOpenTelemetry{},
+			&telemetry.InitHttpClient{},
+			&config.InitVaultProvider{},
+			&postgres.InitDB{SkipMigration: true},
+			&modelrunner.InitAssistantClient{},
+			&pubsub.InitClient{},
+			&postgres.InitBoardSummaryRepository{},
+			&time.InitCurrentTimeProvider{},
+			&board.InitGenerateBoardSummary{},
+		).
+		Host(
+			&workers.BoardSummaryGenerator{},
+		)
+}
+
+// NewChatSummaryGenerator builds the chat summary generator deployable.
+// It hosts the chat summary generator in a dedicated process.
+func NewChatSummaryGenerator() *symbiont.App {
+	return symbiont.NewApp().
+		Initialize(
+			&log.InitLogger{},
+			&telemetry.InitOpenTelemetry{},
+			&telemetry.InitHttpClient{},
+			&config.InitVaultProvider{},
+			&postgres.InitDB{SkipMigration: true},
+			&modelrunner.InitAssistantClient{},
+			&pubsub.InitClient{},
+			&postgres.InitChatMessageRepository{},
+			&postgres.InitConversationSummaryRepository{},
+			&time.InitCurrentTimeProvider{},
+			&chat.InitGenerateChatSummary{},
+		).
+		Host(
+			&workers.ChatSummaryGenerator{},
+		)
+}
+
+// NewConversationTitleGenerator builds the conversation title generator deployable.
+// It hosts the conversation title generator in a dedicated process.
+func NewConversationTitleGenerator() *symbiont.App {
+	return symbiont.NewApp().
+		Initialize(
+			&log.InitLogger{},
+			&telemetry.InitOpenTelemetry{},
+			&telemetry.InitHttpClient{},
+			&config.InitVaultProvider{},
+			&postgres.InitDB{SkipMigration: true},
+			&modelrunner.InitAssistantClient{},
+			&pubsub.InitClient{},
+			&postgres.InitChatMessageRepository{},
+			&postgres.InitConversationRepository{},
+			&postgres.InitConversationSummaryRepository{},
+			&time.InitCurrentTimeProvider{},
+			&chat.InitGenerateConversationTitle{},
+		).
+		Host(
+			&workers.ConversationTitleGenerator{},
 		)
 }

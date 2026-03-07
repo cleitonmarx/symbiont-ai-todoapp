@@ -39,7 +39,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	todoApp := app.NewTodoApp(
+	todoApp := app.NewMonolithic(
 		&InitEnvVars{
 			envVars: map[string]string{
 				"VAULT_ADDR":                             "http://localhost:8200",

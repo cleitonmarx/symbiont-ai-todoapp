@@ -41,6 +41,9 @@ Rules:
 17. If the user says "related", "similar", "about", or "regarding", prefer semantic search using `search_by_similarity` (not `search_by_title`).
 18. When using semantic search for related/similar intents, prefer `sort_by=similarityAsc` unless the user explicitly asked another sort.
 19. If `due_before=<yesterday>` was used, every returned todo is overdue by definition. Don't make any date calculation, or try to define what's overdue. Just return the returned todos.
+20. Never fabricate todo titles, due dates, or statuses.
+21. For "show/list/display/find" requests, only return itemized todos from `fetch_todos` output in this turn.
+22. If `set_ui_filters` was called but `fetch_todos` has not succeeded in this turn, call `fetch_todos` before returning itemized results.
 
 
 

@@ -9,23 +9,35 @@ import (
 	"github.com/cleitonmarx/symbiont/depend"
 )
 
-// InitAssistantClient initializes the assistant client dependency.
+// InitAssistantClient initializes assistant/chat-model dependencies.
 type InitAssistantClient struct {
-	HttpClient         *http.Client `resolve:""`
-	EmbeddingModelHost string       `config:"LLM_EMBEDDING_MODEL_HOST"`
-	ModelHost          string       `config:"LLM_MODEL_HOST"`
-	APIKey             string       `config:"LLM_API_KEY" default:""`
-	EmbeddingAPIKey    string       `config:"LLM_EMBEDDING_API_KEY" default:""`
+	HttpClient *http.Client `resolve:""`
+	ModelHost  string       `config:"LLM_MODEL_HOST"`
+	APIKey     string       `config:"LLM_API_KEY" default:""`
 }
 
-// Initialize creates and registers the assistant client and related interfaces in the dependency container.
+// Initialize creates and registers assistant/model-catalog interfaces in the dependency container.
 func (i InitAssistantClient) Initialize(ctx context.Context) (context.Context, error) {
 	adapter := NewAssistantClientAdapter(
 		NewDRMAPIClient(i.ModelHost, i.APIKey, i.HttpClient),
-		NewDRMAPIClient(i.EmbeddingModelHost, i.EmbeddingAPIKey, i.HttpClient),
 	)
 	depend.Register[assistant.Assistant](adapter)
-	depend.Register[semantic.Encoder](adapter)
 	depend.Register[assistant.ModelCatalog](adapter)
+	return ctx, nil
+}
+
+// InitEncoderClient initializes embedding-model dependencies.
+type InitEncoderClient struct {
+	HttpClient         *http.Client `resolve:""`
+	EmbeddingModelHost string       `config:"LLM_EMBEDDING_MODEL_HOST"`
+	EmbeddingAPIKey    string       `config:"LLM_EMBEDDING_API_KEY" default:""`
+}
+
+// Initialize creates and registers the semantic encoder interface in the dependency container.
+func (i InitEncoderClient) Initialize(ctx context.Context) (context.Context, error) {
+	adapter := NewSemanticEncoder(
+		NewDRMAPIClient(i.EmbeddingModelHost, i.EmbeddingAPIKey, i.HttpClient),
+	)
+	depend.Register[semantic.Encoder](adapter)
 	return ctx, nil
 }

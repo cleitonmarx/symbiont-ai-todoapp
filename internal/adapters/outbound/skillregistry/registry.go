@@ -72,7 +72,7 @@ func NewSkillRegistry(ctx context.Context, skills []assistant.SkillDefinition, e
 
 // ListRelevant returns only the top relevant skills for the given turn context.
 func (r Registry) ListRelevant(ctx context.Context, query assistant.SkillQueryContext) []assistant.SkillDefinition {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	if r.encoder == nil || strings.TrimSpace(r.embeddingModel) == "" || len(r.embeddedSkills) == 0 {
@@ -133,7 +133,7 @@ func (r Registry) ListRelevant(ctx context.Context, query assistant.SkillQueryCo
 
 // ListSkills returns all registered skills in stable priority order.
 func (r Registry) ListSkills(ctx context.Context) ([]assistant.SkillDefinition, error) {
-	_, span := telemetry.Start(ctx)
+	_, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	return copySkillDefinitions(r.definitions), nil

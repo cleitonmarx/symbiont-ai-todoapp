@@ -26,18 +26,15 @@ RUN go mod download -x
 
 COPY . .
 
-##WORKDIR /build/todoapp
-
 # Copy webapp static files
 COPY --from=webapp-builder /webapp/dist ./internal/adapters/inbound/http/webappdist
 
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o todoapp ./cmd/todoapp
+ARG APP_CMD=monolithic
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o ${APP_CMD} ./cmd/${APP_CMD}
 
 ## Minimal runtime image
 FROM scratch
 
 COPY --from=go-builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY --from=go-builder /build/todoapp .
-
-CMD ["/todoapp"]
+COPY --from=go-builder /build/${APP_CMD} .

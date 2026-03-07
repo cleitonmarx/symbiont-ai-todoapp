@@ -1,8 +1,9 @@
 package graphql
 
 import (
-	"context"
 	"errors"
+	"io"
+	"log"
 	"testing"
 	"time"
 
@@ -80,9 +81,12 @@ func TestTodoGraphQLServer_UpdateTodo(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			mockUC := todouc.NewMockUpdate(t)
 			tt.setupUsecases(mockUC)
-			server := &TodoGraphQLServer{UpdateTodoUsecase: mockUC}
+			server := &TodoGraphQLServer{
+				UpdateTodoUsecase: mockUC,
+				Logger:            log.New(io.Discard, "", 0),
+			}
 
-			got, err := server.UpdateTodo(context.Background(), tt.params)
+			got, err := server.UpdateTodo(t.Context(), tt.params)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -122,9 +126,12 @@ func TestTodoGraphQLServer_DeleteTodo(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			mockUC := todouc.NewMockDelete(t)
 			tt.setupUsecases(mockUC)
-			server := &TodoGraphQLServer{DeleteTodoUsecase: mockUC}
+			server := &TodoGraphQLServer{
+				DeleteTodoUsecase: mockUC,
+				Logger:            log.New(io.Discard, "", 0),
+			}
 
-			got, err := server.DeleteTodo(context.Background(), testID)
+			got, err := server.DeleteTodo(t.Context(), testID)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {

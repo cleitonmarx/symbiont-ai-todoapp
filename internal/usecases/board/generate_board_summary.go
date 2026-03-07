@@ -54,11 +54,11 @@ func NewGenerateBoardSummaryImpl(
 
 // Execute runs the use case to generate the board summary.
 func (gs GenerateBoardSummaryImpl) Execute(ctx context.Context) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	summary, hasChanges, err := gs.generateBoardSummary(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
@@ -67,7 +67,7 @@ func (gs GenerateBoardSummaryImpl) Execute(ctx context.Context) error {
 	}
 
 	err = gs.repo.StoreSummary(spanCtx, summary)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 

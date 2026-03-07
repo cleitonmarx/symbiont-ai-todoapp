@@ -103,7 +103,7 @@ func NewStreamChatImpl(
 
 // Execute streams a chat response and persists the conversation
 func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string, onEvent assistant.EventCallback, opts ...StreamChatOption) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	if strings.TrimSpace(userMessage) == "" {
@@ -120,12 +120,12 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	}
 
 	conversation, conversationCreated, err := sc.createOrRetrieveConversation(spanCtx, params, userMessage)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
 	messagesHistory, summaryContext, err := sc.fetchChatHistory(spanCtx, conversation.ID)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
@@ -212,7 +212,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 				continue
 			}
 
-			telemetry.RecordErrorAndStatus(span, err)
+			telemetry.IsErrorRecorded(span, err)
 			if persistErr := sc.persistFailureMessages(spanCtx, err, model, &state); persistErr != nil {
 				return persistErr
 			}
@@ -220,7 +220,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		}
 	}
 
-	if err := sc.persistUserMessageIfNeeded(spanCtx, &state); telemetry.RecordErrorAndStatus(span, err) {
+	if err := sc.persistUserMessageIfNeeded(spanCtx, &state); telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
@@ -257,7 +257,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	}
 
 	err = sc.persistChatMessage(spanCtx, assistantMsg, state.conversation)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 

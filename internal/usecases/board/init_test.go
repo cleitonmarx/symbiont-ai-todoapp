@@ -1,7 +1,6 @@
 package board
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
@@ -14,7 +13,7 @@ func TestInitGenerateBoardSummary_Initialize(t *testing.T) {
 
 	igbs := InitGenerateBoardSummary{}
 
-	ctx, err := igbs.Initialize(context.Background())
+	ctx, err := igbs.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
@@ -32,7 +31,7 @@ func TestInitGetBoardSummary_Initialize(t *testing.T) {
 		SummaryRepo: summaryRepo,
 	}
 
-	ctx, err := igbs.Initialize(context.Background())
+	ctx, err := igbs.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 }

@@ -27,11 +27,11 @@ func NewListConversationsImpl(conversationRepo assistant.ConversationRepository)
 
 // Query returns a paginated list of conversations for the user ordered by last message time descending.
 func (uc *ListConversationsImpl) Query(ctx context.Context, page int, pageSize int) ([]assistant.Conversation, bool, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	conversations, hasMore, err := uc.conversationRepo.ListConversations(spanCtx, page, pageSize)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 

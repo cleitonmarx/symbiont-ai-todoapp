@@ -39,7 +39,7 @@ func NewSubmitActionApprovalImpl(publisher outbox.EventPublisher) *SubmitActionA
 
 // Execute validates and publishes one approval decision.
 func (uc SubmitActionApprovalImpl) Execute(ctx context.Context, input SubmitActionApprovalInput) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	payload := assistant.ActionApprovalDecision{

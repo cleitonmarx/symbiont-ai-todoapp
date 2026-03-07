@@ -83,7 +83,7 @@ func NewGenerateConversationTitleImpl(
 
 // Execute tries to update only auto-named conversations with an LLM-generated title.
 func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event outbox.ChatMessageEvent) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	if event.Type != outbox.EventType_CHAT_MESSAGE_SENT {
@@ -97,7 +97,7 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event outb
 	}
 
 	conversation, found, err := gct.conversationRepo.GetConversation(spanCtx, event.ConversationID)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to get conversation: %w", err)
 	}
 	if !found {
@@ -110,13 +110,13 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event outb
 	}
 
 	messages, _, err := gct.chatMessageRepo.ListChatMessages(spanCtx, event.ConversationID, 1, MAX_CHAT_MESSAGES_FOR_TITLE)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to list chat messages: %w", err)
 	}
 
 	conversationSummary := "No summary available."
 	summary, found, err := gct.conversationSummaryRepo.GetConversationSummary(spanCtx, event.ConversationID)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to get conversation summary: %w", err)
 	}
 	if found && strings.TrimSpace(summary.CurrentStateSummary) != "" {
@@ -126,7 +126,7 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event outb
 	focusedSummary := focusConversationSummaryForTitle(conversationSummary)
 
 	promptMessages, err := gct.buildPromptMessages(conversation.Title, focusedSummary, messages)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to build title prompt: %w", err)
 	}
 
@@ -138,7 +138,7 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event outb
 		Temperature: common.Ptr(CHAT_TITLE_TEMPERATURE),
 		TopP:        common.Ptr(CHAT_TITLE_TOP_P),
 	})
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to generate conversation title: %w", err)
 	}
 
@@ -165,7 +165,7 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event outb
 	}
 	conversation.UpdatedAt = gct.timeProvider.Now()
 
-	if err := gct.conversationRepo.UpdateConversation(spanCtx, conversation); telemetry.RecordErrorAndStatus(span, err) {
+	if err := gct.conversationRepo.UpdateConversation(spanCtx, conversation); telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to update conversation title: %w", err)
 	}
 

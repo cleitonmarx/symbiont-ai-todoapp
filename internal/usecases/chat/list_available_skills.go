@@ -24,11 +24,11 @@ func NewListAvailableSkillsImpl(skillRegistry assistant.SkillRegistry) *ListAvai
 
 // Query retrieves the list of available skills from the configured catalog.
 func (uc ListAvailableSkillsImpl) Query(ctx context.Context) ([]assistant.SkillDefinition, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	skills, err := uc.skillRegistry.ListSkills(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, err
 	}
 

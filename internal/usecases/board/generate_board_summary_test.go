@@ -1,7 +1,6 @@
 package board
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -155,7 +154,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 
 			gbs := NewGenerateBoardSummaryImpl(sr, tp, assist, "mistral", nil)
 
-			err := gbs.Execute(context.Background())
+			err := gbs.Execute(t.Context())
 			assert.Equal(t, tt.expectedErr, err)
 		})
 	}

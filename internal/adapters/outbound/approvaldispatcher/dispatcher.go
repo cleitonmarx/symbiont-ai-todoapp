@@ -23,7 +23,7 @@ func NewDispatcher() *Dispatcher {
 
 // Wait blocks until a decision is dispatched for the given key, or context is canceled.
 func (d *Dispatcher) Wait(ctx context.Context, key assistant.ActionApprovalKey) (assistant.ActionApprovalDecision, error) {
-	_, span := telemetry.Start(ctx)
+	_, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	ch := d.registerWaiter(key)
@@ -39,7 +39,7 @@ func (d *Dispatcher) Wait(ctx context.Context, key assistant.ActionApprovalKey) 
 
 // Dispatch sends a decision to an active waiter. Returns false when no waiter exists.
 func (d *Dispatcher) Dispatch(ctx context.Context, decision assistant.ActionApprovalDecision) bool {
-	_, span := telemetry.Start(ctx)
+	_, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	ch := d.takeWaiter(decision.Key)

@@ -23,7 +23,7 @@ func NewCompositeActionRegistry(ctx context.Context, registries ...assistant.Act
 
 // Execute iterates through the composed registries to execute the given action call, returning the first successful result.
 func (r CompositeActionRegistry) Execute(ctx context.Context, call assistant.ActionCall, conversationHistory []assistant.Message) assistant.Message {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 	for _, actionRegistry := range r.registriesActions {
 		_, found := actionRegistry.GetDefinition(call.Name)

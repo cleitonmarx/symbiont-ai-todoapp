@@ -30,14 +30,14 @@ func SpanNameFormatter(_ string, r *http.Request) string {
 	return fmt.Sprintf("%s %s", r.Method, r.URL.Path)
 }
 
-// Start a new span with the global tracer.
-func Start(ctx context.Context, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+// StartSpan starts a new span with the global tracer.
+func StartSpan(ctx context.Context, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	return tracer.Start(ctx, getCallerName(2), opts...)
 }
 
-// RecordErrorAndStatus records an error in the span and sets the status to Error.
+// IsErrorRecorded records an error in the span and sets the status to Error.
 // Returns true if an error was recorded, false otherwise.
-func RecordErrorAndStatus(span trace.Span, err error) bool {
+func IsErrorRecorded(span trace.Span, err error) bool {
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())

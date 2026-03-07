@@ -42,10 +42,10 @@ func TestSubmitActionApprovalImpl_Execute(t *testing.T) {
 				TurnID:         turnID,
 				ActionCallID:   actionCallID,
 				ActionName:     "delete_todo",
-				Status:         assistant.ChatMessageApprovalStatus_Expired,
+				Status:         "invalid",
 			},
 			expectErr:        true,
-			expectedErrValue: "status must be APPROVED or REJECTED",
+			expectedErrValue: "invalid status: invalid",
 		},
 		"publish-error": {
 			input: SubmitActionApprovalInput{

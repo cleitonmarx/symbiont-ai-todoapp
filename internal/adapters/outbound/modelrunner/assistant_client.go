@@ -28,7 +28,7 @@ func NewAssistantClientAdapter(client DRMAPIClient, embeddingClient DRMAPIClient
 
 // RunTurn implements assistant.Assistant.RunTurn.
 func (a AssistantClient) RunTurn(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	adapterReq := toChatRequest(req)
@@ -97,17 +97,17 @@ func (a AssistantClient) RunTurn(ctx context.Context, req assistant.TurnRequest,
 
 // RunTurnSync implements assistant.Assistant.RunTurnSync.
 func (a AssistantClient) RunTurnSync(ctx context.Context, req assistant.TurnRequest) (assistant.TurnResponse, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	adapterReq := toChatRequest(req)
 	resp, err := a.client.Chat(spanCtx, adapterReq)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return assistant.TurnResponse{}, err
 	}
 	if len(resp.Choices) == 0 {
 		err := errors.New("no choices in response")
-		telemetry.RecordErrorAndStatus(span, err)
+		telemetry.IsErrorRecorded(span, err)
 		return assistant.TurnResponse{}, err
 	}
 
@@ -124,13 +124,13 @@ func (a AssistantClient) RunTurnSync(ctx context.Context, req assistant.TurnRequ
 
 // VectorizeTodo implements semantic.Encoder.VectorizeTodo.
 func (a AssistantClient) VectorizeTodo(ctx context.Context, model string, todo todo.Todo) (semantic.EmbeddingVector, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 	gen := a.embeddingFactory.Get(model)
 	prompt := gen.GenerateIndexingPrompt(todo.Title)
 	dimension := gen.Dimensions()
 	vec, err := a.embed(spanCtx, model, prompt, dimension)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return semantic.EmbeddingVector{}, err
 	}
 	return vec, nil
@@ -138,14 +138,14 @@ func (a AssistantClient) VectorizeTodo(ctx context.Context, model string, todo t
 
 // VectorizeQuery implements semantic.Encoder.VectorizeQuery.
 func (a AssistantClient) VectorizeQuery(ctx context.Context, model, query string) (semantic.EmbeddingVector, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	gen := a.embeddingFactory.Get(model)
 	prompt := gen.GenerateSearchPrompt(query)
 	dimension := gen.Dimensions()
 	vec, err := a.embed(spanCtx, model, prompt, dimension)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return semantic.EmbeddingVector{}, err
 	}
 	return vec, nil
@@ -249,11 +249,11 @@ func (a AssistantClient) embed(ctx context.Context, model, input string, dimensi
 
 // ListAvailableModels returns all available models in a provider-agnostic shape.
 func (a AssistantClient) ListAvailableModels(ctx context.Context) ([]assistant.ModelInfo, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	resp, err := a.client.AvailableModels(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, err
 	}
 
@@ -276,11 +276,11 @@ func (a AssistantClient) ListAvailableModels(ctx context.Context) ([]assistant.M
 
 // ListModels implements assistant.ModelCatalog.ListModels.
 func (a AssistantClient) ListModels(ctx context.Context) ([]assistant.ModelCapabilities, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	resp, err := a.client.AvailableModels(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, err
 	}
 

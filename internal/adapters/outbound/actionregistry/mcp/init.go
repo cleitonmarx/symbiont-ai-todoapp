@@ -25,7 +25,7 @@ type InitMCPActionRegistry struct {
 
 // Initialize creates and registers the MCP-backed action registry.
 func (i *InitMCPActionRegistry) Initialize(ctx context.Context) (context.Context, error) {
-	_, span := telemetry.Start(ctx)
+	_, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	i.registry = NewMCPRegistry(

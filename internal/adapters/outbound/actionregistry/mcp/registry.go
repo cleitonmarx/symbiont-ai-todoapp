@@ -52,7 +52,7 @@ func newMCPRegistryWithConnector(cfg Config, connector mcpConnector) *MCPRegistr
 
 // Execute runs one MCP tool call and returns the result as a tool message.
 func (r *MCPRegistry) Execute(ctx context.Context, call assistant.ActionCall, _ []assistant.Message) assistant.Message {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	span.SetAttributes(
 		attribute.String("mcp.tool_name", call.Name),
 	)

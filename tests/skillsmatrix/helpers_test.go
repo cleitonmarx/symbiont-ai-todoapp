@@ -55,7 +55,7 @@ func newSkillMatrixRegistry(t *testing.T) assistant.SkillRegistry {
 	require.NoError(t, err)
 
 	drmClient := modelrunner.NewDRMAPIClient("http://localhost:12434", "", http.DefaultClient)
-	encoder := modelrunner.NewAssistantClientAdapter(drmClient, drmClient)
+	encoder := modelrunner.NewSemanticEncoder(drmClient)
 
 	registry, err := skillregistry.NewSkillRegistry(ctx, skills, encoder, "embeddinggemma:300M-Q8_0", skillregistry.Config{
 		RelevantSkillsTopK:     2,

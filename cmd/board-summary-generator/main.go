@@ -7,8 +7,8 @@ import (
 )
 
 func main() {
-	err := app.NewTodoApp().Run()
+	err := app.NewBoardSummaryGenerator().Run()
 	if err != nil {
-		log.Fatalf("Failed to run the TodoApp: %v", err)
+		log.Fatalf("Failed to run the Board Summary Generator: %v", err)
 	}
 }

@@ -30,9 +30,9 @@ var migrationsFS embed.FS
 
 // InitDB initializes the Postgres database connection and runs migrations.
 type InitDB struct {
+	SkipMigration      bool
 	db                 *sql.DB
 	metricRegistration metric.Registration
-	skipMigration      bool
 	Logger             *log.Logger `resolve:""`
 	DBUser             string      `config:"DB_USER"`
 	DBPass             string      `config:"DB_PASS"`
@@ -87,7 +87,7 @@ func (di *InitDB) Initialize(ctx context.Context) (context.Context, error) {
 	}
 
 	// Run migrations
-	if !di.skipMigration {
+	if !di.SkipMigration {
 		if err := di.runMigrations(); err != nil {
 			return ctx, fmt.Errorf("failed to run migrations: %w", err)
 		}

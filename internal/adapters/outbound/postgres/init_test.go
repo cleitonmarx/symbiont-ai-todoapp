@@ -82,7 +82,7 @@ func TestInitDB_Initialize(t *testing.T) {
 		DBHost:        "localhost",
 		DBPort:        "5432",
 		DBName:        "testdb",
-		skipMigration: true,
+		SkipMigration: true,
 	}
 
 	_, err := dbInit.Initialize(t.Context())

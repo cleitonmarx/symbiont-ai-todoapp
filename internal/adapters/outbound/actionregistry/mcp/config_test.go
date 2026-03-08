@@ -25,7 +25,6 @@ func TestConfig_WithDefaults(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, tt.input.withDefaults())

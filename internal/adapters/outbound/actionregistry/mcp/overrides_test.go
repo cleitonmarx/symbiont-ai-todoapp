@@ -83,7 +83,6 @@ tools:
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got, err := parseToolOverrideDefinitions([]byte(tt.content))
@@ -122,7 +121,7 @@ tools:
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got, err := parseToolOverrideStatusMessages([]byte(tt.content))
@@ -146,7 +145,7 @@ func TestApprovalOverrideHelpers(t *testing.T) {
 		}
 
 		for name, tt := range tests {
-			tt := tt
+
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				assert.Equal(t, tt.want, sanitizePreviewFields(tt.input))
@@ -168,7 +167,7 @@ func TestApprovalOverrideHelpers(t *testing.T) {
 		}
 
 		for name, tt := range tests {
-			tt := tt
+
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				got, err := parseApprovalTimeout(tt.input)
@@ -202,7 +201,7 @@ func TestApprovalOverrideHelpers(t *testing.T) {
 		}
 
 		for name, tt := range tests {
-			tt := tt
+
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				got, err := tt.input.toDomain()

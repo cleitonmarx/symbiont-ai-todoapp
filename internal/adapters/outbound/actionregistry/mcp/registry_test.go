@@ -75,7 +75,6 @@ func TestMCPRegistry_Execute(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			registry := newMCPRegistryWithConnector(Config{Endpoint: "http://localhost:8811/mcp"}, &fakeConnector{session: tt.session})
@@ -138,7 +137,7 @@ func TestMCPRegistry_Methods(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tt.assert(t, tt.registry)
@@ -175,7 +174,6 @@ func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			session := &fakeSession{listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{tt.tool}}}}

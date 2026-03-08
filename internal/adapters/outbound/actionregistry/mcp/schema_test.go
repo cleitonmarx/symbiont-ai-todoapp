@@ -40,7 +40,6 @@ func TestToolToActionDefinition(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tt.assert(t, toolToActionDefinition(tt.tool))
@@ -84,7 +83,7 @@ func TestSchemaToInput(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tt.assert(t, schemaToInput(tt.schema))
@@ -106,7 +105,7 @@ func TestSchemaHelpers(t *testing.T) {
 			"empty":    {input: map[string]any{}, want: ""},
 		}
 		for name, tt := range tests {
-			tt := tt
+
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				assert.Equal(t, tt.want, schemaFieldType(tt.input))
@@ -125,7 +124,7 @@ func TestSchemaHelpers(t *testing.T) {
 			"other":  {input: 1, want: ""},
 		}
 		for name, tt := range tests {
-			tt := tt
+
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				assert.Equal(t, tt.want, parseTypeValue(tt.input))
@@ -143,7 +142,7 @@ func TestSchemaHelpers(t *testing.T) {
 			"invalid": {input: "title", want: map[string]bool{}},
 		}
 		for name, tt := range tests {
-			tt := tt
+
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				assert.Equal(t, tt.want, requiredSet(tt.input))
@@ -161,7 +160,7 @@ func TestSchemaHelpers(t *testing.T) {
 			"present": {input: assistant.ActionApproval{Timeout: time.Second}, want: true},
 		}
 		for name, tt := range tests {
-			tt := tt
+
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				assert.Equal(t, tt.want, hasApprovalOverride(tt.input))
@@ -198,7 +197,7 @@ func TestMergeActionDefinition(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tt.assert(t, mergeAssistantActionDefinition(base, tt.override))
@@ -225,7 +224,7 @@ func TestAnyToMap(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got, ok := anyToMap(tt.input)
@@ -250,7 +249,7 @@ func TestAsString(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, asString(tt.input))

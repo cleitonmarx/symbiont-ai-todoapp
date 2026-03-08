@@ -1,12 +1,12 @@
 package skillregistry
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/semantic"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -94,16 +94,8 @@ func TestRegistry_RankSkills(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
-			var encoder semantic.Encoder
-			if strings.TrimSpace(tt.currentInput) == "" {
-				encoder = semantic.NewMockEncoder(t)
-			} else {
-				encoder = newSemanticEncoder(t, "embed-model", tt.queryVectors)
-			}
+			encoder := newSemanticEncoder(t, "embed-model", tt.queryVectors)
 			registry := Registry{
 				encoder:        encoder,
 				embeddingModel: "embed-model",
@@ -111,13 +103,42 @@ func TestRegistry_RankSkills(t *testing.T) {
 				embeddedSkills: tt.embedded,
 			}
 
-			got := registry.rankSkills(t.Context(), tt.currentInput, tt.recentInputs, tt.summary, tt.minScore, true)
+			got := registry.rankSkills(t.Context(), tt.currentInput, tt.recentInputs, tt.summary, tt.minScore, true, nil)
 			require.Len(t, got, len(tt.wantNames))
 			for i, want := range tt.wantNames {
 				assert.Equal(t, want, got[i].definition.Name)
 			}
 		})
 	}
+}
+
+func TestRegistry_RankSkills_DeduplicatesQueryEmbeddingWithSharedCache(t *testing.T) {
+	t.Parallel()
+
+	encoder := semantic.NewMockEncoder(t)
+	encoder.EXPECT().
+		VectorizeQuery(mock.Anything, "embed-model", "same query").
+		Return(semantic.EmbeddingVector{Vector: []float64{1, 0}}, nil).
+		Once()
+
+	registry := Registry{
+		encoder:        encoder,
+		embeddingModel: "embed-model",
+		cfg:            normalizeConfig(Config{}),
+		embeddedSkills: []embeddedSkill{
+			{
+				definition: assistant.SkillDefinition{Name: "todo-read-view"},
+				useVector:  []float64{1, 0},
+			},
+		},
+	}
+
+	cache := make(map[string][]float64, 1)
+	first := registry.rankSkills(t.Context(), "same query", "same query", "same query", 0.1, true, cache)
+	require.NotEmpty(t, first)
+
+	second := registry.rankSkills(t.Context(), "same query", "", "", 0, false, cache)
+	require.NotEmpty(t, second)
 }
 
 func TestRegistry_ChooseRanking(t *testing.T) {
@@ -205,7 +226,7 @@ func TestRegistry_ChooseRanking(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got := registry.chooseRanking(tt.contextRanked, tt.latestOnly, tt.hasPriorContext)
@@ -250,7 +271,7 @@ func TestTrimRanked(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got := trimRanked(tt.input, tt.topK)
@@ -308,7 +329,7 @@ func TestRegistry_ScoreSkill(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got, ok := registry.scoreSkill(tt.queryVectors, tt.skill, tt.includePriority)
@@ -353,7 +374,7 @@ func TestWeightedSimilarity(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got, ok := weightedSimilarity(tt.queryVectors, tt.skillVector)
@@ -383,7 +404,7 @@ func TestPriorityBoost(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			assert.InDelta(t, tt.want, priorityBoost(tt.priority), 0.0001)

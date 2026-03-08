@@ -1,7 +1,6 @@
 package skillregistry
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
@@ -25,17 +24,24 @@ func newSemanticEncoder(t *testing.T, model string, params semanticEncoderParams
 	t.Helper()
 
 	enc := semantic.NewMockEncoder(t)
-	enc.EXPECT().
-		VectorizeQuery(mock.Anything, model, mock.Anything).
-		RunAndReturn(func(_ context.Context, _ string, query string) (semantic.EmbeddingVector, error) {
-			if err, ok := params.QueryErrors[query]; ok {
-				return semantic.EmbeddingVector{}, err
-			}
-			if vec, ok := params.QueryVectors[query]; ok {
-				return semantic.EmbeddingVector{Vector: vec}, nil
-			}
-			return semantic.EmbeddingVector{}, nil
-		})
+
+	seenQueries := make(map[string]struct{}, len(params.QueryErrors)+len(params.QueryVectors))
+	for query, err := range params.QueryErrors {
+		seenQueries[query] = struct{}{}
+		enc.EXPECT().
+			VectorizeQuery(mock.Anything, model, query).
+			Return(semantic.EmbeddingVector{}, err).
+			Once()
+	}
+	for query, vec := range params.QueryVectors {
+		if _, alreadySetAsError := seenQueries[query]; alreadySetAsError {
+			continue
+		}
+		enc.EXPECT().
+			VectorizeQuery(mock.Anything, model, query).
+			Return(semantic.EmbeddingVector{Vector: vec}, nil).
+			Once()
+	}
 
 	for name, vector := range params.SkillVectors {
 		skillName := name

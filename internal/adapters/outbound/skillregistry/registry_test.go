@@ -36,7 +36,7 @@ func TestNewSkillRegistry_ValidatesDependencies(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			_, err := NewSkillRegistry(t.Context(), []assistant.SkillDefinition{{Name: "x", Content: "y"}}, tt.enc, tt.model, Config{})
@@ -120,7 +120,7 @@ Build a simple plan in steps.
 	require.NoError(t, err)
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got := registry.ListRelevant(t.Context(), tt.query)
@@ -211,7 +211,7 @@ Use safe mutation flow.
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

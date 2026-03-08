@@ -121,7 +121,7 @@ func TestCompactToLastMessages(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got := compactToLastMessages(tt.messages, tt.max)
@@ -162,7 +162,6 @@ func TestTruncateToFirstChars(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, truncateToFirstChars(tt.input, tt.max))

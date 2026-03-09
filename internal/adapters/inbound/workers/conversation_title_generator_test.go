@@ -92,9 +92,50 @@ func TestConversationTitleGenerator_Run(t *testing.T) {
 				},
 			},
 		},
+		"uses-latest-assistant-event-even-when-latest-chat-message-is-user": {
+			payloads: [][]byte{
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
+					ChatMessageID:  firstMessageID,
+					ConversationID: conversationID,
+				}),
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
+					ChatMessageID:  secondMessageID,
+					ConversationID: conversationID,
+				}),
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_User,
+					ChatMessageID:  thirdMessageID,
+					ConversationID: conversationID,
+				}),
+			},
+			expectedEvents: []outbox.ChatMessageEvent{
+				{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_Assistant,
+					ChatMessageID:  secondMessageID,
+					ConversationID: conversationID,
+				},
+			},
+		},
 		"invalid-payload": {
 			payloads: [][]byte{
 				[]byte(`{"type"`),
+			},
+			expectedEvents: nil,
+		},
+		"user-chat-events-do-not-trigger-title-generation": {
+			payloads: [][]byte{
+				chatEventPayload(t, outbox.ChatMessageEvent{
+					Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+					ChatRole:       assistant.ChatRole_User,
+					ChatMessageID:  firstMessageID,
+					ConversationID: conversationID,
+				}),
 			},
 			expectedEvents: nil,
 		},

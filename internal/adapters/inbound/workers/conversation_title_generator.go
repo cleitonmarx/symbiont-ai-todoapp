@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub/v2"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"github.com/google/uuid"
@@ -103,6 +104,12 @@ func (s ConversationTitleGenerator) flush(ctx context.Context, batch []*pubsub.M
 		}
 
 		if event.Type != outbox.EventType_CHAT_MESSAGE_SENT {
+			msg.Ack()
+			continue
+		}
+		// Title generation should only be triggered by assistant messages.
+		// User messages are acked and ignored by this worker.
+		if event.ChatRole != assistant.ChatRole_Assistant {
 			msg.Ack()
 			continue
 		}

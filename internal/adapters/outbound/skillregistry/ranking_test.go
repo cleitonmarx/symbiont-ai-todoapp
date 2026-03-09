@@ -271,9 +271,7 @@ func TestTrimRanked(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			got := trimRanked(tt.input, tt.topK)
 			require.Len(t, got, len(tt.wantNames))
 			for i, want := range tt.wantNames {
@@ -329,9 +327,7 @@ func TestRegistry_ScoreSkill(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			got, ok := registry.scoreSkill(tt.queryVectors, tt.skill, tt.includePriority)
 			assert.Equal(t, tt.wantOk, ok)
 			if tt.wantOk {
@@ -374,9 +370,7 @@ func TestWeightedSimilarity(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			got, ok := weightedSimilarity(tt.queryVectors, tt.skillVector)
 			assert.Equal(t, tt.wantOk, ok)
 			if tt.wantOk {
@@ -404,9 +398,7 @@ func TestPriorityBoost(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			assert.InDelta(t, tt.want, priorityBoost(tt.priority), 0.0001)
 		})
 	}

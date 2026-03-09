@@ -19,7 +19,7 @@ type ConversationTitleGenerator struct {
 	Client                    *pubsub.Client                 `resolve:""`
 	GenerateConversationTitle chat.GenerateConversationTitle `resolve:""`
 	Interval                  time.Duration                  `config:"CHAT_TITLE_BATCH_INTERVAL" default:"3s"`
-	BatchSize                 int                            `config:"CHAT_TITLE_BATCH_SIZE" default:"50"`
+	BatchSize                 int                            `config:"CHAT_TITLE_BATCH_SIZE" default:"5"`
 	SubscriptionID            string                         `config:"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID"`
 	workerExecutionChan       chan struct{}
 }
@@ -29,7 +29,7 @@ func (s ConversationTitleGenerator) Run(ctx context.Context) error {
 	s.Logger.Println("ConversationTitleGenerator: running...")
 
 	if s.BatchSize <= 0 {
-		s.BatchSize = 50
+		s.BatchSize = 5
 	}
 	if s.Interval <= 0 {
 		s.Interval = 3 * time.Second

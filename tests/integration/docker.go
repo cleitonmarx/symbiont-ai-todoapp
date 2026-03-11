@@ -25,6 +25,7 @@ func (i *InitDockerCompose) Initialize(ctx context.Context) (context.Context, er
 	err = i.compose.
 		WaitForService("postgres", wait.ForHealthCheck()).
 		WaitForService("vault", wait.ForHealthCheck()).
+		WaitForService("pubsub-emulator", wait.ForHealthCheck()).
 		WaitForService("mcp-gateway", wait.ForHealthCheck()).
 		Up(ctx, compose.Wait(true))
 	if err != nil {

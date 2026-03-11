@@ -234,18 +234,18 @@ Prerequisites:
 
 - Docker + Docker Compose
 - Docker Model Runner for `qwen3` and `embeddinggemma`
-- Run commands from the repo root (where `docker-compose.yml` exists), or pass `-f ./docker-compose.yml`.
+- Run commands from the repo root (where `docker-compose.yml` and `docker-compose.split.yml` exist), or pass `-f` explicitly.
 
 Run default stack (monolithic app + dependencies):
 
 ```bash
-docker compose --profile monolithic up --build
+docker compose -f docker-compose.yml up --build
 ```
 
 Check running services:
 
 ```bash
-docker compose --profile monolithic ps
+docker compose -f docker-compose.yml ps
 ```
 
 Useful local URLs:
@@ -263,30 +263,28 @@ Stop:
 docker compose down
 ```
 
-Run split deployables (second profile):
+Run split deployables:
 
 ```bash
-docker compose --profile split up --build \
-  http-api graphql-api message-relay \
-  board-summary-generator chat-summary-generator conversation-title-generator
+docker compose -f docker-compose.split.yml up --build
 ```
 
 Check running split services:
 
 ```bash
-docker compose --profile split ps
+docker compose -f docker-compose.split.yml ps
 ```
 
 If you see `no configuration file provided: not found`, run commands from this repository root or use:
 
 ```bash
-docker compose -f ./docker-compose.yml --profile split ps
+docker compose -f ./docker-compose.split.yml ps
 ```
 
-Split profile URLs:
+Split stack URLs:
 
-- HTTP API + embedded UI: `http://localhost:18080`
-- GraphQL playground: `http://localhost:18085`
+- HTTP API + embedded UI (via Traefik): `http://localhost:18080`
+- GraphQL playground (via Traefik): `http://localhost:18085`
 
 ## Local Development
 
@@ -325,7 +323,7 @@ MCP_GATEWAY_ENDPOINT=http://localhost:8811 \
 go run ./cmd/monolithic
 ```
 
-### Deployable profiles reference
+### Deployable reference
 
 Docker Compose commands are documented in `Quick Start (Docker Compose)` above.
 Use this section as a deployable command/env reference.
@@ -406,6 +404,90 @@ go test -tags=skillmatrix -v -timeout 30m ./tests/skillsmatrix/...
 
 Skill matrix tests require an embedding-compatible model endpoint at `http://localhost:12434` (for example Docker Model Runner with `embeddinggemma:300M-Q8_0`).
 
+## Load Testing (k6)
+
+All load tests under `tests/k6` use the same env-var standard (`K6_LOAD_*`).
+
+Run the full load suite (`regular` runs all scenarios sequentially):
+
+```bash
+go tool k6 run tests/k6/all-scenarios.ts
+```
+
+Run the full load suite with all scenarios in parallel:
+
+```bash
+K6_LOAD_RUN_ALL_SCENARIOS_PARALLEL=true \
+go tool k6 run tests/k6/all-scenarios.ts
+```
+
+Run one suite scenario:
+
+```bash
+K6_LOAD_TEST_SCENARIO=todo-rest-create-update-delete \
+go tool k6 run tests/k6/all-scenarios.ts
+```
+
+Available `K6_LOAD_TEST_SCENARIO` values:
+
+- `regular`
+- `todo-flow-rest-graphql`
+- `fetch-board-summary-updates`
+- `board-summary-under-event-burst`
+- `conversation`
+- `todo-rest-create-update-delete`
+- `assistant-actions-approval-flow`
+
+Run REST-only throughput test (create, update, delete; no list, no summary assertions):
+
+```bash
+go tool k6 run tests/k6/todo-rest-create-update-delete.ts
+```
+
+Run assistant action approval-flow load test (SSE parsing + approval submission):
+
+```bash
+go tool k6 run tests/k6/assistant-actions-approval-flow.ts
+```
+
+Optional load tuning variables:
+
+- `K6_REST_BASE_URL` (default: `http://localhost:8080`)
+- `K6_GRAPHQL_ENDPOINT` (default: `http://localhost:8085/v1/query`)
+- `K6_LOAD_TEST_SCENARIO` for `tests/k6/all-scenarios.ts` (default: `regular`)
+- `K6_LOAD_RUN_ALL_SCENARIOS_PARALLEL` (default: `false`; when `true`, all `regular` suite scenarios start at `0s`)
+- `K6_LOAD_EXECUTION_STRATEGY` (default: `regular`; options: `regular`, `smoke`, `spike`, `stress`)
+- `K6_LOAD_START_VUS` (default: `1`)
+- `K6_LOAD_TARGET_VUS` (default: `10` in most single-scenario scripts; `3` in `all-scenarios.ts` and `assistant-actions-approval-flow.ts`)
+- `K6_LOAD_RAMP_UP`, `K6_LOAD_STEADY`, `K6_LOAD_RAMP_DOWN`
+- `K6_LOAD_GRACEFUL_RAMP_DOWN`, `K6_LOAD_GRACEFUL_STOP`
+- `K6_LOAD_SMOKE_VUS`, `K6_LOAD_SMOKE_DURATION`
+- `K6_LOAD_SPIKE_TARGET_VUS`, `K6_LOAD_SPIKE_RAMP_UP`, `K6_LOAD_SPIKE_HOLD`, `K6_LOAD_SPIKE_RAMP_DOWN`
+- `K6_LOAD_STRESS_STAGE1_DURATION`, `K6_LOAD_STRESS_STAGE2_DURATION`, `K6_LOAD_STRESS_STAGE3_DURATION`, `K6_LOAD_STRESS_RAMP_DOWN`
+- `K6_LOAD_STRESS_STAGE2_TARGET_VUS`, `K6_LOAD_STRESS_STAGE3_TARGET_VUS`
+- `K6_LOAD_CHAT_TIMEOUT` (default: `120s`)
+- `K6_LOAD_CHAT_RETRY_COUNT` (default: `2`)
+- `K6_LOAD_CHAT_RETRY_BACKOFF_SECONDS` (default: `1`)
+- `K6_LOAD_CUSTOM_METRICS` (default: `false`; when `true`, scenario-level custom Trend metrics are emitted)
+
+Examples:
+
+```bash
+# Run only REST CUD scenario from the suite using spike execution strategy
+K6_LOAD_TEST_SCENARIO=todo-rest-create-update-delete \
+K6_LOAD_EXECUTION_STRATEGY=spike \
+go tool k6 run tests/k6/all-scenarios.ts
+```
+
+```bash
+# Run approval-flow load test against split stack
+K6_REST_BASE_URL=http://localhost:18080 \
+K6_GRAPHQL_ENDPOINT=http://localhost:18085/v1/query \
+K6_LOAD_EXECUTION_STRATEGY=smoke \
+K6_LOAD_CUSTOM_METRICS=true \
+go tool k6 run tests/k6/assistant-actions-approval-flow.ts
+```
+
 ## Key Configuration
 
 Required or commonly tuned variables:
@@ -427,7 +509,7 @@ Required or commonly tuned variables:
 - `SUMMARY_BATCH_INTERVAL` (default: `3s`), `SUMMARY_BATCH_SIZE` (default: `20`)
 - `CHAT_SUMMARY_BATCH_INTERVAL` (default: `3s`), `CHAT_SUMMARY_BATCH_SIZE` (default: `50`)
 - `CHAT_TITLE_BATCH_INTERVAL` (default: `3s`), `CHAT_TITLE_BATCH_SIZE` (default: `50`)
-- `OTEL_SERVICE_NAME` (set per deployable in split profile)
+- `OTEL_SERVICE_NAME` (set per deployable in split compose)
 - `OTEL_RESOURCE_ATTRIBUTES` (for example `service.instance.id=<instance-id>`; if `service.instance.id` is not set, app falls back to container hostname)
 - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`
 

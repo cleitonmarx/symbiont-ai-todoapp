@@ -1,0 +1,174 @@
+include:
+  - docker-compose.deps.yml
+
+x-app-env: &app-env
+  OTEL_SERVICE_NAME: todoapp
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: todoappdb
+  VAULT_ADDR: http://vault:8200
+  VAULT_TOKEN: root-token
+  VAULT_MOUNT_PATH: secret
+  VAULT_SECRET_PATH: todoapp
+  PUBSUB_EMULATOR_HOST: pubsub-emulator:8681
+  PUBSUB_PROJECT_ID: local-dev
+  PUBSUB_TOPIC_ID: Todo
+  TODO_EVENTS_SUBSCRIPTION_ID: todo_summary_generator
+  CHAT_EVENTS_SUBSCRIPTION_ID: chat_message_summary_generator
+  CHAT_TITLE_EVENTS_SUBSCRIPTION_ID: chat_message_title_generator
+  ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID: action_approval_dispatcher
+
+x-assistant-llm-env: &assistant-llm-env
+  LLM_MODEL_HOST: http://model-runner.docker.internal
+  LLM_SUMMARY_MODEL: qwen3:4B-F16
+  LLM_CHAT_SUMMARY_MODEL: qwen3:4B-F16
+  LLM_CHAT_TITLE_MODEL: qwen3:4B-F16
+
+x-encoder-llm-env: &encoder-llm-env
+  LLM_EMBEDDING_MODEL_HOST: http://model-runner.docker.internal
+  LLM_EMBEDDING_MODEL: embeddinggemma:300M-Q8_0
+
+x-http-api-env: &http-api-env
+  MCP_GATEWAY_ENDPOINT: http://mcp-gateway:8811
+
+x-app-depends: &app-depends
+  postgres:
+    condition: service_healthy
+  vault:
+    condition: service_healthy
+  pubsub-emulator:
+    condition: service_healthy
+  mcp-gateway:
+    condition: service_started
+
+services:
+  traefik:
+    image: traefik:v3.6.4
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.http.address=:18080"
+      - "--entrypoints.graphql.address=:18085"
+      - "--ping=true"
+    ports:
+      - "18080:18080"
+      - "18085:18085"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      mcp-gateway:
+        condition: service_started
+
+  http-api:
+    scale: 2
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:18080
+        VITE_GRAPHQL_ENDPOINT: http://localhost:18085/v1/query
+    command: ["/http-api"]
+    expose:
+      - "8080"
+    environment:
+      <<: [*app-env, *assistant-llm-env, *encoder-llm-env, *http-api-env]
+      OTEL_SERVICE_NAME: http-api
+    models:
+      - qwen3
+      - embeddinggemma
+    healthcheck:
+      test: ["CMD", "./healthchecker", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.http-api.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.http-api.entrypoints=http"
+      - "traefik.http.routers.http-api.service=http-api"
+      - "traefik.http.services.http-api.loadbalancer.server.port=8080"
+    depends_on:
+      <<: *app-depends
+      traefik:
+        condition: service_started
+
+  graphql-api:
+    scale: 2
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["/graphql-api"]
+    expose:
+      - "8085"
+    environment:
+      <<: [*app-env, *encoder-llm-env]
+      OTEL_SERVICE_NAME: graphql-api
+    models:
+      - embeddinggemma
+    healthcheck:
+      test: ["CMD", "./healthchecker", "http://localhost:8085/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.graphql-api.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.graphql-api.entrypoints=graphql"
+      - "traefik.http.routers.graphql-api.service=graphql-api"
+      - "traefik.http.services.graphql-api.loadbalancer.server.port=8085"
+    depends_on:
+      <<: *app-depends
+      traefik:
+        condition: service_started
+
+  message-relay:
+    scale: 2
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["/message-relay"]
+    environment:
+      <<: [*app-env]
+      OTEL_SERVICE_NAME: message-relay
+    depends_on: *app-depends
+
+  board-summary-generator:
+    scale: 2
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["/board-summary-generator"]
+    environment:
+      <<: [*app-env, *assistant-llm-env]
+      OTEL_SERVICE_NAME: board-summary-generator
+      SUMMARY_BATCH_INTERVAL: 5s
+      SUMMARY_BATCH_SIZE: 300
+    models:
+      - qwen3
+    depends_on: *app-depends
+
+  chat-summary-generator:
+    scale: 2
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["/chat-summary-generator"]
+    environment:
+      <<: [*app-env, *assistant-llm-env]
+      OTEL_SERVICE_NAME: chat-summary-generator
+    models:
+      - qwen3
+    depends_on: *app-depends
+
+  conversation-title-generator:
+    scale: 2
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["/conversation-title-generator"]
+    environment:
+      <<: [*app-env, *assistant-llm-env]
+      OTEL_SERVICE_NAME: conversation-title-generator
+    models:
+      - qwen3
+    depends_on: *app-depends

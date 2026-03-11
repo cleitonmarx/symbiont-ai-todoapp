@@ -44,6 +44,7 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 
 	tests := map[string]struct {
 		setExpectations func(
+			*core.MockLocker,
 			*todo.MockBoardSummaryRepository,
 			*core.MockCurrentTimeProvider,
 			*assistant.MockAssistant,
@@ -52,10 +53,14 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 	}{
 		"success": {
 			setExpectations: func(
+				locker *core.MockLocker,
 				sr *todo.MockBoardSummaryRepository,
 				tp *core.MockCurrentTimeProvider,
 				assist *assistant.MockAssistant,
 			) {
+				locker.EXPECT().TryLock(mock.Anything, "generate_board_summary").
+					Return(func() {}, true, nil).
+					Once()
 
 				tp.EXPECT().Now().Return(fixedTime)
 
@@ -89,10 +94,15 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 		},
 		"llm-client-error": {
 			setExpectations: func(
+				locker *core.MockLocker,
 				sr *todo.MockBoardSummaryRepository,
 				tp *core.MockCurrentTimeProvider,
 				assist *assistant.MockAssistant,
 			) {
+				locker.EXPECT().TryLock(mock.Anything, "generate_board_summary").
+					Return(func() {}, true, nil).
+					Once()
+
 				tp.EXPECT().Now().Return(fixedTime)
 
 				sr.EXPECT().CalculateSummaryContent(mock.Anything).
@@ -113,10 +123,15 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 		},
 		"store-summary-error": {
 			setExpectations: func(
+				locker *core.MockLocker,
 				sr *todo.MockBoardSummaryRepository,
 				tp *core.MockCurrentTimeProvider,
 				assist *assistant.MockAssistant,
 			) {
+				locker.EXPECT().TryLock(mock.Anything, "generate_board_summary").
+					Return(func() {}, true, nil).
+					Once()
+
 				tp.EXPECT().Now().Return(fixedTime)
 
 				sr.EXPECT().CalculateSummaryContent(mock.Anything).
@@ -144,15 +159,16 @@ func TestGenerateBoardSummaryImpl_Execute(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			locker := core.NewMockLocker(t)
 			sr := todo.NewMockBoardSummaryRepository(t)
 			tp := core.NewMockCurrentTimeProvider(t)
 			assist := assistant.NewMockAssistant(t)
 
 			if tt.setExpectations != nil {
-				tt.setExpectations(sr, tp, assist)
+				tt.setExpectations(locker, sr, tp, assist)
 			}
 
-			gbs := NewGenerateBoardSummaryImpl(sr, tp, assist, "mistral", nil)
+			gbs := NewGenerateBoardSummaryImpl(locker, sr, tp, assist, "mistral", nil)
 
 			err := gbs.Execute(t.Context())
 			assert.Equal(t, tt.expectedErr, err)

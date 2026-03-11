@@ -1,57 +1,8 @@
 include:
   - docker-compose.deps.yml 
 
-x-app-env: &app-env
-  OTEL_SERVICE_NAME: todoapp
-  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://jaeger:4318/v1/traces
-  OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://prometheus:9090/api/v1/otlp/v1/metrics
-  OTEL_SEMCONV_STABILITY_OPT_IN: database
-  DB_HOST: postgres
-  DB_PORT: "5432"
-  DB_NAME: todoappdb
-  VAULT_ADDR: http://vault:8200
-  VAULT_TOKEN: root-token
-  VAULT_MOUNT_PATH: secret
-  VAULT_SECRET_PATH: todoapp
-  PUBSUB_EMULATOR_HOST: pubsub-emulator:8681
-  PUBSUB_PROJECT_ID: local-dev
-  PUBSUB_TOPIC_ID: Todo
-  TODO_EVENTS_SUBSCRIPTION_ID: todo_summary_generator
-  CHAT_EVENTS_SUBSCRIPTION_ID: chat_message_summary_generator
-  CHAT_TITLE_EVENTS_SUBSCRIPTION_ID: chat_message_title_generator
-  ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID: action_approval_dispatcher
-  SUMMARY_BATCH_INTERVAL: 1s
-  
-x-assistant-llm-env: &assistant-llm-env
-  LLM_MODEL_HOST: http://model-runner.docker.internal
-  LLM_SUMMARY_MODEL: qwen3:4B-F16
-  LLM_CHAT_SUMMARY_MODEL: qwen3:4B-F16
-  LLM_CHAT_TITLE_MODEL: qwen3:4B-F16
-
-x-encoder-llm-env: &encoder-llm-env
-  LLM_EMBEDDING_MODEL_HOST: http://model-runner.docker.internal
-  LLM_EMBEDDING_MODEL: embeddinggemma:300M-Q8_0
-
-x-http-api-env: &http-api-env
-  MCP_GATEWAY_ENDPOINT: http://mcp-gateway:8811
-
-x-app-depends: &app-depends
-  jaeger:
-    condition: service_started
-  postgres:
-    condition: service_healthy
-  vault:
-    condition: service_healthy
-  pubsub-emulator:
-    condition: service_healthy
-  prometheus:
-    condition: service_started
-  mcp-gateway:
-    condition: service_started
-
 services:
   todoapp:
-    profiles: ["monolithic"]
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -60,115 +11,63 @@ services:
       - "8080:8080"
       - "8085:8085"
     environment:
-      <<: [*app-env, *assistant-llm-env, *encoder-llm-env, *http-api-env]
       OTEL_SERVICE_NAME: todoapp
+      #OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://jaeger:4318/v1/traces
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://prometheus:9090/api/v1/otlp/v1/metrics
+      OTEL_SEMCONV_STABILITY_OPT_IN: database
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: todoappdb
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: root-token
+      VAULT_MOUNT_PATH: secret
+      VAULT_SECRET_PATH: todoapp
+      PUBSUB_EMULATOR_HOST: pubsub-emulator:8681
+      PUBSUB_PROJECT_ID: local-dev
+      PUBSUB_TOPIC_ID: Todo
+      TODO_EVENTS_SUBSCRIPTION_ID: todo_summary_generator
+      CHAT_EVENTS_SUBSCRIPTION_ID: chat_message_summary_generator
+      CHAT_TITLE_EVENTS_SUBSCRIPTION_ID: chat_message_title_generator
+      ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID: action_approval_dispatcher
+      SUMMARY_BATCH_INTERVAL: 1s
+      CHAT_TITLE_BATCH_INTERVAL: 3s
+      LLM_MODEL_HOST: http://model-runner.docker.internal
+      LLM_SUMMARY_MODEL: qwen3:4B-F16
+      LLM_CHAT_SUMMARY_MODEL: qwen3:4B-F16
+      LLM_CHAT_TITLE_MODEL: qwen3:4B-F16
+      LLM_EMBEDDING_MODEL_HOST: http://model-runner.docker.internal
+      LLM_EMBEDDING_MODEL: embeddinggemma:300M-Q8_0
+      MCP_GATEWAY_ENDPOINT: http://mcp-gateway:8811
     models:
       - qwen3
       - embeddinggemma
-    depends_on: *app-depends
+    healthcheck:
+      test: ["CMD", "./healthchecker", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+      pubsub-emulator:
+        condition: service_healthy
+      mcp-gateway:
+        condition: service_started
+      jaeger:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      grafana:
+        condition: service_started
 
-  http-api:
-    profiles: ["split"]
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-      args:
-        APP_CMD: http-api
-        VITE_API_BASE_URL: http://localhost:18080
-        VITE_GRAPHQL_ENDPOINT: http://localhost:18085/v1/query
-    command: ["/http-api"]
-    ports:
-      - "18080:8080"
-    environment:
-      <<: [*app-env, *assistant-llm-env, *encoder-llm-env, *http-api-env]
-      OTEL_SERVICE_NAME: http-api
-    models:
-      - qwen3
-      - embeddinggemma
-    depends_on: *app-depends
-
-  graphql-api:
-    profiles: ["split"]
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-      args:
-        APP_CMD: graphql-api
-    command: ["/graphql-api"]
-    ports:
-      - "18085:8085"
-    environment:
-      <<: [*app-env, *encoder-llm-env]
-      OTEL_SERVICE_NAME: graphql-api
-    models:
-      - embeddinggemma
-    depends_on: *app-depends
-
-  message-relay:
-    profiles: ["split"]
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-      args:
-        APP_CMD: message-relay
-    command: ["/message-relay"]
-    environment:
-      <<: [*app-env]
-      OTEL_SERVICE_NAME: message-relay
-    depends_on: *app-depends
-
-  board-summary-generator:
-    profiles: ["split"]
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-      args:
-        APP_CMD: board-summary-generator
-    command: ["/board-summary-generator"]
-    environment:
-      <<: [*app-env, *assistant-llm-env]
-      OTEL_SERVICE_NAME: board-summary-generator
-    models:
-      - qwen3
-    depends_on: *app-depends
-
-  chat-summary-generator:
-    profiles: ["split"]
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-      args:
-        APP_CMD: chat-summary-generator
-    command: ["/chat-summary-generator"]
-    environment:
-      <<: [*app-env, *assistant-llm-env]
-      OTEL_SERVICE_NAME: chat-summary-generator
-    models:
-      - qwen3
-    depends_on: *app-depends
-
-  conversation-title-generator:
-    profiles: ["split"]
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-      args:
-        APP_CMD: conversation-title-generator
-    command: ["/conversation-title-generator"]
-    environment:
-      <<: [*app-env, *assistant-llm-env]
-      OTEL_SERVICE_NAME: conversation-title-generator
-    models:
-      - qwen3
-    depends_on: *app-depends
-  
   jaeger:
     image: jaegertracing/all-in-one:1.76.0
     ports:
       - "6831:6831/udp"
       - "16686:16686"
       - "4318:4318"
-
 
   prometheus:
     image: prom/prometheus:v3.9.1

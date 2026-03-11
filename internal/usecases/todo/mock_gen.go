@@ -468,7 +468,7 @@ type MockList_Query_Call struct {
 //   - ctx context.Context
 //   - page int
 //   - pageSize int
-//   - opts ...ListTodoOptions
+//   - opts ...ListOptions
 func (_e *MockList_Expecter) Query(ctx interface{}, page interface{}, pageSize interface{}, opts ...interface{}) *MockList_Query_Call {
 	return &MockList_Query_Call{Call: _e.mock.On("Query",
 		append([]interface{}{ctx, page, pageSize}, opts...)...)}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub/v2"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
 	"github.com/google/uuid"
@@ -18,7 +19,7 @@ type ConversationTitleGenerator struct {
 	Logger                    *log.Logger                    `resolve:""`
 	Client                    *pubsub.Client                 `resolve:""`
 	GenerateConversationTitle chat.GenerateConversationTitle `resolve:""`
-	Interval                  time.Duration                  `config:"CHAT_TITLE_BATCH_INTERVAL" default:"3s"`
+	Interval                  time.Duration                  `config:"CHAT_TITLE_BATCH_INTERVAL" default:"5s"`
 	BatchSize                 int                            `config:"CHAT_TITLE_BATCH_SIZE" default:"50"`
 	SubscriptionID            string                         `config:"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID"`
 	workerExecutionChan       chan struct{}
@@ -29,7 +30,7 @@ func (s ConversationTitleGenerator) Run(ctx context.Context) error {
 	s.Logger.Println("ConversationTitleGenerator: running...")
 
 	if s.BatchSize <= 0 {
-		s.BatchSize = 50
+		s.BatchSize = 5
 	}
 	if s.Interval <= 0 {
 		s.Interval = 3 * time.Second
@@ -103,6 +104,12 @@ func (s ConversationTitleGenerator) flush(ctx context.Context, batch []*pubsub.M
 		}
 
 		if event.Type != outbox.EventType_CHAT_MESSAGE_SENT {
+			msg.Ack()
+			continue
+		}
+		// Title generation should only be triggered by assistant messages.
+		// User messages are acked and ignored by this worker.
+		if event.ChatRole != assistant.ChatRole_Assistant {
 			msg.Ack()
 			continue
 		}

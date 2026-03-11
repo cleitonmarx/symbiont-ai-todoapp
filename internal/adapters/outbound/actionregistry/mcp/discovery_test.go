@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
@@ -37,7 +36,6 @@ func TestParseActionCallArguments(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got, err := parseActionCallArguments(tt.input)
@@ -84,7 +82,7 @@ func TestRenderCallToolResult(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tt.assert(t, renderCallToolResult(tt.result))
@@ -130,7 +128,7 @@ func TestRenderContent(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tt.assert(t, renderContent(tt.content))
@@ -177,10 +175,10 @@ func TestListAllTools(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			got, err := listAllTools(context.Background(), tt.session)
+			got, err := listAllTools(t.Context(), tt.session)
 			tt.assert(t, got, err)
 		})
 	}
@@ -198,7 +196,6 @@ func TestActionErrorMessage(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			msg := actionErrorMessage(tt.callID, tt.code, tt.details)

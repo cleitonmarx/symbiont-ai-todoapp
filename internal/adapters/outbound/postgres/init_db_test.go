@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"io"
 	"log"
 	"testing"
@@ -9,7 +8,7 @@ import (
 	"github.com/XSAM/otelsql"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 )
 
 func Test_withQueryAttributes(t *testing.T) {
@@ -67,7 +66,7 @@ func Test_withQueryAttributes(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := withQueryAttributes(log.New(io.Discard, "", 0))(context.Background(), otelsql.MethodConnQuery, tt.query, nil)
+			got := withQueryAttributes(log.New(io.Discard, "", 0))(t.Context(), otelsql.MethodConnQuery, tt.query, nil)
 			assert.Equal(t, tt.want, got)
 
 		})

@@ -126,7 +126,7 @@ func NewGenerateChatSummaryImpl(
 
 // Execute updates the current conversation summary using the latest chat message event.
 func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event outbox.ChatMessageEvent) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	if event.Type != outbox.EventType_CHAT_MESSAGE_SENT {
@@ -138,7 +138,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event outbox.Cha
 
 	currentSummary := assistant.DefaultConversationStateSummary
 	previous, found, err := gcs.conversationSummaryRepo.GetConversationSummary(spanCtx, event.ConversationID)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to get conversation summary: %w", err)
 	}
 
@@ -152,7 +152,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event outbox.Cha
 	}
 
 	unsummarizedMessages, hasMore, err := gcs.chatMessageRepo.ListChatMessages(spanCtx, event.ConversationID, 1, MAX_CHAT_SUMMARY_MESSAGES_PER_RUN, messageOptions...)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to list chat messages: %w", err)
 	}
 	span.SetAttributes(
@@ -168,7 +168,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event outbox.Cha
 	}
 
 	promptMessages, err := gcs.buildPromptMessages(currentSummary, formatMessagesForSummary(unsummarizedMessages))
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to build prompt messages: %w", err)
 	}
 
@@ -181,7 +181,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event outbox.Cha
 		TopP:             common.Ptr(CHAT_SUMMARY_TOP_P),
 		FrequencyPenalty: common.Ptr(CHAT_SUMMARY_FREQUENCY_PENALTY),
 	})
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to generate chat summary: %w", err)
 	}
 
@@ -210,7 +210,7 @@ func (gcs GenerateChatSummaryImpl) Execute(ctx context.Context, event outbox.Cha
 	}
 
 	err = gcs.conversationSummaryRepo.StoreConversationSummary(spanCtx, newSummary)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to store conversation summary: %w", err)
 	}
 

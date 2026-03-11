@@ -318,7 +318,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				actionCompletedData  assistant.ActionCompleted
 				actionStartedSeen    bool
 			)
-			err := useCase.Execute(context.Background(), "Delete todo 1", "test-model", func(_ context.Context, eventType assistant.EventType, data any) error {
+			err := useCase.Execute(t.Context(), "Delete todo 1", "test-model", func(_ context.Context, eventType assistant.EventType, data any) error {
 				eventSequence = append(eventSequence, eventType)
 				switch eventType {
 				case assistant.EventType_ActionApprovalRequired:

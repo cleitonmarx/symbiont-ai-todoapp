@@ -29,7 +29,7 @@ func NewDelete(uow transaction.UnitOfWork, deleter Deleter) DeleteImpl {
 
 // Execute deletes a todo item by its ID.
 func (dti DeleteImpl) Execute(ctx context.Context, id uuid.UUID) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	return dti.uow.Execute(spanCtx, func(uowCtx context.Context, scope transaction.Scope) error {

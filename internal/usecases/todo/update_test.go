@@ -204,7 +204,7 @@ func TestUpdateImpl_Execute(t *testing.T) {
 
 			uti := NewUpdateImpl(uow, modifier)
 
-			got, gotErr := uti.Execute(context.Background(), tt.id, tt.title, tt.status, tt.dueDate)
+			got, gotErr := uti.Execute(t.Context(), tt.id, tt.title, tt.status, tt.dueDate)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			if tt.expectedErr == nil {
 				assert.Equal(t, tt.expectedTodo.ID, got.ID)

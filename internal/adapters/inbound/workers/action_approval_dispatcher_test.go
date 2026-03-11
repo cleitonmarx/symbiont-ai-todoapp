@@ -41,6 +41,7 @@ func TestActionApprovalDispatcher_Run(t *testing.T) {
 				ActionName: "delete_todo",
 				Status:     assistant.ChatMessageApprovalStatus_Approved,
 				Reason:     common.Ptr("approved"),
+				DecidedAt:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 			}),
 			expectDispatch:             true,
 			expectedDispatchStatus:     assistant.ChatMessageApprovalStatus_Approved,
@@ -48,32 +49,20 @@ func TestActionApprovalDispatcher_Run(t *testing.T) {
 			expectedDispatchReason:     common.Ptr("approved"),
 			dispatchReturn:             true,
 		},
-		"accepts-snake-case-payload-and-normalizes-status": {
-			payload: approvalDecisionSnakeJSON(t, map[string]any{
-				"conversation_id": conversationID.String(),
-				"turn_id":         turnID.String(),
-				"action_call_id":  actionCallID,
-				"action_name":     "delete_todo",
-				"status":          "approved",
-				"reason":          "approved from endpoint",
-			}),
-			expectDispatch:             true,
-			expectedDispatchStatus:     assistant.ChatMessageApprovalStatus_Approved,
-			expectedDispatchActionName: "delete_todo",
-			expectedDispatchReason:     common.Ptr("approved from endpoint"),
-			dispatchReturn:             true,
-		},
 		"invalid-payload": {
 			payload:        []byte(`{"invalid"`),
 			expectDispatch: false,
 		},
 		"invalid-status": {
-			payload: approvalDecisionSnakeJSON(t, map[string]any{
-				"conversation_id": conversationID.String(),
-				"turn_id":         turnID.String(),
-				"action_call_id":  actionCallID,
-				"action_name":     "delete_todo",
-				"status":          "PENDING",
+			payload: approvalDecisionJSON(t, assistant.ActionApprovalDecision{
+				Key: assistant.ActionApprovalKey{
+					ConversationID: conversationID,
+					TurnID:         turnID,
+					ActionCallID:   actionCallID,
+				},
+				ActionName: "delete_todo",
+				Status:     "INVALID_STATUS",
+				DecidedAt:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 			}),
 			expectDispatch: false,
 		},
@@ -189,14 +178,6 @@ func approvalDecisionJSON(t *testing.T, decision assistant.ActionApprovalDecisio
 	t.Helper()
 
 	data, err := json.Marshal(decision)
-	assert.NoError(t, err)
-	return data
-}
-
-func approvalDecisionSnakeJSON(t *testing.T, payload map[string]any) []byte {
-	t.Helper()
-
-	data, err := json.Marshal(payload)
 	assert.NoError(t, err)
 	return data
 }

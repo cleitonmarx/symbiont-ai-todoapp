@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
@@ -76,14 +75,13 @@ func TestMCPRegistry_Execute(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			registry := newMCPRegistryWithConnector(Config{Endpoint: "http://localhost:8811/mcp"}, &fakeConnector{session: tt.session})
 			if tt.initialize {
 				require.NoError(t, registry.initializeActions(t.Context()))
 			}
-			msg := registry.Execute(context.Background(), tt.call, nil)
+			msg := registry.Execute(t.Context(), tt.call, nil)
 			tt.assertMessage(t, msg)
 			if tt.assertSession != nil {
 				tt.assertSession(t, tt.session)
@@ -139,7 +137,7 @@ func TestMCPRegistry_Methods(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tt.assert(t, tt.registry)
@@ -176,12 +174,11 @@ func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			session := &fakeSession{listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{tt.tool}}}}
 			registry := newMCPRegistryWithConnector(Config{Endpoint: "http://localhost:8811/mcp"}, &fakeConnector{session: session})
-			require.NoError(t, registry.initializeActions(context.Background()))
+			require.NoError(t, registry.initializeActions(t.Context()))
 			tt.assert(t, registry)
 		})
 	}

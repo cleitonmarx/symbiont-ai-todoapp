@@ -1,7 +1,6 @@
 package board
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -96,7 +95,7 @@ func TestGetBoardSummaryImpl_Query(t *testing.T) {
 
 			gbs := NewGetBoardSummaryImpl(summaryRepo)
 
-			got, gotErr := gbs.Query(context.Background())
+			got, gotErr := gbs.Query(t.Context())
 			assert.Equal(t, tt.expectedErr, gotErr)
 			assert.Equal(t, tt.expectedSummary.ID, got.ID)
 			assert.Equal(t, tt.expectedSummary.Content.Counts.Open, got.Content.Counts.Open)

@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -32,6 +31,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 			*assistant.MockConversationSummaryRepository,
 			*assistant.MockChatMessageRepository,
 			*core.MockCurrentTimeProvider,
+			*core.MockLocker,
 			*assistant.MockAssistant,
 		)
 		expectedErr error
@@ -77,8 +77,14 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				_ *assistant.MockConversationSummaryRepository,
 				_ *assistant.MockChatMessageRepository,
 				_ *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
 				_ *assistant.MockAssistant,
 			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, true, nil).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(assistant.Conversation{}, false, nil).
@@ -99,8 +105,14 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				_ *assistant.MockConversationSummaryRepository,
 				_ *assistant.MockChatMessageRepository,
 				_ *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
 				_ *assistant.MockAssistant,
 			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, true, nil).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(assistant.Conversation{
@@ -125,8 +137,14 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *assistant.MockConversationSummaryRepository,
 				chatRepo *assistant.MockChatMessageRepository,
 				_ *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
 				assist *assistant.MockAssistant,
 			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, true, nil).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(assistant.Conversation{
@@ -172,8 +190,14 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *assistant.MockConversationSummaryRepository,
 				chatRepo *assistant.MockChatMessageRepository,
 				timeProvider *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
 				assist *assistant.MockAssistant,
 			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, true, nil).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(assistant.Conversation{
@@ -251,8 +275,14 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *assistant.MockConversationSummaryRepository,
 				chatRepo *assistant.MockChatMessageRepository,
 				timeProvider *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
 				assist *assistant.MockAssistant,
 			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, true, nil).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(assistant.Conversation{
@@ -304,8 +334,14 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *assistant.MockConversationSummaryRepository,
 				chatRepo *assistant.MockChatMessageRepository,
 				timeProvider *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
 				assist *assistant.MockAssistant,
 			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, true, nil).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(assistant.Conversation{
@@ -351,8 +387,14 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *assistant.MockConversationSummaryRepository,
 				chatRepo *assistant.MockChatMessageRepository,
 				timeProvider *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
 				assist *assistant.MockAssistant,
 			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, true, nil).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(assistant.Conversation{
@@ -411,8 +453,14 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 				summaryRepo *assistant.MockConversationSummaryRepository,
 				chatRepo *assistant.MockChatMessageRepository,
 				_ *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
 				assist *assistant.MockAssistant,
 			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, true, nil).
+					Once()
+
 				conversationRepo.EXPECT().
 					GetConversation(mock.Anything, conversationID).
 					Return(assistant.Conversation{
@@ -447,6 +495,52 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		"lock-not-acquired-noop": {
+			model: "title-model",
+			event: outbox.ChatMessageEvent{
+				Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+				ConversationID: conversationID,
+				ChatMessageID:  chatMessageID,
+				ChatRole:       assistant.ChatRole_Assistant,
+			},
+			setExpectations: func(
+				_ *assistant.MockConversationRepository,
+				_ *assistant.MockConversationSummaryRepository,
+				_ *assistant.MockChatMessageRepository,
+				_ *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
+				_ *assistant.MockAssistant,
+			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, false, nil).
+					Once()
+			},
+			expectedErr: nil,
+		},
+		"lock-error": {
+			model: "title-model",
+			event: outbox.ChatMessageEvent{
+				Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+				ConversationID: conversationID,
+				ChatMessageID:  chatMessageID,
+				ChatRole:       assistant.ChatRole_Assistant,
+			},
+			setExpectations: func(
+				_ *assistant.MockConversationRepository,
+				_ *assistant.MockConversationSummaryRepository,
+				_ *assistant.MockChatMessageRepository,
+				_ *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
+				_ *assistant.MockAssistant,
+			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, false, errors.New("lock backend unavailable")).
+					Once()
+			},
+			expectedErr: errors.New("failed to acquire conversation title lock: lock backend unavailable"),
+		},
 	}
 
 	for name, tt := range tests {
@@ -455,22 +549,24 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 			summaryRepo := assistant.NewMockConversationSummaryRepository(t)
 			chatRepo := assistant.NewMockChatMessageRepository(t)
 			timeProvider := core.NewMockCurrentTimeProvider(t)
+			locker := core.NewMockLocker(t)
 			assist := assistant.NewMockAssistant(t)
 			if tt.setExpectations != nil {
-				tt.setExpectations(conversationRepo, summaryRepo, chatRepo, timeProvider, assist)
+				tt.setExpectations(conversationRepo, summaryRepo, chatRepo, timeProvider, locker, assist)
 			}
 
 			uc := NewGenerateConversationTitleImpl(
 				conversationRepo,
 				summaryRepo,
 				chatRepo,
+				locker,
 				timeProvider,
 				assist,
 				tt.model,
 				nil,
 			)
 
-			err := uc.Execute(context.Background(), tt.event)
+			err := uc.Execute(t.Context(), tt.event)
 			if tt.expectedErr != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tt.expectedErr.Error(), err.Error())

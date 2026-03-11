@@ -934,7 +934,7 @@ func TestStreamChatImpl_Execute_PersistsSelectedSkillsAndEmitsTurnMetadata(t *te
 	)
 
 	var turnStarted assistant.TurnStarted
-	err := useCase.Execute(context.Background(), "Update my todos", "test-model", func(_ context.Context, eventType assistant.EventType, data any) error {
+	err := useCase.Execute(t.Context(), "Update my todos", "test-model", func(_ context.Context, eventType assistant.EventType, data any) error {
 		if eventType == assistant.EventType_TurnStarted {
 			turnStarted = data.(assistant.TurnStarted)
 		}

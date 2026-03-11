@@ -30,7 +30,7 @@ func NewCreateImpl(uow transaction.UnitOfWork, creator Creator) CreateImpl {
 
 // Execute creates a new todo item.
 func (cti CreateImpl) Execute(ctx context.Context, title string, dueDate time.Time) (domain.Todo, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	var todo domain.Todo
@@ -39,7 +39,7 @@ func (cti CreateImpl) Execute(ctx context.Context, title string, dueDate time.Ti
 		todo, err = cti.creator.Create(uowCtx, scope, title, dueDate)
 		return err
 	})
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return domain.Todo{}, err
 	}
 

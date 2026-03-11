@@ -72,7 +72,7 @@ func NewSkillRegistry(ctx context.Context, skills []assistant.SkillDefinition, e
 
 // ListRelevant returns only the top relevant skills for the given turn context.
 func (r Registry) ListRelevant(ctx context.Context, query assistant.SkillQueryContext) []assistant.SkillDefinition {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	if r.encoder == nil || strings.TrimSpace(r.embeddingModel) == "" || len(r.embeddedSkills) == 0 {
@@ -85,7 +85,6 @@ func (r Registry) ListRelevant(ctx context.Context, query assistant.SkillQueryCo
 			forcedNames = append(forcedNames, skill.Name)
 		}
 		span.SetAttributes(attribute.StringSlice("skillregistry.forced_skill_names", forcedNames))
-		span.SetAttributes(attribute.StringSlice("skillregistry.relevant_skill_names", forcedNames))
 		return forced
 	}
 
@@ -101,13 +100,22 @@ func (r Registry) ListRelevant(ctx context.Context, query assistant.SkillQueryCo
 		contextMinScore = max(0, contextMinScore-(r.cfg.LatestIntentOverrideDelta/2))
 	}
 
-	scored := r.rankSkills(spanCtx, currentInput, recentInputs, query.ConversationSummary, contextMinScore, true)
+	queryVectorCache := make(map[string][]float64, 4)
+	scored := r.rankSkills(
+		spanCtx,
+		currentInput,
+		recentInputs,
+		query.ConversationSummary,
+		contextMinScore,
+		true,
+		queryVectorCache,
+	)
 	latestInput := latestUserInput(query.Messages, r.cfg.SelectionMaxChars)
 	if latestInput == "" {
 		return nil
 	}
 
-	latestOnly := r.rankSkills(spanCtx, latestInput, "", "", 0, false)
+	latestOnly := r.rankSkills(spanCtx, latestInput, "", "", 0, false, queryVectorCache)
 	scored = r.chooseRanking(scored, latestOnly, hasPriorContext)
 	if len(scored) == 0 {
 		return nil
@@ -133,7 +141,7 @@ func (r Registry) ListRelevant(ctx context.Context, query assistant.SkillQueryCo
 
 // ListSkills returns all registered skills in stable priority order.
 func (r Registry) ListSkills(ctx context.Context) ([]assistant.SkillDefinition, error) {
-	_, span := telemetry.Start(ctx)
+	_, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	return copySkillDefinitions(r.definitions), nil

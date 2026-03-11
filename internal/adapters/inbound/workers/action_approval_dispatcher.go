@@ -204,68 +204,15 @@ func (w ActionApprovalDispatcher) deleteSubscription(ctx context.Context, subscr
 	return nil
 }
 
-type actionApprovalDecisionPayload struct {
-	ConversationID uuid.UUID `json:"conversation_id"`
-	TurnID         uuid.UUID `json:"turn_id"`
-	ActionCallID   string    `json:"action_call_id"`
-	ActionName     string    `json:"action_name"`
-	Status         string    `json:"status"`
-	Reason         *string   `json:"reason,omitempty"`
-}
-
+// decodeApprovalDecision attempts to parse the incoming Pub/Sub message payload into an ActionApprovalDecision struct,
 func decodeApprovalDecision(payload []byte) (assistant.ActionApprovalDecision, error) {
 	var direct assistant.ActionApprovalDecision
-	if err := json.Unmarshal(payload, &direct); err == nil {
-		direct.Status = normalizeApprovalStatus(string(direct.Status))
-		if err := validateApprovalDecision(direct); err == nil {
-			return direct, nil
-		}
+	if err := json.Unmarshal(payload, &direct); err != nil {
+		return assistant.ActionApprovalDecision{}, err
 	}
-
-	var msg actionApprovalDecisionPayload
-	if err := json.Unmarshal(payload, &msg); err != nil {
+	if err := direct.Validate(); err != nil {
 		return assistant.ActionApprovalDecision{}, err
 	}
 
-	decision := assistant.ActionApprovalDecision{
-		Key: assistant.ActionApprovalKey{
-			ConversationID: msg.ConversationID,
-			TurnID:         msg.TurnID,
-			ActionCallID:   strings.TrimSpace(msg.ActionCallID),
-		},
-		ActionName: strings.TrimSpace(msg.ActionName),
-		Status:     normalizeApprovalStatus(msg.Status),
-		Reason:     msg.Reason,
-	}
-
-	if err := validateApprovalDecision(decision); err != nil {
-		return assistant.ActionApprovalDecision{}, err
-	}
-	return decision, nil
-}
-
-func validateApprovalDecision(decision assistant.ActionApprovalDecision) error {
-	switch {
-	case decision.Key.ConversationID == uuid.Nil:
-		return errors.New("conversation_id is required")
-	case decision.Key.TurnID == uuid.Nil:
-		return errors.New("turn_id is required")
-	case strings.TrimSpace(decision.Key.ActionCallID) == "":
-		return errors.New("action_call_id is required")
-	}
-
-	switch decision.Status {
-	case assistant.ChatMessageApprovalStatus_Approved,
-		assistant.ChatMessageApprovalStatus_Rejected,
-		assistant.ChatMessageApprovalStatus_AutoRejected,
-		assistant.ChatMessageApprovalStatus_Expired:
-		return nil
-	default:
-		return fmt.Errorf("invalid approval status: %q", decision.Status)
-	}
-}
-
-func normalizeApprovalStatus(raw string) assistant.ChatMessageApprovalStatus {
-	status := strings.ToUpper(strings.TrimSpace(raw))
-	return assistant.ChatMessageApprovalStatus(status)
+	return direct, nil
 }

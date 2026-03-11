@@ -33,7 +33,7 @@ func NewRelayImpl(uow transaction.UnitOfWork, publisher outbox.EventPublisher, l
 
 // Execute processes pending outbox events and relays them.
 func (r RelayImpl) Execute(ctx context.Context) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	err := r.Uow.Execute(spanCtx, func(uowCtx context.Context, scope transaction.Scope) error {
@@ -51,7 +51,7 @@ func (r RelayImpl) Execute(ctx context.Context) error {
 		}
 		return nil
 	})
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 	return nil

@@ -28,6 +28,7 @@ type GenerateBoardSummary interface {
 
 // GenerateBoardSummaryImpl is the implementation of the GenerateBoardSummary use case.
 type GenerateBoardSummaryImpl struct {
+	locker             core.Locker
 	repo               todo.BoardSummaryRepository
 	timeProvider       core.CurrentTimeProvider
 	assistant          assistant.Assistant
@@ -37,6 +38,7 @@ type GenerateBoardSummaryImpl struct {
 
 // NewGenerateBoardSummaryImpl creates a new instance of GenerateBoardSummaryImpl.
 func NewGenerateBoardSummaryImpl(
+	locker core.Locker,
 	bsr todo.BoardSummaryRepository,
 	tp core.CurrentTimeProvider,
 	assistant assistant.Assistant,
@@ -44,6 +46,7 @@ func NewGenerateBoardSummaryImpl(
 	q CompletedBoardSummaryChannel,
 ) GenerateBoardSummaryImpl {
 	return GenerateBoardSummaryImpl{
+		locker:             locker,
 		repo:               bsr,
 		timeProvider:       tp,
 		assistant:          assistant,
@@ -54,11 +57,20 @@ func NewGenerateBoardSummaryImpl(
 
 // Execute runs the use case to generate the board summary.
 func (gs GenerateBoardSummaryImpl) Execute(ctx context.Context) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
+	unlock, locked, err := gs.locker.TryLock(spanCtx, "generate_board_summary")
+	if telemetry.IsErrorRecorded(span, err) {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	if !locked {
+		return nil
+	}
+	defer unlock()
+
 	summary, hasChanges, err := gs.generateBoardSummary(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
@@ -67,7 +79,7 @@ func (gs GenerateBoardSummaryImpl) Execute(ctx context.Context) error {
 	}
 
 	err = gs.repo.StoreSummary(spanCtx, summary)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 

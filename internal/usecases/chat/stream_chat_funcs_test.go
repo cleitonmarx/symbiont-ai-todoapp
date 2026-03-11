@@ -89,7 +89,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	)
 
 	var capturedContent string
-	err := useCase.Execute(context.Background(), tt.userMessage, tt.model, func(_ context.Context, eventType assistant.EventType, data any) error {
+	err := useCase.Execute(t.Context(), tt.userMessage, tt.model, func(_ context.Context, eventType assistant.EventType, data any) error {
 		if tt.onEventErrType != "" && eventType == tt.onEventErrType {
 			return errors.New("onEvent error")
 		}

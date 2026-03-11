@@ -31,7 +31,7 @@ func NewUpdateImpl(uow transaction.UnitOfWork, modifier Updater) UpdateImpl {
 
 // Execute updates an existing todo item identified by id with the provided title, status, and/or due date.
 func (uti UpdateImpl) Execute(ctx context.Context, id uuid.UUID, title *string, status *domain.Status, dueDate *time.Time) (domain.Todo, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	var todo domain.Todo
@@ -44,7 +44,7 @@ func (uti UpdateImpl) Execute(ctx context.Context, id uuid.UUID, title *string, 
 		return nil
 	})
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return domain.Todo{}, err
 	}
 

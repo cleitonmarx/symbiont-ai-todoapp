@@ -8,19 +8,21 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ListTodos returns a paginated list of todos with optional filtering and sorting
-// (GET /api/todos)
+// (GET /api/v1/todos)
 func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, params gen.ListTodosParams) {
 	resp := gen.ListTodosResp{
 		Items: []gen.Todo{},
 		Page:  params.Page,
 	}
-	var queryParams []todouc.ListTodoOptions
+	var queryParams []todouc.ListOptions
 	if params.Status != nil {
 		queryParams = append(queryParams, todouc.WithStatus(todo.Status(*params.Status)))
 	}
@@ -37,8 +39,9 @@ func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, param
 		queryParams = append(queryParams, todouc.WithSortBy(string(*params.Sort)))
 	}
 
-	todos, hasMore, err := api.ListTodosUseCase.Query(r.Context(), params.Page, params.PageSize, queryParams...)
-	if err != nil {
+	ctx := r.Context()
+	todos, hasMore, err := api.ListTodosUseCase.Query(ctx, params.Page, params.PageSize, queryParams...)
+	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) {
 		api.Logger.Printf("Error listing todos: %v", err)
 		respondError(w, toError(err))
 		return
@@ -60,7 +63,7 @@ func (api TodoAppServer) ListTodos(w http.ResponseWriter, r *http.Request, param
 }
 
 // CreateTodo creates a new todo item
-// (POST /api/todos)
+// (POST /api/v1/todos)
 func (api TodoAppServer) CreateTodo(w http.ResponseWriter, r *http.Request) {
 	var req gen.CreateTodoJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -72,8 +75,9 @@ func (api TodoAppServer) CreateTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todo, err := api.CreateTodoUseCase.Execute(r.Context(), req.Title, req.DueDate.Time)
-	if err != nil {
+	ctx := r.Context()
+	todo, err := api.CreateTodoUseCase.Execute(ctx, req.Title, req.DueDate.Time)
+	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) {
 		api.Logger.Printf("Error creating todo: %v", err)
 		respondError(w, toError(err))
 		return
@@ -83,7 +87,7 @@ func (api TodoAppServer) CreateTodo(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateTodo updates an existing todo item
-// (PATCH /api/todos/{todo_id})
+// (PATCH /api/v1/todos/{todo_id})
 func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todoId openapi_types.UUID) {
 	var req gen.UpdateTodoJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -107,14 +111,15 @@ func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todo
 		return
 	}
 
+	ctx := r.Context()
 	todo, err := api.UpdateTodoUseCase.Execute(
-		r.Context(),
+		ctx,
 		uuid.UUID(todoId),
 		req.Title,
 		(*todo.Status)(req.Status),
 		dueDate,
 	)
-	if err != nil {
+	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) {
 		api.Logger.Printf("Error updating todo: %v", err)
 		respondError(w, toError(err))
 		return
@@ -124,10 +129,11 @@ func (api TodoAppServer) UpdateTodo(w http.ResponseWriter, r *http.Request, todo
 }
 
 // DeleteTodo deletes a todo item by ID
-// (DELETE /api/todos/{todo_id})
+// (DELETE /api/v1/todos/{todo_id})
 func (api TodoAppServer) DeleteTodo(w http.ResponseWriter, r *http.Request, todoId openapi_types.UUID) {
-	err := api.DeleteTodoUseCase.Execute(r.Context(), todoId)
-	if err != nil {
+	ctx := r.Context()
+	err := api.DeleteTodoUseCase.Execute(ctx, todoId)
+	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) {
 		api.Logger.Printf("Error deleting todo: %v", err)
 		respondError(w, toError(err))
 		return

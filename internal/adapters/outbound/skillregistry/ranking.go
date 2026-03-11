@@ -34,38 +34,43 @@ type weightedQueryVector struct {
 }
 
 // rankSkills embeds the supplied query inputs and produces scored skill
-// candidates ordered from most to least relevant.
-func (r Registry) rankSkills(ctx context.Context, currentInput, recentInputs, summary string, minScore float64, includePriority bool) []scoredSkill {
+// candidates ordered from most to least relevant. The optional cache map
+// enables embedding reuse for repeated inputs within one ranking flow.
+func (r Registry) rankSkills(
+	ctx context.Context,
+	currentInput, recentInputs, summary string,
+	minScore float64,
+	includePriority bool,
+	queryVectorCache map[string][]float64,
+) []scoredSkill {
 	currentInput = truncateToLastChars(strings.TrimSpace(currentInput), r.cfg.SelectionMaxChars)
 	if currentInput == "" {
 		return nil
 	}
 
-	currentVector, err := r.encoder.VectorizeQuery(ctx, r.embeddingModel, currentInput)
-	if err != nil || len(currentVector.Vector) == 0 {
+	currentVector, ok := r.vectorizeQueryCached(ctx, currentInput, queryVectorCache)
+	if !ok {
 		return nil
 	}
 
 	var recentVector []float64
-	recentInputs = truncateToLastChars(recentInputs, r.cfg.SelectionMaxChars)
+	recentInputs = truncateToLastChars(strings.TrimSpace(recentInputs), r.cfg.SelectionMaxChars)
 	if recentInputs != "" {
-		vec, err := r.encoder.VectorizeQuery(ctx, r.embeddingModel, recentInputs)
-		if err == nil && len(vec.Vector) > 0 {
-			recentVector = vec.Vector
+		if vec, ok := r.vectorizeQueryCached(ctx, recentInputs, queryVectorCache); ok {
+			recentVector = vec
 		}
 	}
 
 	var summaryVector []float64
-	summary = truncateToLastChars(summary, r.cfg.SelectionMaxChars)
+	summary = truncateToLastChars(strings.TrimSpace(summary), r.cfg.SelectionMaxChars)
 	if summary != "" {
-		vec, err := r.encoder.VectorizeQuery(ctx, r.embeddingModel, summary)
-		if err == nil && len(vec.Vector) > 0 {
-			summaryVector = vec.Vector
+		if vec, ok := r.vectorizeQueryCached(ctx, summary, queryVectorCache); ok {
+			summaryVector = vec
 		}
 	}
 
 	queryVectors := []weightedQueryVector{
-		{weight: r.cfg.CurrentInputWeight, vector: currentVector.Vector},
+		{weight: r.cfg.CurrentInputWeight, vector: currentVector},
 		{weight: r.cfg.RecentInputsWeight, vector: recentVector},
 		{weight: r.cfg.SummaryWeight, vector: summaryVector},
 	}
@@ -90,6 +95,31 @@ func (r Registry) rankSkills(ctx context.Context, currentInput, recentInputs, su
 	})
 
 	return scored
+}
+
+// vectorizeQueryCached embeds a query and optionally reuses/caches the
+// resulting vector by normalized query text.
+func (r Registry) vectorizeQueryCached(ctx context.Context, query string, cache map[string][]float64) ([]float64, bool) {
+	if query == "" {
+		return nil, false
+	}
+
+	if cache != nil {
+		if vector, ok := cache[query]; ok && len(vector) > 0 {
+			return vector, true
+		}
+	}
+
+	embedded, err := r.encoder.VectorizeQuery(ctx, r.embeddingModel, query)
+	if err != nil || len(embedded.Vector) == 0 {
+		return nil, false
+	}
+
+	if cache != nil {
+		cache[query] = embedded.Vector
+	}
+
+	return embedded.Vector, true
 }
 
 // chooseRanking picks whether to trust conversation context or the latest

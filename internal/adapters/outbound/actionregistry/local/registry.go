@@ -30,7 +30,7 @@ func NewActionRegistry(se semantic.Encoder, embeddingModel string, actionVectorL
 
 // Execute invokes the appropriate action.
 func (r LocalRegistry) Execute(ctx context.Context, call assistant.ActionCall, conversationHistory []assistant.Message) assistant.Message {
-	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
+	spanCtx, span := telemetry.StartSpan(ctx, trace.WithAttributes(
 		attribute.String("assistant_action", call.Name),
 	))
 	defer span.End()

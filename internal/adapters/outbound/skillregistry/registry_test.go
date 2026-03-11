@@ -1,7 +1,6 @@
 package skillregistry
 
 import (
-	"context"
 	"testing"
 	"testing/fstest"
 
@@ -37,10 +36,10 @@ func TestNewSkillRegistry_ValidatesDependencies(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			_, err := NewSkillRegistry(context.Background(), []assistant.SkillDefinition{{Name: "x", Content: "y"}}, tt.enc, tt.model, Config{})
+			_, err := NewSkillRegistry(t.Context(), []assistant.SkillDefinition{{Name: "x", Content: "y"}}, tt.enc, tt.model, Config{})
 			tt.assert(t, err)
 		})
 	}
@@ -111,7 +110,7 @@ Build a simple plan in steps.
 		},
 	})
 
-	registry, err := NewSkillRegistry(context.Background(), skills, encoder, "embed-model", Config{
+	registry, err := NewSkillRegistry(t.Context(), skills, encoder, "embed-model", Config{
 		RelevantSkillsTopK:     2,
 		RelevantSkillsMinScore: 0.10,
 		AvoidPenaltyWeight:     0.80,
@@ -121,10 +120,10 @@ Build a simple plan in steps.
 	require.NoError(t, err)
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			got := registry.ListRelevant(context.Background(), tt.query)
+			got := registry.ListRelevant(t.Context(), tt.query)
 			if tt.wantTop == "" {
 				assert.Empty(t, got)
 				return
@@ -175,7 +174,7 @@ Use safe mutation flow.
 		},
 	})
 
-	registry, err := NewSkillRegistry(context.Background(), skills, encoder, "embed-model", Config{
+	registry, err := NewSkillRegistry(t.Context(), skills, encoder, "embed-model", Config{
 		RelevantSkillsTopK:     2,
 		RelevantSkillsMinScore: 0.10,
 	})
@@ -212,11 +211,11 @@ Use safe mutation flow.
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			got := registry.ListRelevant(context.Background(), assistant.SkillQueryContext{
+			got := registry.ListRelevant(t.Context(), assistant.SkillQueryContext{
 				Messages: tt.messages,
 			})
 

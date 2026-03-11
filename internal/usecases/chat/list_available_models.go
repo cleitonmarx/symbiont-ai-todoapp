@@ -28,11 +28,11 @@ func NewListAvailableModelsImpl(
 
 // Query retrieves the list of available assistant models
 func (uc ListAvailableModelsImpl) Query(ctx context.Context) ([]assistant.ModelInfo, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	assistantModels, err := uc.assistantCatalog.ListModels(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, err
 	}
 

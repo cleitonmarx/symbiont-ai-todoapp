@@ -1,7 +1,6 @@
 package graphql
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -81,7 +80,7 @@ func TestClient_UpdateTodos(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			client := NewClientWithHTTPClient("http://fake", testHTTPClient(tt.mockHandler))
-			out, err := client.UpdateTodos(context.Background(), tt.params)
+			out, err := client.UpdateTodos(t.Context(), tt.params)
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, out)
@@ -136,7 +135,7 @@ func TestClient_DeleteTodos(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			client := NewClientWithHTTPClient("http://fake", testHTTPClient(tt.mockHandler))
-			out, err := client.DeleteTodos(context.Background(), tt.ids)
+			out, err := client.DeleteTodos(t.Context(), tt.ids)
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, out)
@@ -198,7 +197,7 @@ func TestClient_ListTodos(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			client := NewClientWithHTTPClient("http://fake", testHTTPClient(tt.mockHandler))
-			out, err := client.ListTodos(context.Background(), tt.status, tt.page, tt.pageSize)
+			out, err := client.ListTodos(t.Context(), tt.status, tt.page, tt.pageSize)
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, out)

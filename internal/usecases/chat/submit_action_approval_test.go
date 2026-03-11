@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -43,10 +42,10 @@ func TestSubmitActionApprovalImpl_Execute(t *testing.T) {
 				TurnID:         turnID,
 				ActionCallID:   actionCallID,
 				ActionName:     "delete_todo",
-				Status:         assistant.ChatMessageApprovalStatus_Expired,
+				Status:         "invalid",
 			},
 			expectErr:        true,
-			expectedErrValue: "status must be APPROVED or REJECTED",
+			expectedErrValue: "invalid status: invalid",
 		},
 		"publish-error": {
 			input: SubmitActionApprovalInput{
@@ -90,7 +89,7 @@ func TestSubmitActionApprovalImpl_Execute(t *testing.T) {
 			}
 
 			uc := NewSubmitActionApprovalImpl(publisher)
-			err := uc.Execute(context.Background(), tt.input)
+			err := uc.Execute(t.Context(), tt.input)
 
 			if !tt.expectErr {
 				assert.NoError(t, err)

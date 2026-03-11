@@ -104,11 +104,9 @@ func (c *BoardSummaryContent) ApplySummary(summary string) {
 
 // BuildComparisonHints computes hints by comparing this content with a previous version.
 func (c BoardSummaryContent) BuildComparisonHints(previous BoardSummaryContent) ComparisonHints {
-	// Completed progress hints
 	doneDelta := c.Counts.Done - previous.Counts.Done
 	completedCandidates := c.extractCompletedCandidates(previous)
 
-	// Urgency hints
 	overdueTitles := normalizeTitles(c.Overdue)
 	nearDeadlineTitles := normalizeTitles(c.NearDeadline)
 

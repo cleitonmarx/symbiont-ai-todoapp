@@ -40,7 +40,7 @@ func NewBoardSummaryRepository(db *sql.DB) BoardSummaryRepository {
 
 // StoreSummary stores a board summary in the database, updating if it already exists.
 func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary todo.BoardSummary) error {
-	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
+	spanCtx, span := telemetry.StartSpan(ctx, trace.WithAttributes(
 		attribute.String("summary_id", summary.ID.String()),
 		attribute.String("model", summary.Model),
 	))
@@ -48,7 +48,7 @@ func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary todo
 
 	// Marshal the content to JSON
 	contentJSON, err := json.Marshal(summary.Content)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to marshal summary content: %w", err)
 	}
 
@@ -72,7 +72,7 @@ func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary todo
 
 	_, err = query.ExecContext(spanCtx)
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to store summary: %w", err)
 	}
 
@@ -81,7 +81,7 @@ func (bsr BoardSummaryRepository) StoreSummary(ctx context.Context, summary todo
 
 // GetLatestSummary retrieves the most recently generated board summary.
 func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (todo.BoardSummary, bool, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	var summary todo.BoardSummary
@@ -107,13 +107,13 @@ func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (todo.Bo
 		return todo.BoardSummary{}, false, nil
 	}
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return todo.BoardSummary{}, false, err
 	}
 
 	// Unmarshal the JSON content
 	err = json.Unmarshal(contentJSON, &summary.Content)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return todo.BoardSummary{}, false, fmt.Errorf("failed to unmarshal summary content: %w", err)
 	}
 
@@ -122,7 +122,7 @@ func (bsr BoardSummaryRepository) GetLatestSummary(ctx context.Context) (todo.Bo
 
 // CalculateSummaryContent computes aggregate board summary sections from todo data.
 func (bsr BoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (todo.BoardSummaryContent, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	var countsJSON, overdueJSON, nearDeadlineJSON, nextUpJSON []byte
@@ -140,7 +140,7 @@ func (bsr BoardSummaryRepository) CalculateSummaryContent(ctx context.Context) (
 		QueryRowContext(spanCtx).
 		Scan(&countsJSON, &overdueJSON, &nearDeadlineJSON, &nextUpJSON)
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return todo.BoardSummaryContent{}, err
 	}
 

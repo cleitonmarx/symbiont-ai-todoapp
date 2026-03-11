@@ -150,7 +150,7 @@ func TestActionApprovalDecision_Validate(t *testing.T) {
 				DecidedAt:  now,
 			},
 			wantErr: true,
-			errMsg:  "status must be APPROVED or REJECTED",
+			errMsg:  "invalid status: INVALID",
 		},
 	}
 

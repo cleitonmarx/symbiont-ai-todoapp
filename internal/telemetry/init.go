@@ -5,17 +5,20 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/cleitonmarx/symbiont/depend"
 	"github.com/hashicorp/go-retryablehttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 )
 
 // InitOpenTelemetry is a component that sets up OpenTelemetry tracing.
@@ -118,16 +121,61 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
+// newAppResource creates a new OpenTelemetry resource with environment-configured attributes.
 func newAppResource(ctx context.Context) (*resource.Resource, error) {
 	res, err := resource.New(ctx,
-		resource.WithAttributes(
-			semconv.ServiceNameKey.String("todoapp"),
-		),
+		resource.WithFromEnv(),
+		resource.WithTelemetrySDK(),
+		resource.WithSchemaURL(semconv.SchemaURL),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
-	return res, nil
+
+	if resourceHasAttribute(res, semconv.ServiceInstanceIDKey) {
+		return res, nil
+	}
+
+	fallbackInstanceID := resolveServiceInstanceID(os.Hostname)
+	fallbackRes := resource.NewSchemaless(
+		semconv.ServiceInstanceIDKey.String(fallbackInstanceID),
+	)
+	// Keep environment-derived attributes as authoritative when both exist.
+	mergedRes, err := resource.Merge(fallbackRes, res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge fallback service instance id: %w", err)
+	}
+	return mergedRes, nil
+}
+
+// resourceHasAttribute checks if the given resource has an attribute with the specified key.
+func resourceHasAttribute(res *resource.Resource, key attribute.Key) bool {
+	if res == nil {
+		return false
+	}
+
+	for _, kv := range res.Attributes() {
+		if kv.Key == key {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveServiceInstanceID determines the fallback service instance ID for telemetry.
+// It uses hostname when available and defaults to "unknown" otherwise.
+func resolveServiceInstanceID(hostnameProvider func() (string, error)) string {
+	if hostnameProvider != nil {
+		hostname, err := hostnameProvider()
+		if err == nil {
+			hostname = strings.TrimSpace(hostname)
+			if hostname != "" {
+				return hostname
+			}
+		}
+	}
+
+	return "unknown"
 }
 
 // dontRetry500StatusPolicy is a retry policy for the retryablehttp client that prevents

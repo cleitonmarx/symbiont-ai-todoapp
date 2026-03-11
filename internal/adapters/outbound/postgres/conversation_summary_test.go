@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -77,7 +76,7 @@ func TestConversationSummaryRepository_GetConversationSummary(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewConversationSummaryRepository(db)
-			got, found, gotErr := repo.GetConversationSummary(context.Background(), conversationID)
+			got, found, gotErr := repo.GetConversationSummary(t.Context(), conversationID)
 			if tt.expectErr {
 				assert.Error(t, gotErr)
 			} else {
@@ -138,7 +137,7 @@ func TestConversationSummaryRepository_StoreConversationSummary(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewConversationSummaryRepository(db)
-			gotErr := repo.StoreConversationSummary(context.Background(), summary)
+			gotErr := repo.StoreConversationSummary(t.Context(), summary)
 			if tt.expectErr {
 				assert.Error(t, gotErr)
 			} else {
@@ -184,7 +183,7 @@ func TestConversationSummaryRepository_DeleteConversationSummary(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewConversationSummaryRepository(db)
-			gotErr := repo.DeleteConversationSummary(context.Background(), conversationID)
+			gotErr := repo.DeleteConversationSummary(t.Context(), conversationID)
 			if tt.expectErr {
 				assert.Error(t, gotErr)
 			} else {

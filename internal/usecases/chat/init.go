@@ -58,10 +58,12 @@ type InitGenerateConversationTitle struct {
 // Initialize registers the GenerateConversationTitle use case in the dependency container.
 func (i InitGenerateConversationTitle) Initialize(ctx context.Context) (context.Context, error) {
 	queue, _ := depend.Resolve[CompletedConversationTitleUpdateChannel]()
+	lock, _ := depend.Resolve[core.Locker]()
 	depend.Register[GenerateConversationTitle](NewGenerateConversationTitleImpl(
 		i.ConversationRepo,
 		i.ConversationSummaryRepo,
 		i.ChatMessageRepo,
+		lock,
 		i.TimeProvider,
 		i.Assistant,
 		i.Model,

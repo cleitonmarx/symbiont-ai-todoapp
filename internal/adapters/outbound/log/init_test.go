@@ -1,11 +1,11 @@
 package log
 
 import (
-	"context"
-	"github.com/cleitonmarx/symbiont/depend"
-	"github.com/stretchr/testify/assert"
 	"log"
 	"testing"
+
+	"github.com/cleitonmarx/symbiont/depend"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestInitLogger_Initialize(t *testing.T) {
@@ -13,7 +13,7 @@ func TestInitLogger_Initialize(t *testing.T) {
 
 	init := InitLogger{}
 
-	_, err := init.Initialize(context.Background())
+	_, err := init.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	_, err = depend.Resolve[*log.Logger]()

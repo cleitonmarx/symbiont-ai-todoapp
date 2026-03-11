@@ -132,7 +132,7 @@ func (lft FetchTodosAction) Execute(ctx context.Context, call assistant.ActionCa
 		}
 	}
 
-	buildResult, err := todouc.NewTodoSearchBuilder().
+	buildResult, err := todouc.NewSearchBuilder().
 		WithStatus((*todo.Status)(params.Status)).
 		WithDueDateRange(dueAfterTime, dueBeforeTime).
 		WithSortBy(params.SortBy).

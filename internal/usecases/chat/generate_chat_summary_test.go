@@ -502,7 +502,7 @@ func TestGenerateChatSummaryImpl_Execute(t *testing.T) {
 				nil,
 			)
 
-			gotErr := uc.Execute(context.Background(), tt.event)
+			gotErr := uc.Execute(t.Context(), tt.event)
 			assert.Equal(t, tt.expectedErr, gotErr)
 		})
 	}

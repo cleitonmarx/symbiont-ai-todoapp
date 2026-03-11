@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -50,7 +49,7 @@ func TestListAvailableSkillsImpl_Query(t *testing.T) {
 			tt.setExpectations(mockSkillRegistry)
 
 			uc := NewListAvailableSkillsImpl(mockSkillRegistry)
-			got, err := uc.Query(context.Background())
+			got, err := uc.Query(t.Context())
 
 			assert.Equal(t, tt.expectedError, err)
 			assert.Equal(t, tt.expected, got)

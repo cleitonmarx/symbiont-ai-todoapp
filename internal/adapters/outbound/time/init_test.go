@@ -1,7 +1,6 @@
 package time
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
@@ -14,7 +13,7 @@ func TestInitCurrentTimeProvider_Initialize(t *testing.T) {
 
 	i := &InitCurrentTimeProvider{}
 
-	_, err := i.Initialize(context.Background())
+	_, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	_, err = depend.Resolve[core.CurrentTimeProvider]()

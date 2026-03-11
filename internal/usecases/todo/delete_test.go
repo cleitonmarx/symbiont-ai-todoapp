@@ -83,7 +83,7 @@ func TestDeleteImpl_Execute(t *testing.T) {
 
 			dti := NewDelete(uow, deleter)
 
-			gotErr := dti.Execute(context.Background(), tt.id)
+			gotErr := dti.Execute(t.Context(), tt.id)
 			assert.Equal(t, tt.expectedErr, gotErr)
 		})
 	}

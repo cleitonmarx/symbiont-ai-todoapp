@@ -3,6 +3,8 @@ package graphql
 import (
 	"context"
 	"errors"
+	"io"
+	"log"
 	"testing"
 	"time"
 
@@ -56,8 +58,8 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			setupUsecases: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 2, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
-						p := todouc.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListOptions) {
+						p := todouc.ListParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
@@ -83,8 +85,8 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			setupUsecases: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 2, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
-						p := todouc.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListOptions) {
+						p := todouc.ListParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
@@ -112,8 +114,8 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			setupUsecases: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 2, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
-						p := todouc.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListOptions) {
+						p := todouc.ListParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
@@ -138,8 +140,8 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 			setupUsecases: func(m *todouc.MockList) {
 				m.EXPECT().
 					Query(mock.Anything, 1, 2, mock.Anything).
-					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListTodoOptions) {
-						p := todouc.ListTodoParams{}
+					Run(func(_ context.Context, _ int, _ int, opts ...todouc.ListOptions) {
+						p := todouc.ListParams{}
 						for _, opt := range opts {
 							opt(&p)
 						}
@@ -172,9 +174,21 @@ func TestTodoGraphQLServer_ListTodos(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			mockUC := todouc.NewMockList(t)
 			tt.setupUsecases(mockUC)
-			server := &TodoGraphQLServer{ListTodosUsecase: mockUC}
+			server := &TodoGraphQLServer{
+				ListTodosUsecase: mockUC,
+				Logger:           log.New(io.Discard, "", 0),
+			}
 
-			got, err := server.ListTodos(context.Background(), tt.page, tt.pageSize, tt.status, tt.search, tt.searchType, tt.dateRange, tt.sortBy)
+			got, err := server.ListTodos(
+				t.Context(),
+				tt.page,
+				tt.pageSize,
+				tt.status,
+				tt.search,
+				tt.searchType,
+				tt.dateRange,
+				tt.sortBy,
+			)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {

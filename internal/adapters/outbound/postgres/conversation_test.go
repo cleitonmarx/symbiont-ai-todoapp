@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -73,7 +72,7 @@ func TestConversationRepository_CreateConversation(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewConversationRepository(db)
-			got, gotErr := repo.CreateConversation(context.Background(), tt.title, tt.titleSource)
+			got, gotErr := repo.CreateConversation(t.Context(), tt.title, tt.titleSource)
 			if tt.expectErr {
 				assert.Error(t, gotErr)
 			} else {
@@ -147,7 +146,7 @@ func TestConversationRepository_GetConversation(t *testing.T) {
 			tt.expect(mock)
 
 			repo := NewConversationRepository(db)
-			got, found, gotErr := repo.GetConversation(context.Background(), conversationID)
+			got, found, gotErr := repo.GetConversation(t.Context(), conversationID)
 			if tt.expectErr {
 				assert.Error(t, gotErr)
 			} else {

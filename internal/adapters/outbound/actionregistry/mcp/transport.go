@@ -12,7 +12,7 @@ import (
 
 // Connect builds an SDK client and opens a streamable-http MCP session.
 func (c streamableConnector) Connect(ctx context.Context) (mcpSession, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	if strings.TrimSpace(c.endpoint) == "" {

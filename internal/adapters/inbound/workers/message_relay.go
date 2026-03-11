@@ -12,7 +12,7 @@ import (
 type MessageRelay struct {
 	MessageDispatcher   outbox.Relay  `resolve:""`
 	Logger              *log.Logger   `resolve:""`
-	Interval            time.Duration `config:"FETCH_OUTBOX_INTERVAL" default:"500ms"`
+	Interval            time.Duration `config:"FETCH_OUTBOX_INTERVAL" default:"1s"`
 	workerExecutionChan chan struct{}
 }
 

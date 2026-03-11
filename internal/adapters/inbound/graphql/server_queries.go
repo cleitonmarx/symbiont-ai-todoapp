@@ -8,12 +8,14 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/graphql/types"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	todouc "github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/todo"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ListTodos is the resolver for the listTodos field.
 func (s *TodoGraphQLServer) ListTodos(ctx context.Context, page int, pageSize int, status *gen.TodoStatus, search *string, searchType *gen.SearchType, dateRange *gen.DateRange, sortBy *gen.TodoSortBy) (*gen.TodoPage, error) {
-	var options []todouc.ListTodoOptions
+	var options []todouc.ListOptions
 	if status != nil {
 		options = append(options, todouc.WithStatus(todo.Status(*status)))
 	}
@@ -31,7 +33,8 @@ func (s *TodoGraphQLServer) ListTodos(ctx context.Context, page int, pageSize in
 	}
 
 	todos, hasMore, err := s.ListTodosUsecase.Query(ctx, page, pageSize, options...)
-	if err != nil {
+	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) {
+		s.Logger.Printf("Error listing todos: %v", err)
 		return nil, err
 	}
 

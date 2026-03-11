@@ -119,7 +119,7 @@ func (t SetUIFiltersAction) Execute(_ context.Context, call assistant.ActionCall
 		}
 	}
 
-	err := todouc.NewTodoSearchBuilder().
+	err := todouc.NewSearchBuilder().
 		WithStatus((*todo.Status)(params.Status)).
 		WithDueDateRange(dueAfterTime, dueBeforeTime).
 		WithSortBy(params.SortBy).

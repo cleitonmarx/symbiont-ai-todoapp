@@ -28,11 +28,11 @@ func NewListChatMessagesImpl(chatMessageRepo assistant.ChatMessageRepository) Li
 
 // Query retrieves chat messages with pagination support
 func (lcm ListChatMessagesImpl) Query(ctx context.Context, conversationID uuid.UUID, page int, pageSize int) ([]assistant.ChatMessage, bool, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	messages, hasMore, err := lcm.ChatMessageRepo.ListChatMessages(spanCtx, conversationID, page, pageSize)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 

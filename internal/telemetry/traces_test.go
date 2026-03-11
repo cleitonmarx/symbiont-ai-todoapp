@@ -28,13 +28,13 @@ func TestRecordErrorAndStatus(t *testing.T) {
 
 	span := &mockSpan{}
 	err := errors.New("fail")
-	assert.True(t, RecordErrorAndStatus(span, err))
+	assert.True(t, IsErrorRecorded(span, err))
 	assert.Equal(t, "fail", span.lastError)
 	assert.Equal(t, "fail", span.statusMsg)
 	assert.Equal(t, codes.Error, span.statusCode) // codes.Error
 
 	span = &mockSpan{}
-	assert.False(t, RecordErrorAndStatus(span, nil))
+	assert.False(t, IsErrorRecorded(span, nil))
 	assert.Equal(t, "OK", span.statusMsg)
 	assert.Equal(t, codes.Ok, span.statusCode) // codes.Ok
 }
@@ -51,7 +51,7 @@ func TestStart(t *testing.T) {
 	)
 	tracer = tp.Tracer("test-tracer")
 
-	_, span := Start(t.Context())
+	_, span := StartSpan(t.Context())
 	span.End()
 
 	// Assert the name

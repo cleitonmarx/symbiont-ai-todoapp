@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/DataDog/go-sqllexer"
 	"github.com/XSAM/otelsql"
@@ -22,7 +23,7 @@ import (
 	pgxvector "github.com/pgvector/pgvector-go/pgx"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 )
 
 //go:embed migrations/*.sql
@@ -30,9 +31,9 @@ var migrationsFS embed.FS
 
 // InitDB initializes the Postgres database connection and runs migrations.
 type InitDB struct {
+	SkipMigration      bool
 	db                 *sql.DB
 	metricRegistration metric.Registration
-	skipMigration      bool
 	Logger             *log.Logger `resolve:""`
 	DBUser             string      `config:"DB_USER"`
 	DBPass             string      `config:"DB_PASS"`
@@ -56,6 +57,11 @@ func (di *InitDB) Initialize(ctx context.Context) (context.Context, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create connection pool: %w", err)
 	}
+	cfg.MaxConns = 50
+	cfg.MinConns = 5
+	cfg.MaxConnIdleTime = 5 * time.Minute
+	cfg.MaxConnLifetime = 30 * time.Minute
+	cfg.HealthCheckPeriod = 1 * time.Minute
 
 	cfg.AfterConnect = func(ctx context.Context, pgconn *pgx.Conn) error {
 		return pgxvector.RegisterTypes(ctx, pgconn)
@@ -87,7 +93,7 @@ func (di *InitDB) Initialize(ctx context.Context) (context.Context, error) {
 	}
 
 	// Run migrations
-	if !di.skipMigration {
+	if !di.SkipMigration {
 		if err := di.runMigrations(); err != nil {
 			return ctx, fmt.Errorf("failed to run migrations: %w", err)
 		}

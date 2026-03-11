@@ -29,7 +29,7 @@ func NewDeleteConversationImpl(uow transaction.UnitOfWork) *DeleteConversationIm
 
 // Execute deletes all messages and summaries related to the specified conversation, effectively resetting the conversation history.
 func (uc *DeleteConversationImpl) Execute(ctx context.Context, conversationID uuid.UUID) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	err := uc.uow.Execute(spanCtx, func(uowCtx context.Context, scope transaction.Scope) error {
@@ -53,7 +53,7 @@ func (uc *DeleteConversationImpl) Execute(ctx context.Context, conversationID uu
 		return nil
 	})
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 	return nil

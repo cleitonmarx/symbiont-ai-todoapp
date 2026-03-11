@@ -6,60 +6,68 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+    command: ["/monolithic"]
     ports:
       - "8080:8080"
       - "8085:8085"
     environment:
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://jaeger:4318/v1/traces
-      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://prometheus:9090/api/v1/otlp/v1/metrics
-      - OTEL_SEMCONV_STABILITY_OPT_IN=database
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=todoappdb
-      - VAULT_ADDR=http://vault:8200
-      - VAULT_TOKEN=root-token
-      - VAULT_MOUNT_PATH=secret
-      - VAULT_SECRET_PATH=todoapp
-      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8681
-      - PUBSUB_PROJECT_ID=local-dev
-      - PUBSUB_TOPIC_ID=Todo
-      - TODO_EVENTS_SUBSCRIPTION_ID=todo_summary_generator
-      - CHAT_EVENTS_SUBSCRIPTION_ID=chat_message_summary_generator
-      - CHAT_TITLE_EVENTS_SUBSCRIPTION_ID=chat_message_title_generator
-      - ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID=action_approval_dispatcher
-      - SUMMARY_BATCH_INTERVAL=1s
-      - LLM_EMBEDDING_MODEL_HOST=http://model-runner.docker.internal
-      - LLM_EMBEDDING_MODEL=embeddinggemma:300M-Q8_0 
-      - LLM_MODEL_HOST=http://model-runner.docker.internal
-      - LLM_SUMMARY_MODEL=qwen3:4B-F16
-      - LLM_CHAT_SUMMARY_MODEL=qwen3:4B-F16
-      - LLM_CHAT_TITLE_MODEL=qwen3:4B-F16
-      - MCP_GATEWAY_ENDPOINT=http://mcp-gateway:8811
-
+      OTEL_SERVICE_NAME: todoapp
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://jaeger:4318/v1/traces
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://prometheus:9090/api/v1/otlp/v1/metrics
+      OTEL_SEMCONV_STABILITY_OPT_IN: database
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: todoappdb
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: root-token
+      VAULT_MOUNT_PATH: secret
+      VAULT_SECRET_PATH: todoapp
+      PUBSUB_EMULATOR_HOST: pubsub-emulator:8681
+      PUBSUB_PROJECT_ID: local-dev
+      PUBSUB_TOPIC_ID: Todo
+      TODO_EVENTS_SUBSCRIPTION_ID: todo_summary_generator
+      CHAT_EVENTS_SUBSCRIPTION_ID: chat_message_summary_generator
+      CHAT_TITLE_EVENTS_SUBSCRIPTION_ID: chat_message_title_generator
+      ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID: action_approval_dispatcher
+      SUMMARY_BATCH_INTERVAL: 1s
+      CHAT_TITLE_BATCH_INTERVAL: 3s
+      LLM_MODEL_HOST: http://model-runner.docker.internal
+      LLM_SUMMARY_MODEL: qwen3:4B-F16
+      LLM_CHAT_SUMMARY_MODEL: qwen3:4B-F16
+      LLM_CHAT_TITLE_MODEL: qwen3:4B-F16
+      LLM_EMBEDDING_MODEL_HOST: http://model-runner.docker.internal
+      LLM_EMBEDDING_MODEL: embeddinggemma:300M-Q8_0
+      MCP_GATEWAY_ENDPOINT: http://mcp-gateway:8811
     models:
       - qwen3
       - embeddinggemma
+    healthcheck:
+      test: ["CMD", "./healthchecker", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
-      jaeger:
-        condition: service_started
       postgres:
         condition: service_healthy
       vault:
         condition: service_healthy
       pubsub-emulator:
         condition: service_healthy
-      prometheus:
-        condition: service_started
       mcp-gateway:
         condition: service_started
-  
+      jaeger:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      grafana:
+        condition: service_started
+
   jaeger:
     image: jaegertracing/all-in-one:1.76.0
     ports:
       - "6831:6831/udp"
       - "16686:16686"
       - "4318:4318"
-
 
   prometheus:
     image: prom/prometheus:v3.9.1

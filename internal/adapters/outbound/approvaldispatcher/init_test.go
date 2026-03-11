@@ -1,7 +1,6 @@
 package approvaldispatcher
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
@@ -13,7 +12,7 @@ import (
 func TestInitDispatcher_Initialize(t *testing.T) {
 	i := InitDispatcher{}
 
-	ctx, err := i.Initialize(context.Background())
+	ctx, err := i.Initialize(t.Context())
 	require.NoError(t, err)
 	assert.NotNil(t, ctx)
 

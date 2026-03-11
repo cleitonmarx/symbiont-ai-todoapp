@@ -1,7 +1,6 @@
 package telemetry
 
 import (
-	"context"
 	"log"
 	"strings"
 	"testing"
@@ -13,7 +12,7 @@ func TestInitOpenTelemetry_Initialize_Close(t *testing.T) {
 	t.Parallel()
 
 	init := &InitOpenTelemetry{Logger: log.New(&strings.Builder{}, "", 0)}
-	ctx := context.Background()
+	ctx := t.Context()
 	ctx, err := init.Initialize(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
@@ -24,7 +23,7 @@ func TestInitHttpClient_Initialize(t *testing.T) {
 	t.Parallel()
 
 	init := InitHttpClient{Logger: log.New(&strings.Builder{}, "", 0)}
-	ctx := context.Background()
+	ctx := t.Context()
 	ctx, err := init.Initialize(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)

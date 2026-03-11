@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
@@ -15,7 +14,7 @@ func TestInitDeleteConversation_Initialize(t *testing.T) {
 
 	idc := InitDeleteConversation{}
 
-	_, err := idc.Initialize(context.Background())
+	_, err := idc.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	uc, err := depend.Resolve[DeleteConversation]()
@@ -29,7 +28,7 @@ func TestInitGenerateChatSummary_Initialize(t *testing.T) {
 
 	i := InitGenerateChatSummary{}
 
-	ctx, err := i.Initialize(context.Background())
+	ctx, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
@@ -43,7 +42,7 @@ func TestInitGenerateConversationTitle_Initialize(t *testing.T) {
 
 	i := InitGenerateConversationTitle{}
 
-	ctx, err := i.Initialize(context.Background())
+	ctx, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
@@ -60,7 +59,7 @@ func TestInitListAvailableModels_Initialize(t *testing.T) {
 		AssistantCatalog: assistantCatalog,
 	}
 
-	_, err := init.Initialize(context.Background())
+	_, err := init.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	uc, err := depend.Resolve[ListAvailableModels]()
@@ -73,7 +72,7 @@ func TestInitListChatMessages_Initialize(t *testing.T) {
 
 	idc := InitListChatMessages{}
 
-	_, err := idc.Initialize(context.Background())
+	_, err := idc.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	uc, err := depend.Resolve[ListChatMessages]()
@@ -86,7 +85,7 @@ func TestInitListConversations_Initialize(t *testing.T) {
 
 	ilc := InitListConversations{}
 
-	ctx, err := ilc.Initialize(context.Background())
+	ctx, err := ilc.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
@@ -100,7 +99,7 @@ func TestInitStreamChat_Initialize(t *testing.T) {
 
 	i := InitStreamChat{}
 
-	ctx, err := i.Initialize(context.Background())
+	ctx, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
@@ -118,7 +117,7 @@ func TestInitSubmitActionApproval_Initialize(t *testing.T) {
 		Publisher: publisher,
 	}
 
-	_, err := init.Initialize(context.Background())
+	_, err := init.Initialize(t.Context())
 	assert.NoError(t, err)
 
 	uc, err := depend.Resolve[SubmitActionApproval]()
@@ -131,7 +130,7 @@ func TestInitUpdateConversation_Initialize(t *testing.T) {
 
 	iuc := InitUpdateConversation{}
 
-	ctx, err := iuc.Initialize(context.Background())
+	ctx, err := iuc.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 

@@ -39,7 +39,6 @@ func TestExecuteCodeToolFormatter_FormatResult(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			msg := formatter.FormatResult(tt.actionResult, assistant.ActionCall{ID: "call-1"})
@@ -73,7 +72,7 @@ func TestExecuteCodeToolFormatter_FormatArguments(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -120,7 +119,7 @@ func TestToolFormatterRegistry_FormatResult(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -155,7 +154,7 @@ func TestToolFormatterRegistry_FormatArguments(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

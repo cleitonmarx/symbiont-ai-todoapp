@@ -18,8 +18,8 @@ import (
 type ChatSummaryGenerator struct {
 	Logger              *log.Logger              `resolve:""`
 	Client              *pubsub.Client           `resolve:""`
-	Interval            time.Duration            `config:"CHAT_SUMMARY_BATCH_INTERVAL" default:"3s"`
-	BatchSize           int                      `config:"CHAT_SUMMARY_BATCH_SIZE" default:"50"`
+	Interval            time.Duration            `config:"CHAT_SUMMARY_BATCH_INTERVAL" default:"5s"`
+	BatchSize           int                      `config:"CHAT_SUMMARY_BATCH_SIZE" default:"100"`
 	SubscriptionID      string                   `config:"CHAT_EVENTS_SUBSCRIPTION_ID"`
 	GenerateChatSummary chat.GenerateChatSummary `resolve:""`
 	workerExecutionChan chan struct{}

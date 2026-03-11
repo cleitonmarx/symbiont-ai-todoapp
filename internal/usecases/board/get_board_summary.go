@@ -29,11 +29,11 @@ func NewGetBoardSummaryImpl(r todo.BoardSummaryRepository) GetBoardSummaryImpl {
 //
 //	It returns an error if the summary is not found or if there is an issue with the repository.
 func (gbs GetBoardSummaryImpl) Query(ctx context.Context) (todo.BoardSummary, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	summary, found, err := gbs.summaryRepo.GetLatestSummary(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return todo.BoardSummary{}, err
 	}
 	if !found {

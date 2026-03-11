@@ -41,7 +41,7 @@ func TestPubSubEventPublisher_PublishEvent(t *testing.T) {
 			},
 			expectErr: false,
 			validateMessage: func(t *testing.T, client *pubsubV2.Client, subName string) {
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 				defer cancel()
 
 				messages := make([]*pubsubV2.Message, 0)
@@ -88,7 +88,7 @@ func TestPubSubEventPublisher_PublishEvent(t *testing.T) {
 			assert.NoError(t, err)
 			defer conn.Close() //nolint:errcheck
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
 
 			client, err := pubsubV2.NewClient(
@@ -123,7 +123,7 @@ func TestPubSubEventPublisher_PublishEvent(t *testing.T) {
 
 			publisher := NewPubSubEventPublisher(client)
 
-			publishCtx, publishCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			publishCtx, publishCancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer publishCancel()
 
 			err = publisher.PublishEvent(publishCtx, tt.event)

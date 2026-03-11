@@ -2,6 +2,7 @@ package assistant
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -42,10 +43,12 @@ func (d ActionApprovalDecision) Validate() error {
 
 	switch d.Status {
 	case ChatMessageApprovalStatus_Approved,
-		ChatMessageApprovalStatus_Rejected:
+		ChatMessageApprovalStatus_Rejected,
+		ChatMessageApprovalStatus_AutoRejected,
+		ChatMessageApprovalStatus_Expired:
 		return nil
 	default:
-		return core.NewValidationErr("status must be APPROVED or REJECTED")
+		return core.NewValidationErr(fmt.Sprintf("invalid status: %s", d.Status))
 	}
 }
 

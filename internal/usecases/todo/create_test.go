@@ -105,7 +105,7 @@ func TestCreateImpl_Execute(t *testing.T) {
 
 			cti := NewCreateImpl(uow, creator)
 
-			got, gotErr := cti.Execute(context.Background(), tt.title, tt.dueDate)
+			got, gotErr := cti.Execute(t.Context(), tt.title, tt.dueDate)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			if tt.expectedErr == nil {
 				assert.Equal(t, tt.expectedTodo.ID, got.ID)

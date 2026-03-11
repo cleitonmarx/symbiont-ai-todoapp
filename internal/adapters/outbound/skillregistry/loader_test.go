@@ -84,7 +84,7 @@ name: noop
 	}
 
 	for _, tt := range tests {
-		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := parseSkillMarkdown("skills/mutation.md", []byte(tt.content))
@@ -142,7 +142,7 @@ High skill.
 	}
 
 	for _, tt := range tests {
-		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := LoadSkillsFromFS(tt.fs)

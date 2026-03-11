@@ -157,7 +157,7 @@ func TestCreateTodosAction(t *testing.T) {
 			assert.NotEmpty(t, definition.Description)
 			assert.NotEmpty(t, definition.Input)
 
-			resp := action.Execute(context.Background(), tt.functionCall, tt.history)
+			resp := action.Execute(t.Context(), tt.functionCall, tt.history)
 			tt.validateResp(t, resp)
 		})
 	}

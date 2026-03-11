@@ -1,7 +1,6 @@
 package local
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
@@ -60,7 +59,7 @@ func TestActionRegistry(t *testing.T) {
 			},
 			testFunc: func(t *testing.T, manager LocalRegistry) {
 				result := manager.Execute(
-					context.Background(),
+					t.Context(),
 					assistant.ActionCall{
 						ID:    "call-1",
 						Name:  "fetch_todos",
@@ -79,7 +78,7 @@ func TestActionRegistry(t *testing.T) {
 			setupActions: func() []assistant.Action { return []assistant.Action{} },
 			testFunc: func(t *testing.T, manager LocalRegistry) {
 				result := manager.Execute(
-					context.Background(),
+					t.Context(),
 					assistant.ActionCall{ID: "x", Name: "unknown_action", Input: ""},
 					nil,
 				)

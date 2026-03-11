@@ -11,6 +11,7 @@ import (
 
 // InitGenerateBoardSummary initializes the GenerateBoardSummary use case.
 type InitGenerateBoardSummary struct {
+	Locker       core.Locker                 `resolve:""`
 	SummaryRepo  todo.BoardSummaryRepository `resolve:""`
 	TimeProvider core.CurrentTimeProvider    `resolve:""`
 	Assistant    assistant.Assistant         `resolve:""`
@@ -21,7 +22,7 @@ type InitGenerateBoardSummary struct {
 func (igbs InitGenerateBoardSummary) Initialize(ctx context.Context) (context.Context, error) {
 	queue, _ := depend.Resolve[CompletedBoardSummaryChannel]()
 	depend.Register[GenerateBoardSummary](NewGenerateBoardSummaryImpl(
-		igbs.SummaryRepo, igbs.TimeProvider, igbs.Assistant, igbs.Model, queue,
+		igbs.Locker, igbs.SummaryRepo, igbs.TimeProvider, igbs.Assistant, igbs.Model, queue,
 	))
 	return ctx, nil
 }

@@ -40,7 +40,7 @@ func NewTodoRepository(br sq.BaseRunner) TodoRepository {
 
 // ListTodos lists todos with pagination and optional filters.
 func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, opts ...todo.ListOption) ([]todo.Todo, bool, error) {
-	spanCtx, span := telemetry.Start(ctx, trace.WithAttributes(
+	spanCtx, span := telemetry.StartSpan(ctx, trace.WithAttributes(
 		attribute.Int("page", page),
 		attribute.Int("pageSize", pageSize),
 	))
@@ -95,12 +95,12 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 	}
 
 	qry, err := applySort(qry, params)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 
 	rows, err := qry.QueryContext(spanCtx)
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -116,13 +116,13 @@ func (tr TodoRepository) ListTodos(ctx context.Context, page int, pageSize int, 
 			&td.CreatedAt,
 			&td.UpdatedAt,
 		)
-		if telemetry.RecordErrorAndStatus(span, err) {
+		if telemetry.IsErrorRecorded(span, err) {
 			return nil, false, err
 		}
 		todos = append(todos, td)
 	}
 
-	if err := rows.Err(); telemetry.RecordErrorAndStatus(span, err) {
+	if err := rows.Err(); telemetry.IsErrorRecorded(span, err) {
 		return nil, false, err
 	}
 
@@ -158,7 +158,7 @@ func applySort(qry sq.SelectBuilder, params *todo.ListParams) (sq.SelectBuilder,
 
 // CreateTodo creates a new todo.
 func (tr TodoRepository) CreateTodo(ctx context.Context, td todo.Todo) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	_, err := tr.sb.
@@ -183,7 +183,7 @@ func (tr TodoRepository) CreateTodo(ctx context.Context, td todo.Todo) error {
 		).
 		ExecContext(spanCtx)
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
@@ -192,7 +192,7 @@ func (tr TodoRepository) CreateTodo(ctx context.Context, td todo.Todo) error {
 
 // UpdateTodo updates an existing todo.
 func (tr TodoRepository) UpdateTodo(ctx context.Context, td todo.Todo) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	_, err := tr.sb.
@@ -205,7 +205,7 @@ func (tr TodoRepository) UpdateTodo(ctx context.Context, td todo.Todo) error {
 		Where(sq.Eq{"id": td.ID}).
 		ExecContext(spanCtx)
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 	return nil
@@ -213,7 +213,7 @@ func (tr TodoRepository) UpdateTodo(ctx context.Context, td todo.Todo) error {
 
 // DeleteTodo deletes a todo by its ID.
 func (tr TodoRepository) DeleteTodo(ctx context.Context, id uuid.UUID) error {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	_, err := tr.sb.
@@ -221,7 +221,7 @@ func (tr TodoRepository) DeleteTodo(ctx context.Context, id uuid.UUID) error {
 		Where(sq.Eq{"id": id}).
 		ExecContext(spanCtx)
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 	return nil
@@ -229,7 +229,7 @@ func (tr TodoRepository) DeleteTodo(ctx context.Context, id uuid.UUID) error {
 
 // GetTodo retrieves a todo by its ID.
 func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (todo.Todo, bool, error) {
-	spanCtx, span := telemetry.Start(ctx)
+	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	var td todo.Todo
@@ -253,7 +253,7 @@ func (tr TodoRepository) GetTodo(ctx context.Context, id uuid.UUID) (todo.Todo, 
 		return todo.Todo{}, false, nil
 	}
 
-	if telemetry.RecordErrorAndStatus(span, err) {
+	if telemetry.IsErrorRecorded(span, err) {
 		return todo.Todo{}, false, err
 	}
 

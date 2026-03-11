@@ -61,7 +61,7 @@ func TestMCPToolAction_Methods(t *testing.T) {
 				return assistant.Message{Role: assistant.ChatRole_Tool, Content: call.Name}
 			}},
 			assertResult: func(t *testing.T, action mcpToolAction) {
-				msg := action.Execute(context.Background(), assistant.ActionCall{Name: "fetch"}, nil)
+				msg := action.Execute(t.Context(), assistant.ActionCall{Name: "fetch"}, nil)
 				assert.Equal(t, assistant.ChatRole_Tool, msg.Role)
 				assert.Equal(t, "fetch", msg.Content)
 			},
@@ -69,7 +69,7 @@ func TestMCPToolAction_Methods(t *testing.T) {
 		"execute-default-error": {
 			action: mcpToolAction{},
 			assertResult: func(t *testing.T, action mcpToolAction) {
-				msg := action.Execute(context.Background(), assistant.ActionCall{ID: "call-1"}, nil)
+				msg := action.Execute(t.Context(), assistant.ActionCall{ID: "call-1"}, nil)
 				assert.Equal(t, assistant.ChatRole_Tool, msg.Role)
 				require.NotNil(t, msg.ActionCallID)
 				assert.Equal(t, "call-1", *msg.ActionCallID)
@@ -79,7 +79,6 @@ func TestMCPToolAction_Methods(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tt.assertResult(t, tt.action)

@@ -196,7 +196,7 @@ func TestUpdateConversationImpl_Execute(t *testing.T) {
 
 			uc := NewUpdateConversationImpl(uow, timeProvider)
 
-			got, gotErr := uc.Execute(context.Background(), tt.conversationID, tt.title)
+			got, gotErr := uc.Execute(t.Context(), tt.conversationID, tt.title)
 			if tt.expectedErr != nil {
 				assert.Error(t, gotErr)
 				assert.Equal(t, tt.expectedErr.Error(), gotErr.Error())

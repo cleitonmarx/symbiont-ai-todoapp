@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -159,7 +158,7 @@ func TestListConversationsImpl_Query(t *testing.T) {
 
 			lc := NewListConversationsImpl(repo)
 
-			got, hasMore, gotErr := lc.Query(context.Background(), tt.page, tt.pageSize)
+			got, hasMore, gotErr := lc.Query(t.Context(), tt.page, tt.pageSize)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			assert.Equal(t, tt.expectedConversations, got)
 			assert.Equal(t, tt.expectedHasMore, hasMore)

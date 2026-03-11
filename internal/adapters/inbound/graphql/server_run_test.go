@@ -12,7 +12,7 @@ import (
 func TestTodoGraphQLServer_Run(t *testing.T) {
 	t.Parallel()
 
-	cancelCtx, cancel := context.WithCancel(context.Background())
+	cancelCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	server := &TodoGraphQLServer{

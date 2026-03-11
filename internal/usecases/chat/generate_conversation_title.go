@@ -54,6 +54,7 @@ type GenerateConversationTitleImpl struct {
 	conversationRepo        assistant.ConversationRepository
 	conversationSummaryRepo assistant.ConversationSummaryRepository
 	chatMessageRepo         assistant.ChatMessageRepository
+	lock                    core.Locker
 	timeProvider            core.CurrentTimeProvider
 	assistant               assistant.Assistant
 	model                   string
@@ -65,8 +66,9 @@ func NewGenerateConversationTitleImpl(
 	conversationRepo assistant.ConversationRepository,
 	conversationSummaryRepo assistant.ConversationSummaryRepository,
 	chatMessageRepo assistant.ChatMessageRepository,
+	lock core.Locker,
 	timeProvider core.CurrentTimeProvider,
-	assistant assistant.Assistant,
+	assistantClient assistant.Assistant,
 	model string,
 	q CompletedConversationTitleUpdateChannel,
 ) GenerateConversationTitleImpl {
@@ -74,8 +76,9 @@ func NewGenerateConversationTitleImpl(
 		conversationRepo:        conversationRepo,
 		conversationSummaryRepo: conversationSummaryRepo,
 		chatMessageRepo:         chatMessageRepo,
+		lock:                    lock,
 		timeProvider:            timeProvider,
-		assistant:               assistant,
+		assistant:               assistantClient,
 		model:                   model,
 		completedTitleCh:        q,
 	}
@@ -95,6 +98,16 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event outb
 	if event.ChatRole != assistant.ChatRole_Assistant {
 		return nil
 	}
+
+	lockKey := "conversation-title:" + event.ConversationID.String()
+	unlock, locked, err := gct.lock.TryLock(spanCtx, lockKey)
+	if telemetry.IsErrorRecorded(span, err) {
+		return fmt.Errorf("failed to acquire conversation title lock: %w", err)
+	}
+	if !locked {
+		return nil
+	}
+	defer unlock()
 
 	conversation, found, err := gct.conversationRepo.GetConversation(spanCtx, event.ConversationID)
 	if telemetry.IsErrorRecorded(span, err) {

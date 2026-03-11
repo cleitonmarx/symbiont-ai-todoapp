@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
 	"github.com/cleitonmarx/symbiont/depend"
@@ -40,6 +41,17 @@ type InitConversationRepository struct {
 // Initialize registers the ConversationRepository in the dependency container.
 func (i InitConversationRepository) Initialize(ctx context.Context) (context.Context, error) {
 	depend.Register[assistant.ConversationRepository](NewConversationRepository(i.DB))
+	return ctx, nil
+}
+
+// InitLocker is a Symbiont initializer for core.Locker.
+type InitLocker struct {
+	DB *sql.DB `resolve:""`
+}
+
+// Initialize registers the core.Locker in the dependency container.
+func (i InitLocker) Initialize(ctx context.Context) (context.Context, error) {
+	depend.Register[core.Locker](NewAdvisoryLocker(i.DB))
 	return ctx, nil
 }
 

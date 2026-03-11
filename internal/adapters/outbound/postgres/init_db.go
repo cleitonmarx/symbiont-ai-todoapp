@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/DataDog/go-sqllexer"
 	"github.com/XSAM/otelsql"
@@ -56,6 +57,11 @@ func (di *InitDB) Initialize(ctx context.Context) (context.Context, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create connection pool: %w", err)
 	}
+	cfg.MaxConns = 50
+	cfg.MinConns = 5
+	cfg.MaxConnIdleTime = 5 * time.Minute
+	cfg.MaxConnLifetime = 30 * time.Minute
+	cfg.HealthCheckPeriod = 1 * time.Minute
 
 	cfg.AfterConnect = func(ctx context.Context, pgconn *pgx.Conn) error {
 		return pgxvector.RegisterTypes(ctx, pgconn)

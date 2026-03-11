@@ -8,6 +8,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/todo"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
 	"github.com/cleitonmarx/symbiont/depend"
@@ -67,6 +68,20 @@ func TestInitConversationRepository_Initialize(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = depend.Resolve[assistant.ConversationRepository]()
+	assert.NoError(t, err)
+}
+
+func TestInitLocker_Initialize(t *testing.T) {
+	t.Parallel()
+
+	i := &InitLocker{
+		DB: &sql.DB{},
+	}
+
+	_, err := i.Initialize(t.Context())
+	assert.NoError(t, err)
+
+	_, err = depend.Resolve[core.Locker]()
 	assert.NoError(t, err)
 }
 

@@ -15,8 +15,8 @@ import (
 type BoardSummaryGenerator struct {
 	Logger               *log.Logger                `resolve:""`
 	Client               *pubsub.Client             `resolve:""`
-	Interval             time.Duration              `config:"SUMMARY_BATCH_INTERVAL" default:"3s"`
-	BatchSize            int                        `config:"SUMMARY_BATCH_SIZE" default:"20"`
+	Interval             time.Duration              `config:"SUMMARY_BATCH_INTERVAL" default:"5s"`
+	BatchSize            int                        `config:"SUMMARY_BATCH_SIZE" default:"100"`
 	SubscriptionID       string                     `config:"TODO_EVENTS_SUBSCRIPTION_ID"`
 	GenerateBoardSummary board.GenerateBoardSummary `resolve:""`
 	workerExecutionChan  chan struct{}

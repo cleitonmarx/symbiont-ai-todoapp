@@ -19,8 +19,8 @@ type ConversationTitleGenerator struct {
 	Logger                    *log.Logger                    `resolve:""`
 	Client                    *pubsub.Client                 `resolve:""`
 	GenerateConversationTitle chat.GenerateConversationTitle `resolve:""`
-	Interval                  time.Duration                  `config:"CHAT_TITLE_BATCH_INTERVAL" default:"3s"`
-	BatchSize                 int                            `config:"CHAT_TITLE_BATCH_SIZE" default:"5"`
+	Interval                  time.Duration                  `config:"CHAT_TITLE_BATCH_INTERVAL" default:"5s"`
+	BatchSize                 int                            `config:"CHAT_TITLE_BATCH_SIZE" default:"50"`
 	SubscriptionID            string                         `config:"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID"`
 	workerExecutionChan       chan struct{}
 }

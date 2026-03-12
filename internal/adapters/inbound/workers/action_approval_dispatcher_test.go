@@ -108,7 +108,7 @@ func TestActionApprovalDispatcher_Run(t *testing.T) {
 				Logger:              log.Default(),
 				Client:              client,
 				Dispatcher:          dispatcher,
-				SubscriptionID:      subscriptionID,
+				SubscriptionPrefix:  subscriptionID,
 				ProjectID:           "test-project",
 				ServerID:            "server_" + name,
 				workerExecutionChan: signalChan,
@@ -147,14 +147,14 @@ func TestActionApprovalDispatcher_resolveSubscriptionID(t *testing.T) {
 	}{
 		"custom-server-id": {
 			worker: ActionApprovalDispatcher{
-				SubscriptionID: "action_approval_dispatcher",
-				ServerID:       "api@node#1",
+				SubscriptionPrefix: "action_approval_dispatcher",
+				ServerID:           "api@node#1",
 			},
 			expectedSubscription: "action_approval_dispatcher-api-node-1",
 		},
 		"generated-server-id": {
 			worker: ActionApprovalDispatcher{
-				SubscriptionID: "action_approval_dispatcher",
+				SubscriptionPrefix: "action_approval_dispatcher",
 			},
 			expectedPattern: `^action_approval_dispatcher-[a-z0-9_-]+$`,
 		},
@@ -169,7 +169,7 @@ func TestActionApprovalDispatcher_resolveSubscriptionID(t *testing.T) {
 			}
 
 			assert.Regexp(t, tt.expectedPattern, got)
-			assert.NotEqual(t, tt.worker.SubscriptionID, got)
+			assert.NotEqual(t, tt.worker.SubscriptionPrefix, got)
 		})
 	}
 }

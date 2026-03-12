@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 				"TODO_EVENTS_SUBSCRIPTION_ID":            "todo_summary_generator",
 				"CHAT_EVENTS_SUBSCRIPTION_ID":            "chat_message_summary_generator",
 				"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID":      "chat_message_title_generator",
-				"ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID": "action_approval_dispatcher",
+				"ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX": "action_approval_dispatcher",
 				"LLM_EMBEDDING_MODEL_HOST":               "http://localhost:12434",
 				"LLM_MODEL_HOST":                         "http://localhost:12434",
 				"LLM_CHAT_SUMMARY_MODEL":                 "qwen3:4B-F16",

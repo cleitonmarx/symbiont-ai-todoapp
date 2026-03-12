@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "todoapp.commonEnvConfigMapName" . }}
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+data:
+  DB_HOST: {{ include "todoapp.postgresServiceName" . | quote }}
+  DB_PORT: {{ .Values.postgres.servicePort | quote }}
+  DB_NAME: {{ .Values.postgres.auth.database | quote }}
+
+  VAULT_ADDR: {{ printf "http://%s:%d" (include "todoapp.vaultServiceName" .) (int .Values.vault.servicePort) | quote }}
+  VAULT_TOKEN: {{ .Values.vault.devToken | quote }}
+  VAULT_MOUNT_PATH: {{ .Values.vault.mountPath | quote }}
+  VAULT_SECRET_PATH: {{ .Values.vault.secretPath | quote }}
+
+  PUBSUB_EMULATOR_HOST: {{ printf "%s:%d" (include "todoapp.pubsubServiceName" .) (int .Values.pubsub.servicePort) | quote }}
+  PUBSUB_PROJECT_ID: {{ .Values.pubsub.projectId | quote }}
+  PUBSUB_TOPIC_ID: {{ .Values.pubsub.topicIds.todo | quote }}
+  TODO_EVENTS_SUBSCRIPTION_ID: {{ .Values.pubsub.subscriptionIds.todoEvents | quote }}
+  CHAT_EVENTS_SUBSCRIPTION_ID: {{ .Values.pubsub.subscriptionIds.chatEvents | quote }}
+  CHAT_TITLE_EVENTS_SUBSCRIPTION_ID: {{ .Values.pubsub.subscriptionIds.chatTitleEvents | quote }}
+  ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX: {{ .Values.pubsub.subscriptionPrefixes.actionApprovalEvents | quote }}
+
+  MCP_GATEWAY_ENDPOINT: {{ printf "http://%s:%d" (include "todoapp.mcpServiceName" .) (int .Values.mcp.servicePort) | quote }}
+{{- range $key, $value := .Values.env.common }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}

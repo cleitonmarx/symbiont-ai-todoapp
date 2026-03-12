@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "todoapp.fullname" . }}-http-api
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: http-api
+spec:
+  replicas: {{ .Values.replicas.httpApi }}
+  selector:
+    matchLabels:
+      {{- include "todoapp.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: http-api
+  template:
+    metadata:
+      labels:
+        {{- include "todoapp.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: http-api
+      annotations:
+        checksum/env-common: {{ toYaml .Values.env.common | sha256sum | quote }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+        - name: http-api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - "/http-api"
+          envFrom:
+            - configMapRef:
+                name: {{ include "todoapp.commonEnvConfigMapName" . }}
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "http-api"
+            - name: API_SERVER_PORT
+              value: "8080"
+            - name: {{ .Values.env.secrets.keys.llmApiKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "todoapp.secretName" . }}
+                  key: {{ .Values.env.secrets.keys.llmApiKey }}
+                  optional: {{ .Values.env.secrets.optional }}
+            - name: {{ .Values.env.secrets.keys.llmEmbeddingApiKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "todoapp.secretName" . }}
+                  key: {{ .Values.env.secrets.keys.llmEmbeddingApiKey }}
+                  optional: {{ .Values.env.secrets.optional }}
+            - name: {{ .Values.env.secrets.keys.mcpGatewayApiKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "todoapp.secretName" . }}
+                  key: {{ .Values.env.secrets.keys.mcpGatewayApiKey }}
+                  optional: {{ .Values.env.secrets.optional }}
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.resources.app | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "todoapp.fullname" . }}-http-api
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: http-api
+spec:
+  type: {{ .Values.services.http.type }}
+  selector:
+    {{- include "todoapp.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: http-api
+  ports:
+    - name: http
+      port: {{ .Values.services.http.port }}
+      targetPort: http
+      protocol: TCP
+      {{- if or (eq .Values.services.http.type "NodePort") (eq .Values.services.http.type "LoadBalancer") }}
+      nodePort: {{ .Values.services.http.nodePort }}
+      {{- end }}

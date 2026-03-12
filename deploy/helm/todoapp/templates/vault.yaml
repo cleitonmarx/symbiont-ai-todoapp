@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "todoapp.vaultServiceName" . }}
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vault
+spec:
+  selector:
+    {{- include "todoapp.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: vault
+  ports:
+    - name: http
+      port: {{ .Values.vault.servicePort }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "todoapp.vaultServiceName" . }}
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vault
+spec:
+  serviceName: {{ include "todoapp.vaultServiceName" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "todoapp.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: vault
+  template:
+    metadata:
+      labels:
+        {{- include "todoapp.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: vault
+    spec:
+      containers:
+        - name: vault
+          image: "{{ .Values.vault.image.repository }}:{{ .Values.vault.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              vault server -dev -dev-root-token-id={{ .Values.vault.devToken }} -dev-listen-address=0.0.0.0:{{ .Values.vault.servicePort }}
+          env:
+            - name: VAULT_DEV_ROOT_TOKEN_ID
+              value: {{ .Values.vault.devToken | quote }}
+            - name: VAULT_DEV_LISTEN_ADDRESS
+              value: {{ printf "0.0.0.0:%d" (int .Values.vault.servicePort) | quote }}
+            - name: VAULT_ADDR
+              value: {{ printf "http://127.0.0.1:%d" (int .Values.vault.servicePort) | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.vault.servicePort }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.vault.persistence.mountPath }}
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources.vault | nindent 12 }}
+      {{- if not .Values.vault.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- end }}
+  {{- if .Values.vault.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.vault.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.vault.persistence.size }}
+  {{- end }}
+---
+{{- if .Values.vault.initJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "todoapp.fullname" . }}-vault-init
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vault-init
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      labels:
+        {{- include "todoapp.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: vault-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: vault-init
+          image: "{{ .Values.vault.image.repository }}:{{ .Values.vault.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              export VAULT_ADDR="http://{{ include "todoapp.vaultServiceName" . }}:{{ .Values.vault.servicePort }}"
+              export VAULT_TOKEN="{{ .Values.vault.devToken }}"
+
+              max_retries=60
+              retry=0
+              until vault status >/dev/null 2>&1; do
+                retry=$((retry + 1))
+                if [ "$retry" -ge "$max_retries" ]; then
+                  echo "Vault did not become ready in time"
+                  exit 1
+                fi
+                sleep 2
+              done
+
+              vault secrets enable -path={{ .Values.vault.mountPath }} kv-v2 >/dev/null 2>&1 || true
+
+              vault kv put {{ .Values.vault.mountPath }}/{{ .Values.vault.secretPath }} \
+                DB_USER={{ .Values.postgres.auth.user }} \
+                DB_PASS={{ .Values.postgres.auth.password }}
+{{- end }}

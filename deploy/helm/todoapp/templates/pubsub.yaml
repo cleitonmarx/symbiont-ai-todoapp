@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "todoapp.pubsubServiceName" . }}
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pubsub-emulator
+spec:
+  selector:
+    {{- include "todoapp.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: pubsub-emulator
+  ports:
+    - name: http
+      port: {{ .Values.pubsub.servicePort }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "todoapp.pubsubServiceName" . }}
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pubsub-emulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "todoapp.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: pubsub-emulator
+  template:
+    metadata:
+      labels:
+        {{- include "todoapp.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: pubsub-emulator
+    spec:
+      containers:
+        - name: pubsub-emulator
+          image: "{{ .Values.pubsub.image.repository }}:{{ .Values.pubsub.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              (/usr/bin/wait-for -t 300 localhost:{{ .Values.pubsub.servicePort }} -- env PUBSUB_EMULATOR_HOST=localhost:{{ .Values.pubsub.servicePort }} /usr/bin/pubsubc -debug; nc -lkp 8682 >/dev/null) &
+              exec gcloud beta emulators pubsub start --host-port=0.0.0.0:{{ .Values.pubsub.servicePort }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.pubsub.servicePort }}
+          env:
+            - name: PUBSUB_PROJECT1
+              value: {{ include "todoapp.pubsubProjectSpec" . | quote }}
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources.pubsub | nindent 12 }}

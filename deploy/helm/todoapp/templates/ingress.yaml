@@ -1,0 +1,46 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "todoapp.fullname" . }}
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  rules:
+    - host: {{ .Values.ingress.hosts.http | quote }}
+      http:
+        paths:
+          - path: /v1/query
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "todoapp.fullname" . }}-graphql-api
+                port:
+                  number: {{ .Values.services.graphql.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "todoapp.fullname" . }}-http-api
+                port:
+                  number: {{ .Values.services.http.port }}
+    - host: {{ .Values.ingress.hosts.graphql | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "todoapp.fullname" . }}-graphql-api
+                port:
+                  number: {{ .Values.services.graphql.port }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

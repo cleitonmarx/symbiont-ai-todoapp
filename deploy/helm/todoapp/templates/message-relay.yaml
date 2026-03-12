@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "todoapp.fullname" . }}-message-relay
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: message-relay
+spec:
+  replicas: {{ .Values.replicas.messageRelay }}
+  selector:
+    matchLabels:
+      {{- include "todoapp.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: message-relay
+  template:
+    metadata:
+      labels:
+        {{- include "todoapp.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: message-relay
+      annotations:
+        checksum/env-common: {{ toYaml .Values.env.common | sha256sum | quote }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+        - name: message-relay
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - "/message-relay"
+          envFrom:
+            - configMapRef:
+                name: {{ include "todoapp.commonEnvConfigMapName" . }}
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "message-relay"
+            - name: {{ .Values.env.secrets.keys.llmApiKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "todoapp.secretName" . }}
+                  key: {{ .Values.env.secrets.keys.llmApiKey }}
+                  optional: {{ .Values.env.secrets.optional }}
+            - name: {{ .Values.env.secrets.keys.llmEmbeddingApiKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "todoapp.secretName" . }}
+                  key: {{ .Values.env.secrets.keys.llmEmbeddingApiKey }}
+                  optional: {{ .Values.env.secrets.optional }}
+            - name: {{ .Values.env.secrets.keys.mcpGatewayApiKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "todoapp.secretName" . }}
+                  key: {{ .Values.env.secrets.keys.mcpGatewayApiKey }}
+                  optional: {{ .Values.env.secrets.optional }}
+          resources:
+            {{- toYaml .Values.resources.app | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

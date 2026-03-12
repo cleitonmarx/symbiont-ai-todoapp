@@ -203,7 +203,7 @@ Recommended hardware profile for a smooth local experience:
 
 Model note:
 
-- `qwen3:4B-F16` requires about 15 GB of memory in this setup.
+- `docker.io/ai/qwen3:4B-F16` requires about 15 GB of memory in this setup.
 
 ### 2) OpenAI API (lighter local machine requirements)
 
@@ -225,7 +225,7 @@ Use this environment configuration:
 
 ### Embedding Model
 
-`embeddinggemma:300M-Q8_0` is highly recommended for this project due to its speed/capacity tradeoff. You can still use another embedding model if needed by updating `LLM_EMBEDDING_MODEL`.
+`docker.io/ai/embeddinggemma:300M-Q8_0` is highly recommended for this project due to its speed/capacity tradeoff. You can still use another embedding model if needed by updating `LLM_EMBEDDING_MODEL`.
 
 
 ## Quick Start (Docker Compose)
@@ -286,6 +286,13 @@ Split stack URLs:
 - HTTP API + embedded UI (via Traefik): `http://localhost:18080`
 - GraphQL playground (via Traefik): `http://localhost:18085`
 
+## Kubernetes (Docker Desktop) with Terraform + Helm
+
+Deployment documentation is maintained in:
+
+- Terraform stack runbook: [deploy/terraform/local-docker-desktop/README.md](deploy/terraform/local-docker-desktop/README.md)
+- Helm chart values and components: [deploy/helm/todoapp/README.md](deploy/helm/todoapp/README.md)
+
 ## Local Development
 
 ### Backend + dependencies
@@ -312,13 +319,13 @@ PUBSUB_TOPIC_ID=Todo \
 TODO_EVENTS_SUBSCRIPTION_ID=todo_summary_generator \
 CHAT_EVENTS_SUBSCRIPTION_ID=chat_message_summary_generator \
 CHAT_TITLE_EVENTS_SUBSCRIPTION_ID=chat_message_title_generator \
-ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID=action_approval_dispatcher \
+ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX=action_approval_dispatcher \
 LLM_MODEL_HOST=http://localhost:12434 \
 LLM_EMBEDDING_MODEL_HOST=http://localhost:12434 \
-LLM_SUMMARY_MODEL=qwen3:4B-F16 \
-LLM_CHAT_SUMMARY_MODEL=qwen3:4B-F16 \
-LLM_CHAT_TITLE_MODEL=qwen3:4B-F16 \
-LLM_EMBEDDING_MODEL=embeddinggemma:300M-Q8_0 \
+LLM_SUMMARY_MODEL=docker.io/ai/qwen3:4B-F16 \
+LLM_CHAT_SUMMARY_MODEL=docker.io/ai/qwen3:4B-F16 \
+LLM_CHAT_TITLE_MODEL=docker.io/ai/qwen3:4B-F16 \
+LLM_EMBEDDING_MODEL=docker.io/ai/embeddinggemma:300M-Q8_0 \
 MCP_GATEWAY_ENDPOINT=http://localhost:8811 \
 go run ./cmd/monolithic
 ```
@@ -347,7 +354,7 @@ Required env subsets per deployable:
   - `DB_HOST`, `DB_PORT`, `DB_NAME`
 - HTTP API (`cmd/http-api`) additional:
   - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (local emulator)
-  - `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID`
+  - `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX`
   - `LLM_MODEL_HOST`, `LLM_EMBEDDING_MODEL_HOST`, `LLM_EMBEDDING_MODEL`
   - `MCP_GATEWAY_ENDPOINT`
   - Optional: `LLM_API_KEY`, `LLM_EMBEDDING_API_KEY`, `MCP_GATEWAY_API_KEY`, `MCP_GATEWAY_API_KEY_HEADER`, `MCP_GATEWAY_REQUEST_TIMEOUT`, `LLM_MAX_ACTION_CYCLES`
@@ -402,7 +409,7 @@ Run skill matrix tests:
 go test -tags=skillmatrix -v -timeout 30m ./tests/skillsmatrix/...
 ```
 
-Skill matrix tests require an embedding-compatible model endpoint at `http://localhost:12434` (for example Docker Model Runner with `embeddinggemma:300M-Q8_0`).
+Skill matrix tests require an embedding-compatible model endpoint at `http://localhost:12434` (for example Docker Model Runner with `docker.io/ai/embeddinggemma:300M-Q8_0`).
 
 ## Load Testing (k6)
 
@@ -497,7 +504,7 @@ Required or commonly tuned variables:
 - `DB_HOST`, `DB_PORT` (default: `5432`), `DB_NAME`
 - `DB_USER`, `DB_PASS` (can be sourced from Vault)
 - `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_MOUNT_PATH`, `VAULT_SECRET_PATH`
-- `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `PUBSUB_TOPIC_ID`, `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`, `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID`
+- `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `PUBSUB_TOPIC_ID`, `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`, `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX`
 - `LLM_MODEL_HOST`, `LLM_EMBEDDING_MODEL_HOST`, `LLM_API_KEY`, `LLM_EMBEDDING_API_KEY`, `LLM_SUMMARY_MODEL`, `LLM_CHAT_SUMMARY_MODEL`, `LLM_CHAT_TITLE_MODEL`, `LLM_EMBEDDING_MODEL`
 - `MCP_GATEWAY_ENDPOINT` (e.g. `http://mcp-gateway:8811`)
 - `MCP_GATEWAY_API_KEY` (default: `-`)

@@ -5,7 +5,29 @@ import {
   TodoStatus,
 } from '../types/graphql';
 
-const GRAPHQL_ENDPOINT = import.meta.env.VITE_GRAPHQL_ENDPOINT || 'http://localhost:8085/v1/query';
+function resolveGraphQLEndpoint(): string {
+  const configured = (import.meta.env.VITE_GRAPHQL_ENDPOINT ?? '').trim();
+  if (configured !== '') {
+    return configured;
+  }
+
+  if (typeof window === 'undefined') {
+    return '/v1/query';
+  }
+
+  const { protocol, hostname } = window.location;
+  if (hostname === 'todoapp.local') {
+    return `${protocol}//graphql.todoapp.local/v1/query`;
+  }
+
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:8085/v1/query';
+  }
+
+  return '/v1/query';
+}
+
+const GRAPHQL_ENDPOINT = resolveGraphQLEndpoint();
 
 const LIST_TODOS_QUERY = `
   query ListTodos(

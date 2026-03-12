@@ -69,7 +69,7 @@ graph TD
 	chat_ListAvailableModels____ptr_chat_ListAvailableModelsImpl["<b><span style='font-size:16px'>chat.ListAvailableModels</span></b><br/><span style='color:darkgray;font-size:11px;'>ð§© *chat.ListAvailableModelsImpl</span><br/><span style='color:darkblue;font-size:11px;'>ðï¸ chat.InitListAvailableModels.Initialize</span><br/><span style='color:gray;font-size:11px;'>ð(chat/init.go:80)</span><br/><span style='color:green;font-size:11px;'>ð <b>Dependency</b></span>"]
 	assistant_SkillRegistry____skillregistry_Registry["<b><span style='font-size:16px'>assistant.SkillRegistry</span></b><br/><span style='color:darkgray;font-size:11px;'>ð§© skillregistry.Registry</span><br/><span style='color:darkblue;font-size:11px;'>ðï¸ skillregistry.InitLocalSkillRegistry.Initialize</span><br/><span style='color:gray;font-size:11px;'>ð(skillregistry/init.go:25)</span><br/><span style='color:green;font-size:11px;'>ð <b>Dependency</b></span>"]
 	assistant_ActionRegistry__mcp__ptr_mcp_MCPRegistry["<b><span style='font-size:16px'>assistant.ActionRegistry</span></b><br/><span style='color:#b26a00;font-size:12px;'>name: mcp</span><br/><span style='color:darkgray;font-size:11px;'>ð§© *mcp.MCPRegistry</span><br/><span style='color:darkblue;font-size:11px;'>ðï¸ mcp.(*InitMCPActionRegistry).Initialize</span><br/><span style='color:gray;font-size:11px;'>ð(mcp/init.go:43)</span><br/><span style='color:green;font-size:11px;'>ð <b>Dependency</b></span>"]
-	ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID["<b><span style='font-size:16px'>ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID</span></b><br/><span style='color:green;font-size:11px;'>ð«´ð½ config.EnvVarProvider</span><br/><span style='color:green;font-size:11px;'>ð <b>Config</b></span>"]
+	ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX["<b><span style='font-size:16px'>ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX</span></b><br/><span style='color:green;font-size:11px;'>ð«´ð½ config.EnvVarProvider</span><br/><span style='color:green;font-size:11px;'>ð <b>Config</b></span>"]
 	LLM_CHAT_SUMMARY_MODEL["<b><span style='font-size:16px'>LLM_CHAT_SUMMARY_MODEL</span></b><br/><span style='color:green;font-size:11px;'>ð«´ð½ config.EnvVarProvider</span><br/><span style='color:green;font-size:11px;'>ð <b>Config</b></span>"]
 	LLM_SUMMARY_MODEL["<b><span style='font-size:16px'>LLM_SUMMARY_MODEL</span></b><br/><span style='color:green;font-size:11px;'>ð«´ð½ config.EnvVarProvider</span><br/><span style='color:green;font-size:11px;'>ð <b>Config</b></span>"]
 	SUMMARY_BATCH_SIZE["<b><span style='font-size:16px'>SUMMARY_BATCH_SIZE</span></b><br/><span style='color:green;font-size:11px;'>default</span><br/><span style='color:green;font-size:11px;'>ð <b>Config</b></span>"]
@@ -210,7 +210,7 @@ graph TD
 	ptr_workers_ChatSummaryGenerator --- SymbiontApp
 	ptr_workers_ConversationTitleGenerator --- SymbiontApp
 	ptr_workers_MessageRelay --- SymbiontApp
-	ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID -.-> ptr_workers_ActionApprovalDispatcher
+	ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX -.-> ptr_workers_ActionApprovalDispatcher
 	API_SERVER_PORT -.-> ptr_http_TodoAppServer
 	CHAT_EVENTS_SUBSCRIPTION_ID -.-> ptr_workers_ChatSummaryGenerator
 	CHAT_SUMMARY_BATCH_INTERVAL -.-> ptr_workers_ChatSummaryGenerator
@@ -389,7 +389,7 @@ graph TD
 	style chat_ListAvailableModels____ptr_chat_ListAvailableModelsImpl fill:#d6fff9,stroke:#2ec4b6,stroke-width:2px,color:#222222
 	style assistant_SkillRegistry____skillregistry_Registry fill:#d6fff9,stroke:#2ec4b6,stroke-width:2px,color:#222222
 	style assistant_ActionRegistry__mcp__ptr_mcp_MCPRegistry fill:#d6fff9,stroke:#2ec4b6,stroke-width:2px,color:#222222
-	style ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID fill:#f1f7d2,stroke:#a7c957,stroke-width:2px,color:#222222
+	style ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX fill:#f1f7d2,stroke:#a7c957,stroke-width:2px,color:#222222
 	style LLM_CHAT_SUMMARY_MODEL fill:#f1f7d2,stroke:#a7c957,stroke-width:2px,color:#222222
 	style LLM_SUMMARY_MODEL fill:#f1f7d2,stroke:#a7c957,stroke-width:2px,color:#222222
 	style SUMMARY_BATCH_SIZE fill:#f1f7d2,stroke:#a7c957,stroke-width:2px,color:#222222

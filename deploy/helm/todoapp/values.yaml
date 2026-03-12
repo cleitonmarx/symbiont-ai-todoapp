@@ -1,0 +1,143 @@
+image:
+  repository: todoapp
+  tag: dev
+  pullPolicy: IfNotPresent
+
+replicas:
+  httpApi: 1
+  graphqlApi: 1
+  messageRelay: 1
+  boardSummaryGenerator: 1
+  chatSummaryGenerator: 1
+  conversationTitleGenerator: 1
+
+services:
+  http:
+    type: ClusterIP
+    port: 8080
+    nodePort: 30080
+  graphql:
+    type: ClusterIP
+    port: 8085
+    nodePort: 30085
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    http: todoapp.local
+    graphql: graphql.todoapp.local
+  tls: []
+
+env:
+  common:
+    LLM_MODEL_HOST: http://host.docker.internal:12434
+    LLM_EMBEDDING_MODEL_HOST: http://host.docker.internal:12434
+    LLM_SUMMARY_MODEL: docker.io/ai/qwen3:4B-F16
+    LLM_CHAT_SUMMARY_MODEL: docker.io/ai/qwen3:4B-F16
+    LLM_CHAT_TITLE_MODEL: docker.io/ai/qwen3:4B-F16
+    LLM_EMBEDDING_MODEL: docker.io/ai/embeddinggemma:300M-Q8_0
+    MCP_GATEWAY_API_KEY_HEADER: Authorization
+    MCP_GATEWAY_REQUEST_TIMEOUT: 20s
+    MCP_GATEWAY_TOP_ACTIONS_PER_REGISTRY: "2"
+    LLM_MAX_ACTION_CYCLES: "50"
+    FETCH_OUTBOX_INTERVAL: 500ms
+    SUMMARY_BATCH_INTERVAL: 3s
+    SUMMARY_BATCH_SIZE: "20"
+    CHAT_SUMMARY_BATCH_INTERVAL: 3s
+    CHAT_SUMMARY_BATCH_SIZE: "50"
+    CHAT_TITLE_BATCH_INTERVAL: 3s
+    CHAT_TITLE_BATCH_SIZE: "50"
+    OTEL_RESOURCE_ATTRIBUTES: ""
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ""
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ""
+
+  secrets:
+    create: false
+    existingSecret: ""
+    optional: true
+    keys:
+      llmApiKey: LLM_API_KEY
+      llmEmbeddingApiKey: LLM_EMBEDDING_API_KEY
+      mcpGatewayApiKey: MCP_GATEWAY_API_KEY
+    data:
+      llmApiKey: ""
+      llmEmbeddingApiKey: ""
+      mcpGatewayApiKey: ""
+
+postgres:
+  image:
+    repository: pgvector/pgvector
+    tag: pg18-trixie
+  servicePort: 5432
+  auth:
+    user: todoapp
+    password: todoapppass
+    database: todoappdb
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+    mountPath: /var/lib/postgresql
+
+vault:
+  image:
+    repository: hashicorp/vault
+    tag: "1.15"
+  servicePort: 8200
+  devToken: root-token
+  mountPath: secret
+  secretPath: todoapp
+  initJob:
+    enabled: true
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+    mountPath: /vault/file
+
+pubsub:
+  image:
+    repository: marcelcorso/gcloud-pubsub-emulator
+    tag: latest
+  servicePort: 8681
+  projectId: local-dev
+  topicIds:
+    todo: Todo
+    chatMessages: ChatMessages
+    actionApprovals: ActionApprovals
+  subscriptionIds:
+    todoEvents: todo_summary_generator
+    chatEvents: chat_message_summary_generator
+    chatTitleEvents: chat_message_title_generator
+  subscriptionPrefixes:
+    actionApprovalEvents: action_approval_dispatcher
+
+mcp:
+  image:
+    repository: docker/mcp-gateway
+    tag: latest
+  servicePort: 8811
+  transport: streamable-http
+  servers: duckduckgo,mcp-code-interpreter
+  tools:
+    - duckduckgo:fetch_content
+    - duckduckgo:search
+    - mcp-code-interpreter:execute_code
+  dockerSocket:
+    enabled: true
+    hostPath: /var/run/docker.sock
+    mountPath: /var/run/docker.sock
+
+resources:
+  app: {}
+  postgres: {}
+  vault: {}
+  pubsub: {}
+  mcp: {}
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

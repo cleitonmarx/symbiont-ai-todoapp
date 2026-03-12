@@ -1,0 +1,6 @@
+apiVersion: v2
+name: todoapp
+description: Symbiont AI Todo App deployment for local Kubernetes (Docker Desktop first)
+type: application
+version: 0.1.0
+appVersion: "dev"

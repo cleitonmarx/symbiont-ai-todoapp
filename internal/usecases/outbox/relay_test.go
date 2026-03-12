@@ -3,6 +3,8 @@ package outbox
 import (
 	"context"
 	"errors"
+	"io"
+	"log"
 	"testing"
 	"time"
 
@@ -258,7 +260,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				tt.setExpectations(uow, publisher)
 			}
 
-			relay := NewRelayImpl(uow, publisher, nil)
+			relay := NewRelayImpl(uow, publisher, log.New(io.Discard, "", 0))
 			gotErr := relay.Execute(t.Context())
 
 			assert.Equal(t, tt.expectedErr, gotErr)

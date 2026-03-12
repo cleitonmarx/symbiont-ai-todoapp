@@ -51,7 +51,7 @@ services:
     ports:
       - "8681:8681"
     environment:
-      PUBSUB_PROJECT1: local-dev,Todo:todo_summary_generator,ChatMessages:chat_message_summary_generator:chat_message_title_generator,ActionApprovals:action_approval_dispatcher
+      PUBSUB_PROJECT1: local-dev,Todo:todo_summary_generator,ChatMessages:chat_message_summary_generator:chat_message_title_generator,ActionApprovals
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8681"]
       interval: 3s
@@ -66,7 +66,7 @@ services:
       - --servers=duckduckgo,mcp-code-interpreter
       - --tools=duckduckgo:fetch_content
       - --tools=duckduckgo:search
-      - --tools=execute_code
+      - --tools=mcp-code-interpreter:execute_code
     ports:
       - "8811:8811"
     volumes:
@@ -81,13 +81,13 @@ services:
 
 models:
   qwen3:
-    model: qwen3:4B-F16
+    model: docker.io/ai/qwen3:4B-F16
     context_size: 9000
     runtime_flags:
       - "--batch-size"
       - "1024"
   embeddinggemma:
-    model: embeddinggemma:300M-Q8_0
+    model: docker.io/ai/embeddinggemma:300M-Q8_0
     runtime_flags:
       - "--embeddings"
       - "--ubatch-size"

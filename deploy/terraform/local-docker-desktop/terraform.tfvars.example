@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars and adjust as needed.
+kube_context      = "docker-desktop"
+namespace         = "todoapp"
+release_name      = "todoapp"
+image_repository  = "todoapp"
+image_tag         = "dev"
+service_type      = "ClusterIP"
+ingress_enabled   = true
+manage_ingress_nginx = true
+ingress_nginx_namespace = "ingress-nginx"
+ingress_nginx_release_name = "ingress-nginx"
+# ingress_nginx_chart_version = "4.0.0"
+ingress_class_name = "nginx"
+http_host         = "todoapp.local"
+graphql_host      = "graphql.todoapp.local"
+
+# Optional secrets
+llm_api_key           = ""
+llm_embedding_api_key = ""
+mcp_gateway_api_key   = ""

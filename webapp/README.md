@@ -17,8 +17,9 @@ To run the application locally, follow these steps:
    npm install
    ```
 
-3. **Set the API base URL** (optional):
-   The API base URL is configured via the `VITE_API_BASE_URL` environment variable. By default, it points to `http://localhost:8080`.
+3. **Set API/GraphQL URLs** (optional):
+   - `VITE_API_BASE_URL` (default: same-origin, e.g. `""`)
+   - `VITE_GRAPHQL_ENDPOINT` (default: auto; when host is `todoapp.local`, uses `http://graphql.todoapp.local/v1/query`)
 
 4. **Run the application**:
    ```bash

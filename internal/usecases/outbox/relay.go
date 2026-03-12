@@ -44,6 +44,10 @@ func (r RelayImpl) Execute(ctx context.Context) error {
 			return err
 		}
 
+		if len(events) > 0 {
+			r.Logger.Printf("Fetched %d pending outbox events", len(events))
+		}
+
 		for _, event := range events {
 			if err := r.relayEvent(uowCtx, outboxRepo, event); err != nil {
 				r.Logger.Printf("relay failed for event %s: %v", event.ID, err)

@@ -26,7 +26,7 @@ type ActionApprovalDispatcher struct {
 	Logger              *log.Logger                        `resolve:""`
 	Client              *pubsub.Client                     `resolve:""`
 	Dispatcher          assistant.ActionApprovalDispatcher `resolve:""`
-	SubscriptionID      string                             `config:"ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID"`
+	SubscriptionPrefix  string                             `config:"ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX"`
 	ProjectID           string                             `config:"PUBSUB_PROJECT_ID"`
 	ServerID            string
 	workerExecutionChan chan struct{}
@@ -99,7 +99,7 @@ func (w ActionApprovalDispatcher) Run(ctx context.Context) error {
 
 // resolveSubscriptionID determines the effective subscription ID to use, applying server ID suffix if configured.
 func (w ActionApprovalDispatcher) resolveSubscriptionID() string {
-	base := strings.TrimSpace(w.SubscriptionID)
+	base := strings.TrimSpace(w.SubscriptionPrefix)
 	if base == "" {
 		return ""
 	}
@@ -152,7 +152,7 @@ func (w ActionApprovalDispatcher) ensureSubscription(ctx context.Context, subscr
 		return errors.New("PUBSUB_PROJECT_ID is required")
 	}
 	if strings.TrimSpace(subscriptionID) == "" {
-		return errors.New("ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID is required")
+		return errors.New("ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX is required")
 	}
 
 	subscriptionPath := fmt.Sprintf("projects/%s/subscriptions/%s", projectID, subscriptionID)
@@ -189,7 +189,7 @@ func (w ActionApprovalDispatcher) deleteSubscription(ctx context.Context, subscr
 		return errors.New("PUBSUB_PROJECT_ID is required")
 	}
 	if strings.TrimSpace(subscriptionID) == "" {
-		return errors.New("ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID is required")
+		return errors.New("ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX is required")
 	}
 
 	subscriptionPath := fmt.Sprintf("projects/%s/subscriptions/%s", projectID, subscriptionID)

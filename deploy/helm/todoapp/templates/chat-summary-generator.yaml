@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "todoapp.fullname" . }}-chat-summary-generator
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chat-summary-generator
+spec:
+  replicas: {{ .Values.replicas.chatSummaryGenerator }}
+  selector:
+    matchLabels:
+      {{- include "todoapp.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: chat-summary-generator
+  template:
+    metadata:
+      labels:
+        {{- include "todoapp.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: chat-summary-generator
+      annotations:
+        checksum/env-common: {{ toYaml .Values.env.common | sha256sum | quote }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+        - name: chat-summary-generator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - "/chat-summary-generator"
+          envFrom:
+            - configMapRef:
+                name: {{ include "todoapp.commonEnvConfigMapName" . }}
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "chat-summary-generator"
+            - name: {{ .Values.env.secrets.keys.llmApiKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "todoapp.secretName" . }}
+                  key: {{ .Values.env.secrets.keys.llmApiKey }}
+                  optional: {{ .Values.env.secrets.optional }}
+            - name: {{ .Values.env.secrets.keys.llmEmbeddingApiKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "todoapp.secretName" . }}
+                  key: {{ .Values.env.secrets.keys.llmEmbeddingApiKey }}
+                  optional: {{ .Values.env.secrets.optional }}
+            - name: {{ .Values.env.secrets.keys.mcpGatewayApiKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "todoapp.secretName" . }}
+                  key: {{ .Values.env.secrets.keys.mcpGatewayApiKey }}
+                  optional: {{ .Values.env.secrets.optional }}
+          resources:
+            {{- toYaml .Values.resources.app | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

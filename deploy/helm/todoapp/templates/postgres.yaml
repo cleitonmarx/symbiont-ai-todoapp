@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "todoapp.fullname" . }}-postgres-init
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+data:
+  init_vector.sql: |
+    CREATE EXTENSION IF NOT EXISTS vector;
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "todoapp.postgresServiceName" . }}
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  selector:
+    {{- include "todoapp.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  ports:
+    - name: postgres
+      port: {{ .Values.postgres.servicePort }}
+      targetPort: postgres
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "todoapp.postgresServiceName" . }}
+  labels:
+    {{- include "todoapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: {{ include "todoapp.postgresServiceName" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "todoapp.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "todoapp.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.postgres.servicePort }}
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.auth.user | quote }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.postgres.auth.password | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.auth.database | quote }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.postgres.persistence.mountPath | quote }}
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d/init_vector.sql
+              subPath: init_vector.sql
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.postgres.auth.user }}"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.postgres.auth.user }}"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources.postgres | nindent 12 }}
+      volumes:
+        - name: init-script
+          configMap:
+            name: {{ include "todoapp.fullname" . }}-postgres-init
+        {{- if not .Values.postgres.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.postgres.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.postgres.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.persistence.size }}
+  {{- end }}

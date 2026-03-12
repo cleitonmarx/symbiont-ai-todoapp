@@ -28,15 +28,15 @@ services:
       TODO_EVENTS_SUBSCRIPTION_ID: todo_summary_generator
       CHAT_EVENTS_SUBSCRIPTION_ID: chat_message_summary_generator
       CHAT_TITLE_EVENTS_SUBSCRIPTION_ID: chat_message_title_generator
-      ACTION_APPROVAL_EVENTS_SUBSCRIPTION_ID: action_approval_dispatcher
+      ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX: action_approval_dispatcher
       SUMMARY_BATCH_INTERVAL: 1s
       CHAT_TITLE_BATCH_INTERVAL: 3s
       LLM_MODEL_HOST: http://model-runner.docker.internal
-      LLM_SUMMARY_MODEL: qwen3:4B-F16
-      LLM_CHAT_SUMMARY_MODEL: qwen3:4B-F16
-      LLM_CHAT_TITLE_MODEL: qwen3:4B-F16
+      LLM_SUMMARY_MODEL: docker.io/ai/qwen3:4B-F16
+      LLM_CHAT_SUMMARY_MODEL: docker.io/ai/qwen3:4B-F16
+      LLM_CHAT_TITLE_MODEL: docker.io/ai/qwen3:4B-F16
       LLM_EMBEDDING_MODEL_HOST: http://model-runner.docker.internal
-      LLM_EMBEDDING_MODEL: embeddinggemma:300M-Q8_0
+      LLM_EMBEDDING_MODEL: docker.io/ai/embeddinggemma:300M-Q8_0
       MCP_GATEWAY_ENDPOINT: http://mcp-gateway:8811
     models:
       - qwen3

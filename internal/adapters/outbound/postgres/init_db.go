@@ -23,7 +23,7 @@ import (
 	pgxvector "github.com/pgvector/pgvector-go/pgx"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
 //go:embed migrations/*.sql

@@ -8,7 +8,7 @@ import (
 	"github.com/XSAM/otelsql"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
 func Test_withQueryAttributes(t *testing.T) {

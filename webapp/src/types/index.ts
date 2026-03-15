@@ -125,6 +125,8 @@ export interface Conversation {
   id: string;
   title: string;
   title_source: ConversationTitleSource;
+  total_tokens_used: number;
+  context_compaction_trigger_tokens: number;
   created_at: string;
   updated_at: string;
 }

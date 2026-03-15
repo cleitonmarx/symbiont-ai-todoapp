@@ -28,6 +28,8 @@ interface UseChatReturn {
   selectedModel: string;
   toolCallingStatus: string | null;
   toolCallingCount: number;
+  contextCompactionStatus: 'idle' | 'running' | 'failed';
+  contextCompactionError: string | null;
   pendingApproval: ActionApprovalRequest | null;
   approvalSubmitting: boolean;
   loading: boolean;
@@ -125,6 +127,29 @@ interface StreamActionApprovalResolvedEventData {
 interface StreamTurnCompletedEventData {
   assistant_message_id?: string;
   completed_at?: string;
+}
+
+interface StreamContextCompactionStartedEventData {
+  conversation_id?: string;
+  unsummarized_message_count?: number;
+  unsummarized_total_tokens?: number;
+  reason?: string;
+}
+
+interface StreamContextCompactionCompletedEventData {
+  conversation_id?: string;
+  unsummarized_message_count?: number;
+  unsummarized_total_tokens?: number;
+  reason?: string;
+  compacted_at?: string;
+}
+
+interface StreamContextCompactionFailedEventData {
+  conversation_id?: string;
+  unsummarized_message_count?: number;
+  unsummarized_total_tokens?: number;
+  reason?: string;
+  error?: string;
 }
 
 interface StreamErrorEventData {
@@ -465,6 +490,8 @@ export const useChat = ({
   const [selectedModel, setSelectedModel] = useState(loadPersistedModel);
   const [toolCallingStatus, setToolCallingStatus] = useState<string | null>(null);
   const [toolCallingCount, setToolCallingCount] = useState(0);
+  const [contextCompactionStatus, setContextCompactionStatus] = useState<'idle' | 'running' | 'failed'>('idle');
+  const [contextCompactionError, setContextCompactionError] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<ActionApprovalRequest | null>(null);
   const [approvalSubmitting, setApprovalSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -748,6 +775,8 @@ export const useChat = ({
       try {
         setLoading(true);
         resetToolActivity();
+        setContextCompactionStatus('idle');
+        setContextCompactionError(null);
         clearPendingApproval();
         setError(null);
         abortControllerRef.current = new AbortController();
@@ -871,6 +900,31 @@ export const useChat = ({
                   content: assistantContent,
                 }));
               });
+              return;
+            }
+
+            if (eventType === 'context_compaction_started') {
+              const _data = rawData as StreamContextCompactionStartedEventData;
+              setContextCompactionStatus('running');
+              setContextCompactionError(null);
+              return;
+            }
+
+            if (eventType === 'context_compaction_completed') {
+              const _data = rawData as StreamContextCompactionCompletedEventData;
+              setContextCompactionStatus('idle');
+              setContextCompactionError(null);
+              return;
+            }
+
+            if (eventType === 'context_compaction_failed') {
+              const data = rawData as StreamContextCompactionFailedEventData;
+              setContextCompactionStatus('failed');
+              setContextCompactionError(
+                typeof data.error === 'string' && data.error.trim().length > 0
+                  ? data.error
+                  : 'Context compaction failed',
+              );
               return;
             }
 
@@ -1017,6 +1071,7 @@ export const useChat = ({
               }
               clearPendingApproval();
               resetToolActivity();
+              setContextCompactionStatus((current) => (current === 'failed' ? current : 'idle'));
               setLoading(false);
               readerRef.current = null;
               abortControllerRef.current = null;
@@ -1096,6 +1151,7 @@ export const useChat = ({
         }
         clearPendingApproval();
         resetToolActivity();
+        setContextCompactionStatus((current) => (current === 'failed' ? current : 'idle'));
         readerRef.current = null;
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
@@ -1105,6 +1161,7 @@ export const useChat = ({
         }
         clearPendingApproval();
         resetToolActivity();
+        setContextCompactionStatus((current) => (current === 'failed' ? current : 'idle'));
         setLoading(false);
         readerRef.current = null;
         abortControllerRef.current = null;
@@ -1132,6 +1189,8 @@ export const useChat = ({
     selectedModel,
     toolCallingStatus,
     toolCallingCount,
+    contextCompactionStatus,
+    contextCompactionError,
     pendingApproval,
     approvalSubmitting,
     loading,

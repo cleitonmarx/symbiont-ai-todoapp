@@ -49,6 +49,41 @@ const formatConversationAge = (updatedAt: string): string => {
   return `${Math.max(1, Math.round(totalMinutes / DAY_MINUTES))}d`;
 };
 
+const formatTokenCount = (value: number): string => new Intl.NumberFormat().format(Math.max(0, Math.trunc(value)));
+
+interface ContextMeterHint {
+  usagePercent: number;
+  remainingPercent: number;
+  fillDegrees: number;
+}
+
+const resolveContextMeterHint = (tokensUsed: number, maxTokens: number): ContextMeterHint => {
+  const safeTokens = Math.max(0, Math.trunc(tokensUsed));
+  const safeMaxTokens = Math.max(0, Math.trunc(maxTokens));
+  const usageRatio = safeMaxTokens > 0 ? Math.min(safeTokens / safeMaxTokens, 1) : 0;
+  const usagePercent = Math.round(usageRatio * 100);
+
+  return {
+    usagePercent,
+    remainingPercent: Math.max(0, 100 - usagePercent),
+    fillDegrees: safeTokens > 0 && safeMaxTokens > 0 ? Math.max(12, Math.round(usageRatio * 360)) : 0,
+  };
+};
+
+const formatCompactTokenCount = (value: number): string => {
+  const safeValue = Math.max(0, Math.trunc(value));
+  if (safeValue < 1000) {
+    return String(safeValue);
+  }
+
+  return new Intl.NumberFormat(undefined, {
+    notation: 'compact',
+    maximumFractionDigits: safeValue >= 100000 ? 0 : 1,
+  })
+    .format(safeValue)
+    .toLowerCase();
+};
+
 const formatCountdown = (remainingMs: number): string => {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / SECOND_MS));
   const hours = Math.floor(totalSeconds / 3600);
@@ -469,6 +504,8 @@ export const ChatPanel = ({
     selectedModel,
     toolCallingStatus,
     toolCallingCount,
+    contextCompactionStatus,
+    contextCompactionError,
     pendingApproval,
     approvalSubmitting,
     loading,
@@ -517,6 +554,16 @@ export const ChatPanel = ({
     () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
     [activeConversationId, conversations],
   );
+  const activeConversationTokens = activeConversation?.total_tokens_used ?? 0;
+  const contextMeterMaxTokens = activeConversation?.context_compaction_trigger_tokens ?? conversations[0]?.context_compaction_trigger_tokens ?? 0;
+  const contextMeterHint = useMemo(
+    () => resolveContextMeterHint(activeConversationTokens, contextMeterMaxTokens),
+    [activeConversationTokens, contextMeterMaxTokens],
+  );
+  const contextMeterTitle =
+    contextMeterMaxTokens > 0
+      ? `Context window:\n${contextMeterHint.usagePercent}% used (${contextMeterHint.remainingPercent}% left)\n${formatCompactTokenCount(activeConversationTokens)}/${formatCompactTokenCount(contextMeterMaxTokens)} used`
+      : `Context window:\n${formatCompactTokenCount(activeConversationTokens)} used`;
 
   useEffect(() => {
     if (!isCompact) {
@@ -1200,6 +1247,18 @@ export const ChatPanel = ({
               </div>
             ) : null}
 
+            {contextCompactionStatus === 'running' ? (
+              <div className="ui-chat-tool-status ui-chat-compaction-status">
+                <span>Compacting conversation context...</span>
+              </div>
+            ) : null}
+
+            {contextCompactionStatus === 'failed' && contextCompactionError ? (
+              <div className="ui-chat-compaction-error">
+                Context compaction failed: {contextCompactionError}
+              </div>
+            ) : null}
+
             {pendingApproval ? (
               <section className={`ui-chat-approval ${approvalExpired ? 'expired' : ''}`}>
                 <header className="ui-chat-approval-header">
@@ -1404,22 +1463,31 @@ export const ChatPanel = ({
                       )}
                     </select>
                   </div>
+                  <div className="ui-chat-send-actions">
+                    <span
+                      className="ui-chat-context-icon"
+                      style={{ '--ui-context-fill': `${contextMeterHint.fillDegrees}deg` } as React.CSSProperties}
+                      title={contextMeterTitle}
+                      aria-label={contextMeterTitle}
+                      role="img"
+                    />
 
-                  {loading ? (
-                    <button type="button" className="ui-chat-send-btn stop" onClick={stopStream} aria-label="Stop stream">
-                      ■
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="ui-chat-send-btn"
-                      onClick={() => void handleSend()}
-                      disabled={!input.trim() && selectedSkillNames.length === 0}
-                      aria-label="Send message"
-                    >
-                      ↑
-                    </button>
-                  )}
+                    {loading ? (
+                      <button type="button" className="ui-chat-send-btn stop" onClick={stopStream} aria-label="Stop stream">
+                        ■
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="ui-chat-send-btn"
+                        onClick={() => void handleSend()}
+                        disabled={!input.trim() && selectedSkillNames.length === 0}
+                        aria-label="Send message"
+                      >
+                        ↑
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </footer>

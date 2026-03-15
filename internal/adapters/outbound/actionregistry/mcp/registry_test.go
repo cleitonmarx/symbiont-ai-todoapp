@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMCPRegistry_Execute(t *testing.T) {
+func TestActionRegistry_Execute(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
@@ -41,13 +41,18 @@ func TestMCPRegistry_Execute(t *testing.T) {
 			initialize: true,
 			assertMessage: func(t *testing.T, msg assistant.Message) {
 				assert.Contains(t, msg.Content, "invalid_arguments")
+				assert.NotNil(t, msg.ActionError)
 			},
 		},
 		"error-prefixes-content": {
-			session:       &fakeSession{listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{{Name: "fetch", Description: "Fetches content", InputSchema: map[string]any{"type": "object"}}}}}, callResult: &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "failed"}}}},
-			call:          assistant.ActionCall{ID: "call-3", Name: "fetch", Input: `{}`},
-			initialize:    true,
-			assertMessage: func(t *testing.T, msg assistant.Message) { assert.Equal(t, "error: failed", msg.Content) },
+			session:    &fakeSession{listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{{Name: "fetch", Description: "Fetches content", InputSchema: map[string]any{"type": "object"}}}}}, callResult: &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "failed"}}}},
+			call:       assistant.ActionCall{ID: "call-3", Name: "fetch", Input: `{}`},
+			initialize: true,
+			assertMessage: func(t *testing.T, msg assistant.Message) {
+				assert.Equal(t, "error: failed", msg.Content)
+				assert.NotNil(t, msg.ActionError)
+				assert.Equal(t, "error: failed", *msg.ActionError)
+			},
 		},
 		"execute-code-normalizes-escaped-newlines": {
 			session: &fakeSession{
@@ -70,6 +75,7 @@ func TestMCPRegistry_Execute(t *testing.T) {
 			call:    assistant.ActionCall{ID: "call-unknown", Name: "missing_tool", Input: `{}`},
 			assertMessage: func(t *testing.T, msg assistant.Message) {
 				assert.Contains(t, msg.Content, "unknown_action")
+				assert.NotNil(t, msg.ActionError)
 			},
 		},
 	}
@@ -77,7 +83,7 @@ func TestMCPRegistry_Execute(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			registry := newMCPRegistryWithConnector(Config{Endpoint: "http://localhost:8811/mcp"}, &fakeConnector{session: tt.session})
+			registry := newActionRegistryWithConnector(Config{Endpoint: "http://localhost:8811/mcp"}, &fakeConnector{session: tt.session})
 			if tt.initialize {
 				require.NoError(t, registry.initializeActions(t.Context()))
 			}
@@ -90,45 +96,45 @@ func TestMCPRegistry_Execute(t *testing.T) {
 	}
 }
 
-func TestMCPRegistry_Methods(t *testing.T) {
+func TestActionRegistry_Methods(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		registry *MCPRegistry
-		assert   func(*testing.T, *MCPRegistry)
+		registry *ActionRegistry
+		assert   func(*testing.T, *ActionRegistry)
 	}{
 		"get-definition-found": {
-			registry: &MCPRegistry{actionsByName: map[string]assistant.Action{"search": mcpToolAction{definition: assistant.ActionDefinition{Name: "search"}}}},
-			assert: func(t *testing.T, registry *MCPRegistry) {
+			registry: &ActionRegistry{actionsByName: map[string]assistant.Action{"search": mcpToolAction{definition: assistant.ActionDefinition{Name: "search"}}}},
+			assert: func(t *testing.T, registry *ActionRegistry) {
 				def, found := registry.GetDefinition("search")
 				require.True(t, found)
 				assert.Equal(t, "search", def.Name)
 			},
 		},
 		"get-renderer-found": {
-			registry: &MCPRegistry{actionsByName: map[string]assistant.Action{"execute_code": mcpToolAction{renderer: fakeRenderer{ok: true}}}},
-			assert: func(t *testing.T, registry *MCPRegistry) {
+			registry: &ActionRegistry{actionsByName: map[string]assistant.Action{"execute_code": mcpToolAction{renderer: fakeRenderer{ok: true}}}},
+			assert: func(t *testing.T, registry *ActionRegistry) {
 				renderer, found := registry.GetRenderer("execute_code")
 				require.True(t, found)
 				assert.NotNil(t, renderer)
 			},
 		},
 		"status-message-found": {
-			registry: &MCPRegistry{actionsByName: map[string]assistant.Action{"search": mcpToolAction{statusMessage: "Searching..."}}},
-			assert: func(t *testing.T, registry *MCPRegistry) {
+			registry: &ActionRegistry{actionsByName: map[string]assistant.Action{"search": mcpToolAction{statusMessage: "Searching..."}}},
+			assert: func(t *testing.T, registry *ActionRegistry) {
 				assert.Equal(t, "Searching...", registry.StatusMessage("search"))
 			},
 		},
 		"status-message-defaults": {
-			registry: &MCPRegistry{},
-			assert: func(t *testing.T, registry *MCPRegistry) {
+			registry: &ActionRegistry{},
+			assert: func(t *testing.T, registry *ActionRegistry) {
 				assert.Equal(t, defaultStatusMessage, registry.StatusMessage("missing"))
 				assert.Equal(t, defaultStatusMessage, registry.StatusMessage(" "))
 			},
 		},
 		"close-session": {
-			registry: &MCPRegistry{session: &fakeSession{}},
-			assert: func(t *testing.T, registry *MCPRegistry) {
+			registry: &ActionRegistry{session: &fakeSession{}},
+			assert: func(t *testing.T, registry *ActionRegistry) {
 				fake := registry.session.(*fakeSession)
 				require.NoError(t, registry.Close())
 				assert.Equal(t, 1, fake.closeCalls)
@@ -145,16 +151,16 @@ func TestMCPRegistry_Methods(t *testing.T) {
 	}
 }
 
-func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
+func TestActionRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
 		tool   *mcp.Tool
-		assert func(*testing.T, *MCPRegistry)
+		assert func(*testing.T, *ActionRegistry)
 	}{
 		"search": {
 			tool: &mcp.Tool{Name: "search", Description: "Original description", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Query"}}, "required": []any{"query"}}},
-			assert: func(t *testing.T, registry *MCPRegistry) {
+			assert: func(t *testing.T, registry *ActionRegistry) {
 				def, found := registry.GetDefinition("search")
 				require.True(t, found)
 				assert.Equal(t, "Search the web with DuckDuckGo and return concise result snippets with source links.", def.Description)
@@ -164,7 +170,7 @@ func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 		},
 		"execute-code": {
 			tool: &mcp.Tool{Name: "execute_code", Description: "Original execute code description", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"code": map[string]any{"type": "string", "description": "Original code description"}, "session_id": map[string]any{"type": "integer", "description": "Original session_id description"}}, "required": []any{"code"}}},
-			assert: func(t *testing.T, registry *MCPRegistry) {
+			assert: func(t *testing.T, registry *ActionRegistry) {
 				def, found := registry.GetDefinition("execute_code")
 				require.True(t, found)
 				assert.Equal(t, "Execute short self-contained Python code for deterministic calculations, grouping, validation, and data shaping. The tool input must be valid JSON, but the `code` field must contain raw Python source with real newlines, not escaped source like `\\\\n` or `\\\\t`. Prefer compact self-contained scripts and use single quotes inside Python when possible to reduce escaping.", def.Description)
@@ -177,7 +183,7 @@ func TestRegistry_InitializeActions_AppliesToolOverrides(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			session := &fakeSession{listResults: []*mcp.ListToolsResult{{Tools: []*mcp.Tool{tt.tool}}}}
-			registry := newMCPRegistryWithConnector(Config{Endpoint: "http://localhost:8811/mcp"}, &fakeConnector{session: session})
+			registry := newActionRegistryWithConnector(Config{Endpoint: "http://localhost:8811/mcp"}, &fakeConnector{session: session})
 			require.NoError(t, registry.initializeActions(t.Context()))
 			tt.assert(t, registry)
 		})

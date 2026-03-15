@@ -204,6 +204,8 @@ func TestActionErrorMessage(t *testing.T) {
 			assert.Equal(t, tt.callID, *msg.ActionCallID)
 			assert.Contains(t, msg.Content, tt.code)
 			assert.Contains(t, msg.Content, tt.details)
+			require.NotNil(t, msg.ActionError)
+			assert.Equal(t, tt.details, *msg.ActionError)
 		})
 	}
 }

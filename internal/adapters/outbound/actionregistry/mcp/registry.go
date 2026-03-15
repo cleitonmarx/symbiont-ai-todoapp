@@ -14,36 +14,36 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-var _ assistant.ActionRegistry = (*MCPRegistry)(nil)
+var _ assistant.ActionRegistry = (*ActionRegistry)(nil)
 
-// MCPRegistry implements assistant.ActionRegistry using a remote MCP gateway.
-type MCPRegistry struct {
+// ActionRegistry implements assistant.ActionRegistry using a MCP gateway.
+type ActionRegistry struct {
 	cfg           Config
 	connector     mcpConnector
 	session       mcpSession
 	actionsByName map[string]assistant.Action
 }
 
-// NewMCPRegistry creates an MCP-backed assistant action registry.
-func NewMCPRegistry(
+// NewActionRegistry creates an MCP-backed assistant action registry.
+func NewActionRegistry(
 	cfg Config,
 	httpClient *http.Client,
-) *MCPRegistry {
+) *ActionRegistry {
 	cfg = cfg.withDefaults()
 	if cfg.APIKey != "" {
 		httpClient = withAPIKey(httpClient, cfg.APIKeyHeader, cfg.APIKey)
 	}
-	return &MCPRegistry{
+	return &ActionRegistry{
 		cfg:           cfg,
 		connector:     streamableConnector{endpoint: cfg.Endpoint, httpClient: httpClient},
 		actionsByName: map[string]assistant.Action{},
 	}
 }
 
-// newMCPRegistryWithConnector allows injecting a fake connector in tests.
-func newMCPRegistryWithConnector(cfg Config, connector mcpConnector) *MCPRegistry {
+// newActionRegistryWithConnector allows injecting a fake connector in tests.
+func newActionRegistryWithConnector(cfg Config, connector mcpConnector) *ActionRegistry {
 	cfg = cfg.withDefaults()
-	return &MCPRegistry{
+	return &ActionRegistry{
 		cfg:           cfg,
 		connector:     connector,
 		actionsByName: map[string]assistant.Action{},
@@ -51,7 +51,7 @@ func newMCPRegistryWithConnector(cfg Config, connector mcpConnector) *MCPRegistr
 }
 
 // Execute runs one MCP tool call and returns the result as a tool message.
-func (r *MCPRegistry) Execute(ctx context.Context, call assistant.ActionCall, _ []assistant.Message) assistant.Message {
+func (r *ActionRegistry) Execute(ctx context.Context, call assistant.ActionCall, _ []assistant.Message) assistant.Message {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	span.SetAttributes(
 		attribute.String("mcp.tool_name", call.Name),
@@ -98,15 +98,22 @@ func (r *MCPRegistry) Execute(ctx context.Context, call assistant.ActionCall, _ 
 		content = "ok"
 	}
 
+	var actionError *string
+	if result != nil && result.IsError {
+		errText := strings.TrimSpace(content)
+		actionError = &errText
+	}
+
 	return assistant.Message{
 		Role:         assistant.ChatRole_Tool,
 		ActionCallID: common.Ptr(call.ID),
 		Content:      content,
+		ActionError:  actionError,
 	}
 }
 
 // GetDefinition returns one action definition by name.
-func (r *MCPRegistry) GetDefinition(actionName string) (assistant.ActionDefinition, bool) {
+func (r *ActionRegistry) GetDefinition(actionName string) (assistant.ActionDefinition, bool) {
 	action, found := r.actionsByName[actionName]
 	if !found {
 		return assistant.ActionDefinition{}, false
@@ -115,7 +122,7 @@ func (r *MCPRegistry) GetDefinition(actionName string) (assistant.ActionDefiniti
 }
 
 // GetRenderer returns one deterministic action result renderer by action name.
-func (r *MCPRegistry) GetRenderer(actionName string) (assistant.ActionResultRenderer, bool) {
+func (r *ActionRegistry) GetRenderer(actionName string) (assistant.ActionResultRenderer, bool) {
 	action, found := r.actionsByName[actionName]
 	if !found {
 		return nil, false
@@ -124,7 +131,7 @@ func (r *MCPRegistry) GetRenderer(actionName string) (assistant.ActionResultRend
 }
 
 // StatusMessage returns a status message for one tool name.
-func (r *MCPRegistry) StatusMessage(actionName string) string {
+func (r *ActionRegistry) StatusMessage(actionName string) string {
 	trimmedActionName := strings.TrimSpace(actionName)
 	if trimmedActionName == "" {
 		return defaultStatusMessage
@@ -138,7 +145,7 @@ func (r *MCPRegistry) StatusMessage(actionName string) string {
 }
 
 // withTimeout applies request timeout defaults to MCP network calls.
-func (r *MCPRegistry) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+func (r *ActionRegistry) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	if r.cfg.RequestTimeout <= 0 {
 		return ctx, func() {}
 	}
@@ -146,7 +153,7 @@ func (r *MCPRegistry) withTimeout(ctx context.Context) (context.Context, context
 }
 
 // connectSession opens one MCP client session through the configured connector.
-func (r *MCPRegistry) connectSession(ctx context.Context) (mcpSession, error) {
+func (r *ActionRegistry) connectSession(ctx context.Context) (mcpSession, error) {
 	connectCtx, cancel := r.withTimeout(ctx)
 	defer cancel()
 
@@ -154,7 +161,7 @@ func (r *MCPRegistry) connectSession(ctx context.Context) (mcpSession, error) {
 }
 
 // initializeActions loads tools once, applies YAML overrides, and precomputes embeddings.
-func (r *MCPRegistry) initializeActions(ctx context.Context) error {
+func (r *ActionRegistry) initializeActions(ctx context.Context) error {
 	session, err := r.connectSession(ctx)
 	if err != nil {
 		return err
@@ -196,7 +203,7 @@ func (r *MCPRegistry) initializeActions(ctx context.Context) error {
 }
 
 // Close terminates the MCP session and releases resources.
-func (r *MCPRegistry) Close() error {
+func (r *ActionRegistry) Close() error {
 	if r.session != nil {
 		return r.session.Close()
 	}

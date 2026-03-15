@@ -115,9 +115,11 @@ func renderContent(content mcp.Content) string {
 
 // actionErrorMessage formats a structured tool error payload consumed by the assistant loop.
 func actionErrorMessage(callID, code, details string) assistant.Message {
+	content := fmt.Sprintf("errors[1]{error,details}%s,%s", code, details)
 	return assistant.Message{
 		Role:         assistant.ChatRole_Tool,
 		ActionCallID: common.Ptr(callID),
-		Content:      fmt.Sprintf("errors[1]{error,details}%s,%s", code, details),
+		Content:      content,
+		ActionError:  common.Ptr(details),
 	}
 }

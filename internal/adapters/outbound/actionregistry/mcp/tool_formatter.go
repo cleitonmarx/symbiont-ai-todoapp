@@ -63,6 +63,13 @@ func (f executeCodeToolFormatter) FormatResult(actionResult string, call assista
 	_ = json.Unmarshal([]byte(actionResult), &result) //nolint:errcheck
 	if len(result.Errors) > 0 {
 		content = `{"error":"code_error","details":"` + strings.Join(result.Errors, ", ") + `"}`
+		errMsg := strings.Join(result.Errors, ", ")
+		return assistant.Message{
+			Role:         assistant.ChatRole_Tool,
+			ActionCallID: &call.ID,
+			Content:      content,
+			ActionError:  &errMsg,
+		}
 	} else {
 		content = strings.Join(result.Result, "\n")
 	}

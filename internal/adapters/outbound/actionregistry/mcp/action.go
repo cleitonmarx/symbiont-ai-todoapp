@@ -45,10 +45,12 @@ func (a mcpToolAction) Renderer() (assistant.ActionResultRenderer, bool) {
 // Execute delegates execution to the registry callback bound at initialization time.
 func (a mcpToolAction) Execute(ctx context.Context, call assistant.ActionCall, history []assistant.Message) assistant.Message {
 	if a.execute == nil {
+		errMsg := "action is not executable"
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: common.Ptr(call.ID),
 			Content:      "errors[1]{error,details}mcp_call_error,action is not executable",
+			ActionError:  &errMsg,
 		}
 	}
 	return a.execute(ctx, call, history)

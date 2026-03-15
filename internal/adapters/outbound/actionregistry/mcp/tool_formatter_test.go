@@ -28,6 +28,8 @@ func TestExecuteCodeToolFormatter_FormatResult(t *testing.T) {
 			assert: func(t *testing.T, msg assistant.Message) {
 				assert.Contains(t, msg.Content, "code_error")
 				assert.Contains(t, msg.Content, "boom")
+				assert.NotNil(t, msg.ActionError)
+				assert.Equal(t, "boom", *msg.ActionError)
 			},
 		},
 		"invalid-json-produces-empty-content": {

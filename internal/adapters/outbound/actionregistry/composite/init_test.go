@@ -12,11 +12,11 @@ import (
 func TestInitCompositeActionRegistry_Initialize(t *testing.T) {
 	t.Parallel()
 
-	r := &InitCompositeActionRegistry{}
+	r := &InitActionRegistry{}
 	ctx, err := r.Initialize(t.Context())
 	require.NoError(t, err)
 	assert.NotNil(t, ctx)
 	dep, err := depend.Resolve[assistant.ActionRegistry]()
 	require.NoError(t, err)
-	assert.IsType(t, CompositeActionRegistry{}, dep)
+	assert.IsType(t, ActionRegistry{}, dep)
 }

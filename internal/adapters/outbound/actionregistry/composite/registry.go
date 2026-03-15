@@ -8,21 +8,21 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 )
 
-// CompositeActionRegistry implements assistant.ActionRegistry interface.
+// ActionRegistry implements assistant.ActionRegistry interface.
 // It aggregates actions from multiple EmbeddingActionRegistry instances.
-type CompositeActionRegistry struct {
+type ActionRegistry struct {
 	registriesActions []assistant.ActionRegistry
 }
 
-// NewCompositeActionRegistry creates a new CompositeActionRegistry from the given embedding registries.
-func NewCompositeActionRegistry(ctx context.Context, registries ...assistant.ActionRegistry) CompositeActionRegistry {
-	return CompositeActionRegistry{
+// NewActionRegistry creates a new composite ActionRegistry from the given embedding registries.
+func NewActionRegistry(ctx context.Context, registries ...assistant.ActionRegistry) ActionRegistry {
+	return ActionRegistry{
 		registriesActions: registries,
 	}
 }
 
 // Execute iterates through the composed registries to execute the given action call, returning the first successful result.
-func (r CompositeActionRegistry) Execute(ctx context.Context, call assistant.ActionCall, conversationHistory []assistant.Message) assistant.Message {
+func (r ActionRegistry) Execute(ctx context.Context, call assistant.ActionCall, conversationHistory []assistant.Message) assistant.Message {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 	for _, actionRegistry := range r.registriesActions {
@@ -32,14 +32,16 @@ func (r CompositeActionRegistry) Execute(ctx context.Context, call assistant.Act
 		}
 		return actionRegistry.Execute(spanCtx, call, conversationHistory)
 	}
+	errMsg := fmt.Sprintf("no registry found for action '%s'", call.Name)
 	return assistant.Message{
-		Role:    assistant.ChatRole_Tool,
-		Content: fmt.Sprintf("error: no registry found for action '%s'", call.Name),
+		Role:        assistant.ChatRole_Tool,
+		Content:     "error: " + errMsg,
+		ActionError: &errMsg,
 	}
 }
 
 // GetDefinition returns one action definition by name.
-func (r CompositeActionRegistry) GetDefinition(actionName string) (assistant.ActionDefinition, bool) {
+func (r ActionRegistry) GetDefinition(actionName string) (assistant.ActionDefinition, bool) {
 	for _, actionRegistry := range r.registriesActions {
 		definition, found := actionRegistry.GetDefinition(actionName)
 		if found {
@@ -50,7 +52,7 @@ func (r CompositeActionRegistry) GetDefinition(actionName string) (assistant.Act
 }
 
 // GetRenderer returns one deterministic action result renderer by action name.
-func (r CompositeActionRegistry) GetRenderer(actionName string) (assistant.ActionResultRenderer, bool) {
+func (r ActionRegistry) GetRenderer(actionName string) (assistant.ActionResultRenderer, bool) {
 	for _, actionRegistry := range r.registriesActions {
 		renderer, found := actionRegistry.GetRenderer(actionName)
 		if found {
@@ -61,7 +63,7 @@ func (r CompositeActionRegistry) GetRenderer(actionName string) (assistant.Actio
 }
 
 // StatusMessage iterates through the composed registries to get the status message for the given action, returning a default message if none found.
-func (r CompositeActionRegistry) StatusMessage(actionName string) string {
+func (r ActionRegistry) StatusMessage(actionName string) string {
 	for _, actionRegistry := range r.registriesActions {
 		_, found := actionRegistry.GetDefinition(actionName)
 		if found {

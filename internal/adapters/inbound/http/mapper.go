@@ -36,13 +36,15 @@ func toTodo(t todo.Todo) gen.Todo {
 	}
 }
 
-func toConversation(c assistant.Conversation) gen.Conversation {
+func toConversationProjection(c assistant.Conversation, totalTokensUsed int64, contextCompactionTriggerTokens int) gen.Conversation {
 	return gen.Conversation{
-		Id:          c.ID,
-		Title:       c.Title,
-		TitleSource: gen.ConversationTitleSource(c.TitleSource),
-		UpdatedAt:   c.UpdatedAt,
-		CreatedAt:   c.CreatedAt,
+		Id:                             c.ID,
+		Title:                          c.Title,
+		TitleSource:                    gen.ConversationTitleSource(c.TitleSource),
+		TotalTokensUsed:                totalTokensUsed,
+		ContextCompactionTriggerTokens: int64(contextCompactionTriggerTokens),
+		UpdatedAt:                      c.UpdatedAt,
+		CreatedAt:                      c.CreatedAt,
 	}
 }
 

@@ -16,17 +16,20 @@ import (
 var chatPrompt embed.FS
 
 // buildSystemPrompt loads the base prompt template and appends the latest conversation summary context.
-func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID uuid.UUID) ([]assistant.Message, string, error) {
+func (sc StreamChatImpl) buildSystemPrompt(
+	ctx context.Context,
+	conversationID uuid.UUID,
+) ([]assistant.Message, string, *uuid.UUID, error) {
 	file, err := chatPrompt.Open("prompts/chat.yml")
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to open chat prompt: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to open chat prompt: %w", err)
 	}
 	defer file.Close() //nolint:errcheck
 
 	messages := []assistant.Message{}
 	err = yaml.NewDecoder(file).Decode(&messages)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to decode summary prompt: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to decode summary prompt: %w", err)
 	}
 	for i, msg := range messages {
 		if msg.Role == assistant.ChatRole_Developer || msg.Role == assistant.ChatRole_System {
@@ -43,7 +46,7 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 
 	latestSummary, found, err := sc.conversationSummaryRepo.GetConversationSummary(ctx, conversationID)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to load conversation summary: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to load conversation summary: %w", err)
 	}
 
 	summaryText := "No conversation summary available."
@@ -53,7 +56,7 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 	messages = append(messages, assistant.Message{
 		Role: assistant.ChatRole_System,
 		Content: fmt.Sprintf(
-			"Conversation summary context:\n%s\n\nUse this as compact memory, but prioritize explicit user instructions in this turn.",
+			"Conversation compacted context:\n%s\n\nUse this as compact memory, but prioritize explicit user instructions in this turn.",
 			summaryText,
 		),
 	})
@@ -63,17 +66,27 @@ func (sc StreamChatImpl) buildSystemPrompt(ctx context.Context, conversationID u
 		summaryContext = summaryText
 	}
 
-	return messages, summaryContext, nil
+	var lastSummarizedMessageID *uuid.UUID
+	if found && latestSummary.LastSummarizedMessageID != nil {
+		lastSummarizedMessageID = latestSummary.LastSummarizedMessageID
+	}
+
+	return messages, summaryContext, lastSummarizedMessageID, nil
 }
 
 // fetchChatHistory combines the current system prompt with recent non-system conversation history.
 func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uuid.UUID) ([]assistant.Message, string, error) {
-	systemPrompt, summaryContext, err := sc.buildSystemPrompt(ctx, conversationID)
+	systemPrompt, summaryContext, lastSummarizedMessageID, err := sc.buildSystemPrompt(ctx, conversationID)
 	if err != nil {
 		return nil, "", err
 	}
 
-	history, _, err := sc.chatMessageRepo.ListChatMessages(ctx, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES)
+	historyOptions := make([]assistant.ListChatMessagesOption, 0, 1)
+	if lastSummarizedMessageID != nil {
+		historyOptions = append(historyOptions, assistant.WithChatMessagesAfterMessageID(*lastSummarizedMessageID))
+	}
+
+	history, _, err := sc.chatMessageRepo.ListChatMessages(ctx, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES, historyOptions...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -94,6 +107,7 @@ func (sc StreamChatImpl) fetchChatHistory(ctx context.Context, conversationID uu
 				Content:      msg.Content,
 				ActionCallID: msg.ActionCallID,
 				ActionCalls:  msg.ActionCalls,
+				ActionError:  msg.ErrorMessage,
 			})
 		}
 	}

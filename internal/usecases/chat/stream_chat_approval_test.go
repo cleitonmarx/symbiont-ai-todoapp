@@ -300,8 +300,10 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				log.New(io.Discard, "", 0),
 				chatRepo,
 				summaryRepo,
+				nil,
 				conversationRepo,
 				timeProvider,
+				nil,
 				assist,
 				actionRegistry,
 				skillRegistry,
@@ -309,6 +311,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				uow,
 				"test-embedding-model",
 				7,
+				8000,
 			)
 
 			var (

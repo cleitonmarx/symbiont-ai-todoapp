@@ -23,16 +23,16 @@ func TestInitDeleteConversation_Initialize(t *testing.T) {
 
 }
 
-func TestInitGenerateChatSummary_Initialize(t *testing.T) {
+func TestInitConversationCompactor_Initialize(t *testing.T) {
 	t.Parallel()
 
-	i := InitGenerateChatSummary{}
+	i := InitConversationCompactor{}
 
 	ctx, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
-	uc, err := depend.Resolve[GenerateChatSummary]()
+	uc, err := depend.Resolve[ConversationCompactor]()
 	assert.NoError(t, err)
 	assert.NotNil(t, uc)
 }

@@ -67,6 +67,8 @@ func (sc StreamChatImpl) persistFailureMessages(
 
 // persistChatMessage stores one chat message and publishes the corresponding outbox event.
 func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message assistant.ChatMessage, conversation assistant.Conversation) error {
+	message.ContextTokensEstimate = sc.estimateContextTokens(ctx, message)
+
 	return sc.uow.Execute(ctx, func(uowCtx context.Context, scope transaction.Scope) error {
 		if err := scope.ChatMessage().CreateChatMessages(uowCtx, []assistant.ChatMessage{message}); err != nil {
 			return err
@@ -95,6 +97,23 @@ func (sc StreamChatImpl) persistChatMessage(ctx context.Context, message assista
 
 		return nil
 	})
+}
+
+// estimateContextTokens counts the persisted context footprint for a chat message using the configured tokenizer or fallback estimator.
+func (sc StreamChatImpl) estimateContextTokens(ctx context.Context, message assistant.ChatMessage) int {
+	input := assistant.BuildChatMessageTokenizationInput(message)
+	if strings.TrimSpace(input) == "" {
+		return 0
+	}
+
+	if sc.tokenizer != nil {
+		count, err := sc.tokenizer.CountTokens(ctx, message.Model, input)
+		if err == nil && count >= 0 {
+			return count
+		}
+	}
+
+	return assistant.EstimateTokenCountFallback(input)
 }
 
 // streamChatExecutionState tracks mutable per-turn state while Execute is streaming.

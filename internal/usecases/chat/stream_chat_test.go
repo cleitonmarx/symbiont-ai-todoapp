@@ -922,8 +922,10 @@ func TestStreamChatImpl_Execute_PersistsSelectedSkillsAndEmitsTurnMetadata(t *te
 		log.New(io.Discard, "", 0),
 		chatRepo,
 		summaryRepo,
+		nil,
 		conversationRepo,
 		timeProvider,
+		nil,
 		assist,
 		actionRegistry,
 		skillRegistry,
@@ -931,6 +933,7 @@ func TestStreamChatImpl_Execute_PersistsSelectedSkillsAndEmitsTurnMetadata(t *te
 		uow,
 		"test-embedding-model",
 		7,
+		8000,
 	)
 
 	var turnStarted assistant.TurnStarted
@@ -947,6 +950,153 @@ func TestStreamChatImpl_Execute_PersistsSelectedSkillsAndEmitsTurnMetadata(t *te
 	assert.Equal(t, assistantMsgID, turnStarted.AssistantMessageID)
 	assert.NotEqual(t, uuid.Nil, turnStarted.TurnID)
 	assert.Equal(t, expectedSkills, turnStarted.SelectedSkills)
+}
+
+func TestStreamChatImpl_Execute_UsesUnsummarizedHistoryAfterSummaryCheckpoint(t *testing.T) {
+	t.Parallel()
+
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	checkpointMessageID := uuid.MustParse("323e4567-e89b-12d3-a456-426614174002")
+	userMsgID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	assistantMsgID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
+	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
+
+	chatRepo := assistant.NewMockChatMessageRepository(t)
+	summaryRepo := assistant.NewMockConversationSummaryRepository(t)
+	conversationRepo := assistant.NewMockConversationRepository(t)
+	timeProvider := core.NewMockCurrentTimeProvider(t)
+	assist := assistant.NewMockAssistant(t)
+	actionRegistry := assistant.NewMockActionRegistry(t)
+	skillRegistry := assistant.NewMockSkillRegistry(t)
+	uow := transaction.NewMockUnitOfWork(t)
+	outbox := outbox.NewMockRepository(t)
+
+	actionRegistry.EXPECT().
+		GetRenderer(mock.Anything).
+		Return(nil, false).
+		Maybe()
+
+	skillRegistry.EXPECT().
+		ListRelevant(mock.Anything, mock.Anything).
+		Return([]assistant.SkillDefinition{}).
+		Once()
+
+	conversationRepo.EXPECT().
+		GetConversation(mock.Anything, conversationID).
+		Return(assistant.Conversation{ID: conversationID}, true, nil).
+		Once()
+
+	summaryRepo.EXPECT().
+		GetConversationSummary(mock.Anything, conversationID).
+		Return(assistant.ConversationSummary{
+			ConversationID:          conversationID,
+			CurrentStateSummary:     "Current intent: organize todos",
+			LastSummarizedMessageID: &checkpointMessageID,
+		}, true, nil).
+		Once()
+
+	chatRepo.EXPECT().
+		ListChatMessages(
+			mock.Anything,
+			conversationID,
+			1,
+			MAX_CHAT_HISTORY_MESSAGES,
+			mock.MatchedBy(func(options []assistant.ListChatMessagesOption) bool {
+				if len(options) != 1 {
+					return false
+				}
+
+				params := assistant.ListChatMessagesParams{}
+				options[0](&params)
+				return params.AfterMessageID != nil && *params.AfterMessageID == checkpointMessageID
+			}),
+		).
+		Return([]assistant.ChatMessage{
+			{
+				ID:        uuid.New(),
+				ChatRole:  assistant.ChatRole_User,
+				Content:   "Most recent user request",
+				CreatedAt: fixedTime.Add(-time.Minute),
+			},
+			{
+				ID:        uuid.New(),
+				ChatRole:  assistant.ChatRole_Assistant,
+				Content:   "Most recent assistant reply",
+				CreatedAt: fixedTime.Add(-30 * time.Second),
+			},
+		}, false, nil).
+		Once()
+
+	expectNowCalls(timeProvider, fixedTime, 4)
+
+	assist.EXPECT().
+		RunTurn(mock.Anything, mock.Anything, mock.Anything).
+		Run(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) {
+			assert.NotContains(t, req.Messages, assistant.Message{
+				Role:    assistant.ChatRole_User,
+				Content: "Old summarized message",
+			})
+			assert.Contains(t, req.Messages, assistant.Message{
+				Role:    assistant.ChatRole_User,
+				Content: "Most recent user request",
+			})
+			assert.Contains(t, req.Messages, assistant.Message{
+				Role:    assistant.ChatRole_Assistant,
+				Content: "Most recent assistant reply",
+			})
+
+			_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
+				UserMessageID:      userMsgID,
+				AssistantMessageID: assistantMsgID,
+			})
+			_ = onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "Done."})
+			_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
+				AssistantMessageID: assistantMsgID.String(),
+				CompletedAt:        fixedTime.Format(time.RFC3339),
+			})
+		}).
+		Return(nil)
+
+	expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+		{
+			Role:            assistant.ChatRole_User,
+			Content:         "Follow up on the plan",
+			ID:              &userMsgID,
+			ActionCallsLen:  0,
+			HasActionCallID: false,
+		},
+		{
+			Role:            assistant.ChatRole_Assistant,
+			Content:         "Done.",
+			ID:              &assistantMsgID,
+			ActionCallsLen:  0,
+			HasActionCallID: false,
+		},
+	})
+
+	useCase := NewStreamChatImpl(
+		log.New(io.Discard, "", 0),
+		chatRepo,
+		summaryRepo,
+		nil,
+		conversationRepo,
+		timeProvider,
+		nil,
+		assist,
+		actionRegistry,
+		skillRegistry,
+		nil,
+		uow,
+		"test-embedding-model",
+		7,
+		8000,
+	)
+
+	err := useCase.Execute(t.Context(), "Follow up on the plan", "test-model", func(_ context.Context, _ assistant.EventType, _ any) error {
+		return nil
+	}, WithConversationID(conversationID))
+
+	assert.NoError(t, err)
 }
 
 // Verify that the StreamChat use case is registered

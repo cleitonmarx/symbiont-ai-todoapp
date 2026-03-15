@@ -113,6 +113,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: common.Ptr(actionCall.ID),
 			Content:      actionContent,
+			ActionError:  common.Ptr(reason),
 		}
 		now := sc.timeProvider.Now()
 		actionChatMsg := assistant.ChatMessage{
@@ -187,7 +188,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 	}
 	if !actionSucceeded {
 		actionChatMsg.MessageState = assistant.ChatMessageState_Failed
-		actionChatMsg.ErrorMessage = &actionMessage.Content
+		actionChatMsg.ErrorMessage = resolveActionErrorMessage(actionMessage)
 	}
 	if approvalDecision.Status != "" {
 		actionChatMsg.ApprovalStatus = &approvalDecision.Status
@@ -210,7 +211,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 		OutputTruncated: isOutputPreviewTruncated(actionMessage.Content),
 	}
 	if !actionSucceeded {
-		actionCompleted.Error = &actionMessage.Content
+		actionCompleted.Error = resolveActionErrorMessage(actionMessage)
 	}
 	if err := onEvent(ctx, assistant.EventType_ActionCompleted, actionCompleted); err != nil {
 		return false, err
@@ -228,13 +229,14 @@ func (sc StreamChatImpl) handleActionCallEvent(
 					Content:      actionMessage.Content,
 					ActionCallID: actionMessage.ActionCallID,
 					ActionCalls:  actionMessage.ActionCalls,
+					ActionError:  actionMessage.ActionError,
 				},
 				renderedMessage,
 			)
 			if err := sc.handleRenderedActionResult(ctx, renderedMessage, state, onEvent); err != nil {
 				return false, err
 			}
-			return false, nil
+			return true, nil
 		}
 	}
 
@@ -248,6 +250,7 @@ func (sc StreamChatImpl) handleActionCallEvent(
 			Content:      actionMessage.Content,
 			ActionCallID: actionMessage.ActionCallID,
 			ActionCalls:  actionMessage.ActionCalls,
+			ActionError:  actionMessage.ActionError,
 		},
 	)
 	if !actionSucceeded {
@@ -259,6 +262,17 @@ func (sc StreamChatImpl) handleActionCallEvent(
 	}
 
 	return true, nil
+}
+
+// resolveActionErrorMessage extracts the best available machine-readable tool error.
+func resolveActionErrorMessage(message assistant.Message) *string {
+	if message.ActionError != nil {
+		return message.ActionError
+	}
+	if strings.TrimSpace(message.Content) == "" {
+		return nil
+	}
+	return &message.Content
 }
 
 // approvalDecisionReason derives a human-readable explanation for an approval decision.

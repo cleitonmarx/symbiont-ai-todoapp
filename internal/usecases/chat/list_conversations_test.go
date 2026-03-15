@@ -22,6 +22,7 @@ func TestListConversationsImpl_Query(t *testing.T) {
 		page                  int
 		pageSize              int
 		expectedConversations []assistant.Conversation
+		expectedTokenUsage    map[uuid.UUID]int64
 		expectedHasMore       bool
 		expectedErr           error
 	}{
@@ -45,6 +46,16 @@ func TestListConversationsImpl_Query(t *testing.T) {
 						UpdatedAt:   fixedTime,
 					},
 				}, true, nil)
+				repo.EXPECT().GetConversationContextTokenUsage(
+					mock.Anything,
+					[]uuid.UUID{
+						uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
+						uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"),
+					},
+				).Return(map[uuid.UUID]int64{
+					uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"): 320,
+					uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"): 125,
+				}, nil)
 			},
 			expectedConversations: []assistant.Conversation{
 				{
@@ -62,6 +73,10 @@ func TestListConversationsImpl_Query(t *testing.T) {
 					UpdatedAt:   fixedTime,
 				},
 			},
+			expectedTokenUsage: map[uuid.UUID]int64{
+				uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"): 320,
+				uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"): 125,
+			},
 			expectedHasMore: true,
 			expectedErr:     nil,
 		},
@@ -78,6 +93,12 @@ func TestListConversationsImpl_Query(t *testing.T) {
 						UpdatedAt:   fixedTime,
 					},
 				}, true, nil)
+				repo.EXPECT().GetConversationContextTokenUsage(
+					mock.Anything,
+					[]uuid.UUID{uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")},
+				).Return(map[uuid.UUID]int64{
+					uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"): 42,
+				}, nil)
 			},
 			expectedConversations: []assistant.Conversation{
 				{
@@ -87,6 +108,9 @@ func TestListConversationsImpl_Query(t *testing.T) {
 					CreatedAt:   fixedTime,
 					UpdatedAt:   fixedTime,
 				},
+			},
+			expectedTokenUsage: map[uuid.UUID]int64{
+				uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"): 42,
 			},
 			expectedHasMore: true,
 			expectedErr:     nil,
@@ -104,6 +128,12 @@ func TestListConversationsImpl_Query(t *testing.T) {
 						UpdatedAt:   fixedTime,
 					},
 				}, false, nil)
+				repo.EXPECT().GetConversationContextTokenUsage(
+					mock.Anything,
+					[]uuid.UUID{uuid.MustParse("123e4567-e89b-12d3-a456-426614174002")},
+				).Return(map[uuid.UUID]int64{
+					uuid.MustParse("123e4567-e89b-12d3-a456-426614174002"): 9,
+				}, nil)
 			},
 			expectedConversations: []assistant.Conversation{
 				{
@@ -114,6 +144,9 @@ func TestListConversationsImpl_Query(t *testing.T) {
 					UpdatedAt:   fixedTime,
 				},
 			},
+			expectedTokenUsage: map[uuid.UUID]int64{
+				uuid.MustParse("123e4567-e89b-12d3-a456-426614174002"): 9,
+			},
 			expectedHasMore: false,
 			expectedErr:     nil,
 		},
@@ -122,8 +155,10 @@ func TestListConversationsImpl_Query(t *testing.T) {
 			pageSize: 10,
 			setExpectations: func(repo *assistant.MockConversationRepository) {
 				repo.EXPECT().ListConversations(mock.Anything, 1, 10).Return([]assistant.Conversation{}, false, nil)
+				repo.EXPECT().GetConversationContextTokenUsage(mock.Anything, []uuid.UUID{}).Return(map[uuid.UUID]int64{}, nil)
 			},
 			expectedConversations: []assistant.Conversation{},
+			expectedTokenUsage:    map[uuid.UUID]int64{},
 			expectedHasMore:       false,
 			expectedErr:           nil,
 		},
@@ -136,6 +171,28 @@ func TestListConversationsImpl_Query(t *testing.T) {
 			expectedConversations: nil,
 			expectedHasMore:       false,
 			expectedErr:           errors.New("database error"),
+		},
+		"usage-query-error": {
+			page:     1,
+			pageSize: 10,
+			setExpectations: func(repo *assistant.MockConversationRepository) {
+				repo.EXPECT().ListConversations(mock.Anything, 1, 10).Return([]assistant.Conversation{
+					{
+						ID:          uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
+						Title:       "Conversation 1",
+						TitleSource: assistant.ConversationTitleSource_User,
+						CreatedAt:   fixedTime,
+						UpdatedAt:   fixedTime,
+					},
+				}, false, nil)
+				repo.EXPECT().GetConversationContextTokenUsage(
+					mock.Anything,
+					[]uuid.UUID{uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")},
+				).Return(nil, errors.New("usage error"))
+			},
+			expectedConversations: nil,
+			expectedHasMore:       false,
+			expectedErr:           errors.New("usage error"),
 		},
 		"invalid-page-number": {
 			page:     0,
@@ -158,9 +215,10 @@ func TestListConversationsImpl_Query(t *testing.T) {
 
 			lc := NewListConversationsImpl(repo)
 
-			got, hasMore, gotErr := lc.Query(t.Context(), tt.page, tt.pageSize)
+			got, tokenUsage, hasMore, gotErr := lc.Query(t.Context(), tt.page, tt.pageSize)
 			assert.Equal(t, tt.expectedErr, gotErr)
 			assert.Equal(t, tt.expectedConversations, got)
+			assert.Equal(t, tt.expectedTokenUsage, tokenUsage)
 			assert.Equal(t, tt.expectedHasMore, hasMore)
 		})
 	}

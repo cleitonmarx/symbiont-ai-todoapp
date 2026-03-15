@@ -130,7 +130,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 			expectErr:       false,
 			expectedContent: "",
 		},
-		"success-with-renderer-bypasses-follow-up-runturn": {
+		"success-with-renderer-continues-follow-up-runturn": {
 			userMessage: "Rename my todo",
 			model:       "test-model",
 			options: []StreamChatOption{
@@ -198,22 +198,44 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 
 				expectNowCalls(timeProvider, fixedTime, 6)
 
+				runTurnCalls := 0
 				assist.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
-							return err
+						runTurnCalls++
+						switch runTurnCalls {
+						case 1:
+							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
+								UserMessageID:      userMsgID,
+								AssistantMessageID: assistantMsgID,
+							}); err != nil {
+								return err
+							}
+							return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
+								ID:    "func-123",
+								Name:  "update_todos",
+								Input: `{"todos":[{"id":"1","title":"Updated"}]}`,
+							})
+						case 2:
+							if len(req.Messages) == 0 {
+								return fmt.Errorf("expected follow-up request messages")
+							}
+							lastMessage := req.Messages[len(req.Messages)-1]
+							if lastMessage.Role != assistant.ChatRole_Assistant || lastMessage.Content != "**Updated** (Due: Jan 25, 2026) - OPEN." {
+								return fmt.Errorf("expected rendered assistant message in follow-up request, got role=%s content=%q", lastMessage.Role, lastMessage.Content)
+							}
+							if err := onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "\nAnything else?"}); err != nil {
+								return err
+							}
+							return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
+								AssistantMessageID: assistantMsgID.String(),
+								CompletedAt:        fixedTime.Format(time.RFC3339),
+							})
+						default:
+							return fmt.Errorf("unexpected RunTurn call %d", runTurnCalls)
 						}
-						return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
-							ID:    "func-123",
-							Name:  "update_todos",
-							Input: `{"todos":[{"id":"1","title":"Updated"}]}`,
-						})
 					}).
-					Once()
+					Twice()
 
 				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
@@ -242,7 +264,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					},
 					{
 						Role:            assistant.ChatRole_Assistant,
-						Content:         "**Updated** (Due: Jan 25, 2026) - OPEN.",
+						Content:         "**Updated** (Due: Jan 25, 2026) - OPEN.\nAnything else?",
 						ID:              &assistantMsgID,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
@@ -250,7 +272,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				})
 			},
 			expectErr:       false,
-			expectedContent: "updating todos...\n**Updated** (Due: Jan 25, 2026) - OPEN.",
+			expectedContent: "updating todos...\n**Updated** (Due: Jan 25, 2026) - OPEN.\nAnything else?",
 		},
 		"action-message-marked-as-failed-when-content-has-error": {
 			userMessage: "Call failing action",
@@ -297,7 +319,12 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Call failing action"
 						}),
 					).
-					Return(assistant.Message{Role: assistant.ChatRole_Tool, ActionCallID: common.Ptr("func-error"), Content: "error: failing_action unavailable"})
+					Return(assistant.Message{
+						Role:         assistant.ChatRole_Tool,
+						ActionCallID: common.Ptr("func-error"),
+						Content:      "error: failing_action unavailable",
+						ActionError:  common.Ptr("error: failing_action unavailable"),
+					})
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).

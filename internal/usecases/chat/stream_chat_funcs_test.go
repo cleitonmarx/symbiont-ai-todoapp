@@ -77,8 +77,10 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 		log.New(io.Discard, "", 0),
 		chatRepo,
 		summaryRepo,
+		nil,
 		conversationRepo,
 		timeProvider,
+		nil,
 		assist,
 		actionRegistry,
 		skillRegistry,
@@ -86,6 +88,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 		uow,
 		"test-embedding-model",
 		7,
+		8000,
 	)
 
 	var capturedContent string

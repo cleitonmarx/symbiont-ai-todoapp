@@ -7,10 +7,9 @@
 
     RULES:
     1. Title must be 3 to 7 words.
-    2. Use focused summary as the primary context.
-    3. If `current_intent` exists, anchor the title to it.
-    4. Use recent user request only as secondary context.
-    5. Ignore IDs, status markers, tool metadata, and output_format labels.
+    2. Use focused compacted context as the primary context.
+    3. Use recent user request only as secondary context.
+    4. Ignore IDs, status markers, and low-level tool metadata.
     6. Do not list individual tasks.
     7. Do not invent unrelated topics.
     8. No quotes, emojis, markdown, numbering, or labels.
@@ -19,7 +18,7 @@
     INPUT:
     Current title: %[1]s
 
-    Focused summary:
+    Focused compacted context:
     %[2]s
 
     Recent conversation context:
@@ -27,7 +26,7 @@
 
     SELF-CHECK:
     Self-check before final output:
-    - topic overlaps with current_intent or user request
+    - topic overlaps with compacted context or user request
     - title is specific, not generic
 
     OUTPUT:

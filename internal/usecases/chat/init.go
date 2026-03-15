@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
@@ -22,8 +23,8 @@ func (i InitDeleteConversation) Initialize(ctx context.Context) (context.Context
 	return ctx, nil
 }
 
-// InitGenerateChatSummary is the initializer for the GenerateChatSummary use case
-type InitGenerateChatSummary struct {
+// InitConversationCompactor initializes the synchronous conversation compactor.
+type InitConversationCompactor struct {
 	ChatMessageRepo         assistant.ChatMessageRepository         `resolve:""`
 	ConversationSummaryRepo assistant.ConversationSummaryRepository `resolve:""`
 	TimeProvider            core.CurrentTimeProvider                `resolve:""`
@@ -31,17 +32,16 @@ type InitGenerateChatSummary struct {
 	Model                   string                                  `config:"LLM_CHAT_SUMMARY_MODEL"`
 }
 
-// Initialize registers the GenerateChatSummary use case in the dependency container.
-func (i InitGenerateChatSummary) Initialize(ctx context.Context) (context.Context, error) {
-	queue, _ := depend.Resolve[CompletedConversationSummaryChannel]()
-	depend.Register[GenerateChatSummary](NewGenerateChatSummaryImpl(
+// Initialize registers the ConversationCompactor in the dependency container.
+func (i InitConversationCompactor) Initialize(ctx context.Context) (context.Context, error) {
+	compactor := NewConversationCompactorImpl(
 		i.ChatMessageRepo,
 		i.ConversationSummaryRepo,
 		i.TimeProvider,
 		i.Assistant,
 		i.Model,
-		queue,
-	))
+	)
+	depend.Register[ConversationCompactor](compactor)
 	return ctx, nil
 }
 
@@ -125,25 +125,31 @@ type InitStreamChat struct {
 	Logger                  *log.Logger                             `resolve:""`
 	ChatMessageRepo         assistant.ChatMessageRepository         `resolve:""`
 	ConversationSummaryRepo assistant.ConversationSummaryRepository `resolve:""`
+	ConversationCompactor   ConversationCompactor                   `resolve:""`
 	ConversationRepo        assistant.ConversationRepository        `resolve:""`
 	Uow                     transaction.UnitOfWork                  `resolve:""`
 	TimeProvider            core.CurrentTimeProvider                `resolve:""`
+	Tokenizer               assistant.Tokenizer                     `resolve:""`
 	ActionRegistry          assistant.ActionRegistry                `resolve:""`
 	SkillRegistry           assistant.SkillRegistry                 `resolve:""`
 	ApprovalDispatcher      assistant.ActionApprovalDispatcher      `resolve:""`
 	Assistant               assistant.Assistant                     `resolve:""`
 	EmbeddingModel          string                                  `config:"LLM_EMBEDDING_MODEL"`
 	MaxActionCycles         int                                     `config:"LLM_MAX_ACTION_CYCLES" default:"50"`
+	CompactionTriggerTokens int                                     `config:"CHAT_COMPACTION_TRIGGER_TOKENS"`
+	CompactionTimeout       time.Duration                           `config:"CHAT_COMPACTION_TIMEOUT" default:"20s"`
 }
 
 // Initialize registers the StreamChat use case in the dependency container.
 func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[StreamChat](NewStreamChatImpl(
+	useCase := NewStreamChatImpl(
 		i.Logger,
 		i.ChatMessageRepo,
 		i.ConversationSummaryRepo,
+		i.ConversationCompactor,
 		i.ConversationRepo,
 		i.TimeProvider,
+		i.Tokenizer,
 		i.Assistant,
 		i.ActionRegistry,
 		i.SkillRegistry,
@@ -151,7 +157,12 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 		i.Uow,
 		i.EmbeddingModel,
 		i.MaxActionCycles,
-	))
+		i.CompactionTriggerTokens,
+	)
+	if i.CompactionTimeout > 0 {
+		useCase.compactionTimeout = i.CompactionTimeout
+	}
+	depend.Register[StreamChat](useCase)
 	return ctx, nil
 }
 

@@ -202,9 +202,7 @@ func TestUpdateConversationImpl_Execute(t *testing.T) {
 				assert.Equal(t, tt.expectedErr.Error(), gotErr.Error())
 			} else {
 				assert.NoError(t, gotErr)
-				assert.Equal(t, tt.expectedConv.ID, got.ID)
-				assert.Equal(t, tt.expectedConv.Title, got.Title)
-				assert.Equal(t, tt.expectedConv.TitleSource, got.TitleSource)
+				assert.Equal(t, tt.expectedConv, got)
 			}
 		})
 	}

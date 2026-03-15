@@ -17,7 +17,7 @@ import (
 
 const (
 	// MAX_CHAT_HISTORY_MESSAGES is the maximum number of prior messages included in chat context.
-	MAX_CHAT_HISTORY_MESSAGES = 5
+	MAX_CHAT_HISTORY_MESSAGES = 100
 
 	// MAX_REPEATED_ACTION_CALL_HIT is the limit for repeated action-call detections before aborting.
 	MAX_REPEATED_ACTION_CALL_HIT = 5
@@ -31,6 +31,8 @@ const (
 	MAX_SKILLS_PROMPT_CHARS = 4000
 	// MAX_RECOVERY_MESSAGES is the maximum number of recovery messages retained in loops.
 	MAX_RECOVERY_MESSAGES = 8
+	// DEFAULT_CONTEXT_COMPACTION_TIMEOUT bounds synchronous pre-turn compaction.
+	DEFAULT_CONTEXT_COMPACTION_TIMEOUT = 20 * time.Second
 )
 
 // StreamChatParams holds optional parameters for StreamChat execution.
@@ -59,15 +61,19 @@ type StreamChatImpl struct {
 	logger                  *log.Logger
 	chatMessageRepo         assistant.ChatMessageRepository
 	conversationSummaryRepo assistant.ConversationSummaryRepository
+	conversationCompactor   ConversationCompactor
 	conversationRepo        assistant.ConversationRepository
 	uow                     transaction.UnitOfWork
 	timeProvider            core.CurrentTimeProvider
+	tokenizer               assistant.Tokenizer
 	assistant               assistant.Assistant
 	actionRegistry          assistant.ActionRegistry
 	skillRegistry           assistant.SkillRegistry
 	approvalDispatcher      assistant.ActionApprovalDispatcher
 	embeddingModel          string
 	maxActionCycles         int
+	compactionPolicy        assistant.ContextCompactionPolicy
+	compactionTimeout       time.Duration
 }
 
 // NewStreamChatImpl creates a new instance of StreamChatImpl
@@ -75,29 +81,38 @@ func NewStreamChatImpl(
 	logger *log.Logger,
 	chatMessageRepo assistant.ChatMessageRepository,
 	conversationSummaryRepo assistant.ConversationSummaryRepository,
+	conversationCompactor ConversationCompactor,
 	conversationRepo assistant.ConversationRepository,
 	timeProvider core.CurrentTimeProvider,
-	assistant assistant.Assistant,
+	tokenizer assistant.Tokenizer,
+	assistantClient assistant.Assistant,
 	actionRegistry assistant.ActionRegistry,
 	assistantSkillRegistry assistant.SkillRegistry,
 	approvalDispatcher assistant.ActionApprovalDispatcher,
 	uow transaction.UnitOfWork,
 	embeddingModel string,
 	maxActionCycles int,
+	compactionTriggerTokens int,
 ) StreamChatImpl {
 	return StreamChatImpl{
 		logger:                  logger,
 		chatMessageRepo:         chatMessageRepo,
 		conversationSummaryRepo: conversationSummaryRepo,
+		conversationCompactor:   conversationCompactor,
 		conversationRepo:        conversationRepo,
 		uow:                     uow,
 		timeProvider:            timeProvider,
-		assistant:               assistant,
+		tokenizer:               tokenizer,
+		assistant:               assistantClient,
 		actionRegistry:          actionRegistry,
 		skillRegistry:           assistantSkillRegistry,
 		approvalDispatcher:      approvalDispatcher,
 		embeddingModel:          embeddingModel,
 		maxActionCycles:         maxActionCycles,
+		compactionPolicy: assistant.ContextCompactionPolicy{
+			TriggerTokenCount: compactionTriggerTokens,
+		},
+		compactionTimeout: DEFAULT_CONTEXT_COMPACTION_TIMEOUT,
 	}
 }
 
@@ -121,6 +136,10 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 
 	conversation, conversationCreated, err := sc.createOrRetrieveConversation(spanCtx, params, userMessage)
 	if telemetry.IsErrorRecorded(span, err) {
+		return err
+	}
+
+	if err := sc.compactConversationContext(spanCtx, conversation.ID, onEvent); telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 

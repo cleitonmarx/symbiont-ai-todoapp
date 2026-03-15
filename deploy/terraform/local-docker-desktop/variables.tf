@@ -143,5 +143,5 @@ variable "mcp_gateway_api_key" {
 variable "helm_timeout_seconds" {
   description = "Timeout in seconds for Helm release operations."
   type        = number
-  default     = 900
+  default     = 8000
 }

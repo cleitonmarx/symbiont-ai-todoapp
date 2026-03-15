@@ -71,6 +71,7 @@ type ChatMessage struct {
 	PromptTokens           int
 	CompletionTokens       int
 	TotalTokens            int
+	ContextTokensEstimate  int
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 }

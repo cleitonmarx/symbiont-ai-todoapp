@@ -97,7 +97,7 @@ func (c *Conversation) ApplyLLMGeneratedTitle(rawTitle, focusedSummary string) C
 	}
 
 	title := normalizeGeneratedConversationTitle(rawTitle)
-	if title != "" && !isGeneratedTitleGroundedInSummary(title, focusedSummary) {
+	if title != "" && shouldRequireGeneratedTitleGrounding(focusedSummary) && !isGeneratedTitleGroundedInSummary(title, focusedSummary) {
 		return ConversationTitleApplyStatus_SkippedNotGrounded
 	}
 	if title == "" || strings.EqualFold(title, c.Title) {
@@ -112,12 +112,25 @@ func (c *Conversation) ApplyLLMGeneratedTitle(rawTitle, focusedSummary string) C
 	return ConversationTitleApplyStatus_Updated
 }
 
+// shouldRequireGeneratedTitleGrounding reports whether a generated title must overlap with compacted context keywords.
+func shouldRequireGeneratedTitleGrounding(focusedSummary string) bool {
+	summary := strings.TrimSpace(strings.ToLower(focusedSummary))
+	switch summary {
+	case "", "none", "no summary available.":
+		return false
+	default:
+		return len(extractGroundingKeywords(summary)) > 0
+	}
+}
+
 // ConversationRepository defines the interface for managing conversations.
 type ConversationRepository interface {
 	// CreateConversation creates a new conversation with the given title and returns it.
 	CreateConversation(context.Context, string, ConversationTitleSource) (Conversation, error)
 	// GetConversation returns the conversation with the given ID, a boolean indicating if it was found, and an error if any.
 	GetConversation(context.Context, uuid.UUID) (Conversation, bool, error)
+	// GetConversationContextTokenUsage returns the current unsummarized context token usage keyed by conversation ID.
+	GetConversationContextTokenUsage(context.Context, []uuid.UUID) (map[uuid.UUID]int64, error)
 	// UpdateConversation updates the conversation with the given ID.
 	UpdateConversation(context.Context, Conversation) error
 	// ListConversations returns a list of conversations with pagination support ordered by last message time descending.

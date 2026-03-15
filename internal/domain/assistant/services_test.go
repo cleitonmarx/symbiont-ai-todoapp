@@ -47,151 +47,94 @@ func TestGenerateAutoConversationTitle(t *testing.T) {
 	}
 }
 
-func TestDetermineConversationSummaryGenerationDecision(t *testing.T) {
+func TestDetermineContextCompactionDecision(t *testing.T) {
 	t.Parallel()
 
-	policy := ConversationSummaryGenerationPolicy{
-		TriggerMessageCount: 10,
-		TriggerTokenCount:   2000,
-	}
-
-	actions := map[string]struct{}{
-		"create_todo": {},
-		"update_todo": {},
+	policy := ContextCompactionPolicy{
+		TriggerTokenCount: 2000,
 	}
 
 	tests := map[string]struct {
 		messages []ChatMessage
-		hasMore  bool
-		actions  map[string]struct{}
-		want     ConversationSummaryGenerationDecision
+		want     ContextCompactionDecision
 	}{
-		"triggered-by-state-changing-action-success": {
-			messages: func() []ChatMessage {
-				actionCallID := "action-1"
-				return []ChatMessage{
-					{
-						ChatRole: ChatRole_Assistant,
-						ActionCalls: []ActionCall{
-							{ID: actionCallID, Name: "create_todo"},
-						},
-					},
-					{
-						ChatRole:     ChatRole_Tool,
-						ActionCallID: &actionCallID,
-						MessageState: ChatMessageState_Completed,
-					},
-				}
-			}(),
-			actions: actions,
-			want: ConversationSummaryGenerationDecision{
-				ShouldGenerate: true,
-				Reason:         ConversationSummaryGenerationReason_StateChangingActionSuccess,
-				MessageCount:   2,
-				TotalTokens:    0,
-			},
-		},
-		"triggered-by-message-count-threshold": {
-			messages: []ChatMessage{
-				{ChatRole: ChatRole_User},
-				{ChatRole: ChatRole_Assistant},
-				{ChatRole: ChatRole_User},
-				{ChatRole: ChatRole_Assistant},
-				{ChatRole: ChatRole_User},
-				{ChatRole: ChatRole_Assistant},
-				{ChatRole: ChatRole_User},
-				{ChatRole: ChatRole_Assistant},
-				{ChatRole: ChatRole_User},
-				{ChatRole: ChatRole_Assistant},
-			},
-			actions: actions,
-			want: ConversationSummaryGenerationDecision{
-				ShouldGenerate: true,
-				Reason:         ConversationSummaryGenerationReason_MessageCountThreshold,
-				MessageCount:   10,
-				TotalTokens:    0,
-			},
-		},
-		"triggered-by-has-more": {
-			messages: []ChatMessage{
-				{ChatRole: ChatRole_User},
-			},
-			hasMore: true,
-			actions: actions,
-			want: ConversationSummaryGenerationDecision{
-				ShouldGenerate: true,
-				Reason:         ConversationSummaryGenerationReason_MessageCountThreshold,
-				MessageCount:   1,
-				TotalTokens:    0,
-			},
-		},
 		"triggered-by-token-count-threshold": {
 			messages: []ChatMessage{
-				{ChatRole: ChatRole_Assistant, TotalTokens: 2001},
+				{
+					ChatRole:              ChatRole_Assistant,
+					MessageState:          ChatMessageState_Completed,
+					Content:               "short",
+					TotalTokens:           1,
+					ContextTokensEstimate: 2001,
+				},
 			},
-			actions: actions,
-			want: ConversationSummaryGenerationDecision{
+			want: ContextCompactionDecision{
 				ShouldGenerate: true,
-				Reason:         ConversationSummaryGenerationReason_TokenCountThreshold,
+				Reason:         ContextCompactionReasonTokenCountThreshold,
 				MessageCount:   1,
 				TotalTokens:    2001,
 			},
 		},
-		"does-not-trigger-for-non-state-changing-action": {
+		"does-not-trigger-by-action-success-alone": {
 			messages: func() []ChatMessage {
-				actionCallID := "action-2"
+				actionCallID := "action-1"
 				return []ChatMessage{
 					{
-						ChatRole: ChatRole_Assistant,
-						ActionCalls: []ActionCall{
-							{ID: actionCallID, Name: "search_todo"},
-						},
-					},
-					{
-						ChatRole:     ChatRole_Tool,
-						ActionCallID: &actionCallID,
-						MessageState: ChatMessageState_Completed,
-					},
-				}
-			}(),
-			actions: actions,
-			want: ConversationSummaryGenerationDecision{
-				ShouldGenerate: false,
-				Reason:         ConversationSummaryGenerationReason_None,
-				MessageCount:   2,
-				TotalTokens:    0,
-			},
-		},
-		"does-not-trigger-with-empty-actions-config": {
-			messages: func() []ChatMessage {
-				actionCallID := "action-3"
-				return []ChatMessage{
-					{
-						ChatRole: ChatRole_Assistant,
+						ChatRole:              ChatRole_Assistant,
+						ContextTokensEstimate: 12,
 						ActionCalls: []ActionCall{
 							{ID: actionCallID, Name: "create_todo"},
 						},
 					},
 					{
-						ChatRole:     ChatRole_Tool,
-						ActionCallID: &actionCallID,
-						MessageState: ChatMessageState_Completed,
+						ChatRole:              ChatRole_Tool,
+						ActionCallID:          &actionCallID,
+						MessageState:          ChatMessageState_Completed,
+						ContextTokensEstimate: 12,
 					},
 				}
 			}(),
-			actions: map[string]struct{}{},
-			want: ConversationSummaryGenerationDecision{
+			want: ContextCompactionDecision{
 				ShouldGenerate: false,
-				Reason:         ConversationSummaryGenerationReason_None,
+				Reason:         ContextCompactionReasonNone,
 				MessageCount:   2,
-				TotalTokens:    0,
+				TotalTokens:    24,
+			},
+		},
+		"does-not-trigger-below-thresholds": {
+			messages: []ChatMessage{
+				{ChatRole: ChatRole_User, MessageState: ChatMessageState_Completed, Content: "short", ContextTokensEstimate: 5},
+				{ChatRole: ChatRole_Assistant, MessageState: ChatMessageState_Completed, Content: "short", ContextTokensEstimate: 6},
+			},
+			want: ContextCompactionDecision{
+				ShouldGenerate: false,
+				Reason:         ContextCompactionReasonNone,
+				MessageCount:   2,
+				TotalTokens:    11,
+			},
+		},
+		"ignores-llm-usage-total-tokens-for-thresholds": {
+			messages: []ChatMessage{
+				{
+					ChatRole:              ChatRole_Assistant,
+					MessageState:          ChatMessageState_Completed,
+					Content:               "ok",
+					TotalTokens:           3200,
+					ContextTokensEstimate: 5,
+				},
+			},
+			want: ContextCompactionDecision{
+				ShouldGenerate: false,
+				Reason:         ContextCompactionReasonNone,
+				MessageCount:   1,
+				TotalTokens:    5,
 			},
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := DetermineConversationSummaryGenerationDecision(tt.messages, tt.hasMore, policy, tt.actions)
+			got := DetermineContextCompactionDecision(tt.messages, policy)
 			assert.Equal(t, tt.want, got)
 		})
 	}

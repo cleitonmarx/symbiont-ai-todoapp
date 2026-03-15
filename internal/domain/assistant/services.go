@@ -1,8 +1,6 @@
 package assistant
 
-import (
-	"strings"
-)
+import "strings"
 
 // GenerateAutoConversationTitle generates a conversation title based on the user's initial message.
 func GenerateAutoConversationTitle(userMessage string) string {
@@ -17,79 +15,34 @@ func GenerateAutoConversationTitle(userMessage string) string {
 	return strings.Join(words[:5], " ") + "..."
 }
 
-// DetermineConversationSummaryGenerationDecision evaluates whether unsummarized messages warrant
-// generating a new conversation summary.
-func DetermineConversationSummaryGenerationDecision(
+// DetermineContextCompactionDecision evaluates whether unsummarized messages warrant
+// generating a compacted conversation summary.
+func DetermineContextCompactionDecision(
 	messages []ChatMessage,
-	hasMore bool,
-	policy ConversationSummaryGenerationPolicy,
-	stateChangingActions map[string]struct{},
-) ConversationSummaryGenerationDecision {
-	totalTokens := sumMessagesTotalTokens(messages)
-	decision := ConversationSummaryGenerationDecision{
+	policy ContextCompactionPolicy,
+) ContextCompactionDecision {
+	totalTokens := estimateMessagesContextTokens(messages)
+	decision := ContextCompactionDecision{
 		ShouldGenerate: false,
-		Reason:         ConversationSummaryGenerationReason_None,
+		Reason:         ContextCompactionReasonNone,
 		MessageCount:   len(messages),
 		TotalTokens:    totalTokens,
 	}
 
-	if hasStateChangingActionSuccess(messages, stateChangingActions) {
-		decision.ShouldGenerate = true
-		decision.Reason = ConversationSummaryGenerationReason_StateChangingActionSuccess
-		return decision
-	}
-
-	if hasMore || len(messages) >= policy.TriggerMessageCount {
-		decision.ShouldGenerate = true
-		decision.Reason = ConversationSummaryGenerationReason_MessageCountThreshold
-		return decision
-	}
-
 	if totalTokens >= policy.TriggerTokenCount {
 		decision.ShouldGenerate = true
-		decision.Reason = ConversationSummaryGenerationReason_TokenCountThreshold
+		decision.Reason = ContextCompactionReasonTokenCountThreshold
 	}
 
 	return decision
 }
 
-// hasStateChangingActionSuccess checks if any of the messages indicate a successful execution of a state-changing action.
-func hasStateChangingActionSuccess(messages []ChatMessage, stateChangingActions map[string]struct{}) bool {
-	if len(stateChangingActions) == 0 {
-		return false
-	}
-
-	actionCallFunctionsByID := map[string]string{}
-	for _, message := range messages {
-		if message.ChatRole != ChatRole_Assistant {
-			continue
-		}
-		for _, actionCall := range message.ActionCalls {
-			actionCallFunctionsByID[actionCall.ID] = strings.ToLower(actionCall.Name)
-		}
-	}
-
-	for _, message := range messages {
-		if !message.IsActionCallSuccess() {
-			continue
-		}
-		actionFunction, found := actionCallFunctionsByID[*message.ActionCallID]
-		if !found {
-			continue
-		}
-		if _, stateChanging := stateChangingActions[actionFunction]; stateChanging {
-			return true
-		}
-	}
-
-	return false
-}
-
-// sumMessagesTotalTokens calculates the total number of tokens across a slice of chat messages.
-func sumMessagesTotalTokens(messages []ChatMessage) int {
+// estimateMessagesContextTokens approximates the active context size represented
+// by the persisted chat messages, instead of using model usage/billing tokens.
+func estimateMessagesContextTokens(messages []ChatMessage) int {
 	tokenCount := 0
 	for _, message := range messages {
-		tokenCount += message.TotalTokens
+		tokenCount += message.ContextTokensEstimate
 	}
 	return tokenCount
 }

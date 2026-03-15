@@ -52,6 +52,7 @@ func (o *InitOpenTelemetry) Initialize(ctx context.Context) (context.Context, er
 			return ctx, err
 		}
 		otel.SetTracerProvider(o.tp)
+		tracer = otel.Tracer(tracerName)
 	}
 
 	if o.MetricsEndpoint != "" {

@@ -17,9 +17,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-var (
-	tracer = otel.Tracer("")
-)
+const tracerName = "todoapp"
+
+var tracer = otel.Tracer(tracerName)
 
 // SpanNameFormatter formats span names for HTTP requests.
 // It uses the HTTP method and URL path as the span name.

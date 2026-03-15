@@ -56,7 +56,7 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 	}{
 		"success": {
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectExec("INSERT INTO chat_messages (id,conversation_id,turn_id,turn_sequence,chat_role,content,action_call_id,action_calls,model,message_state,error_message,prompt_tokens,completion_tokens,total_tokens,approval_status,approval_decision_reason,approval_decided_at,selected_skills,action_executed,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)").
+				m.ExpectExec("INSERT INTO chat_messages (id,conversation_id,turn_id,turn_sequence,chat_role,content,action_call_id,action_calls,model,message_state,error_message,prompt_tokens,completion_tokens,total_tokens,context_tokens_estimate,approval_status,approval_decision_reason,approval_decided_at,selected_skills,action_executed,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)").
 					WithArgs(
 						msg.ID,
 						msg.ConversationID,
@@ -72,6 +72,7 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 						msg.PromptTokens,
 						msg.CompletionTokens,
 						msg.TotalTokens,
+						msg.ContextTokensEstimate,
 						msg.ApprovalStatus,
 						msg.ApprovalDecisionReason,
 						msg.ApprovalDecidedAt,
@@ -86,7 +87,7 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 		},
 		"database-error": {
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectExec("INSERT INTO chat_messages (id,conversation_id,turn_id,turn_sequence,chat_role,content,action_call_id,action_calls,model,message_state,error_message,prompt_tokens,completion_tokens,total_tokens,approval_status,approval_decision_reason,approval_decided_at,selected_skills,action_executed,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)").
+				m.ExpectExec("INSERT INTO chat_messages (id,conversation_id,turn_id,turn_sequence,chat_role,content,action_call_id,action_calls,model,message_state,error_message,prompt_tokens,completion_tokens,total_tokens,context_tokens_estimate,approval_status,approval_decision_reason,approval_decided_at,selected_skills,action_executed,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)").
 					WithArgs(
 						msg.ID,
 						msg.ConversationID,
@@ -102,6 +103,7 @@ func TestChatMessageRepository_CreateChatMessages(t *testing.T) {
 						msg.PromptTokens,
 						msg.CompletionTokens,
 						msg.TotalTokens,
+						msg.ContextTokensEstimate,
 						msg.ApprovalStatus,
 						msg.ApprovalDecisionReason,
 						msg.ApprovalDecidedAt,
@@ -164,6 +166,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			0,
 			0,
 			0,
+			0,
 			nil,
 			nil,
 			nil,
@@ -190,7 +193,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 					AddRow(row(fixedID3, conversationID, turnID3, 2, t3)...).
 					AddRow(row(fixedID2, conversationID, turnID2, 1, t2)...).
 					AddRow(row(fixedID1, conversationID, turnID1, 0, t1)...)
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, context_tokens_estimate, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
@@ -222,6 +225,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 						0,
 						0,
 						0,
+						0,
 						string(assistant.ChatMessageApprovalStatus_Approved),
 						approvalReason,
 						approvalDecidedAt,
@@ -230,7 +234,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 						t1,
 						t1,
 					)
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, context_tokens_estimate, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
@@ -272,7 +276,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 					AddRow(row(fixedID2, conversationID, turnID2, 1, t2)...).
 					AddRow(row(fixedID1, conversationID, turnID1, 0, t1)...)
 
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, context_tokens_estimate, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3").
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
@@ -290,7 +294,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 				rows := sqlmock.NewRows(chatFields).
 					AddRow(row(fixedID1, conversationID, turnID1, 0, t1)...)
 
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3 OFFSET 2").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, context_tokens_estimate, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3 OFFSET 2").
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
@@ -305,7 +309,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			pageSize: 10,
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(chatFields)
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, context_tokens_estimate, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
@@ -317,7 +321,7 @@ func TestChatMessageRepository_ListChatMessages(t *testing.T) {
 			page:     1,
 			pageSize: 10,
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, context_tokens_estimate, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 11").
 					WithArgs(conversationID).
 					WillReturnError(errors.New("db error"))
 			},
@@ -376,6 +380,7 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 			0,
 			0,
 			0,
+			0,
 			nil,
 			nil,
 			nil,
@@ -406,7 +411,7 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 					AddRow(row(fixedID2, turnID, 1, fixedTime)...).
 					AddRow(row(fixedID3, turnID, 2, fixedTime)...).
 					AddRow(row(fixedID4, turnID, 3, fixedTime)...)
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages LEFT JOIN ( SELECT created_at AS checkpoint_created_at, id AS checkpoint_id FROM chat_messages WHERE conversation_id = $1 AND id = $2 LIMIT 1 ) checkpoint ON TRUE WHERE conversation_id = $3 AND (checkpoint.checkpoint_id IS NULL OR chat_messages.created_at > checkpoint.checkpoint_created_at OR (chat_messages.created_at = checkpoint.checkpoint_created_at AND chat_messages.id > checkpoint.checkpoint_id)) ORDER BY created_at ASC, id ASC LIMIT 3").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, context_tokens_estimate, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages LEFT JOIN ( SELECT created_at AS checkpoint_created_at, id AS checkpoint_id FROM chat_messages WHERE conversation_id = $1 AND id = $2 LIMIT 1 ) checkpoint ON TRUE WHERE conversation_id = $3 AND (checkpoint.checkpoint_id IS NULL OR chat_messages.created_at > checkpoint.checkpoint_created_at OR (chat_messages.created_at = checkpoint.checkpoint_created_at AND chat_messages.id > checkpoint.checkpoint_id)) ORDER BY created_at ASC, id ASC LIMIT 3").
 					WithArgs(conversationID, fixedID1, conversationID).
 					WillReturnRows(rows)
 			},
@@ -424,7 +429,7 @@ func TestChatMessageRepository_ListChatMessages_WithOptionalParameters(t *testin
 				assistant.WithChatMessagesAfterMessageID(fixedID1),
 			},
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages LEFT JOIN ( SELECT created_at AS checkpoint_created_at, id AS checkpoint_id FROM chat_messages WHERE conversation_id = $1 AND id = $2 LIMIT 1 ) checkpoint ON TRUE WHERE conversation_id = $3 AND (checkpoint.checkpoint_id IS NULL OR chat_messages.created_at > checkpoint.checkpoint_created_at OR (chat_messages.created_at = checkpoint.checkpoint_created_at AND chat_messages.id > checkpoint.checkpoint_id)) ORDER BY created_at ASC, id ASC LIMIT 11").
+				m.ExpectQuery("SELECT id, conversation_id, turn_id, turn_sequence, chat_role, content, action_call_id, action_calls, model, message_state, error_message, prompt_tokens, completion_tokens, total_tokens, context_tokens_estimate, approval_status, approval_decision_reason, approval_decided_at, selected_skills, action_executed, created_at, updated_at FROM chat_messages LEFT JOIN ( SELECT created_at AS checkpoint_created_at, id AS checkpoint_id FROM chat_messages WHERE conversation_id = $1 AND id = $2 LIMIT 1 ) checkpoint ON TRUE WHERE conversation_id = $3 AND (checkpoint.checkpoint_id IS NULL OR chat_messages.created_at > checkpoint.checkpoint_created_at OR (chat_messages.created_at = checkpoint.checkpoint_created_at AND chat_messages.id > checkpoint.checkpoint_id)) ORDER BY created_at ASC, id ASC LIMIT 11").
 					WithArgs(conversationID, fixedID1, conversationID).
 					WillReturnError(errors.New("db error"))
 			},

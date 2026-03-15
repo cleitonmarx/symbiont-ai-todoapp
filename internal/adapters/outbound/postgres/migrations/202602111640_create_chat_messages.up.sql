@@ -13,6 +13,7 @@ CREATE TABLE chat_messages (
     prompt_tokens INTEGER NOT NULL,
     completion_tokens INTEGER NOT NULL,
     total_tokens INTEGER NOT NULL,
+    context_tokens_estimate INTEGER NOT NULL,
     approval_status TEXT,
     approval_decision_reason TEXT,
     approval_decided_at TIMESTAMPTZ,

@@ -25,7 +25,6 @@ func TestNewApps_NotNil(t *testing.T) {
 		NewGraphQLAPI(),
 		NewMessageRelay(),
 		NewBoardSummaryGenerator(),
-		NewChatSummaryGenerator(),
 		NewConversationTitleGenerator(),
 	}
 

@@ -11,12 +11,12 @@ import (
 func TestInitActionRegistry_Initialize(t *testing.T) {
 	t.Parallel()
 
-	i := InitLocalActionRegistry{}
+	i := InitActionRegistry{}
 	registry, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, registry)
 
 	dependency, err := depend.ResolveNamed[assistant.ActionRegistry]("local")
 	assert.NoError(t, err)
-	assert.IsType(t, LocalRegistry{}, dependency)
+	assert.IsType(t, ActionRegistry{}, dependency)
 }

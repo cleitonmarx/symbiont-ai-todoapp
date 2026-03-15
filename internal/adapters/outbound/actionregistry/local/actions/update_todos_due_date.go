@@ -96,17 +96,21 @@ func (a UpdateTodosDueDateAction) Execute(ctx context.Context, call assistant.Ac
 
 	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
+		content := newActionError("invalid_arguments", err.Error(), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 	if len(params.Todos) == 0 {
+		content := newActionError("invalid_arguments", "todos must not be empty.", exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", "todos must not be empty.", exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 
@@ -119,19 +123,23 @@ func (a UpdateTodosDueDateAction) Execute(ctx context.Context, call assistant.Ac
 	for i, todo := range params.Todos {
 		todoID, parseErr := uuid.Parse(todo.ID)
 		if parseErr != nil {
+			content := newActionError("invalid_todo_id", fmt.Sprintf("todo at index %d has invalid id: %s", i, parseErr.Error()), exampleArgs)
 			return assistant.Message{
 				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
-				Content:      newActionError("invalid_todo_id", fmt.Sprintf("todo at index %d has invalid id: %s", i, parseErr.Error()), exampleArgs),
+				Content:      content,
+				ActionError:  &content,
 			}
 		}
 
 		dueDate, found := extractDateParam(todo.DueDate, conversationHistory, now)
 		if !found {
+			content := newActionError("invalid_due_date", fmt.Sprintf("todo at index %d has invalid due_date.", i), exampleArgs)
 			return assistant.Message{
 				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
-				Content:      newActionError("invalid_due_date", fmt.Sprintf("todo at index %d has invalid due_date.", i), exampleArgs),
+				Content:      content,
+				ActionError:  &content,
 			}
 		}
 
@@ -153,10 +161,12 @@ func (a UpdateTodosDueDateAction) Execute(ctx context.Context, call assistant.Ac
 		return nil
 	})
 	if err != nil {
+		content := newActionError("update_todos_due_date_error", err.Error(), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("update_todos_due_date_error", err.Error(), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 

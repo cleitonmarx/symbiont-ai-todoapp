@@ -101,17 +101,21 @@ func (a UpdateTodosAction) Execute(ctx context.Context, call assistant.ActionCal
 
 	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
+		content := newActionError("invalid_arguments", err.Error(), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 	if len(params.Todos) == 0 {
+		content := newActionError("invalid_arguments", "todos must not be empty.", exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", "todos must not be empty.", exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 
@@ -124,10 +128,12 @@ func (a UpdateTodosAction) Execute(ctx context.Context, call assistant.ActionCal
 	for i, td := range params.Todos {
 		todoID, parseErr := uuid.Parse(td.ID)
 		if parseErr != nil {
+			content := newActionError("invalid_todo_id", fmt.Sprintf("todo at index %d has invalid id: %s", i, parseErr.Error()), exampleArgs)
 			return assistant.Message{
 				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
-				Content:      newActionError("invalid_todo_id", fmt.Sprintf("todo at index %d has invalid id: %s", i, parseErr.Error()), exampleArgs),
+				Content:      content,
+				ActionError:  &content,
 			}
 		}
 
@@ -135,10 +141,12 @@ func (a UpdateTodosAction) Execute(ctx context.Context, call assistant.ActionCal
 		if td.Status != nil {
 			status := todo.Status(*td.Status)
 			if status != todo.Status_OPEN && status != todo.Status_DONE {
+				content := newActionError("invalid_status", fmt.Sprintf("todo at index %d has invalid status: %s", i, *td.Status), exampleArgs)
 				return assistant.Message{
 					Role:         assistant.ChatRole_Tool,
 					ActionCallID: &call.ID,
-					Content:      newActionError("invalid_status", fmt.Sprintf("todo at index %d has invalid status: %s", i, *td.Status), exampleArgs),
+					Content:      content,
+					ActionError:  &content,
 				}
 			}
 			statusPtr = &status
@@ -163,10 +171,12 @@ func (a UpdateTodosAction) Execute(ctx context.Context, call assistant.ActionCal
 		return nil
 	})
 	if err != nil {
+		content := newActionError("update_todos_error", err.Error(), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("update_todos_error", err.Error(), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 

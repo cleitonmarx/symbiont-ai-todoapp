@@ -18,7 +18,6 @@ data:
   PUBSUB_PROJECT_ID: {{ .Values.pubsub.projectId | quote }}
   PUBSUB_TOPIC_ID: {{ .Values.pubsub.topicIds.todo | quote }}
   TODO_EVENTS_SUBSCRIPTION_ID: {{ .Values.pubsub.subscriptionIds.todoEvents | quote }}
-  CHAT_EVENTS_SUBSCRIPTION_ID: {{ .Values.pubsub.subscriptionIds.chatEvents | quote }}
   CHAT_TITLE_EVENTS_SUBSCRIPTION_ID: {{ .Values.pubsub.subscriptionIds.chatTitleEvents | quote }}
   ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX: {{ .Values.pubsub.subscriptionPrefixes.actionApprovalEvents | quote }}
 

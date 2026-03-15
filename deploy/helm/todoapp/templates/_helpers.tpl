@@ -61,5 +61,5 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{- define "todoapp.pubsubProjectSpec" -}}
-{{- printf "%s,%s:%s,%s:%s:%s,%s" .Values.pubsub.projectId .Values.pubsub.topicIds.todo .Values.pubsub.subscriptionIds.todoEvents .Values.pubsub.topicIds.chatMessages .Values.pubsub.subscriptionIds.chatEvents .Values.pubsub.subscriptionIds.chatTitleEvents .Values.pubsub.topicIds.actionApprovals -}}
+{{- printf "%s,%s:%s,%s:%s,%s" .Values.pubsub.projectId .Values.pubsub.topicIds.todo .Values.pubsub.subscriptionIds.todoEvents .Values.pubsub.topicIds.chatMessages .Values.pubsub.subscriptionIds.chatTitleEvents .Values.pubsub.topicIds.actionApprovals -}}
 {{- end -}}

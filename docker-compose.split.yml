@@ -14,9 +14,10 @@ x-app-env: &app-env
   PUBSUB_PROJECT_ID: local-dev
   PUBSUB_TOPIC_ID: Todo
   TODO_EVENTS_SUBSCRIPTION_ID: todo_summary_generator
-  CHAT_EVENTS_SUBSCRIPTION_ID: chat_message_summary_generator
   CHAT_TITLE_EVENTS_SUBSCRIPTION_ID: chat_message_title_generator
   ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX: action_approval_dispatcher
+  CHAT_COMPACTION_TIMEOUT: 20s
+  CHAT_COMPACTION_TRIGGER_TOKENS: 8000
 
 x-assistant-llm-env: &assistant-llm-env
   LLM_MODEL_HOST: http://model-runner.docker.internal
@@ -143,19 +144,6 @@ services:
       OTEL_SERVICE_NAME: board-summary-generator
       SUMMARY_BATCH_INTERVAL: 5s
       SUMMARY_BATCH_SIZE: 300
-    models:
-      - qwen3
-    depends_on: *app-depends
-
-  chat-summary-generator:
-    scale: 2
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    command: ["/chat-summary-generator"]
-    environment:
-      <<: [*app-env, *assistant-llm-env]
-      OTEL_SERVICE_NAME: chat-summary-generator
     models:
       - qwen3
     depends_on: *app-depends

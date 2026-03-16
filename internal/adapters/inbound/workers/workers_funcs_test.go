@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,43 +20,75 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+const testPubSubProjectID = "test-project"
+
+var (
+	pubSubTestOnce   sync.Once
+	pubSubTestServer *pstest.Server
+	pubSubTestConn   *grpc.ClientConn
+	pubSubTestClient *pubsubV2.Client
+	pubSubTestErr    error
+)
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if pubSubTestClient != nil {
+		pubSubTestClient.Close() //nolint:errcheck
+	}
+	if pubSubTestConn != nil {
+		pubSubTestConn.Close() //nolint:errcheck
+	}
+	if pubSubTestServer != nil {
+		pubSubTestServer.Close() //nolint:errcheck
+	}
+	os.Exit(code)
+}
+
 // setupPubSubServer creates a pstest server with topic and subscription.
 func setupPubSubServer(t *testing.T, ctx context.Context, topicID, subscriptionID string) (*pubsubV2.Client, string) {
-	server := pstest.NewServer()
-	t.Cleanup(func() {
-		server.Close() //nolint:errcheck
+	pubSubTestOnce.Do(func() {
+		pubSubTestServer = pstest.NewServer()
+		pubSubTestConn, pubSubTestErr = grpc.NewClient(
+			pubSubTestServer.Addr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if pubSubTestErr != nil {
+			return
+		}
+		pubSubTestClient, pubSubTestErr = pubsubV2.NewClient(
+			ctx,
+			testPubSubProjectID,
+			option.WithGRPCConn(pubSubTestConn),
+		)
 	})
-
-	conn, err := grpc.NewClient(server.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	assert.NoError(t, err)
-	t.Cleanup(func() {
-		conn.Close() //nolint:errcheck
-	})
-
-	projectID := "test-project"
-	client, err := pubsubV2.NewClient(ctx, projectID, option.WithGRPCConn(conn))
-	assert.NoError(t, err)
-	t.Cleanup(func() {
-		client.Close() //nolint:errcheck
-	})
+	assert.NoError(t, pubSubTestErr)
 
 	// Create topic
-	topicName := "projects/" + projectID + "/topics/" + topicID
-	topic, err := client.TopicAdminClient.CreateTopic(ctx, &pubsubpb.Topic{Name: topicName})
+	topicName := "projects/" + testPubSubProjectID + "/topics/" + topicID
+	_, err := pubSubTestClient.TopicAdminClient.CreateTopic(ctx, &pubsubpb.Topic{Name: topicName})
+	if err != nil {
+		_, err = pubSubTestClient.TopicAdminClient.GetTopic(ctx, &pubsubpb.GetTopicRequest{Topic: topicName})
+	}
 	assert.NoError(t, err)
 
 	// Create subscription
-	subName := "projects/" + projectID + "/subscriptions/" + subscriptionID
-	_, err = client.SubscriptionAdminClient.CreateSubscription(
+	subName := "projects/" + testPubSubProjectID + "/subscriptions/" + subscriptionID
+	_, err = pubSubTestClient.SubscriptionAdminClient.CreateSubscription(
 		ctx,
 		&pubsubpb.Subscription{
 			Name:  subName,
-			Topic: topic.GetName(),
+			Topic: topicName,
 		},
 	)
+	if err != nil {
+		_, err = pubSubTestClient.SubscriptionAdminClient.GetSubscription(
+			ctx,
+			&pubsubpb.GetSubscriptionRequest{Subscription: subName},
+		)
+	}
 	assert.NoError(t, err)
 
-	return client, topicName
+	return pubSubTestClient, topicName
 }
 
 // publishMessages sends many payloads to the same Pub/Sub topic.

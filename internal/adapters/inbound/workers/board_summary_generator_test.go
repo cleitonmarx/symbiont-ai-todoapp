@@ -23,7 +23,7 @@ func TestBoardSummaryGenerator_Run(t *testing.T) {
 	}{
 		"batch-full-triggers-processing": {
 			batchSize:       5,
-			interval:        300 * time.Millisecond,
+			interval:        200 * time.Millisecond,
 			publishCount:    20,
 			expectedBatches: 4,
 			setExpectations: func(gbs *board.MockGenerateBoardSummary) {
@@ -32,7 +32,7 @@ func TestBoardSummaryGenerator_Run(t *testing.T) {
 		},
 		"interval-flush-triggers-processing": {
 			batchSize:       10,
-			interval:        100 * time.Millisecond,
+			interval:        30 * time.Millisecond,
 			publishCount:    3,
 			expectedBatches: 1,
 			setExpectations: func(gbs *board.MockGenerateBoardSummary) {
@@ -70,7 +70,7 @@ func TestBoardSummaryGenerator_Run(t *testing.T) {
 			err := publishMessages(ctx, client, topicName, payloads)
 			assert.NoError(t, err)
 
-			got := waitForBatchSignals(t, signalChan, tt.expectedBatches, 10*time.Second)
+			got := waitForBatchSignals(t, signalChan, tt.expectedBatches, 500*time.Millisecond)
 			assert.Equal(t, tt.expectedBatches, got)
 
 			cancel()

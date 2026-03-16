@@ -80,7 +80,6 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "world"}}}, Usage: &Usage{PromptTokens: 5, CompletionTokens: 5, TotalTokens: 10}},
 			},
 			expectedEvents: []assistant.EventType{
-				assistant.EventType_TurnStarted,
 				assistant.EventType_MessageDelta,
 				assistant.EventType_MessageDelta,
 				assistant.EventType_MessageDelta,
@@ -94,7 +93,6 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: ""}}}},
 			},
 			expectedEvents: []assistant.EventType{
-				assistant.EventType_TurnStarted,
 				assistant.EventType_TurnCompleted,
 			},
 			expectedContent: "",
@@ -151,7 +149,6 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 			},
 
 			expectedEvents: []assistant.EventType{
-				assistant.EventType_TurnStarted,
 				assistant.EventType_ActionRequested,
 				assistant.EventType_TurnCompleted,
 			},

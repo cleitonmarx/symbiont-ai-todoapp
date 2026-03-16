@@ -50,13 +50,13 @@ func TestGenerateAutoConversationTitle(t *testing.T) {
 func TestDetermineContextCompactionDecision(t *testing.T) {
 	t.Parallel()
 
-	policy := ContextCompactionPolicy{
+	policy := CompactionPolicy{
 		TriggerTokenCount: 2000,
 	}
 
 	tests := map[string]struct {
 		messages []ChatMessage
-		want     ContextCompactionDecision
+		want     CompactionDecision
 	}{
 		"triggered-by-token-count-threshold": {
 			messages: []ChatMessage{
@@ -68,11 +68,11 @@ func TestDetermineContextCompactionDecision(t *testing.T) {
 					ContextTokensEstimate: 2001,
 				},
 			},
-			want: ContextCompactionDecision{
-				ShouldGenerate: true,
-				Reason:         ContextCompactionReasonTokenCountThreshold,
-				MessageCount:   1,
-				TotalTokens:    2001,
+			want: CompactionDecision{
+				ShouldCompact: true,
+				Reason:        ContextCompactionReasonTokenCountThreshold,
+				MessageCount:  1,
+				TotalTokens:   2001,
 			},
 		},
 		"does-not-trigger-by-action-success-alone": {
@@ -94,11 +94,11 @@ func TestDetermineContextCompactionDecision(t *testing.T) {
 					},
 				}
 			}(),
-			want: ContextCompactionDecision{
-				ShouldGenerate: false,
-				Reason:         ContextCompactionReasonNone,
-				MessageCount:   2,
-				TotalTokens:    24,
+			want: CompactionDecision{
+				ShouldCompact: false,
+				Reason:        ContextCompactionReasonNone,
+				MessageCount:  2,
+				TotalTokens:   24,
 			},
 		},
 		"does-not-trigger-below-thresholds": {
@@ -106,11 +106,11 @@ func TestDetermineContextCompactionDecision(t *testing.T) {
 				{ChatRole: ChatRole_User, MessageState: ChatMessageState_Completed, Content: "short", ContextTokensEstimate: 5},
 				{ChatRole: ChatRole_Assistant, MessageState: ChatMessageState_Completed, Content: "short", ContextTokensEstimate: 6},
 			},
-			want: ContextCompactionDecision{
-				ShouldGenerate: false,
-				Reason:         ContextCompactionReasonNone,
-				MessageCount:   2,
-				TotalTokens:    11,
+			want: CompactionDecision{
+				ShouldCompact: false,
+				Reason:        ContextCompactionReasonNone,
+				MessageCount:  2,
+				TotalTokens:   11,
 			},
 		},
 		"ignores-llm-usage-total-tokens-for-thresholds": {
@@ -123,11 +123,11 @@ func TestDetermineContextCompactionDecision(t *testing.T) {
 					ContextTokensEstimate: 5,
 				},
 			},
-			want: ContextCompactionDecision{
-				ShouldGenerate: false,
-				Reason:         ContextCompactionReasonNone,
-				MessageCount:   1,
-				TotalTokens:    5,
+			want: CompactionDecision{
+				ShouldCompact: false,
+				Reason:        ContextCompactionReasonNone,
+				MessageCount:  1,
+				TotalTokens:   5,
 			},
 		},
 	}

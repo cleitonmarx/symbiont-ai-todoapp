@@ -20,17 +20,17 @@ type ConversationSummary struct {
 // DefaultConversationStateSummary is used when no persisted summary exists.
 const DefaultConversationStateSummary = "No current state."
 
-// ContextCompactionPolicy controls compaction thresholds.
-type ContextCompactionPolicy struct {
+// CompactionPolicy controls compaction thresholds.
+type CompactionPolicy struct {
 	TriggerTokenCount int
 }
 
-// ContextCompactionDecision is the output of compaction policy evaluation.
-type ContextCompactionDecision struct {
-	ShouldGenerate bool
-	Reason         ContextCompactionReason
-	MessageCount   int
-	TotalTokens    int
+// CompactionDecision is the output of compaction policy evaluation.
+type CompactionDecision struct {
+	ShouldCompact bool
+	Reason        ContextCompactionReason
+	MessageCount  int
+	TotalTokens   int
 }
 
 // CurrentStateOrDefault returns the persisted current state summary, or a default string when empty.

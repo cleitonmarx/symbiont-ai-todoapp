@@ -19,18 +19,18 @@ func GenerateAutoConversationTitle(userMessage string) string {
 // generating a compacted conversation summary.
 func DetermineContextCompactionDecision(
 	messages []ChatMessage,
-	policy ContextCompactionPolicy,
-) ContextCompactionDecision {
+	policy CompactionPolicy,
+) CompactionDecision {
 	totalTokens := estimateMessagesContextTokens(messages)
-	decision := ContextCompactionDecision{
-		ShouldGenerate: false,
-		Reason:         ContextCompactionReasonNone,
-		MessageCount:   len(messages),
-		TotalTokens:    totalTokens,
+	decision := CompactionDecision{
+		ShouldCompact: false,
+		Reason:        ContextCompactionReasonNone,
+		MessageCount:  len(messages),
+		TotalTokens:   totalTokens,
 	}
 
 	if totalTokens >= policy.TriggerTokenCount {
-		decision.ShouldGenerate = true
+		decision.ShouldCompact = true
 		decision.Reason = ContextCompactionReasonTokenCountThreshold
 	}
 

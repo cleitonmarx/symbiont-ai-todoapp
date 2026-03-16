@@ -18,13 +18,56 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func newTestStreamChatUseCase(
+	logger *log.Logger,
+	chatRepo assistant.ChatMessageRepository,
+	summaryRepo assistant.ConversationSummaryRepository,
+	compactor ConversationCompactor,
+	conversationRepo assistant.ConversationRepository,
+	timeProvider core.CurrentTimeProvider,
+	tokenizer assistant.Tokenizer,
+	assist assistant.Assistant,
+	actionRegistry assistant.ActionRegistry,
+	skillRegistry assistant.SkillRegistry,
+	approvalDispatcher assistant.ActionApprovalDispatcher,
+	uow transaction.UnitOfWork,
+	maxActionCycles int,
+	compactionTriggerTokens int,
+	compactionTimeout time.Duration,
+) StreamChatImpl {
+	conversationCreator := newConversationCreator(uow, tokenizer)
+	actionPipeline := newActionPipeline(actionRegistry, approvalDispatcher, conversationCreator, timeProvider)
+	turnRunner := newTurnRunner(logger, assist, timeProvider, conversationCreator, actionPipeline)
+	sessionBuilder := newTurnSessionBuilder(
+		summaryRepo,
+		chatRepo,
+		timeProvider,
+		skillRegistry,
+		actionRegistry,
+	)
+	return NewStreamChatImpl(
+		logger,
+		timeProvider,
+		conversationRepo,
+		compactor,
+		assistant.CompactionPolicy{TriggerTokenCount: compactionTriggerTokens},
+		compactionTimeout,
+		maxActionCycles,
+		sessionBuilder,
+		turnRunner,
+		conversationCreator,
+	)
+}
+
 // streamChatTestTableEntry defines the structure for test cases of StreamChatImpl's Execute method,
 // including input parameters, expectations, and error scenarios.
 type streamChatTestTableEntry struct {
 	userMessage              string
 	model                    string
+	fixedTime                time.Time
 	customSummaryExpectation bool
 	options                  []StreamChatOption
+	persistExpectations      []persistCallExpectation
 	setExpectations          func(
 		*assistant.MockChatMessageRepository,
 		*assistant.MockConversationSummaryRepository,
@@ -65,7 +108,20 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	}
 
 	if tt.setExpectations != nil {
-		tt.setExpectations(chatRepo, summaryRepo, conversationRepo, timeProvider, assist, actionRegistry, skillRegistry, uow, outboxRepo)
+		tt.setExpectations(
+			chatRepo,
+			summaryRepo,
+			conversationRepo,
+			timeProvider,
+			assist,
+			actionRegistry,
+			skillRegistry,
+			uow,
+			outboxRepo,
+		)
+	}
+	if len(tt.persistExpectations) > 0 {
+		expectPersistSequence(t, chatRepo, conversationRepo, uow, outboxRepo, tt.fixedTime, tt.persistExpectations)
 	}
 
 	actionRegistry.EXPECT().
@@ -73,7 +129,7 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 		Return(nil, false).
 		Maybe()
 
-	useCase := NewStreamChatImpl(
+	useCase := newTestStreamChatUseCase(
 		log.New(io.Discard, "", 0),
 		chatRepo,
 		summaryRepo,
@@ -86,9 +142,9 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 		skillRegistry,
 		nil,
 		uow,
-		"test-embedding-model",
 		7,
 		8000,
+		DEFAULT_CONTEXT_COMPACTION_TIMEOUT,
 	)
 
 	var capturedContent string
@@ -168,6 +224,7 @@ type persistCallExpectation struct {
 	PromptTokens           *int
 	CompletionTokens       *int
 	TotalTokens            *int
+	TurnSequence           *int64
 	ActionCallsLen         int
 	HasActionCallID        bool
 	SelectedSkills         []assistant.SelectedSkill
@@ -240,7 +297,11 @@ func expectPersistSequence(
 			assert.Len(t, msg.ActionCalls, exp.ActionCallsLen)
 			assert.ElementsMatch(t, exp.SelectedSkills, msg.SelectedSkills)
 			assert.NotEqual(t, uuid.Nil, msg.TurnID)
-			assert.Equal(t, int64(createIdx-1), msg.TurnSequence)
+			expectedTurnSequence := int64(createIdx - 1)
+			if exp.TurnSequence != nil {
+				expectedTurnSequence = *exp.TurnSequence
+			}
+			assert.Equal(t, expectedTurnSequence, msg.TurnSequence)
 			assert.Equal(t, fixedTime, msg.CreatedAt)
 			assert.Equal(t, fixedTime, msg.UpdatedAt)
 			if exp.PromptTokens != nil {

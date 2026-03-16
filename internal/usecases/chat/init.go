@@ -122,47 +122,109 @@ func (init InitListConversations) Initialize(ctx context.Context) (context.Conte
 
 // InitStreamChat is the initializer for the StreamChat use case
 type InitStreamChat struct {
-	Logger                  *log.Logger                             `resolve:""`
-	ChatMessageRepo         assistant.ChatMessageRepository         `resolve:""`
-	ConversationSummaryRepo assistant.ConversationSummaryRepository `resolve:""`
-	ConversationCompactor   ConversationCompactor                   `resolve:""`
-	ConversationRepo        assistant.ConversationRepository        `resolve:""`
-	Uow                     transaction.UnitOfWork                  `resolve:""`
-	TimeProvider            core.CurrentTimeProvider                `resolve:""`
-	Tokenizer               assistant.Tokenizer                     `resolve:""`
-	ActionRegistry          assistant.ActionRegistry                `resolve:""`
-	SkillRegistry           assistant.SkillRegistry                 `resolve:""`
-	ApprovalDispatcher      assistant.ActionApprovalDispatcher      `resolve:""`
-	Assistant               assistant.Assistant                     `resolve:""`
-	EmbeddingModel          string                                  `config:"LLM_EMBEDDING_MODEL"`
-	MaxActionCycles         int                                     `config:"LLM_MAX_ACTION_CYCLES" default:"50"`
-	CompactionTriggerTokens int                                     `config:"CHAT_COMPACTION_TRIGGER_TOKENS"`
-	CompactionTimeout       time.Duration                           `config:"CHAT_COMPACTION_TIMEOUT" default:"20s"`
+	Logger                  *log.Logger                      `resolve:""`
+	TimeProvider            core.CurrentTimeProvider         `resolve:""`
+	ConversationRepo        assistant.ConversationRepository `resolve:""`
+	ConversationCompactor   ConversationCompactor            `resolve:""`
+	CompactionTriggerTokens int                              `config:"CHAT_COMPACTION_TRIGGER_TOKENS"`
+	CompactionTimeout       time.Duration                    `config:"CHAT_COMPACTION_TIMEOUT" default:"20s"`
+	SessionBuilder          TurnSessionBuilder               `resolve:""`
+	TurnRunner              TurnRunner                       `resolve:""`
+	ConversationCreator     ConversationCreator              `resolve:""`
+	MaxActionCycles         int                              `config:"LLM_MAX_ACTION_CYCLES" default:"50"`
 }
 
 // Initialize registers the StreamChat use case in the dependency container.
 func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error) {
 	useCase := NewStreamChatImpl(
 		i.Logger,
-		i.ChatMessageRepo,
-		i.ConversationSummaryRepo,
-		i.ConversationCompactor,
-		i.ConversationRepo,
 		i.TimeProvider,
-		i.Tokenizer,
-		i.Assistant,
-		i.ActionRegistry,
-		i.SkillRegistry,
-		i.ApprovalDispatcher,
-		i.Uow,
-		i.EmbeddingModel,
+		i.ConversationRepo,
+		i.ConversationCompactor,
+		assistant.CompactionPolicy{TriggerTokenCount: i.CompactionTriggerTokens},
+		i.CompactionTimeout,
 		i.MaxActionCycles,
-		i.CompactionTriggerTokens,
+		i.SessionBuilder,
+		i.TurnRunner,
+		i.ConversationCreator,
 	)
-	if i.CompactionTimeout > 0 {
-		useCase.compactionTimeout = i.CompactionTimeout
-	}
 	depend.Register[StreamChat](useCase)
+	return ctx, nil
+}
+
+// InitConversationCreator is the initializer for the ConversationCreator component.
+type InitConversationCreator struct {
+	Uow       transaction.UnitOfWork `resolve:""`
+	Tokenizer assistant.Tokenizer    `resolve:""`
+}
+
+// Initialize registers the ConversationCreator component in the dependency container.
+func (i InitConversationCreator) Initialize(ctx context.Context) (context.Context, error) {
+	depend.Register[ConversationCreator](newConversationCreator(
+		i.Uow,
+		i.Tokenizer,
+	))
+	return ctx, nil
+}
+
+// InitActionPipeline is the initializer for the ActionPipeline component.
+type InitActionPipeline struct {
+	ActionRegistry      assistant.ActionRegistry           `resolve:""`
+	ApprovalDispatcher  assistant.ActionApprovalDispatcher `resolve:""`
+	ConversationCreator ConversationCreator                `resolve:""`
+	TimeProvider        core.CurrentTimeProvider           `resolve:""`
+}
+
+// Initialize registers the ActionPipeline component in the dependency container.
+func (i InitActionPipeline) Initialize(ctx context.Context) (context.Context, error) {
+	depend.Register[ActionPipeline](newActionPipeline(
+		i.ActionRegistry,
+		i.ApprovalDispatcher,
+		i.ConversationCreator,
+		i.TimeProvider,
+	))
+	return ctx, nil
+}
+
+// InitTurnRunner is the initializer for the TurnRunner component.
+type InitTurnRunner struct {
+	Logger              *log.Logger              `resolve:""`
+	Assistant           assistant.Assistant      `resolve:""`
+	TimeProvider        core.CurrentTimeProvider `resolve:""`
+	ConversationCreator ConversationCreator      `resolve:""`
+	ActionPipeline      ActionPipeline           `resolve:""`
+}
+
+// Initialize registers the TurnRunner component in the dependency container.
+func (i InitTurnRunner) Initialize(ctx context.Context) (context.Context, error) {
+	depend.Register[TurnRunner](newTurnRunner(
+		i.Logger,
+		i.Assistant,
+		i.TimeProvider,
+		i.ConversationCreator,
+		i.ActionPipeline,
+	))
+	return ctx, nil
+}
+
+// InitTurnSessionBuilder is the initializer for the TurnSessionBuilder component.
+type InitTurnSessionBuilder struct {
+	ConversationSummaryRepo assistant.ConversationSummaryRepository `resolve:""`
+	ChatMessageRepo         assistant.ChatMessageRepository         `resolve:""`
+	TimeProvider            core.CurrentTimeProvider                `resolve:""`
+	SkillRegistry           assistant.SkillRegistry                 `resolve:""`
+	ActionRegistry          assistant.ActionRegistry                `resolve:""`
+}
+
+// Initialize registers the TurnSessionBuilder component in the dependency container.
+func (i InitTurnSessionBuilder) Initialize(ctx context.Context) (context.Context, error) {
+	depend.Register[TurnSessionBuilder](newTurnSessionBuilder(
+		i.ConversationSummaryRepo,
+		i.ChatMessageRepo,
+		i.TimeProvider,
+		i.SkillRegistry,
+		i.ActionRegistry,
+	))
 	return ctx, nil
 }
 

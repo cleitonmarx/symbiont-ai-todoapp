@@ -296,7 +296,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				},
 			})
 
-			useCase := NewStreamChatImpl(
+			useCase := newTestStreamChatUseCase(
 				log.New(io.Discard, "", 0),
 				chatRepo,
 				summaryRepo,
@@ -309,9 +309,9 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				skillRegistry,
 				approvalDispatcher,
 				uow,
-				"test-embedding-model",
 				7,
 				8000,
+				DEFAULT_CONTEXT_COMPACTION_TIMEOUT,
 			)
 
 			var (

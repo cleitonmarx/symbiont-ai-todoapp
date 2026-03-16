@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConversationCompactorImpl_CompactConversation(t *testing.T) {
+func TestConversationCompactorImpl_Compact(t *testing.T) {
 	t.Parallel()
 	var CHAT_SUMMARY_TRIGGER_TOKENS = 8000
 
@@ -27,7 +27,6 @@ func TestConversationCompactorImpl_CompactConversation(t *testing.T) {
 		model           string
 		conversationID  uuid.UUID
 		setExpectations func(
-			*testing.T,
 			*assistant.MockChatMessageRepository,
 			*assistant.MockConversationSummaryRepository,
 			*core.MockCurrentTimeProvider,
@@ -44,7 +43,6 @@ func TestConversationCompactorImpl_CompactConversation(t *testing.T) {
 			model:          "summary-model",
 			conversationID: conversationID,
 			setExpectations: func(
-				t *testing.T,
 				_ *assistant.MockChatMessageRepository,
 				summaryRepo *assistant.MockConversationSummaryRepository,
 				_ *core.MockCurrentTimeProvider,
@@ -61,7 +59,6 @@ func TestConversationCompactorImpl_CompactConversation(t *testing.T) {
 			model:          "summary-model",
 			conversationID: conversationID,
 			setExpectations: func(
-				t *testing.T,
 				chatRepo *assistant.MockChatMessageRepository,
 				summaryRepo *assistant.MockConversationSummaryRepository,
 				_ *core.MockCurrentTimeProvider,
@@ -83,7 +80,6 @@ func TestConversationCompactorImpl_CompactConversation(t *testing.T) {
 			model:          "summary-model",
 			conversationID: conversationID,
 			setExpectations: func(
-				t *testing.T,
 				chatRepo *assistant.MockChatMessageRepository,
 				summaryRepo *assistant.MockConversationSummaryRepository,
 				_ *core.MockCurrentTimeProvider,
@@ -104,7 +100,6 @@ func TestConversationCompactorImpl_CompactConversation(t *testing.T) {
 			model:          "summary-model",
 			conversationID: conversationID,
 			setExpectations: func(
-				t *testing.T,
 				chatRepo *assistant.MockChatMessageRepository,
 				summaryRepo *assistant.MockConversationSummaryRepository,
 				timeProvider *core.MockCurrentTimeProvider,
@@ -155,7 +150,7 @@ func TestConversationCompactorImpl_CompactConversation(t *testing.T) {
 			assistantClient := assistant.NewMockAssistant(t)
 
 			if tt.setExpectations != nil {
-				tt.setExpectations(t, chatRepo, summaryRepo, timeProvider, assistantClient)
+				tt.setExpectations(chatRepo, summaryRepo, timeProvider, assistantClient)
 			}
 
 			uc := NewConversationCompactorImpl(
@@ -166,7 +161,7 @@ func TestConversationCompactorImpl_CompactConversation(t *testing.T) {
 				tt.model,
 			)
 
-			gotErr := uc.CompactConversation(t.Context(), tt.conversationID)
+			gotErr := uc.Compact(t.Context(), tt.conversationID)
 			if tt.expectedErr == "" {
 				assert.NoError(t, gotErr)
 				return
@@ -224,12 +219,12 @@ func TestConversationCompactorImpl_EvaluateConversationCompaction(t *testing.T) 
 		"summary-model",
 	)
 
-	decision, err := uc.EvaluateConversationCompaction(t.Context(), conversationID, assistant.ContextCompactionPolicy{
+	decision, err := uc.EvaluateConversationCompaction(t.Context(), conversationID, assistant.CompactionPolicy{
 		TriggerTokenCount: 8000,
 	})
 
 	require.NoError(t, err)
-	assert.True(t, decision.ShouldGenerate)
+	assert.True(t, decision.ShouldCompact)
 	assert.Equal(t, assistant.ContextCompactionReasonTokenCountThreshold, decision.Reason)
 	assert.Equal(t, 2, decision.MessageCount)
 	assert.Equal(t, 9001, decision.TotalTokens)

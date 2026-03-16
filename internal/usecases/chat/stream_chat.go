@@ -2,14 +2,14 @@ package chat
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
 
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/metrics"
 	"github.com/google/uuid"
@@ -58,61 +58,42 @@ type StreamChat interface {
 
 // StreamChatImpl is the implementation of the StreamChat use case
 type StreamChatImpl struct {
-	logger                  *log.Logger
-	chatMessageRepo         assistant.ChatMessageRepository
-	conversationSummaryRepo assistant.ConversationSummaryRepository
-	conversationCompactor   ConversationCompactor
-	conversationRepo        assistant.ConversationRepository
-	uow                     transaction.UnitOfWork
-	timeProvider            core.CurrentTimeProvider
-	tokenizer               assistant.Tokenizer
-	assistant               assistant.Assistant
-	actionRegistry          assistant.ActionRegistry
-	skillRegistry           assistant.SkillRegistry
-	approvalDispatcher      assistant.ActionApprovalDispatcher
-	embeddingModel          string
-	maxActionCycles         int
-	compactionPolicy        assistant.ContextCompactionPolicy
-	compactionTimeout       time.Duration
+	logger                *log.Logger
+	timeProvider          core.CurrentTimeProvider
+	conversationRepo      assistant.ConversationRepository
+	conversationCompactor ConversationCompactor
+	compactionPolicy      assistant.CompactionPolicy
+	compactionTimeout     time.Duration
+	maxActionCycles       int
+	sessionBuilder        TurnSessionBuilder
+	turnRunner            TurnRunner
+	conversationCreator   ConversationCreator
 }
 
 // NewStreamChatImpl creates a new instance of StreamChatImpl
 func NewStreamChatImpl(
 	logger *log.Logger,
-	chatMessageRepo assistant.ChatMessageRepository,
-	conversationSummaryRepo assistant.ConversationSummaryRepository,
-	conversationCompactor ConversationCompactor,
-	conversationRepo assistant.ConversationRepository,
 	timeProvider core.CurrentTimeProvider,
-	tokenizer assistant.Tokenizer,
-	assistantClient assistant.Assistant,
-	actionRegistry assistant.ActionRegistry,
-	assistantSkillRegistry assistant.SkillRegistry,
-	approvalDispatcher assistant.ActionApprovalDispatcher,
-	uow transaction.UnitOfWork,
-	embeddingModel string,
+	conversationRepo assistant.ConversationRepository,
+	conversationCompactor ConversationCompactor,
+	compactionPolicy assistant.CompactionPolicy,
+	compactionTimeout time.Duration,
 	maxActionCycles int,
-	compactionTriggerTokens int,
+	sessionBuilder TurnSessionBuilder,
+	turnRunner TurnRunner,
+	conversationCreator ConversationCreator,
 ) StreamChatImpl {
 	return StreamChatImpl{
-		logger:                  logger,
-		chatMessageRepo:         chatMessageRepo,
-		conversationSummaryRepo: conversationSummaryRepo,
-		conversationCompactor:   conversationCompactor,
-		conversationRepo:        conversationRepo,
-		uow:                     uow,
-		timeProvider:            timeProvider,
-		tokenizer:               tokenizer,
-		assistant:               assistantClient,
-		actionRegistry:          actionRegistry,
-		skillRegistry:           assistantSkillRegistry,
-		approvalDispatcher:      approvalDispatcher,
-		embeddingModel:          embeddingModel,
-		maxActionCycles:         maxActionCycles,
-		compactionPolicy: assistant.ContextCompactionPolicy{
-			TriggerTokenCount: compactionTriggerTokens,
-		},
-		compactionTimeout: DEFAULT_CONTEXT_COMPACTION_TIMEOUT,
+		logger:                logger,
+		timeProvider:          timeProvider,
+		conversationRepo:      conversationRepo,
+		conversationCompactor: conversationCompactor,
+		compactionPolicy:      compactionPolicy,
+		compactionTimeout:     compactionTimeout,
+		maxActionCycles:       maxActionCycles,
+		sessionBuilder:        sessionBuilder,
+		turnRunner:            turnRunner,
+		conversationCreator:   conversationCreator,
 	}
 }
 
@@ -134,135 +115,40 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		opt(params)
 	}
 
-	conversation, conversationCreated, err := sc.createOrRetrieveConversation(spanCtx, params, userMessage)
+	conversation, conversationCreated, err := sc.createOrRetrieveConversation(spanCtx, params.ConversationID, userMessage)
 	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
-	if err := sc.compactConversationContext(spanCtx, conversation.ID, onEvent); telemetry.IsErrorRecorded(span, err) {
+	if err := sc.compactIfNeeded(spanCtx, conversation.ID, onEvent); telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
-	messagesHistory, summaryContext, err := sc.fetchChatHistory(spanCtx, conversation.ID)
+	session, err := sc.sessionBuilder.Build(spanCtx, BuildSessionParams{
+		UserMessage:         userMessage,
+		Model:               model,
+		MaxActionCycles:     sc.maxActionCycles,
+		Conversation:        conversation,
+		ConversationCreated: conversationCreated,
+	})
 	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
-	messagesHistory = append(messagesHistory, assistant.Message{
-		Role:    assistant.ChatRole_User,
-		Content: userMessage,
-	})
-
-	skills := sc.skillRegistry.ListRelevant(spanCtx, assistant.SkillQueryContext{
-		Messages:            messagesHistory,
-		ConversationSummary: summaryContext,
-	})
-	selectedSkills := make([]assistant.SelectedSkill, 0, len(skills))
-	relevantActions := make([]assistant.ActionDefinition, 0, len(skills))
-	uniqueActionNames := make(map[string]struct{})
-	for _, s := range skills {
-		selectedSkills = append(selectedSkills, assistant.NewSelectedSkill(s))
-		sc.logger.Printf("StreamChat: skill '%s' is relevant for the current conversation context", s.Name)
-		for _, tool := range s.Tools {
-			if action, ok := sc.actionRegistry.GetDefinition(tool); ok {
-				if _, exists := uniqueActionNames[action.Name]; !exists {
-					relevantActions = append(relevantActions, action)
-					uniqueActionNames[action.Name] = struct{}{}
-				}
-			}
-		}
-	}
-
-	if skillsPrompt := buildSkillsPrompt(skills); skillsPrompt != "" {
-		messagesHistory = append(messagesHistory, assistant.Message{
-			Role:    assistant.ChatRole_System,
-			Content: skillsPrompt,
-		})
-	}
-
-	req := assistant.TurnRequest{
-		Model:            model,
-		Messages:         messagesHistory,
-		Stream:           true,
-		Temperature:      common.Ptr(CHAT_TEMPERATURE),
-		TopP:             common.Ptr(CHAT_TOP_P),
-		AvailableActions: relevantActions,
-	}
-
-	state := streamChatExecutionState{
-		conversation:        conversation,
-		conversationCreated: conversationCreated,
-		turnID:              uuid.New(),
-		selectedSkills:      selectedSkills,
-		tracker: newActionCycleTracker(
-			sc.maxActionCycles,
-			MAX_REPEATED_ACTION_CALL_HIT,
-		),
-	}
-
-	state.userMsg = assistant.ChatMessage{
-		ConversationID: conversation.ID,
-		TurnID:         state.turnID,
-		TurnSequence:   state.nextTurnSequence(),
-		ChatRole:       assistant.ChatRole_User,
-		Content:        userMessage,
-		Model:          model,
-		MessageState:   assistant.ChatMessageState_Completed,
-	}
-
-	for continueChatStreaming := true; continueChatStreaming; {
-		continueChatStreaming = false
-		var streamEventErr error
-
-		err = sc.assistant.RunTurn(spanCtx, req, func(turnCtx context.Context, eventType assistant.EventType, data any) error {
-			shouldContinue, eventErr := sc.handleStreamEvent(turnCtx, eventType, data, model, &req, &state, onEvent)
-			if shouldContinue {
-				continueChatStreaming = true
-			}
-			if eventErr != nil && streamEventErr == nil {
-				streamEventErr = eventErr
-			}
-			return eventErr
-		})
-		if err != nil {
-			if streamEventErr == nil && sc.prepareRunTurnRecovery(err, &req, &state) {
-				continueChatStreaming = true
-				sc.logger.Printf("StreamChat: encountered error during RunTurn, but prepared recovery. err=%v", err)
-				continue
-			}
-
-			telemetry.IsErrorRecorded(span, err)
-			if persistErr := sc.persistFailureMessages(spanCtx, err, model, &state); persistErr != nil {
+	if err := sc.turnRunner.Run(spanCtx, session, onEvent); telemetry.IsErrorRecorded(span, err) {
+		failedAt := sc.timeProvider.Now()
+		if userMessage, ok := session.TryBuildUserMessage(uuid.Nil, failedAt); ok {
+			if persistErr := sc.conversationCreator.CreateMessage(spanCtx, session.Conversation(), userMessage); telemetry.IsErrorRecorded(span, persistErr) {
 				return persistErr
 			}
-			return err
 		}
-	}
-
-	if err := sc.persistUserMessageIfNeeded(spanCtx, &state); telemetry.IsErrorRecorded(span, err) {
+		if persistErr := sc.conversationCreator.CreateMessage(spanCtx, session.Conversation(), session.BuildFailureMessage(failedAt, err)); telemetry.IsErrorRecorded(span, persistErr) {
+			return persistErr
+		}
 		return err
 	}
 
-	if state.assistantMsgID == uuid.Nil {
-		state.assistantMsgID = uuid.New()
-	}
-
-	assistantMsg := assistant.ChatMessage{
-		ID:               state.assistantMsgID,
-		ConversationID:   state.conversation.ID,
-		TurnID:           state.turnID,
-		TurnSequence:     state.nextTurnSequence(),
-		ChatRole:         assistant.ChatRole_Assistant,
-		Content:          state.assistantMsgContent.String(),
-		SelectedSkills:   state.selectedSkills,
-		Model:            model,
-		MessageState:     assistant.ChatMessageState_Completed,
-		PromptTokens:     state.tokenUsage.PromptTokens,
-		CompletionTokens: state.tokenUsage.CompletionTokens,
-		TotalTokens:      state.tokenUsage.TotalTokens,
-		CreatedAt:        sc.timeProvider.Now(),
-	}
-	assistantMsg.UpdatedAt = assistantMsg.CreatedAt
+	assistantMsg := session.BuildFinalAssistantMessage(sc.timeProvider.Now())
 
 	if assistantMsg.Content == "" {
 		assistantMsg.Content = "Sorry, I could not process your request. Please try again."
@@ -270,53 +156,122 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 			assistant.MessageDelta{
 				Text: assistantMsg.Content + "\n",
 			},
-		); err != nil {
+		); telemetry.IsErrorRecorded(span, err) {
 			return err
 		}
 	}
 
-	err = sc.persistChatMessage(spanCtx, assistantMsg, state.conversation)
+	err = sc.conversationCreator.CreateMessage(spanCtx, session.Conversation(), assistantMsg)
 	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
-	metrics.RecordLLMTokensUsed(spanCtx, state.tokenUsage.PromptTokens, state.tokenUsage.CompletionTokens)
+	tokenUsage := session.TokenUsage()
+	metrics.RecordLLMTokensUsed(spanCtx, tokenUsage.PromptTokens, tokenUsage.CompletionTokens)
 
 	if err := onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
 		AssistantMessageID: assistantMsg.ID.String(),
 		CompletedAt:        sc.timeProvider.Now().Format(time.RFC3339),
-		Usage:              state.tokenUsage,
-	}); err != nil {
+		Usage:              tokenUsage,
+	}); telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 	return nil
 }
 
-// createOrRetrieveConversation resolves the target conversation for the turn,
-// creating a new one when no conversation option was provided.
-func (sc StreamChatImpl) createOrRetrieveConversation(ctx context.Context, params *StreamChatParams, userMessage string) (assistant.Conversation, bool, error) {
-	var (
-		conversation        assistant.Conversation
-		conversationCreated bool
-	)
-
-	if params.ConversationID == nil {
+// createOrRetrieveConversation resolves the target conversation and creates one when no conversation ID is supplied.
+func (sc StreamChatImpl) createOrRetrieveConversation(
+	ctx context.Context,
+	conversationID *uuid.UUID,
+	userMessage string,
+) (assistant.Conversation, bool, error) {
+	if conversationID == nil {
 		title := assistant.GenerateAutoConversationTitle(userMessage)
-		newConversation, err := sc.conversationRepo.CreateConversation(ctx, title, assistant.ConversationTitleSource_Auto)
+		conversation, err := sc.conversationRepo.CreateConversation(ctx, title, assistant.ConversationTitleSource_Auto)
 		if err != nil {
 			return assistant.Conversation{}, false, err
 		}
-		conversation = newConversation
-		conversationCreated = true
-	} else {
-		c, found, err := sc.conversationRepo.GetConversation(ctx, *params.ConversationID)
-		if err != nil {
-			return assistant.Conversation{}, false, err
-		}
-		if !found {
-			return assistant.Conversation{}, false, core.NewValidationErr("conversation not found")
-		}
-		conversation = c
+		return conversation, true, nil
 	}
-	return conversation, conversationCreated, nil
+
+	conversation, found, err := sc.conversationRepo.GetConversation(ctx, *conversationID)
+	if err != nil {
+		return assistant.Conversation{}, false, err
+	}
+	if !found {
+		return assistant.Conversation{}, false, core.NewValidationErr("conversation not found")
+	}
+
+	return conversation, false, nil
+}
+
+// compactIfNeeded evaluates and runs pre-turn context compaction while emitting the corresponding stream events.
+func (sc StreamChatImpl) compactIfNeeded(
+	ctx context.Context,
+	conversationID uuid.UUID,
+	onEvent assistant.EventCallback,
+) error {
+	if sc.conversationCompactor == nil {
+		return nil
+	}
+
+	evalCtx, cancelEval := context.WithTimeout(ctx, sc.compactionTimeout)
+	defer cancelEval()
+
+	decision, err := sc.conversationCompactor.EvaluateConversationCompaction(evalCtx, conversationID, sc.compactionPolicy)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = fmt.Errorf("context compaction evaluation timed out after %s", sc.compactionTimeout)
+		}
+		if sc.logger != nil {
+			sc.logger.Printf("StreamChat: context compaction evaluation failed for conversation %s: %v", conversationID, err)
+		}
+		return onEvent(ctx, assistant.EventType_ContextCompactionFailed, assistant.ContextCompactionFailed{
+			ConversationID:           conversationID,
+			UnsummarizedMessageCount: 0,
+			UnsummarizedTotalTokens:  0,
+			Reason:                   assistant.ContextCompactionReasonNone,
+			Error:                    err.Error(),
+		})
+	}
+
+	if !decision.ShouldCompact {
+		return nil
+	}
+
+	if err := onEvent(ctx, assistant.EventType_ContextCompactionStarted, assistant.ContextCompactionStarted{
+		ConversationID:           conversationID,
+		UnsummarizedMessageCount: decision.MessageCount,
+		UnsummarizedTotalTokens:  decision.TotalTokens,
+		Reason:                   decision.Reason,
+	}); err != nil {
+		return err
+	}
+
+	compactCtx, cancelCompact := context.WithTimeout(ctx, sc.compactionTimeout)
+	defer cancelCompact()
+
+	if err := sc.conversationCompactor.Compact(compactCtx, conversationID); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = fmt.Errorf("context compaction timed out after %s", sc.compactionTimeout)
+		}
+		if sc.logger != nil {
+			sc.logger.Printf("StreamChat: context compaction failed for conversation %s: %v", conversationID, err)
+		}
+		return onEvent(ctx, assistant.EventType_ContextCompactionFailed, assistant.ContextCompactionFailed{
+			ConversationID:           conversationID,
+			UnsummarizedMessageCount: decision.MessageCount,
+			UnsummarizedTotalTokens:  decision.TotalTokens,
+			Reason:                   decision.Reason,
+			Error:                    err.Error(),
+		})
+	}
+
+	return onEvent(ctx, assistant.EventType_ContextCompactionCompleted, assistant.ContextCompactionCompleted{
+		ConversationID:           conversationID,
+		UnsummarizedMessageCount: decision.MessageCount,
+		UnsummarizedTotalTokens:  decision.TotalTokens,
+		Reason:                   decision.Reason,
+		CompactedAt:              sc.timeProvider.Now().Format(time.RFC3339),
+	})
 }

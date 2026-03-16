@@ -109,6 +109,54 @@ func TestInitStreamChat_Initialize(t *testing.T) {
 	assert.NotNil(t, streamChatUseCase)
 }
 
+func TestInitConversationCreator_Initialize(t *testing.T) {
+	t.Parallel()
+
+	i := InitConversationCreator{}
+	_, err := i.Initialize(t.Context())
+	assert.NoError(t, err)
+
+	component, err := depend.Resolve[ConversationCreator]()
+	assert.NoError(t, err)
+	assert.NotNil(t, component)
+}
+
+func TestInitActionPipeline_Initialize(t *testing.T) {
+	t.Parallel()
+
+	i := InitActionPipeline{}
+	_, err := i.Initialize(t.Context())
+	assert.NoError(t, err)
+
+	component, err := depend.Resolve[ActionPipeline]()
+	assert.NoError(t, err)
+	assert.NotNil(t, component)
+}
+
+func TestInitTurnRunner_Initialize(t *testing.T) {
+	t.Parallel()
+
+	i := InitTurnRunner{}
+	_, err := i.Initialize(t.Context())
+	assert.NoError(t, err)
+
+	component, err := depend.Resolve[TurnRunner]()
+	assert.NoError(t, err)
+	assert.NotNil(t, component)
+}
+
+func TestInitTurnSessionBuilder_Initialize(t *testing.T) {
+	t.Parallel()
+
+	i := InitTurnSessionBuilder{}
+	_, err := i.Initialize(t.Context())
+	assert.NoError(t, err)
+
+	component, err := depend.Resolve[TurnSessionBuilder]()
+	assert.NoError(t, err)
+	assert.NotNil(t, component)
+}
+
 func TestInitSubmitActionApproval_Initialize(t *testing.T) {
 	t.Parallel()
 

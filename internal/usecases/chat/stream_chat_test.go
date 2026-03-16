@@ -33,6 +33,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"success": {
 			userMessage:              "Hello, how are you?",
 			model:                    "test-model",
+			fixedTime:                fixedTime,
 			customSummaryExpectation: true,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
@@ -115,25 +116,25 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}).
 					Return(nil)
 
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "Hello, how are you?",
-						ID:              &userMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-					{
-						Role:             assistant.ChatRole_Assistant,
-						Content:          "I'm doing great!",
-						ID:               &assistantMsgID,
-						PromptTokens:     &promptTokens,
-						CompletionTokens: &completionTokens,
-						TotalTokens:      &totalTokens,
-						ActionCallsLen:   0,
-						HasActionCallID:  false,
-					},
-				})
+			},
+			persistExpectations: []persistCallExpectation{
+				{
+					Role:            assistant.ChatRole_User,
+					Content:         "Hello, how are you?",
+					ID:              &userMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
+				{
+					Role:             assistant.ChatRole_Assistant,
+					Content:          "I'm doing great!",
+					ID:               &assistantMsgID,
+					PromptTokens:     &promptTokens,
+					CompletionTokens: &completionTokens,
+					TotalTokens:      &totalTokens,
+					ActionCallsLen:   0,
+					HasActionCallID:  false,
+				},
 			},
 			expectErr:       false,
 			expectedContent: "I'm doing great!",
@@ -141,6 +142,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"success-with-new-conversation": {
 			userMessage:              "Hello, how are you?",
 			model:                    "test-model",
+			fixedTime:                fixedTime,
 			customSummaryExpectation: true,
 			setExpectations: func(
 				chatRepo *assistant.MockChatMessageRepository,
@@ -228,25 +230,25 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}).
 					Return(nil)
 
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "Hello, how are you?",
-						ID:              &userMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-					{
-						Role:             assistant.ChatRole_Assistant,
-						Content:          "I'm doing great!",
-						ID:               &assistantMsgID,
-						PromptTokens:     &promptTokens,
-						CompletionTokens: &completionTokens,
-						TotalTokens:      &totalTokens,
-						ActionCallsLen:   0,
-						HasActionCallID:  false,
-					},
-				})
+			},
+			persistExpectations: []persistCallExpectation{
+				{
+					Role:            assistant.ChatRole_User,
+					Content:         "Hello, how are you?",
+					ID:              &userMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
+				{
+					Role:             assistant.ChatRole_Assistant,
+					Content:          "I'm doing great!",
+					ID:               &assistantMsgID,
+					PromptTokens:     &promptTokens,
+					CompletionTokens: &completionTokens,
+					TotalTokens:      &totalTokens,
+					ActionCallsLen:   0,
+					HasActionCallID:  false,
+				},
 			},
 			expectErr:       false,
 			expectedContent: "I'm doing great!",
@@ -254,6 +256,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"assistant-empty-response": {
 			userMessage: "Test",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -300,22 +303,22 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}).
 					Return(nil)
 
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "Test",
-						ID:              &userMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "Sorry, I could not process your request. Please try again.",
-						ID:              &assistantMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-				})
+			},
+			persistExpectations: []persistCallExpectation{
+				{
+					Role:            assistant.ChatRole_User,
+					Content:         "Test",
+					ID:              &userMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
+				{
+					Role:            assistant.ChatRole_Assistant,
+					Content:         "Sorry, I could not process your request. Please try again.",
+					ID:              &assistantMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
 			},
 			expectErr:       false,
 			expectedContent: "Sorry, I could not process your request. Please try again.\n",
@@ -323,6 +326,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"empty-user-message": {
 			userMessage: "   ",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -339,6 +343,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"list-chat-history-error": {
 			userMessage: "Test",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -373,6 +378,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 		"onEvent-meta-error": {
 			userMessage: "Test",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -414,8 +420,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						})
 					})
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				onEventErr := "onEvent error"
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
 						Content:         "Test",
@@ -432,14 +440,15 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
-				})
-			},
+				}
+			}(),
 			expectErr:      true,
 			onEventErrType: assistant.EventType_TurnStarted,
 		},
 		"onEvent-delta-error": {
 			userMessage: "Test",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -484,8 +493,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						return onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "Hi"})
 					})
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				onEventErr := "onEvent error"
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
 						Content:         "Test",
@@ -502,14 +513,15 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
-				})
-			},
+				}
+			}(),
 			expectErr:      true,
 			onEventErrType: assistant.EventType_MessageDelta,
 		},
 		"llm-chatstream-error": {
 			userMessage: "Test",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -576,29 +588,30 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}).
 					Times(2)
 
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "Test",
-						ID:              &userMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "I hit an internal error while processing your request. Please retry with a smaller scope.",
-						ID:              &assistantMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-				})
+			},
+			persistExpectations: []persistCallExpectation{
+				{
+					Role:            assistant.ChatRole_User,
+					Content:         "Test",
+					ID:              &userMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
+				{
+					Role:            assistant.ChatRole_Assistant,
+					Content:         "I hit an internal error while processing your request. Please retry with a smaller scope.",
+					ID:              &assistantMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
 			},
 			expectErr:       false,
 			expectedContent: "I hit an internal error while processing your request. Please retry with a smaller scope.",
 		},
-		"chatstream-without-meta-persists-user-after-loop": {
+		"chatstream-without-meta-persists-only-assistant": {
 			userMessage: "No meta",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -624,7 +637,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						ID: conversationID,
 					}, true, nil).
 					Once()
-				expectNowCalls(timeProvider, fixedTime, 4)
+				expectNowCalls(timeProvider, fixedTime, 3)
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -642,27 +655,26 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					}).
 					Return(nil)
 
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "No meta",
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
+			},
+			persistExpectations: func() []persistCallExpectation {
+				assistantTurnSequence := int64(1)
+				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_Assistant,
 						Content:         "Hello from model",
+						TurnSequence:    &assistantTurnSequence,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
-				})
-			},
+				}
+			}(),
 			expectErr:       false,
 			expectedContent: "Hello from model",
 		},
 		"user-message-save-error": {
 			userMessage: "Test",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -713,9 +725,11 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						})
 					})
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				dbErr := errors.New("db error")
 				dbErrText := dbErr.Error()
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
 						Content:         "Test",
@@ -733,13 +747,14 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
-				})
-			},
+				}
+			}(),
 			expectErr: true,
 		},
 		"assistant-message-save-error": {
 			userMessage: "Test",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -790,8 +805,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						})
 					})
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				dbErr := errors.New("db error")
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
 						Content:         "Test",
@@ -807,8 +824,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						HasActionCallID: false,
 						CreateErr:       dbErr,
 					},
-				})
-			},
+				}
+			}(),
 			expectErr: true,
 		},
 	}
@@ -918,7 +935,7 @@ func TestStreamChatImpl_Execute_PersistsSelectedSkillsAndEmitsTurnMetadata(t *te
 		},
 	})
 
-	useCase := NewStreamChatImpl(
+	useCase := newTestStreamChatUseCase(
 		log.New(io.Discard, "", 0),
 		chatRepo,
 		summaryRepo,
@@ -931,9 +948,9 @@ func TestStreamChatImpl_Execute_PersistsSelectedSkillsAndEmitsTurnMetadata(t *te
 		skillRegistry,
 		nil,
 		uow,
-		"test-embedding-model",
 		7,
 		8000,
+		DEFAULT_CONTEXT_COMPACTION_TIMEOUT,
 	)
 
 	var turnStarted assistant.TurnStarted
@@ -1074,7 +1091,7 @@ func TestStreamChatImpl_Execute_UsesUnsummarizedHistoryAfterSummaryCheckpoint(t 
 		},
 	})
 
-	useCase := NewStreamChatImpl(
+	useCase := newTestStreamChatUseCase(
 		log.New(io.Discard, "", 0),
 		chatRepo,
 		summaryRepo,
@@ -1087,9 +1104,9 @@ func TestStreamChatImpl_Execute_UsesUnsummarizedHistoryAfterSummaryCheckpoint(t 
 		skillRegistry,
 		nil,
 		uow,
-		"test-embedding-model",
 		7,
 		8000,
+		DEFAULT_CONTEXT_COMPACTION_TIMEOUT,
 	)
 
 	err := useCase.Execute(t.Context(), "Follow up on the plan", "test-model", func(_ context.Context, _ assistant.EventType, _ any) error {

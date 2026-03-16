@@ -36,6 +36,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 		"success-with-action-call": {
 			userMessage: "Call an action",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -93,39 +94,39 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						actionFunctionCallback(userMsgID, assistantMsgID, fixedTime),
 					)
 
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "Call an action",
-						ID:              &userMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
-						ActionCallsLen:  1,
-						HasActionCallID: false,
-						FirstActionCallText: func() *string {
-							msg := "calling list_todos"
-							return &msg
-						}(),
-					},
-					{
-						Role:            assistant.ChatRole_Tool,
-						Content:         "",
-						ActionCallsLen:  0,
-						HasActionCallID: true,
-						ActionExecuted:  common.Ptr(true),
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "Action called successfully.",
-						ID:              &assistantMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-				})
+			},
+			persistExpectations: []persistCallExpectation{
+				{
+					Role:            assistant.ChatRole_User,
+					Content:         "Call an action",
+					ID:              &userMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
+				{
+					Role:            assistant.ChatRole_Assistant,
+					Content:         "",
+					ActionCallsLen:  1,
+					HasActionCallID: false,
+					FirstActionCallText: func() *string {
+						msg := "calling list_todos"
+						return &msg
+					}(),
+				},
+				{
+					Role:            assistant.ChatRole_Tool,
+					Content:         "",
+					ActionCallsLen:  0,
+					HasActionCallID: true,
+					ActionExecuted:  common.Ptr(true),
+				},
+				{
+					Role:            assistant.ChatRole_Assistant,
+					Content:         "Action called successfully.",
+					ID:              &assistantMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
 			},
 			expectErr:       false,
 			expectedContent: "",
@@ -133,6 +134,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 		"success-with-renderer-continues-follow-up-runturn": {
 			userMessage: "Rename my todo",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -237,39 +239,39 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					}).
 					Twice()
 
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "Rename my todo",
-						ID:              &userMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
-						ActionCallsLen:  1,
-						HasActionCallID: false,
-						FirstActionCallText: func() *string {
-							msg := "updating todos...\n"
-							return &msg
-						}(),
-					},
-					{
-						Role:            assistant.ChatRole_Tool,
-						Content:         "todos[1]{id,title,due_date,status}\n1,Updated,2026-01-25,OPEN",
-						ActionCallsLen:  0,
-						HasActionCallID: true,
-						ActionExecuted:  common.Ptr(true),
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "**Updated** (Due: Jan 25, 2026) - OPEN.\nAnything else?",
-						ID:              &assistantMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-				})
+			},
+			persistExpectations: []persistCallExpectation{
+				{
+					Role:            assistant.ChatRole_User,
+					Content:         "Rename my todo",
+					ID:              &userMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
+				{
+					Role:            assistant.ChatRole_Assistant,
+					Content:         "",
+					ActionCallsLen:  1,
+					HasActionCallID: false,
+					FirstActionCallText: func() *string {
+						msg := "updating todos...\n"
+						return &msg
+					}(),
+				},
+				{
+					Role:            assistant.ChatRole_Tool,
+					Content:         "todos[1]{id,title,due_date,status}\n1,Updated,2026-01-25,OPEN",
+					ActionCallsLen:  0,
+					HasActionCallID: true,
+					ActionExecuted:  common.Ptr(true),
+				},
+				{
+					Role:            assistant.ChatRole_Assistant,
+					Content:         "**Updated** (Due: Jan 25, 2026) - OPEN.\nAnything else?",
+					ID:              &assistantMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
 			},
 			expectErr:       false,
 			expectedContent: "updating todos...\n**Updated** (Due: Jan 25, 2026) - OPEN.\nAnything else?",
@@ -277,6 +279,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 		"action-message-marked-as-failed-when-content-has-error": {
 			userMessage: "Call failing action",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -362,8 +365,10 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					}).
 					Times(2)
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				actionErr := "error: failing_action unavailable"
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
 						Content:         "Call failing action",
@@ -397,14 +402,15 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
-				})
-			},
+				}
+			}(),
 			expectErr:       false,
 			expectedContent: "calling failing_action...\nI could not complete that action call.",
 		},
 		"onEvent-action-call-error": {
 			userMessage: "Call action",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -457,8 +463,10 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						})
 					})
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				onEventErr := "onEvent error"
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
 						Content:         "Call action",
@@ -485,14 +493,15 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
-				})
-			},
+				}
+			}(),
 			expectErr:      true,
 			onEventErrType: assistant.EventType_ActionStarted,
 		},
 		"onEvent-action-call-finished-error": {
 			userMessage: "Call action",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -550,8 +559,10 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						})
 					})
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				onEventErr := "onEvent error"
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
 						Content:         "Call action",
@@ -585,14 +596,15 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
-				})
-			},
+				}
+			}(),
 			expectErr:      true,
 			onEventErrType: assistant.EventType_ActionCompleted,
 		},
 		"max-action-cycles-exceeded": {
 			userMessage: "Keep calling actions",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -657,6 +669,8 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					}).
 					Times(8)
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				expectations := []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
@@ -689,14 +703,15 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					ActionCallsLen:  0,
 					HasActionCallID: false,
 				})
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, expectations)
-			},
+				return expectations
+			}(),
 			expectErr:       false,
 			expectedContent: "calling action...\ncalling action...\ncalling action...\ncalling action...\ncalling action...\ncalling action...\ncalling action...\nSorry, I could not process your request. Please try again.\n",
 		},
 		"repeated-action-call-loop": {
 			userMessage: "Call the same action repeatedly",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -761,6 +776,8 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					}).
 					Times(6)
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				expectations := []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
@@ -793,8 +810,8 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					ActionCallsLen:  0,
 					HasActionCallID: false,
 				})
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, expectations)
-			},
+				return expectations
+			}(),
 			expectErr:       false,
 			expectedContent: "calling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\nSorry, I could not process your request. Please try again.\n",
 		},

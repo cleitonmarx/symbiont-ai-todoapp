@@ -56,10 +56,10 @@ type ConversationCompactor interface {
 	EvaluateConversationCompaction(
 		ctx context.Context,
 		conversationID uuid.UUID,
-		policy assistant.ContextCompactionPolicy,
-	) (assistant.ContextCompactionDecision, error)
-	// CompactConversation compacts conversation memory using unsummarized messages.
-	CompactConversation(ctx context.Context, conversationID uuid.UUID) error
+		policy assistant.CompactionPolicy,
+	) (assistant.CompactionDecision, error)
+	// Compact compacts conversation memory using unsummarized messages.
+	Compact(ctx context.Context, conversationID uuid.UUID) error
 }
 
 // ConversationCompactorImpl compacts unsummarized conversation messages into persisted compact memory.
@@ -92,39 +92,39 @@ func NewConversationCompactorImpl(
 func (gcs ConversationCompactorImpl) EvaluateConversationCompaction(
 	ctx context.Context,
 	conversationID uuid.UUID,
-	policy assistant.ContextCompactionPolicy,
-) (assistant.ContextCompactionDecision, error) {
+	policy assistant.CompactionPolicy,
+) (assistant.CompactionDecision, error) {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	if conversationID == uuid.Nil {
 		err := core.NewValidationErr("conversation id cannot be empty")
 		telemetry.IsErrorRecorded(span, err)
-		return assistant.ContextCompactionDecision{}, err
+		return assistant.CompactionDecision{}, err
 	}
 
 	_, _, _, unsummarizedMessages, err := gcs.loadCompactionInput(spanCtx, conversationID)
 	if telemetry.IsErrorRecorded(span, err) {
-		return assistant.ContextCompactionDecision{}, err
+		return assistant.CompactionDecision{}, err
 	}
 	span.SetAttributes(
 		attribute.Int("unsummarized_messages_count", len(unsummarizedMessages)),
 	)
 
 	if len(unsummarizedMessages) == 0 {
-		return assistant.ContextCompactionDecision{
-			ShouldGenerate: false,
-			Reason:         assistant.ContextCompactionReasonNone,
-			MessageCount:   0,
-			TotalTokens:    0,
+		return assistant.CompactionDecision{
+			ShouldCompact: false,
+			Reason:        assistant.ContextCompactionReasonNone,
+			MessageCount:  0,
+			TotalTokens:   0,
 		}, nil
 	}
 
 	return gcs.determineCompactionDecision(span, unsummarizedMessages, policy), nil
 }
 
-// CompactConversation generates and persists refreshed compacted context for the given conversation.
-func (gcs ConversationCompactorImpl) CompactConversation(ctx context.Context, conversationID uuid.UUID) error {
+// Compact generates and persists refreshed compacted context for the given conversation.
+func (gcs ConversationCompactorImpl) Compact(ctx context.Context, conversationID uuid.UUID) error {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
@@ -348,8 +348,8 @@ func normalizeConversationSummary(previousSummary, candidateSummary string) stri
 func (gcs ConversationCompactorImpl) determineCompactionDecision(
 	span trace.Span,
 	messages []assistant.ChatMessage,
-	policy assistant.ContextCompactionPolicy,
-) assistant.ContextCompactionDecision {
+	policy assistant.CompactionPolicy,
+) assistant.CompactionDecision {
 	decision := assistant.DetermineContextCompactionDecision(messages, policy)
 
 	switch decision.Reason {

@@ -1,11 +1,17 @@
 package chat
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildSkillsPrompt(t *testing.T) {
@@ -167,4 +173,62 @@ func TestTruncateToFirstChars(t *testing.T) {
 			assert.Equal(t, tt.want, truncateToFirstChars(tt.input, tt.max))
 		})
 	}
+}
+
+func TestTurnSessionBuilder_LoadMessagesHistory(t *testing.T) {
+	t.Parallel()
+
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	checkpointID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	summaryRepo := assistant.NewMockConversationSummaryRepository(t)
+	chatRepo := assistant.NewMockChatMessageRepository(t)
+	fixedTime := time.Date(2026, 3, 14, 9, 0, 0, 0, time.UTC)
+	timeProvider := core.NewMockCurrentTimeProvider(t)
+
+	summaryRepo.EXPECT().
+		GetConversationSummary(mock.Anything, conversationID).
+		Return(assistant.ConversationSummary{
+			ConversationID:          conversationID,
+			CurrentStateSummary:     "Summary state",
+			LastSummarizedMessageID: &checkpointID,
+		}, true, nil).
+		Once()
+	chatRepo.EXPECT().
+		ListChatMessages(
+			mock.Anything,
+			conversationID,
+			1,
+			MAX_CHAT_HISTORY_MESSAGES,
+			mock.MatchedBy(func(options []assistant.ListChatMessagesOption) bool {
+				params := assistant.ListChatMessagesParams{}
+				for _, opt := range options {
+					opt(&params)
+				}
+				return params.AfterMessageID != nil && *params.AfterMessageID == checkpointID
+			}),
+		).
+		Return([]assistant.ChatMessage{
+			{ChatRole: assistant.ChatRole_Tool, Content: "orphan tool"},
+			{ChatRole: assistant.ChatRole_User, Content: "Hello"},
+			{ChatRole: assistant.ChatRole_Assistant, Content: "Hi"},
+		}, false, nil).
+		Once()
+
+	timeProvider.EXPECT().Now().Return(fixedTime).Once()
+	builder := newTurnSessionBuilder(
+		summaryRepo,
+		chatRepo,
+		timeProvider,
+		nil,
+		nil,
+	).(turnSessionBuilder)
+	messages, summaryContext, err := builder.loadMessagesHistory(context.Background(), conversationID)
+	require.NoError(t, err)
+	assert.Equal(t, "Summary state", summaryContext)
+	require.GreaterOrEqual(t, len(messages), 4)
+	assert.Equal(t, assistant.ChatRole_System, messages[0].Role)
+	assert.Equal(t, assistant.ChatRole_User, messages[len(messages)-2].Role)
+	assert.Equal(t, "Hello", messages[len(messages)-2].Content)
+	assert.Equal(t, assistant.ChatRole_Assistant, messages[len(messages)-1].Role)
+	assert.Equal(t, "Hi", messages[len(messages)-1].Content)
 }

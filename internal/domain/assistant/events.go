@@ -45,8 +45,6 @@ type Usage struct {
 // TurnStarted contains metadata for a streaming assistant session.
 type TurnStarted struct {
 	ConversationID      uuid.UUID       `json:"conversation_id"`
-	UserMessageID       uuid.UUID       `json:"user_message_id"`
-	AssistantMessageID  uuid.UUID       `json:"assistant_message_id"`
 	ConversationCreated bool            `json:"conversation_created"`
 	TurnID              uuid.UUID       `json:"turn_id"`
 	SelectedSkills      []SelectedSkill `json:"selected_skills,omitempty"`
@@ -95,9 +93,7 @@ type ActionCompleted struct {
 
 // TurnCompleted contains completion metadata and usage.
 type TurnCompleted struct {
-	Usage              Usage  `json:"usage"`
-	AssistantMessageID string `json:"assistant_message_id"`
-	CompletedAt        string `json:"completed_at"`
+	Usage Usage `json:"usage"`
 }
 
 // ContextCompactionReason identifies why compaction was triggered.

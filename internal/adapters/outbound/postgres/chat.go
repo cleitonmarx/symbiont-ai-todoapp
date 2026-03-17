@@ -248,6 +248,26 @@ func (r ChatMessageRepository) ListChatMessages(
 	return msgs, hasMore, nil
 }
 
+// DeleteChatMessages removes specific chat messages by ID.
+func (r ChatMessageRepository) DeleteChatMessages(ctx context.Context, messageIDs []uuid.UUID) error {
+	spanCtx, span := telemetry.StartSpan(ctx)
+	defer span.End()
+
+	if len(messageIDs) == 0 {
+		return nil
+	}
+
+	_, err := r.sb.
+		Delete("chat_messages").
+		Where(sq.Eq{"id": messageIDs}).
+		ExecContext(spanCtx)
+
+	if telemetry.IsErrorRecorded(span, err) {
+		return err
+	}
+	return nil
+}
+
 // DeleteConversationMessages removes all messages for a specific conversation.
 func (r ChatMessageRepository) DeleteConversationMessages(ctx context.Context, conversationID uuid.UUID) error {
 	spanCtx, span := telemetry.StartSpan(ctx)

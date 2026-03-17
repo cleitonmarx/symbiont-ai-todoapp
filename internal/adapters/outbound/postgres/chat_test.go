@@ -502,3 +502,49 @@ func TestChatMessageRepository_DeleteConversationMessages(t *testing.T) {
 		})
 	}
 }
+
+func TestChatMessageRepository_DeleteChatMessages(t *testing.T) {
+	t.Parallel()
+
+	messageIDs := []uuid.UUID{
+		uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+	}
+
+	tests := map[string]struct {
+		expect func(sqlmock.Sqlmock)
+		err    error
+	}{
+		"success": {
+			expect: func(m sqlmock.Sqlmock) {
+				m.ExpectExec("DELETE FROM chat_messages WHERE id IN ($1,$2)").
+					WithArgs(messageIDs[0], messageIDs[1]).
+					WillReturnResult(sqlmock.NewResult(1, 2))
+			},
+			err: nil,
+		},
+		"database-error": {
+			expect: func(m sqlmock.Sqlmock) {
+				m.ExpectExec("DELETE FROM chat_messages WHERE id IN ($1,$2)").
+					WithArgs(messageIDs[0], messageIDs[1]).
+					WillReturnError(errors.New("db error"))
+			},
+			err: errors.New("db error"),
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			assert.NoError(t, err)
+			defer db.Close() //nolint:errcheck
+
+			tt.expect(mock)
+
+			repo := NewChatMessageRepository(db)
+			gotErr := repo.DeleteChatMessages(t.Context(), messageIDs)
+			assert.Equal(t, tt.err, gotErr)
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}

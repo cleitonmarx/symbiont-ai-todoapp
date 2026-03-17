@@ -24,14 +24,13 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 
 - **HTTP API** (`internal/adapters/inbound/http`): Serves REST endpoints and static web assets on `API_SERVER_PORT` (default `8080`)
 - **GraphQL API** (`internal/adapters/inbound/graphql`): Serves `/v1/query` and GraphQL playground (`/`) on `GRAPHQL_SERVER_PORT` (default `8085`)
-- **Synchronous Chat Context Compaction** (`internal/usecases/chat/stream_chat_compaction.go` + `internal/usecases/chat/compact_conversation_context.go`): Runs pre-turn in `StreamChat` when thresholds are reached and emits SSE lifecycle events
 - **Message Relay Worker** (`internal/adapters/inbound/workers/message_relay.go`): Publishes persisted outbox events to Pub/Sub
 - **Board Summary Worker** (`internal/adapters/inbound/workers/board_summary_generator.go`): Batches todo events and triggers board-summary generation
 - **Conversation Title Worker** (`internal/adapters/inbound/workers/conversation_title_generator.go`): Batches chat events by `ConversationID` and updates titles asynchronously
 - **Action Approval Dispatcher Worker** (`internal/adapters/inbound/workers/action_approval_dispatcher.go`): Consumes approval decisions from Pub/Sub and forwards them to the in-memory action approval dispatcher, using a server-scoped subscription suffix for horizontal distribution
 - **PostgreSQL** (`internal/adapters/outbound/postgres`): Primary data store with migrations and vector extension support
 - **Vault Provider** (`internal/adapters/outbound/config/vault_provider.go`): Loads secret-backed config values (`DB_USER`, `DB_PASS`)
-- **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI compatible client for chat, embeddings, and model listing
+- **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI-compatible client and adapters for chat streaming, embeddings, and model listing.
 - **Assistant Action/Tool Registries** (`internal/adapters/outbound/actionregistry`):
   - `local`: Built-in app actions (UI filters, fetch todos, and batch todo mutations)
   - `mcp`: MCP gateway-backed action/tool registry using `github.com/modelcontextprotocol/go-sdk/mcp`

@@ -18,6 +18,8 @@ import (
 const (
 	// DEFAULT_CONTEXT_COMPACTION_TIMEOUT bounds synchronous pre-turn compaction.
 	DEFAULT_CONTEXT_COMPACTION_TIMEOUT = 20 * time.Second
+	// DEFAULT_CANCELED_TURN_REPAIR_TIMEOUT bounds cleanup work after a canceled turn.
+	DEFAULT_CANCELED_TURN_REPAIR_TIMEOUT = 3 * time.Second
 )
 
 // StreamChatParams holds optional parameters for StreamChat execution.
@@ -138,6 +140,14 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 	}
 
 	if err := sc.turnRunner.Run(spanCtx, state, onEvent); telemetry.IsErrorRecorded(span, err) {
+		if state.HasPersistedActionCall() {
+			if repairErr := sc.repairFailedTurn(ctx, state); telemetry.IsErrorRecorded(span, repairErr) {
+				return errors.Join(err, repairErr)
+			}
+		}
+		if isCanceledTurnError(err) {
+			return err
+		}
 		failedAt := sc.timeProvider.Now()
 		if persistErr := sc.conversationCreator.CreateMessage(spanCtx, state.Conversation(), sc.buildFailureAssistantMessage(state, failedAt, err)); telemetry.IsErrorRecorded(span, persistErr) {
 			return persistErr
@@ -188,6 +198,19 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return err
 	}
 	return nil
+}
+
+// repairFailedTurn performs detached cleanup so failed turns do not leave dangling assistant tool-call messages in history.
+func (sc StreamChatImpl) repairFailedTurn(ctx context.Context, state TurnState) error {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), DEFAULT_CANCELED_TURN_REPAIR_TIMEOUT)
+	defer cancel()
+
+	return sc.conversationCreator.RepairTurn(cleanupCtx, state.Conversation(), state.TurnID())
+}
+
+// isCanceledTurnError reports whether the turn ended due to cancellation rather than an internal assistant failure.
+func isCanceledTurnError(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // buildFailureAssistantMessage creates the persisted assistant failure message from the use-case-owned turn state.

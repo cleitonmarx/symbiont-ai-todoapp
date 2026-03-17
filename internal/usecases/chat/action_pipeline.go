@@ -82,6 +82,7 @@ func (p ActionPipelineImpl) Handle(
 	if err := p.conversationCreator.CreateMessage(spanCtx, conversation, assistantActionCallMsg); err != nil {
 		return false, err
 	}
+	state.MarkActionCallPersisted()
 
 	approvalDecision, blockedByApproval, approvalErr := p.requestApprovalIfRequired(
 		spanCtx,

@@ -79,6 +79,17 @@ type streamChatTestTableEntry struct {
 		*transaction.MockUnitOfWork,
 		*outbox.MockRepository,
 	)
+	setAfterPersistExpectations func(
+		*assistant.MockChatMessageRepository,
+		*assistant.MockConversationSummaryRepository,
+		*assistant.MockConversationRepository,
+		*core.MockCurrentTimeProvider,
+		*assistant.MockAssistant,
+		*assistant.MockActionRegistry,
+		*assistant.MockSkillRegistry,
+		*transaction.MockUnitOfWork,
+		*outbox.MockRepository,
+	)
 	expectErr       bool
 	expectedContent string
 	onEventErrType  assistant.EventType
@@ -122,6 +133,19 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	}
 	if len(tt.persistExpectations) > 0 {
 		expectPersistSequence(t, chatRepo, conversationRepo, uow, outboxRepo, tt.fixedTime, tt.persistExpectations)
+	}
+	if tt.setAfterPersistExpectations != nil {
+		tt.setAfterPersistExpectations(
+			chatRepo,
+			summaryRepo,
+			conversationRepo,
+			timeProvider,
+			assist,
+			actionRegistry,
+			skillRegistry,
+			uow,
+			outboxRepo,
+		)
 	}
 
 	actionRegistry.EXPECT().
@@ -221,6 +245,7 @@ type persistCallExpectation struct {
 	ActionExecuted         *bool
 	FirstActionCallText    *string
 	CreateErr              error
+	Capture                func(assistant.ChatMessage)
 }
 
 // expectNowCalls stubs current-time reads for cases that rely on a fixed timestamp.
@@ -346,6 +371,9 @@ func expectPersistSequence(
 				if assert.NotEmpty(t, msg.ActionCalls) {
 					assert.Equal(t, *exp.FirstActionCallText, msg.ActionCalls[0].Text)
 				}
+			}
+			if exp.Capture != nil {
+				exp.Capture(msg)
 			}
 
 			if exp.CreateErr == nil {

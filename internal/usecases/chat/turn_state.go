@@ -40,6 +40,10 @@ type TurnState interface {
 	AppendAssistantContent(text string)
 	// AssistantContent returns the accumulated assistant response content for the turn.
 	AssistantContent() string
+	// MarkActionCallPersisted records that an assistant action-call message was stored for this turn.
+	MarkActionCallPersisted()
+	// HasPersistedActionCall reports whether the turn stored any assistant action-call message.
+	HasPersistedActionCall() bool
 	// HasExceededMaxActionCycles increments the action cycle counter and reports whether the limit was exceeded.
 	HasExceededMaxActionCycles() bool
 	// HasExceededRepeatedActionCalls reports whether the same action signature repeated too many times.
@@ -57,6 +61,7 @@ type turnState struct {
 	turnID                  uuid.UUID
 	turnSequence            int64
 	assistantMessageContent strings.Builder
+	actionCallPersisted     bool
 	tracker                 *actionCycleTracker
 }
 
@@ -98,6 +103,16 @@ func (s *turnState) AppendAssistantContent(text string) {
 // AssistantContent returns the accumulated assistant response content for the turn.
 func (s *turnState) AssistantContent() string {
 	return s.assistantMessageContent.String()
+}
+
+// MarkActionCallPersisted records that an assistant action-call message was stored for this turn.
+func (s *turnState) MarkActionCallPersisted() {
+	s.actionCallPersisted = true
+}
+
+// HasPersistedActionCall reports whether the turn stored any assistant action-call message.
+func (s *turnState) HasPersistedActionCall() bool {
+	return s.actionCallPersisted
 }
 
 // HasExceededMaxActionCycles increments the action cycle count and reports whether the limit was exceeded.

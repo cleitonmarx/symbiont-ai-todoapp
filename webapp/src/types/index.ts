@@ -125,6 +125,8 @@ export interface Conversation {
   id: string;
   title: string;
   title_source: ConversationTitleSource;
+  total_tokens_used: number;
+  context_compaction_trigger_tokens: number;
   created_at: string;
   updated_at: string;
 }
@@ -138,9 +140,9 @@ export interface ConversationListResp {
 
 export interface ChatStreamMeta {
   conversation_id: string;
-  user_message_id: string;
-  assistant_message_id: string;
   conversation_created: boolean;
+  turn_id: string;
+  selected_skills?: SelectedSkill[];
 }
 
 export interface ChatStreamDelta {
@@ -148,8 +150,6 @@ export interface ChatStreamDelta {
 }
 
 export interface ChatStreamDone {
-  assistant_message_id: string;
-  completed_at: string;
   usage: {
     prompt_tokens: number;
     completion_tokens: number;

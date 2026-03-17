@@ -43,13 +43,13 @@ var conversationTitlePrompt embed.FS
 // CompletedConversationTitleUpdateChannel carries updated conversations after title generation.
 type CompletedConversationTitleUpdateChannel chan assistant.Conversation
 
-// GenerateConversationTitle defines the interface for generating an LLM title for auto-named conversations.
+// GenerateConversationTitle refreshes auto-generated conversation titles after assistant replies.
 type GenerateConversationTitle interface {
 	// Execute tries to generate and persist a better title for the given conversation event.
 	Execute(ctx context.Context, event outbox.ChatMessageEvent) error
 }
 
-// GenerateConversationTitleImpl is the implementation of GenerateConversationTitle.
+// GenerateConversationTitleImpl implements GenerateConversationTitle.
 type GenerateConversationTitleImpl struct {
 	conversationRepo        assistant.ConversationRepository
 	conversationSummaryRepo assistant.ConversationSummaryRepository
@@ -61,7 +61,7 @@ type GenerateConversationTitleImpl struct {
 	completedTitleCh        CompletedConversationTitleUpdateChannel
 }
 
-// NewGenerateConversationTitleImpl creates a new instance of GenerateConversationTitleImpl.
+// NewGenerateConversationTitleImpl creates a GenerateConversationTitleImpl.
 func NewGenerateConversationTitleImpl(
 	conversationRepo assistant.ConversationRepository,
 	conversationSummaryRepo assistant.ConversationSummaryRepository,
@@ -84,7 +84,7 @@ func NewGenerateConversationTitleImpl(
 	}
 }
 
-// Execute tries to update only auto-named conversations with an LLM-generated title.
+// Execute implements GenerateConversationTitle.
 func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event outbox.ChatMessageEvent) error {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
@@ -127,7 +127,7 @@ func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event outb
 		return fmt.Errorf("failed to list chat messages: %w", err)
 	}
 
-	conversationSummary := "No summary available."
+	conversationSummary := ""
 	summary, found, err := gct.conversationSummaryRepo.GetConversationSummary(spanCtx, event.ConversationID)
 	if telemetry.IsErrorRecorded(span, err) {
 		return fmt.Errorf("failed to get conversation summary: %w", err)
@@ -245,98 +245,31 @@ func formatMessagesForConversationTitle(messages []assistant.ChatMessage) string
 	return strings.Join(lines, "\n")
 }
 
-// focusConversationSummaryForTitle compresses summary memory into high-signal fields for title generation.
+// focusConversationSummaryForTitle compresses compacted context memory into a high-signal prompt snippet for title generation.
 func focusConversationSummaryForTitle(summary string) string {
 	summary = strings.TrimSpace(summary)
 	if summary == "" {
 		return "none"
 	}
 
-	fields := parseSummaryFields(summary)
-	focused := make([]string, 0, 5)
-
-	appendFieldIfNotNone := func(key string) {
-		value := strings.TrimSpace(fields[key])
-		if value == "" || strings.EqualFold(value, "none") {
-			return
-		}
-		focused = append(focused, fmt.Sprintf("%s: %s", key, clampRunes(value, MAX_PROMPT_SUMMARY_CHARS)))
-	}
-
-	appendFieldIfNotNone("current_intent")
-	appendFieldIfNotNone("user_nuances")
-	appendFieldIfNotNone("active_view")
-
-	taskTopics := extractTaskTopics(fields["tasks"], MAX_PROMPT_TASK_TOPICS)
-	if len(taskTopics) > 0 {
-		focused = append(focused, fmt.Sprintf("task_topics: %s", strings.Join(taskTopics, "; ")))
-	}
-
-	appendFieldIfNotNone("last_action")
-
-	if len(focused) == 0 {
-		return clampRunes(strings.Join(strings.Fields(summary), " "), MAX_PROMPT_SUMMARY_CHARS)
-	}
-
-	return strings.Join(focused, "\n")
-}
-
-// parseSummaryFields extracts key-value pairs from the summary text for easier access to important fields.
-func parseSummaryFields(summary string) map[string]string {
-	fields := map[string]string{}
+	lines := make([]string, 0, 5)
 	for line := range strings.SplitSeq(summary, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		key, value, ok := strings.Cut(line, ":")
-		if !ok {
-			continue
-		}
-		key = strings.ToLower(strings.TrimSpace(key))
-		value = strings.TrimSpace(value)
-		fields[key] = value
-	}
-	return fields
-}
 
-// extractTaskTopics parses the tasks field to extract concise topics for the title generation prompt.
-func extractTaskTopics(tasksField string, max int) []string {
-	tasksField = strings.TrimSpace(tasksField)
-	if tasksField == "" || strings.EqualFold(tasksField, "none") || max <= 0 {
-		return nil
-	}
-
-	topics := make([]string, 0, max)
-	seen := map[string]struct{}{}
-	for _, rawTask := range strings.Split(tasksField, ";") {
-		task := strings.TrimSpace(rawTask)
-		if task == "" {
-			continue
-		}
-
-		parts := strings.Split(task, "|")
-		title := strings.TrimSpace(parts[0])
-		if strings.HasPrefix(title, "#") && len(parts) > 1 {
-			title = strings.TrimSpace(parts[1])
-		}
-		title = strings.Join(strings.Fields(title), " ")
-		if title == "" {
-			continue
-		}
-
-		key := strings.ToLower(title)
-		if _, exists := seen[key]; exists {
-			continue
-		}
-		seen[key] = struct{}{}
-		topics = append(topics, clampRunes(title, MAX_PROMPT_MESSAGE_CHARS))
-		if len(topics) >= max {
+		lines = append(lines, clampRunes(line, MAX_PROMPT_SUMMARY_CHARS))
+		if len(lines) == 5 {
 			break
 		}
 	}
 
-	return topics
+	if len(lines) == 0 {
+		return clampRunes(strings.Join(strings.Fields(summary), " "), MAX_PROMPT_SUMMARY_CHARS)
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // clampRunes safely truncates a string to a maximum number of runes,

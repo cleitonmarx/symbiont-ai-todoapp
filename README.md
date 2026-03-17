@@ -11,8 +11,8 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - 🔗 **MCP Gateway Integration**: MCP-based external tools via `docker/mcp-gateway`
 - 💬 **Conversation Management**: Conversation history with rename/delete and auto/LLM title generation
 - 📌 **Board Summary**: AI-generated board summary from todo domain events
-- 🧠 **Conversation/Context Compression**: Conversation-aware AI summaries from chat-message events
-- 🔔 **Event-Driven Workflow**: Outbox + Pub/Sub workers for asynchronous processing
+- 🧠 **Conversation/Context Compression**: In-chat synchronous context compaction with threshold triggers
+- 🔔 **Event-Driven Workflow**: Outbox + Pub/Sub workers for async relay, board summary, conversation title, and approvals
 - 🧠 **Vector Search**: PostgreSQL `pgvector` + embeddings for semantic todo search
 - 🔌 **Dual APIs**: REST (OpenAPI) + GraphQL
 - 📊 **Observability**: OpenTelemetry + Jaeger + Prometheus + Grafana
@@ -26,12 +26,11 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - **GraphQL API** (`internal/adapters/inbound/graphql`): Serves `/v1/query` and GraphQL playground (`/`) on `GRAPHQL_SERVER_PORT` (default `8085`)
 - **Message Relay Worker** (`internal/adapters/inbound/workers/message_relay.go`): Publishes persisted outbox events to Pub/Sub
 - **Board Summary Worker** (`internal/adapters/inbound/workers/board_summary_generator.go`): Batches todo events and triggers board-summary generation
-- **Chat Summary Worker** (`internal/adapters/inbound/workers/chat_summary_generator.go`): Batches chat events by `ConversationID` and triggers one chat-summary generation per conversation window
 - **Conversation Title Worker** (`internal/adapters/inbound/workers/conversation_title_generator.go`): Batches chat events by `ConversationID` and updates titles asynchronously
 - **Action Approval Dispatcher Worker** (`internal/adapters/inbound/workers/action_approval_dispatcher.go`): Consumes approval decisions from Pub/Sub and forwards them to the in-memory action approval dispatcher, using a server-scoped subscription suffix for horizontal distribution
 - **PostgreSQL** (`internal/adapters/outbound/postgres`): Primary data store with migrations and vector extension support
 - **Vault Provider** (`internal/adapters/outbound/config/vault_provider.go`): Loads secret-backed config values (`DB_USER`, `DB_PASS`)
-- **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI compatible client for chat, embeddings, and model listing
+- **Assistant Client** (`internal/adapters/outbound/modelrunner`): OpenAI-compatible client and adapters for chat streaming, embeddings, and model listing.
 - **Assistant Action/Tool Registries** (`internal/adapters/outbound/actionregistry`):
   - `local`: Built-in app actions (UI filters, fetch todos, and batch todo mutations)
   - `mcp`: MCP gateway-backed action/tool registry using `github.com/modelcontextprotocol/go-sdk/mcp`
@@ -44,24 +43,25 @@ AI-powered Todo application built with [Symbiont](https://github.com/cleitonmarx
 - Interactive graph endpoint: `http://localhost:8080/introspect/`
 - Full generated Mermaid graph: `docs/introspection.md`
 
-## Async Batching Behavior
+## Compaction + Async Workers
 
-### ChatSummaryGenerator
+### In-Chat Context Compaction
 
-- Decodes events in batch windows
-- Ignores unrelated event types (Ack)
-- Nacks invalid payloads
-- Coalesces by `ConversationID` and generates one summary per conversation using the latest event
-- Acks or Nacks grouped messages per conversation result
-
-Tunable settings:
-
-- `CHAT_SUMMARY_BATCH_INTERVAL` (default `3s`)
-- `CHAT_SUMMARY_BATCH_SIZE` (default `50`)
+- Runs synchronously in `StreamChat` before each new turn.
+- Trigger policy is token-threshold only:
+  - `unsummarized_tokens >= CHAT_COMPACTION_TRIGGER_TOKENS`
+  - Set `CHAT_COMPACTION_TRIGGER_TOKENS` to about `60-70%` of your model's maximum context window so there is room for the current turn, tool outputs, and the model response.
+- Unsummarized context is measured from the last summarized message checkpoint to the current latest message.
+- Token size is estimated from persisted message payloads, not model billing usage.
+- Timeout safeguard: `CHAT_COMPACTION_TIMEOUT` (default `20s`) to avoid blocking a user turn if compaction stalls
+- Emits SSE lifecycle events:
+  - `context_compaction_started`
+  - `context_compaction_completed`
+  - `context_compaction_failed` (non-fatal; chat turn still continues)
 
 ### ConversationTitleGenerator
 
-- Uses the same batch/coalescing strategy as chat summaries
+- Uses batch/coalescing strategy over chat events
 - Generates/updates one title per conversation using the latest event in the batch
 
 Tunable settings:
@@ -285,6 +285,8 @@ Split stack URLs:
 
 - HTTP API + embedded UI (via Traefik): `http://localhost:18080`
 - GraphQL playground (via Traefik): `http://localhost:18085`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (admin/admin)
 
 ## Kubernetes (Docker Desktop) with Terraform + Helm
 
@@ -317,7 +319,6 @@ PUBSUB_EMULATOR_HOST=localhost:8681 \
 PUBSUB_PROJECT_ID=local-dev \
 PUBSUB_TOPIC_ID=Todo \
 TODO_EVENTS_SUBSCRIPTION_ID=todo_summary_generator \
-CHAT_EVENTS_SUBSCRIPTION_ID=chat_message_summary_generator \
 CHAT_TITLE_EVENTS_SUBSCRIPTION_ID=chat_message_title_generator \
 ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX=action_approval_dispatcher \
 LLM_MODEL_HOST=http://localhost:12434 \
@@ -327,6 +328,8 @@ LLM_CHAT_SUMMARY_MODEL=docker.io/ai/qwen3:4B-F16 \
 LLM_CHAT_TITLE_MODEL=docker.io/ai/qwen3:4B-F16 \
 LLM_EMBEDDING_MODEL=docker.io/ai/embeddinggemma:300M-Q8_0 \
 MCP_GATEWAY_ENDPOINT=http://localhost:8811 \
+CHAT_COMPACTION_TRIGGER_TOKENS=8000 \
+CHAT_COMPACTION_TIMEOUT=20s \
 go run ./cmd/monolithic
 ```
 
@@ -344,7 +347,6 @@ Command matrix:
 | GraphQL API | `go run ./cmd/graphql-api` |
 | Message Relay worker | `go run ./cmd/message-relay` |
 | Board Summary Generator worker | `go run ./cmd/board-summary-generator` |
-| Chat Summary Generator worker | `go run ./cmd/chat-summary-generator` |
 | Conversation Title Generator worker | `go run ./cmd/conversation-title-generator` |
 
 Required env subsets per deployable:
@@ -355,9 +357,10 @@ Required env subsets per deployable:
 - HTTP API (`cmd/http-api`) additional:
   - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (local emulator)
   - `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX`
-  - `LLM_MODEL_HOST`, `LLM_EMBEDDING_MODEL_HOST`, `LLM_EMBEDDING_MODEL`
+  - `LLM_MODEL_HOST`, `LLM_EMBEDDING_MODEL_HOST`, `LLM_CHAT_SUMMARY_MODEL`, `LLM_EMBEDDING_MODEL`
   - `MCP_GATEWAY_ENDPOINT`
-  - Optional: `LLM_API_KEY`, `LLM_EMBEDDING_API_KEY`, `MCP_GATEWAY_API_KEY`, `MCP_GATEWAY_API_KEY_HEADER`, `MCP_GATEWAY_REQUEST_TIMEOUT`, `LLM_MAX_ACTION_CYCLES`
+  - `CHAT_COMPACTION_TRIGGER_TOKENS`
+  - Optional: `LLM_API_KEY`, `LLM_EMBEDDING_API_KEY`, `MCP_GATEWAY_API_KEY`, `MCP_GATEWAY_API_KEY_HEADER`, `MCP_GATEWAY_REQUEST_TIMEOUT`, `LLM_MAX_ACTION_CYCLES`, `CHAT_COMPACTION_TIMEOUT`
 - GraphQL API (`cmd/graphql-api`) additional:
   - `LLM_EMBEDDING_MODEL_HOST`, `LLM_EMBEDDING_MODEL`
   - Optional: `LLM_EMBEDDING_API_KEY`
@@ -368,10 +371,6 @@ Required env subsets per deployable:
   - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (local emulator), `TODO_EVENTS_SUBSCRIPTION_ID`
   - `LLM_MODEL_HOST`, `LLM_SUMMARY_MODEL`
   - Optional: `LLM_API_KEY`, `SUMMARY_BATCH_INTERVAL`, `SUMMARY_BATCH_SIZE`
-- Chat Summary Generator (`cmd/chat-summary-generator`) additional:
-  - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (local emulator), `CHAT_EVENTS_SUBSCRIPTION_ID`
-  - `LLM_MODEL_HOST`, `LLM_CHAT_SUMMARY_MODEL`
-  - Optional: `LLM_API_KEY`, `CHAT_SUMMARY_BATCH_INTERVAL`, `CHAT_SUMMARY_BATCH_SIZE`
 - Conversation Title Generator (`cmd/conversation-title-generator`) additional:
   - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (local emulator), `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`
   - `LLM_MODEL_HOST`, `LLM_CHAT_TITLE_MODEL`
@@ -435,6 +434,13 @@ K6_LOAD_TEST_SCENARIO=todo-rest-create-update-delete \
 go tool k6 run tests/k6/all-scenarios.ts
 ```
 
+Run multiple suite scenarios in one invocation:
+
+```bash
+K6_LOAD_TEST_SCENARIO=todo-flow-rest-graphql,todo-rest-create-update-delete \
+go tool k6 run tests/k6/all-scenarios.ts
+```
+
 Available `K6_LOAD_TEST_SCENARIO` values:
 
 - `regular`
@@ -461,7 +467,7 @@ Optional load tuning variables:
 
 - `K6_REST_BASE_URL` (default: `http://localhost:8080`)
 - `K6_GRAPHQL_ENDPOINT` (default: `http://localhost:8085/v1/query`)
-- `K6_LOAD_TEST_SCENARIO` for `tests/k6/all-scenarios.ts` (default: `regular`)
+- `K6_LOAD_TEST_SCENARIO` for `tests/k6/all-scenarios.ts` (default: `regular`; accepts one scenario key or a comma-separated list)
 - `K6_LOAD_RUN_ALL_SCENARIOS_PARALLEL` (default: `false`; when `true`, all `regular` suite scenarios start at `0s`)
 - `K6_LOAD_EXECUTION_STRATEGY` (default: `regular`; options: `regular`, `smoke`, `spike`, `stress`)
 - `K6_LOAD_START_VUS` (default: `1`)
@@ -503,8 +509,10 @@ Required or commonly tuned variables:
 - `GRAPHQL_SERVER_PORT` (default: `8085`)
 - `DB_HOST`, `DB_PORT` (default: `5432`), `DB_NAME`
 - `DB_USER`, `DB_PASS` (can be sourced from Vault)
+- `DB_MAX_OPEN_CONNS` (default: `50`), `DB_MIN_CONNS` (default: `5`), `DB_MAX_IDLE_CONNS` (default: `25`)
+- `DB_CONN_MAX_LIFETIME` (default: `30m`), `DB_CONN_MAX_IDLE_TIME` (default: `5m`), `DB_HEALTH_CHECK_PERIOD` (default: `1m`)
 - `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_MOUNT_PATH`, `VAULT_SECRET_PATH`
-- `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `PUBSUB_TOPIC_ID`, `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`, `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX`
+- `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `PUBSUB_TOPIC_ID`, `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`, `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX`
 - `LLM_MODEL_HOST`, `LLM_EMBEDDING_MODEL_HOST`, `LLM_API_KEY`, `LLM_EMBEDDING_API_KEY`, `LLM_SUMMARY_MODEL`, `LLM_CHAT_SUMMARY_MODEL`, `LLM_CHAT_TITLE_MODEL`, `LLM_EMBEDDING_MODEL`
 - `MCP_GATEWAY_ENDPOINT` (e.g. `http://mcp-gateway:8811`)
 - `MCP_GATEWAY_API_KEY` (default: `-`)
@@ -514,7 +522,7 @@ Required or commonly tuned variables:
 - `LLM_MAX_ACTION_CYCLES` (default: `50`)
 - `FETCH_OUTBOX_INTERVAL` (default: `500ms`)
 - `SUMMARY_BATCH_INTERVAL` (default: `3s`), `SUMMARY_BATCH_SIZE` (default: `20`)
-- `CHAT_SUMMARY_BATCH_INTERVAL` (default: `3s`), `CHAT_SUMMARY_BATCH_SIZE` (default: `50`)
+- `CHAT_COMPACTION_TRIGGER_TOKENS`, `CHAT_COMPACTION_TIMEOUT` (default: `20s`)
 - `CHAT_TITLE_BATCH_INTERVAL` (default: `3s`), `CHAT_TITLE_BATCH_SIZE` (default: `50`)
 - `OTEL_SERVICE_NAME` (set per deployable in split compose)
 - `OTEL_RESOURCE_ATTRIBUTES` (for example `service.instance.id=<instance-id>`; if `service.instance.id` is not set, app falls back to container hostname)

@@ -1,4 +1,4 @@
-package skillregistry
+package md
 
 import (
 	"testing"

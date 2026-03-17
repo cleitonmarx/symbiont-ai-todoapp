@@ -228,10 +228,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
 					if assistantCallCount == 0 {
 						assistantCallCount++
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
+						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 							return err
 						}
 						return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
@@ -249,10 +246,7 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 					if err := onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: finalAssistantResponse}); err != nil {
 						return err
 					}
-					return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-						AssistantMessageID: assistantMsgID.String(),
-						CompletedAt:        fixedTime.Format(time.RFC3339),
-					})
+					return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
 				}).
 				Times(2)
 
@@ -296,19 +290,22 @@ func TestStreamChatImpl_Execute_ActionApprovalFlows(t *testing.T) {
 				},
 			})
 
-			useCase := NewStreamChatImpl(
+			useCase := newTestStreamChatUseCase(
 				log.New(io.Discard, "", 0),
 				chatRepo,
 				summaryRepo,
+				nil,
 				conversationRepo,
 				timeProvider,
+				nil,
 				assist,
 				actionRegistry,
 				skillRegistry,
 				approvalDispatcher,
 				uow,
-				"test-embedding-model",
 				7,
+				8000,
+				DEFAULT_CONTEXT_COMPACTION_TIMEOUT,
 			)
 
 			var (

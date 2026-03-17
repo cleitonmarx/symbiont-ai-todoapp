@@ -10,24 +10,25 @@ import (
 	"github.com/google/uuid"
 )
 
-// DeleteConversation defines the interface for deleting a conversation usecase
+// DeleteConversation deletes a conversation and all persisted data derived from it.
 type DeleteConversation interface {
+	// Execute removes the conversation, its messages, and its summaries.
 	Execute(ctx context.Context, conversationID uuid.UUID) error
 }
 
-// DeleteConversationImpl implements the DeleteConversation usecase
+// DeleteConversationImpl implements DeleteConversation.
 type DeleteConversationImpl struct {
 	uow transaction.UnitOfWork
 }
 
-// NewDeleteConversationImpl creates a new DeleteConversationImpl instance
+// NewDeleteConversationImpl creates a DeleteConversationImpl.
 func NewDeleteConversationImpl(uow transaction.UnitOfWork) *DeleteConversationImpl {
 	return &DeleteConversationImpl{
 		uow: uow,
 	}
 }
 
-// Execute deletes all messages and summaries related to the specified conversation, effectively resetting the conversation history.
+// Execute implements DeleteConversation.
 func (uc *DeleteConversationImpl) Execute(ctx context.Context, conversationID uuid.UUID) error {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()

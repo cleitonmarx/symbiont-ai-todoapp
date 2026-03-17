@@ -12,8 +12,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// SubmitActionApproval is the use case for submitting one human approval decision.
+// SubmitActionApproval publishes one human approval decision for a pending action call.
 type SubmitActionApproval interface {
+	// Execute validates and publishes one approval decision.
 	Execute(ctx context.Context, input SubmitActionApprovalInput) error
 }
 
@@ -27,7 +28,7 @@ type SubmitActionApprovalInput struct {
 	Reason         *string
 }
 
-// SubmitActionApprovalImpl publishes approval decisions to the approvals topic.
+// SubmitActionApprovalImpl implements SubmitActionApproval.
 type SubmitActionApprovalImpl struct {
 	publisher outbox.EventPublisher
 }
@@ -37,7 +38,7 @@ func NewSubmitActionApprovalImpl(publisher outbox.EventPublisher) *SubmitActionA
 	return &SubmitActionApprovalImpl{publisher: publisher}
 }
 
-// Execute validates and publishes one approval decision.
+// Execute implements SubmitActionApproval.
 func (uc SubmitActionApprovalImpl) Execute(ctx context.Context, input SubmitActionApprovalInput) error {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()

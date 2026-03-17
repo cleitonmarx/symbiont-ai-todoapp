@@ -95,17 +95,21 @@ func (a DeleteTodosAction) Execute(ctx context.Context, call assistant.ActionCal
 
 	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
+		content := newActionError("invalid_arguments", err.Error(), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 	if len(params.Todos) == 0 {
+		content := newActionError("invalid_arguments", "todos must not be empty.", exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", "todos must not be empty.", exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 
@@ -113,18 +117,22 @@ func (a DeleteTodosAction) Execute(ctx context.Context, call assistant.ActionCal
 	for i, todo := range params.Todos {
 		todoID, parseErr := uuid.Parse(todo.ID)
 		if parseErr != nil {
+			content := newActionError("invalid_todo_id", fmt.Sprintf("id at index %d is invalid: %s", i, parseErr.Error()), exampleArgs)
 			return assistant.Message{
 				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
-				Content:      newActionError("invalid_todo_id", fmt.Sprintf("id at index %d is invalid: %s", i, parseErr.Error()), exampleArgs),
+				Content:      content,
+				ActionError:  &content,
 			}
 		}
 
 		if strings.TrimSpace(todo.Title) == "" {
+			content := newActionError("invalid_title", fmt.Sprintf("title at index %d must not be empty.", i), exampleArgs)
 			return assistant.Message{
 				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
-				Content:      newActionError("invalid_title", fmt.Sprintf("title at index %d must not be empty.", i), exampleArgs),
+				Content:      content,
+				ActionError:  &content,
 			}
 		}
 
@@ -141,10 +149,12 @@ func (a DeleteTodosAction) Execute(ctx context.Context, call assistant.ActionCal
 		return nil
 	})
 	if err != nil {
+		content := newActionError("delete_todos_error", fmt.Sprintf("Failed to delete todos: %s", err.Error()), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("delete_todos_error", fmt.Sprintf("Failed to delete todos: %s", err.Error()), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 

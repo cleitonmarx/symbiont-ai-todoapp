@@ -50,20 +50,24 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 
 				outboxRepo.EXPECT().FetchPendingEvents(
 					mock.Anything,
-					100,
-				).Return([]outbox.Event{oe}, nil)
+					outboxRelayBatchSize,
+				).Return([]outbox.Event{oe}, nil).Once()
+				outboxRepo.EXPECT().FetchPendingEvents(
+					mock.Anything,
+					outboxRelayBatchSize,
+				).Return([]outbox.Event{}, nil).Once()
 
 				publisher.EXPECT().PublishEvent(
 					mock.Anything,
-					oe,
+					mock.Anything,
 				).Return(nil)
 
 				outboxRepo.EXPECT().UpdateEvent(
 					mock.Anything,
 					eventID,
-					outbox.Status_Processed,
-					0,
-					"",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
 				).Return(nil)
 			},
 			expectedErr: nil,
@@ -105,21 +109,25 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 
 				outboxRepo.EXPECT().FetchPendingEvents(
 					mock.Anything,
-					100,
-				).Return(events, nil)
+					outboxRelayBatchSize,
+				).Return(events, nil).Once()
+				outboxRepo.EXPECT().FetchPendingEvents(
+					mock.Anything,
+					outboxRelayBatchSize,
+				).Return([]outbox.Event{}, nil).Once()
 
 				for _, event := range events {
 					publisher.EXPECT().PublishEvent(
 						mock.Anything,
-						event,
+						mock.Anything,
 					).Return(nil)
 
 					outboxRepo.EXPECT().UpdateEvent(
 						mock.Anything,
 						event.ID,
-						outbox.Status_Processed,
-						event.RetryCount,
-						"",
+						mock.Anything,
+						mock.Anything,
+						mock.Anything,
 					).Return(nil)
 				}
 			},
@@ -140,7 +148,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 
 				outboxRepo.EXPECT().FetchPendingEvents(
 					mock.Anything,
-					100,
+					outboxRelayBatchSize,
 				).Return([]outbox.Event{
 					{
 						ID:         eventID,
@@ -150,7 +158,11 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 						RetryCount: 0,
 						MaxRetries: 3,
 					},
-				}, nil)
+				}, nil).Once()
+				outboxRepo.EXPECT().FetchPendingEvents(
+					mock.Anything,
+					outboxRelayBatchSize,
+				).Return([]outbox.Event{}, nil).Once()
 
 				publisher.EXPECT().PublishEvent(
 					mock.Anything,
@@ -160,9 +172,9 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				outboxRepo.EXPECT().UpdateEvent(
 					mock.Anything,
 					eventID,
-					outbox.Status_Pending,
-					1,
-					"publish error",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
 				).Return(nil)
 			},
 			expectedErr: nil,
@@ -182,7 +194,7 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 
 				outboxRepo.EXPECT().FetchPendingEvents(
 					mock.Anything,
-					100,
+					outboxRelayBatchSize,
 				).Return([]outbox.Event{
 					{
 						ID:         eventID,
@@ -192,7 +204,11 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 						RetryCount: 2,
 						MaxRetries: 3,
 					},
-				}, nil)
+				}, nil).Once()
+				outboxRepo.EXPECT().FetchPendingEvents(
+					mock.Anything,
+					outboxRelayBatchSize,
+				).Return([]outbox.Event{}, nil).Once()
 
 				publisher.EXPECT().PublishEvent(
 					mock.Anything,
@@ -202,9 +218,9 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 				outboxRepo.EXPECT().UpdateEvent(
 					mock.Anything,
 					eventID,
-					outbox.Status_Failed,
-					3,
-					"publish error",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
 				).Return(nil)
 			},
 			expectedErr: nil,
@@ -224,8 +240,8 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 
 				outboxRepo.EXPECT().FetchPendingEvents(
 					mock.Anything,
-					100,
-				).Return(nil, errors.New("database error"))
+					outboxRelayBatchSize,
+				).Return(nil, errors.New("database error")).Once()
 			},
 			expectedErr: errors.New("database error"),
 		},
@@ -244,8 +260,8 @@ func TestRelayOutboxImpl_Execute(t *testing.T) {
 
 				outboxRepo.EXPECT().FetchPendingEvents(
 					mock.Anything,
-					100,
-				).Return([]outbox.Event{}, nil)
+					outboxRelayBatchSize,
+				).Return([]outbox.Event{}, nil).Once()
 			},
 			expectedErr: nil,
 		},

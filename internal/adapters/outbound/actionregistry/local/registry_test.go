@@ -15,7 +15,7 @@ func TestActionRegistry(t *testing.T) {
 	tests := map[string]struct {
 		setupActions   func() []assistant.Action
 		embeddingModel string
-		testFunc       func(t *testing.T, manager LocalRegistry)
+		testFunc       func(t *testing.T, manager ActionRegistry)
 	}{
 		"status-message-returns-action-specific-message": {
 			setupActions: func() []assistant.Action {
@@ -26,14 +26,14 @@ func TestActionRegistry(t *testing.T) {
 				action.EXPECT().StatusMessage().Return("🔎 Fetching todos...")
 				return []assistant.Action{action}
 			},
-			testFunc: func(t *testing.T, manager LocalRegistry) {
+			testFunc: func(t *testing.T, manager ActionRegistry) {
 				msg := manager.StatusMessage("fetch_todos")
 				assert.Equal(t, "🔎 Fetching todos...", msg)
 			},
 		},
 		"status-message-returns-default-when-action-not-found": {
 			setupActions: func() []assistant.Action { return []assistant.Action{} },
-			testFunc: func(t *testing.T, manager LocalRegistry) {
+			testFunc: func(t *testing.T, manager ActionRegistry) {
 				msg := manager.StatusMessage("unknown_action")
 				assert.Equal(t, "⏳ Processing request...", msg)
 			},
@@ -57,7 +57,7 @@ func TestActionRegistry(t *testing.T) {
 					})
 				return []assistant.Action{action}
 			},
-			testFunc: func(t *testing.T, manager LocalRegistry) {
+			testFunc: func(t *testing.T, manager ActionRegistry) {
 				result := manager.Execute(
 					t.Context(),
 					assistant.ActionCall{
@@ -76,7 +76,7 @@ func TestActionRegistry(t *testing.T) {
 		},
 		"execute-returns-error-for-unknown-action": {
 			setupActions: func() []assistant.Action { return []assistant.Action{} },
-			testFunc: func(t *testing.T, manager LocalRegistry) {
+			testFunc: func(t *testing.T, manager ActionRegistry) {
 				result := manager.Execute(
 					t.Context(),
 					assistant.ActionCall{ID: "x", Name: "unknown_action", Input: ""},

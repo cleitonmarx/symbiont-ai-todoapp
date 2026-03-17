@@ -13,8 +13,8 @@ import (
 	"github.com/cleitonmarx/symbiont/depend"
 )
 
-// InitLocalActionRegistry initializes the local ActionRegistry with core and domain dependencies and registers it in the dependency container.
-type InitLocalActionRegistry struct {
+// InitActionRegistry initializes the local ActionRegistry with core and domain dependencies and registers it in the dependency container.
+type InitActionRegistry struct {
 	Uow            transaction.UnitOfWork   `resolve:""`
 	Creator        todouc.Creator           `resolve:""`
 	Updater        todouc.Updater           `resolve:""`
@@ -25,8 +25,8 @@ type InitLocalActionRegistry struct {
 	EmbeddingModel string                   `config:"LLM_EMBEDDING_MODEL"`
 }
 
-// Initialize creates a LocalActionRegistry with the provided dependencies and registers it in the dependency container.
-func (i InitLocalActionRegistry) Initialize(ctx context.Context) (context.Context, error) {
+// Initialize creates an ActionRegistry with the provided dependencies and registers it in the dependency container.
+func (i InitActionRegistry) Initialize(ctx context.Context) (context.Context, error) {
 	actions := []assistant.Action{
 		actions.NewSetUIFiltersAction(),
 		actions.NewFetchTodosAction(

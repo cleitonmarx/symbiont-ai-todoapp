@@ -5,20 +5,18 @@ import (
 	"errors"
 
 	"strings"
-	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
-	"github.com/google/uuid"
 )
 
-// AssistantClient adapts DRMAPIClient to domain assistant/model interfaces.
+// AssistantClient adapts OpenAICompatClient to domain assistant/model interfaces.
 type AssistantClient struct {
-	client DRMAPIClient
+	client OpenAICompatClient
 }
 
-// NewAssistantClientAdapter creates a new adapter.
-func NewAssistantClientAdapter(client DRMAPIClient) AssistantClient {
+// NewAssistantClient creates a new AssistantClient.
+func NewAssistantClient(client OpenAICompatClient) AssistantClient {
 	return AssistantClient{client: client}
 }
 
@@ -28,14 +26,6 @@ func (a AssistantClient) RunTurn(ctx context.Context, req assistant.TurnRequest,
 	defer span.End()
 
 	adapterReq := toChatRequest(req)
-
-	meta := assistant.TurnStarted{
-		UserMessageID:      uuid.New(),
-		AssistantMessageID: uuid.New(),
-	}
-	if err := onEvent(spanCtx, assistant.EventType_TurnStarted, meta); err != nil {
-		return err
-	}
 
 	var (
 		actionCalls []*assistant.ActionCall
@@ -85,9 +75,7 @@ func (a AssistantClient) RunTurn(ctx context.Context, req assistant.TurnRequest,
 	}
 
 	return onEvent(spanCtx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-		AssistantMessageID: meta.AssistantMessageID.String(),
-		CompletedAt:        time.Now().UTC().Format(time.RFC3339),
-		Usage:              usage,
+		Usage: usage,
 	})
 }
 

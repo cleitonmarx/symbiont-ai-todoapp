@@ -18,6 +18,9 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_NAME: todoappdb
+      DB_MAX_OPEN_CONNS: "30"
+      DB_MIN_CONNS: "3"
+      DB_MAX_IDLE_CONNS: "10"
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: root-token
       VAULT_MOUNT_PATH: secret
@@ -26,9 +29,9 @@ services:
       PUBSUB_PROJECT_ID: local-dev
       PUBSUB_TOPIC_ID: Todo
       TODO_EVENTS_SUBSCRIPTION_ID: todo_summary_generator
-      CHAT_EVENTS_SUBSCRIPTION_ID: chat_message_summary_generator
       CHAT_TITLE_EVENTS_SUBSCRIPTION_ID: chat_message_title_generator
       ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX: action_approval_dispatcher
+      CHAT_COMPACTION_TIMEOUT: 20s
       SUMMARY_BATCH_INTERVAL: 1s
       CHAT_TITLE_BATCH_INTERVAL: 3s
       LLM_MODEL_HOST: http://model-runner.docker.internal
@@ -38,6 +41,7 @@ services:
       LLM_EMBEDDING_MODEL_HOST: http://model-runner.docker.internal
       LLM_EMBEDDING_MODEL: docker.io/ai/embeddinggemma:300M-Q8_0
       MCP_GATEWAY_ENDPOINT: http://mcp-gateway:8811
+      CHAT_COMPACTION_TRIGGER_TOKENS: 8000
     models:
       - qwen3
       - embeddinggemma

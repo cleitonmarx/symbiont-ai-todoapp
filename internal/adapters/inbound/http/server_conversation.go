@@ -6,6 +6,7 @@ import (
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
+	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -14,7 +15,7 @@ import (
 // (GET /api/v1/conversations)
 func (api TodoAppServer) ListConversations(w http.ResponseWriter, r *http.Request, params gen.ListConversationsParams) {
 	ctx := r.Context()
-	conversations, hasMore, err := api.ListConversationsUseCase.Query(ctx, params.Page, params.PageSize)
+	conversations, usageByConversationID, hasMore, err := api.ListConversationsUseCase.Query(ctx, params.Page, params.PageSize)
 	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) {
 		api.Logger.Printf("Error listing conversations: %v", err)
 		respondError(w, toError(err))
@@ -27,7 +28,11 @@ func (api TodoAppServer) ListConversations(w http.ResponseWriter, r *http.Reques
 	}
 
 	for i, c := range conversations {
-		resp.Conversations[i] = toConversation(c)
+		resp.Conversations[i] = toConversationProjection(
+			c,
+			usageByConversationID[c.ID],
+			api.ContextCompactionTriggerTokens,
+		)
 	}
 	if hasMore {
 		nextPage := params.Page + 1
@@ -77,5 +82,21 @@ func (api TodoAppServer) UpdateConversation(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	respondJSON(w, http.StatusOK, toConversation(updatedConversation))
+	conversationUUID := uuid.UUID(conversationId)
+	usageByConversationID, err := api.ConversationRepo.GetConversationContextTokenUsage(ctx, []uuid.UUID{conversationUUID})
+	if telemetry.IsErrorRecorded(trace.SpanFromContext(ctx), err) {
+		api.Logger.Printf("Error loading conversation context token usage: %v", err)
+		respondError(w, toError(err))
+		return
+	}
+
+	respondJSON(
+		w,
+		http.StatusOK,
+		toConversationProjection(
+			updatedConversation,
+			usageByConversationID[conversationUUID],
+			api.ContextCompactionTriggerTokens,
+		),
+	)
 }

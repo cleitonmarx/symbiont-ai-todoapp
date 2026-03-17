@@ -11,11 +11,12 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/approvaldispatcher"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/config"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/log"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/md"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/modelrunner"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/postgres"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/pubsub"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/skillregistry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/time"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/tokenizer"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/board"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
@@ -26,7 +27,7 @@ import (
 // NewMonolithic builds the all-in-one deployable.
 // It hosts the HTTP server (REST API + embedded webapp static files), GraphQL API,
 // action approval dispatcher, message relay, board summary generator,
-// chat summary generator, and conversation title generator in a single process.
+// and conversation title generator in a single process.
 // Optional initializers are executed before the default wiring initializers.
 func NewMonolithic(initializers ...symbiont.Initializer) *symbiont.App {
 	return symbiont.NewApp().
@@ -48,21 +49,26 @@ func NewMonolithic(initializers ...symbiont.Initializer) *symbiont.App {
 			&postgres.InitLocker{},
 			&postgres.InitConversationSummaryRepository{},
 			&time.InitCurrentTimeProvider{},
+			&tokenizer.InitTokenizer{},
 			&approvaldispatcher.InitDispatcher{},
 			&pubsub.InitPublisher{},
-			&skillregistry.InitLocalSkillRegistry{},
+			&md.InitSkillRegistry{},
 			&todo.InitCreator{},
 			&todo.InitDeleter{},
 			&todo.InitUpdater{},
-			&local.InitLocalActionRegistry{},
-			&mcp.InitMCPActionRegistry{},
-			&composite.InitCompositeActionRegistry{},
+			&local.InitActionRegistry{},
+			&mcp.InitActionRegistry{},
+			&composite.InitActionRegistry{},
 			&todo.InitListTodos{},
 			&todo.InitCreateTodo{},
 			&todo.InitUpdateTodo{},
 			&todo.InitDeleteTodo{},
 			&board.InitGenerateBoardSummary{},
-			&chat.InitGenerateChatSummary{},
+			&chat.InitConversationCompactor{},
+			&chat.InitConversationTranscriptWriter{},
+			&chat.InitActionPipeline{},
+			&chat.InitTurnRunner{},
+			&chat.InitTurnStateBuilder{},
 			&chat.InitGenerateConversationTitle{},
 			&board.InitGetBoardSummary{},
 			&chat.InitListConversations{},
@@ -79,7 +85,6 @@ func NewMonolithic(initializers ...symbiont.Initializer) *symbiont.App {
 			&http.TodoAppServer{},
 			&graphql.TodoGraphQLServer{},
 			&workers.BoardSummaryGenerator{},
-			&workers.ChatSummaryGenerator{},
 			&workers.ConversationTitleGenerator{},
 			&workers.ActionApprovalDispatcher{},
 			&workers.MessageRelay{},
@@ -107,20 +112,26 @@ func NewHTTPAPI() *symbiont.App {
 			&postgres.InitConversationRepository{},
 			&postgres.InitConversationSummaryRepository{},
 			&time.InitCurrentTimeProvider{},
+			&tokenizer.InitTokenizer{},
 			&approvaldispatcher.InitDispatcher{},
 			&pubsub.InitPublisher{},
-			&skillregistry.InitLocalSkillRegistry{},
+			&md.InitSkillRegistry{},
 			&todo.InitCreator{},
 			&todo.InitDeleter{},
 			&todo.InitUpdater{},
-			&local.InitLocalActionRegistry{},
-			&mcp.InitMCPActionRegistry{},
-			&composite.InitCompositeActionRegistry{},
+			&local.InitActionRegistry{},
+			&mcp.InitActionRegistry{},
+			&composite.InitActionRegistry{},
 			&todo.InitListTodos{},
 			&todo.InitCreateTodo{},
 			&todo.InitUpdateTodo{},
 			&todo.InitDeleteTodo{},
 			&board.InitGetBoardSummary{},
+			&chat.InitConversationCompactor{},
+			&chat.InitConversationTranscriptWriter{},
+			&chat.InitActionPipeline{},
+			&chat.InitTurnRunner{},
+			&chat.InitTurnStateBuilder{},
 			&chat.InitListConversations{},
 			&chat.InitUpdateConversation{},
 			&chat.InitListChatMessages{},
@@ -199,28 +210,6 @@ func NewBoardSummaryGenerator() *symbiont.App {
 		).
 		Host(
 			&workers.BoardSummaryGenerator{},
-		)
-}
-
-// NewChatSummaryGenerator builds the chat summary generator deployable.
-// It hosts the chat summary generator in a dedicated process.
-func NewChatSummaryGenerator() *symbiont.App {
-	return symbiont.NewApp().
-		Initialize(
-			&log.InitLogger{},
-			&telemetry.InitOpenTelemetry{},
-			&telemetry.InitHttpClient{},
-			&config.InitVaultProvider{},
-			&postgres.InitDB{SkipMigration: true},
-			&modelrunner.InitAssistantClient{},
-			&pubsub.InitClient{},
-			&postgres.InitChatMessageRepository{},
-			&postgres.InitConversationSummaryRepository{},
-			&time.InitCurrentTimeProvider{},
-			&chat.InitGenerateChatSummary{},
-		).
-		Host(
-			&workers.ChatSummaryGenerator{},
 		)
 }
 

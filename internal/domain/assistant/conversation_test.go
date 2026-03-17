@@ -243,6 +243,22 @@ func TestConversation_ApplyLLMGeneratedTitle(t *testing.T) {
 			wantTitle:    strings.Repeat("a", 72),
 			wantSource:   ConversationTitleSource_LLM,
 		},
+		"skip-grounding-when-no-summary-context": {
+			conversation: base,
+			rawTitle:     "Weekend Errands Plan",
+			summary:      "",
+			wantStatus:   ConversationTitleApplyStatus_Updated,
+			wantTitle:    "Weekend Errands Plan",
+			wantSource:   ConversationTitleSource_LLM,
+		},
+		"skip-grounding-when-summary-is-none": {
+			conversation: base,
+			rawTitle:     "Weekend Errands Plan",
+			summary:      "none",
+			wantStatus:   ConversationTitleApplyStatus_Updated,
+			wantTitle:    "Weekend Errands Plan",
+			wantSource:   ConversationTitleSource_LLM,
+		},
 	}
 
 	for name, tt := range tests {

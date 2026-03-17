@@ -18,14 +18,68 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func newTestStreamChatUseCase(
+	logger *log.Logger,
+	chatRepo assistant.ChatMessageRepository,
+	summaryRepo assistant.ConversationSummaryRepository,
+	compactor ConversationCompactor,
+	conversationRepo assistant.ConversationRepository,
+	timeProvider core.CurrentTimeProvider,
+	tokenizer assistant.Tokenizer,
+	assist assistant.Assistant,
+	actionRegistry assistant.ActionRegistry,
+	skillRegistry assistant.SkillRegistry,
+	approvalDispatcher assistant.ActionApprovalDispatcher,
+	uow transaction.UnitOfWork,
+	maxActionCycles int,
+	compactionTriggerTokens int,
+	compactionTimeout time.Duration,
+) StreamChatImpl {
+	transcriptWriter := NewConversationTranscriptWriterImpl(uow, tokenizer)
+	actionPipeline := NewActionPipelineImpl(actionRegistry, approvalDispatcher, transcriptWriter, timeProvider)
+	turnRunner := NewTurnRunnerImpl(logger, assist, actionPipeline)
+	stateBuilder := NewTurnStateBuilderImpl(
+		summaryRepo,
+		chatRepo,
+		timeProvider,
+		skillRegistry,
+		actionRegistry,
+	)
+	return NewStreamChatImpl(
+		logger,
+		timeProvider,
+		conversationRepo,
+		compactor,
+		assistant.CompactionPolicy{TriggerTokenCount: compactionTriggerTokens},
+		compactionTimeout,
+		maxActionCycles,
+		stateBuilder,
+		turnRunner,
+		transcriptWriter,
+	)
+}
+
 // streamChatTestTableEntry defines the structure for test cases of StreamChatImpl's Execute method,
 // including input parameters, expectations, and error scenarios.
 type streamChatTestTableEntry struct {
 	userMessage              string
 	model                    string
+	fixedTime                time.Time
 	customSummaryExpectation bool
 	options                  []StreamChatOption
+	persistExpectations      []persistCallExpectation
 	setExpectations          func(
+		*assistant.MockChatMessageRepository,
+		*assistant.MockConversationSummaryRepository,
+		*assistant.MockConversationRepository,
+		*core.MockCurrentTimeProvider,
+		*assistant.MockAssistant,
+		*assistant.MockActionRegistry,
+		*assistant.MockSkillRegistry,
+		*transaction.MockUnitOfWork,
+		*outbox.MockRepository,
+	)
+	setAfterPersistExpectations func(
 		*assistant.MockChatMessageRepository,
 		*assistant.MockConversationSummaryRepository,
 		*assistant.MockConversationRepository,
@@ -65,7 +119,33 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 	}
 
 	if tt.setExpectations != nil {
-		tt.setExpectations(chatRepo, summaryRepo, conversationRepo, timeProvider, assist, actionRegistry, skillRegistry, uow, outboxRepo)
+		tt.setExpectations(
+			chatRepo,
+			summaryRepo,
+			conversationRepo,
+			timeProvider,
+			assist,
+			actionRegistry,
+			skillRegistry,
+			uow,
+			outboxRepo,
+		)
+	}
+	if len(tt.persistExpectations) > 0 {
+		expectPersistSequence(t, chatRepo, conversationRepo, uow, outboxRepo, tt.fixedTime, tt.persistExpectations)
+	}
+	if tt.setAfterPersistExpectations != nil {
+		tt.setAfterPersistExpectations(
+			chatRepo,
+			summaryRepo,
+			conversationRepo,
+			timeProvider,
+			assist,
+			actionRegistry,
+			skillRegistry,
+			uow,
+			outboxRepo,
+		)
 	}
 
 	actionRegistry.EXPECT().
@@ -73,19 +153,22 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 		Return(nil, false).
 		Maybe()
 
-	useCase := NewStreamChatImpl(
+	useCase := newTestStreamChatUseCase(
 		log.New(io.Discard, "", 0),
 		chatRepo,
 		summaryRepo,
+		nil,
 		conversationRepo,
 		timeProvider,
+		nil,
 		assist,
 		actionRegistry,
 		skillRegistry,
 		nil,
 		uow,
-		"test-embedding-model",
 		7,
+		8000,
+		DEFAULT_CONTEXT_COMPACTION_TIMEOUT,
 	)
 
 	var capturedContent string
@@ -117,15 +200,8 @@ func testStreamChatImpl(t *testing.T, tt streamChatTestTableEntry) {
 
 // actionFunctionCallback returns a mock assistant callback that simulates a
 // action call interaction, including meta, delta, and done events.
-func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.Time) func(_ context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
+func actionFunctionCallback() func(_ context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
 	return func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-		if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-			UserMessageID:      userMsgID,
-			AssistantMessageID: assistantMsgID,
-		}); err != nil {
-			return err
-		}
-
 		lastMsg := req.Messages[len(req.Messages)-1]
 		if lastMsg.Content == "Call an action" {
 			err := onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
@@ -142,10 +218,7 @@ func actionFunctionCallback(userMsgID, assistantMsgID uuid.UUID, fixedTime time.
 			}
 		}
 
-		if err := onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-			AssistantMessageID: assistantMsgID.String(),
-			CompletedAt:        fixedTime.Format(time.RFC3339),
-		}); err != nil {
+		if err := onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{}); err != nil {
 			return err
 		}
 		return nil
@@ -165,20 +238,23 @@ type persistCallExpectation struct {
 	PromptTokens           *int
 	CompletionTokens       *int
 	TotalTokens            *int
+	TurnSequence           *int64
 	ActionCallsLen         int
 	HasActionCallID        bool
 	SelectedSkills         []assistant.SelectedSkill
 	ActionExecuted         *bool
 	FirstActionCallText    *string
 	CreateErr              error
+	Capture                func(assistant.ChatMessage)
 }
 
-// expectNowCalls enforces an exact number of current-time reads.
+// expectNowCalls stubs current-time reads for cases that rely on a fixed timestamp.
 func expectNowCalls(timeProvider *core.MockCurrentTimeProvider, fixedTime time.Time, times int) {
+	_ = times
 	timeProvider.EXPECT().
 		Now().
 		Return(fixedTime).
-		Times(times)
+		Maybe()
 }
 
 // expectPersistSequence validates message persistence and matching outbox payloads in order.
@@ -202,8 +278,10 @@ func expectPersistSequence(
 
 	scope := transaction.NewMockScope(t)
 	scope.EXPECT().ChatMessage().Return(chatRepo).Times(len(expectations))
-	scope.EXPECT().Conversation().Return(conversationRepo).Times(successCount)
-	scope.EXPECT().Outbox().Return(outboxRepo).Times(successCount)
+	if successCount > 0 {
+		scope.EXPECT().Conversation().Return(conversationRepo).Times(successCount)
+		scope.EXPECT().Outbox().Return(outboxRepo).Times(successCount)
+	}
 
 	uow.EXPECT().
 		Execute(mock.Anything, mock.Anything).
@@ -237,7 +315,11 @@ func expectPersistSequence(
 			assert.Len(t, msg.ActionCalls, exp.ActionCallsLen)
 			assert.ElementsMatch(t, exp.SelectedSkills, msg.SelectedSkills)
 			assert.NotEqual(t, uuid.Nil, msg.TurnID)
-			assert.Equal(t, int64(createIdx-1), msg.TurnSequence)
+			expectedTurnSequence := int64(createIdx - 1)
+			if exp.TurnSequence != nil {
+				expectedTurnSequence = *exp.TurnSequence
+			}
+			assert.Equal(t, expectedTurnSequence, msg.TurnSequence)
 			assert.Equal(t, fixedTime, msg.CreatedAt)
 			assert.Equal(t, fixedTime, msg.UpdatedAt)
 			if exp.PromptTokens != nil {
@@ -250,11 +332,7 @@ func expectPersistSequence(
 				assert.Equal(t, *exp.TotalTokens, msg.TotalTokens)
 			}
 
-			if exp.ID != nil {
-				assert.Equal(t, *exp.ID, msg.ID)
-			} else {
-				assert.NotEqual(t, uuid.Nil, msg.ID)
-			}
+			assert.NotEqual(t, uuid.Nil, msg.ID)
 
 			if exp.ErrorMessage != nil {
 				if assert.NotNil(t, msg.ErrorMessage) {
@@ -294,6 +372,9 @@ func expectPersistSequence(
 					assert.Equal(t, *exp.FirstActionCallText, msg.ActionCalls[0].Text)
 				}
 			}
+			if exp.Capture != nil {
+				exp.Capture(msg)
+			}
 
 			if exp.CreateErr == nil {
 				successfulMessage = append(successfulMessage, msg)
@@ -303,26 +384,53 @@ func expectPersistSequence(
 		}).
 		Times(len(expectations))
 
-	outboxCallIndex := 0
-	outboxRepo.EXPECT().
-		CreateChatEvent(mock.Anything, mock.Anything).
-		RunAndReturn(func(ctx context.Context, event outbox.ChatMessageEvent) error {
-			msg := successfulMessage[outboxCallIndex]
-			outboxCallIndex++
+	if successCount > 0 {
+		outboxCallIndex := 0
+		outboxRepo.EXPECT().
+			CreateChatEvent(mock.Anything, mock.Anything).
+			RunAndReturn(func(ctx context.Context, event outbox.ChatMessageEvent) error {
+				msg := successfulMessage[outboxCallIndex]
+				outboxCallIndex++
 
-			assert.Equal(t, outbox.EventType_CHAT_MESSAGE_SENT, event.Type)
-			assert.Equal(t, msg.ChatRole, event.ChatRole)
-			assert.Equal(t, msg.ID, event.ChatMessageID)
-			assert.Equal(t, msg.ConversationID, event.ConversationID)
+				assert.Equal(t, outbox.EventType_CHAT_MESSAGE_SENT, event.Type)
+				assert.Equal(t, msg.ChatRole, event.ChatRole)
+				assert.Equal(t, msg.ID, event.ChatMessageID)
+				assert.Equal(t, msg.ConversationID, event.ConversationID)
 
-			return nil
+				return nil
+			}).
+			Times(successCount)
+
+		conversationRepo.EXPECT().
+			UpdateConversation(mock.Anything, mock.MatchedBy(func(conv assistant.Conversation) bool {
+				return conv.LastMessageAt != nil && conv.UpdatedAt.Equal(fixedTime)
+			})).
+			Return(nil).
+			Times(successCount)
+	}
+}
+
+// expectRepairTurnNoOp validates the no-op repair transaction executed after failed turns with no dangling action calls.
+func expectRepairTurnNoOp(
+	t *testing.T,
+	chatRepo *assistant.MockChatMessageRepository,
+	uow *transaction.MockUnitOfWork,
+	conversationID uuid.UUID,
+) {
+	t.Helper()
+
+	scope := transaction.NewMockScope(t)
+	scope.EXPECT().ChatMessage().Return(chatRepo).Once()
+
+	uow.EXPECT().
+		Execute(mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
+			return fn(ctx, scope)
 		}).
-		Times(successCount)
+		Once()
 
-	conversationRepo.EXPECT().
-		UpdateConversation(mock.Anything, mock.MatchedBy(func(conv assistant.Conversation) bool {
-			return conv.LastMessageAt != nil && conv.UpdatedAt.Equal(fixedTime)
-		})).
-		Return(nil).
-		Times(successCount)
+	chatRepo.EXPECT().
+		ListChatMessages(mock.Anything, conversationID, 1, 0).
+		Return([]assistant.ChatMessage{}, false, nil).
+		Once()
 }

@@ -65,6 +65,8 @@ func TestCompositeActionRegistry_Execute(t *testing.T) {
 			assertMessage: func(t *testing.T, message assistant.Message) {
 				assert.Equal(t, assistant.ChatRole_Tool, message.Role)
 				assert.Equal(t, "error: no registry found for action 'unknown_action'", message.Content)
+				require.NotNil(t, message.ActionError)
+				assert.Equal(t, "no registry found for action 'unknown_action'", *message.ActionError)
 			},
 		},
 	}
@@ -80,7 +82,7 @@ func TestCompositeActionRegistry_Execute(t *testing.T) {
 				registries = append(registries, mock)
 			}
 
-			registry := NewCompositeActionRegistry(t.Context(), registries...)
+			registry := NewActionRegistry(t.Context(), registries...)
 			message := registry.Execute(t.Context(), tt.call, tt.history)
 			if tt.assertMessage != nil {
 				tt.assertMessage(t, message)
@@ -164,7 +166,7 @@ func TestCompositeActionRegistry_GetDefinition(t *testing.T) {
 				registries = append(registries, mockRegistry)
 			}
 
-			registry := NewCompositeActionRegistry(t.Context(), registries...)
+			registry := NewActionRegistry(t.Context(), registries...)
 			definition, found := registry.GetDefinition(tt.actionName)
 			if tt.assertResult != nil {
 				tt.assertResult(t, definition, found)
@@ -230,7 +232,7 @@ func TestCompositeActionRegistry_StatusMessage(t *testing.T) {
 				registries = append(registries, mock)
 			}
 
-			registry := NewCompositeActionRegistry(t.Context(), registries...)
+			registry := NewActionRegistry(t.Context(), registries...)
 			assert.Equal(t, tt.expected, registry.StatusMessage(tt.actionName))
 		})
 	}
@@ -291,7 +293,7 @@ func TestCompositeActionRegistry_GetRenderer(t *testing.T) {
 				registries = append(registries, mock)
 			}
 
-			registry := NewCompositeActionRegistry(t.Context(), registries...)
+			registry := NewActionRegistry(t.Context(), registries...)
 			got, found := registry.GetRenderer(tt.actionName)
 			tt.assertResult(t, got, found)
 		})

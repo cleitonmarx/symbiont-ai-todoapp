@@ -114,10 +114,12 @@ func (lft FetchTodosAction) Execute(ctx context.Context, call assistant.ActionCa
 
 	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
+		content := newActionError("invalid_arguments", fmt.Sprintf("failed to parse action input: %s", err.Error()), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", fmt.Sprintf("failed to parse action input: %s", err.Error()), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 
@@ -141,10 +143,12 @@ func (lft FetchTodosAction) Execute(ctx context.Context, call assistant.ActionCa
 		Build(ctx, lft.semanticEncoder, lft.embeddingModel)
 	if err != nil {
 		code := mapTodoFilterBuildErrCode(err)
+		content := newActionError(code, err.Error(), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError(code, err.Error(), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 	if buildResult.EmbeddingTotalTokens > 0 {
@@ -153,10 +157,12 @@ func (lft FetchTodosAction) Execute(ctx context.Context, call assistant.ActionCa
 
 	todos, hasMore, err := lft.repo.ListTodos(ctx, params.Page, params.PageSize, buildResult.Options...)
 	if err != nil {
+		content := newActionError("list_todos_error", fmt.Sprintf("failed to list todos:%s", err.Error()), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("list_todos_error", fmt.Sprintf("failed to list todos:%s", err.Error()), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 
@@ -193,10 +199,12 @@ func (lft FetchTodosAction) Execute(ctx context.Context, call assistant.ActionCa
 	}
 	content, err := toon.Marshal(output)
 	if err != nil {
+		errorContent := newActionError("marshal_error", err.Error(), "")
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("marshal_error", err.Error(), ""),
+			Content:      errorContent,
+			ActionError:  &errorContent,
 		}
 	}
 

@@ -29,17 +29,41 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
+const (
+	defaultDBMaxOpenConns      = 50
+	defaultDBMinConns          = 5
+	defaultDBMaxIdleConns      = 25
+	defaultDBConnMaxLifetime   = 30 * time.Minute
+	defaultDBConnMaxIdleTime   = 5 * time.Minute
+	defaultDBHealthCheckPeriod = 1 * time.Minute
+)
+
+type dbPoolSettings struct {
+	MaxOpenConns      int
+	MinConns          int
+	MaxIdleConns      int
+	ConnMaxLifetime   time.Duration
+	ConnMaxIdleTime   time.Duration
+	HealthCheckPeriod time.Duration
+}
+
 // InitDB initializes the Postgres database connection and runs migrations.
 type InitDB struct {
-	SkipMigration      bool
-	db                 *sql.DB
-	metricRegistration metric.Registration
-	Logger             *log.Logger `resolve:""`
-	DBUser             string      `config:"DB_USER"`
-	DBPass             string      `config:"DB_PASS"`
-	DBHost             string      `config:"DB_HOST"`
-	DBPort             string      `config:"DB_PORT" default:"5432"`
-	DBName             string      `config:"DB_NAME"`
+	SkipMigration       bool
+	db                  *sql.DB
+	metricRegistration  metric.Registration
+	Logger              *log.Logger   `resolve:""`
+	DBUser              string        `config:"DB_USER"`
+	DBPass              string        `config:"DB_PASS"`
+	DBHost              string        `config:"DB_HOST"`
+	DBPort              string        `config:"DB_PORT" default:"5432"`
+	DBName              string        `config:"DB_NAME"`
+	DBMaxOpenConns      int           `config:"DB_MAX_OPEN_CONNS" default:"50"`
+	DBMinConns          int           `config:"DB_MIN_CONNS" default:"5"`
+	DBMaxIdleConns      int           `config:"DB_MAX_IDLE_CONNS" default:"25"`
+	DBConnMaxLifetime   time.Duration `config:"DB_CONN_MAX_LIFETIME" default:"30m"`
+	DBConnMaxIdleTime   time.Duration `config:"DB_CONN_MAX_IDLE_TIME" default:"5m"`
+	DBHealthCheckPeriod time.Duration `config:"DB_HEALTH_CHECK_PERIOD" default:"1m"`
 }
 
 // Initialize sets up the database connection and runs migrations and registers
@@ -57,11 +81,12 @@ func (di *InitDB) Initialize(ctx context.Context) (context.Context, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create connection pool: %w", err)
 	}
-	cfg.MaxConns = 50
-	cfg.MinConns = 5
-	cfg.MaxConnIdleTime = 5 * time.Minute
-	cfg.MaxConnLifetime = 30 * time.Minute
-	cfg.HealthCheckPeriod = 1 * time.Minute
+	poolSettings := di.poolSettings()
+	cfg.MaxConns = int32(poolSettings.MaxOpenConns)
+	cfg.MinConns = int32(poolSettings.MinConns)
+	cfg.MaxConnIdleTime = poolSettings.ConnMaxIdleTime
+	cfg.MaxConnLifetime = poolSettings.ConnMaxLifetime
+	cfg.HealthCheckPeriod = poolSettings.HealthCheckPeriod
 
 	cfg.AfterConnect = func(ctx context.Context, pgconn *pgx.Conn) error {
 		return pgxvector.RegisterTypes(ctx, pgconn)
@@ -83,6 +108,10 @@ func (di *InitDB) Initialize(ctx context.Context) (context.Context, error) {
 		otelsql.WithAttributesGetter(withQueryAttributes(di.Logger)),
 		otelsql.WithInstrumentAttributesGetter(withQueryAttributes(di.Logger)),
 	)
+	di.db.SetMaxOpenConns(poolSettings.MaxOpenConns)
+	di.db.SetMaxIdleConns(poolSettings.MaxIdleConns)
+	di.db.SetConnMaxLifetime(poolSettings.ConnMaxLifetime)
+	di.db.SetConnMaxIdleTime(poolSettings.ConnMaxIdleTime)
 
 	di.metricRegistration, err = otelsql.RegisterDBStatsMetrics(
 		di.db,
@@ -102,6 +131,42 @@ func (di *InitDB) Initialize(ctx context.Context) (context.Context, error) {
 	depend.Register(di.db)
 
 	return ctx, nil
+}
+
+// poolSettings resolves the DB pool settings, applying defaults and safe bounds.
+func (di InitDB) poolSettings() dbPoolSettings {
+	settings := dbPoolSettings{
+		MaxOpenConns:      defaultDBMaxOpenConns,
+		MinConns:          defaultDBMinConns,
+		MaxIdleConns:      defaultDBMaxIdleConns,
+		ConnMaxLifetime:   defaultDBConnMaxLifetime,
+		ConnMaxIdleTime:   defaultDBConnMaxIdleTime,
+		HealthCheckPeriod: defaultDBHealthCheckPeriod,
+	}
+
+	if di.DBMaxOpenConns > 0 {
+		settings.MaxOpenConns = di.DBMaxOpenConns
+	}
+	if di.DBMinConns > 0 {
+		settings.MinConns = di.DBMinConns
+	}
+	if di.DBMaxIdleConns > 0 {
+		settings.MaxIdleConns = di.DBMaxIdleConns
+	}
+	if di.DBConnMaxLifetime > 0 {
+		settings.ConnMaxLifetime = di.DBConnMaxLifetime
+	}
+	if di.DBConnMaxIdleTime > 0 {
+		settings.ConnMaxIdleTime = di.DBConnMaxIdleTime
+	}
+	if di.DBHealthCheckPeriod > 0 {
+		settings.HealthCheckPeriod = di.DBHealthCheckPeriod
+	}
+
+	settings.MinConns = min(settings.MinConns, settings.MaxOpenConns)
+	settings.MaxIdleConns = min(settings.MaxIdleConns, settings.MaxOpenConns)
+
+	return settings
 }
 
 // runMigrations applies database migrations from the embedded filesystem using golang-migrate.

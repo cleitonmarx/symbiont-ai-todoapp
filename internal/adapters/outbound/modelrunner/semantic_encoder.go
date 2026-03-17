@@ -11,14 +11,14 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 )
 
-// SemanticEncoder implements the semantic.Encoder interface using a DRMAPIClient
+// SemanticEncoder implements the semantic.Encoder interface using an OpenAICompatClient.
 type SemanticEncoder struct {
-	embeddingClient  DRMAPIClient
+	embeddingClient  OpenAICompatClient
 	embeddingFactory EmbeddingFactory
 }
 
-// NewSemanticEncoder creates a new SemanticEncoder with the provided DRMAPIClient for embeddings and an EmbeddingFactory for prompt generation.
-func NewSemanticEncoder(client DRMAPIClient) SemanticEncoder {
+// NewSemanticEncoder creates a new SemanticEncoder with the provided OpenAICompatClient for embeddings and an EmbeddingFactory for prompt generation.
+func NewSemanticEncoder(client OpenAICompatClient) SemanticEncoder {
 	return SemanticEncoder{
 		embeddingClient:  client,
 		embeddingFactory: embeddingFactory{},

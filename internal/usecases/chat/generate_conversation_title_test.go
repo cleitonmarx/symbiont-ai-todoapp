@@ -228,7 +228,7 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 						require.GreaterOrEqual(t, len(req.Messages), 1)
 						assert.Equal(t, assistant.ChatRole_System, req.Messages[0].Role)
 						assert.Contains(t, req.Messages[0].Content, "Current title:")
-						assert.Contains(t, req.Messages[0].Content, "Focused summary:")
+						assert.Contains(t, req.Messages[0].Content, "Focused compacted context:")
 						assert.Contains(t, req.Messages[0].Content, "Recent conversation context:")
 						assert.Contains(t, req.Messages[0].Content, "Spring cleaning plan with room-based todo breakdown")
 						assert.NotContains(t, req.Messages[0].Content, "**")
@@ -540,6 +540,75 @@ func TestGenerateConversationTitleImpl_Execute(t *testing.T) {
 					Once()
 			},
 			expectedErr: errors.New("failed to acquire conversation title lock: lock backend unavailable"),
+		},
+		"missing-summary-can-still-update-title": {
+			model: "title-model",
+			event: outbox.ChatMessageEvent{
+				Type:           outbox.EventType_CHAT_MESSAGE_SENT,
+				ConversationID: conversationID,
+				ChatMessageID:  chatMessageID,
+				ChatRole:       assistant.ChatRole_Assistant,
+			},
+			setExpectations: func(
+				conversationRepo *assistant.MockConversationRepository,
+				summaryRepo *assistant.MockConversationSummaryRepository,
+				chatRepo *assistant.MockChatMessageRepository,
+				timeProvider *core.MockCurrentTimeProvider,
+				locker *core.MockLocker,
+				assist *assistant.MockAssistant,
+			) {
+				locker.EXPECT().
+					TryLock(mock.Anything, "conversation-title:"+conversationID.String()).
+					Return(func() {}, true, nil).
+					Once()
+
+				conversationRepo.EXPECT().
+					GetConversation(mock.Anything, conversationID).
+					Return(assistant.Conversation{
+						ID:          conversationID,
+						Title:       "I need to...",
+						TitleSource: assistant.ConversationTitleSource_Auto,
+					}, true, nil).
+					Once()
+
+				chatRepo.EXPECT().
+					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_MESSAGES_FOR_TITLE).
+					Return([]assistant.ChatMessage{
+						{ChatRole: assistant.ChatRole_User, Content: "Plan errands for Saturday", MessageState: assistant.ChatMessageState_Completed},
+						{ChatRole: assistant.ChatRole_Assistant, Content: "I can help organize your weekend errands.", MessageState: assistant.ChatMessageState_Completed},
+					}, false, nil).
+					Once()
+
+				summaryRepo.EXPECT().
+					GetConversationSummary(mock.Anything, conversationID).
+					Return(assistant.ConversationSummary{}, false, nil).
+					Once()
+
+				assist.EXPECT().
+					RunTurnSync(mock.Anything, mock.MatchedBy(func(req assistant.TurnRequest) bool {
+						require.GreaterOrEqual(t, len(req.Messages), 1)
+						assert.Contains(t, req.Messages[0].Content, "Focused compacted context:")
+						assert.Contains(t, req.Messages[0].Content, "\nnone\n")
+						return true
+					})).
+					Return(assistant.TurnResponse{
+						Content: "Weekend Errands Plan",
+					}, nil).
+					Once()
+
+				timeProvider.EXPECT().Now().Return(fixedTime).Once()
+
+				conversationRepo.EXPECT().
+					UpdateConversation(mock.Anything, mock.MatchedBy(func(c assistant.Conversation) bool {
+						return c.ID == conversationID &&
+							c.Title == "Weekend Errands Plan" &&
+							c.TitleSource == assistant.ConversationTitleSource_LLM &&
+							c.UpdatedAt.Equal(fixedTime)
+					})).
+					Return(nil).
+					Once()
+			},
+			expectedErr: nil,
 		},
 	}
 

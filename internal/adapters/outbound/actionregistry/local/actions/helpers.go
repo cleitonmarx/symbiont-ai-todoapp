@@ -72,10 +72,12 @@ func parseDueDateParams(dueAfter, dueBefore *string, exampleArgs string) (*time.
 	if dueAfter != nil {
 		parsedTime, ok := core.ExtractTimeFromText(*dueAfter, now, now.Location())
 		if !ok {
+			content := newActionError("invalid_due_after", "could not parse due_after date", exampleArgs)
 			errMsg := assistant.Message{
 				Role:         assistant.ChatRole_Tool,
 				ActionCallID: nil,
-				Content:      newActionError("invalid_due_after", "could not parse due_after date", exampleArgs),
+				Content:      content,
+				ActionError:  &content,
 			}
 			return nil, nil, &errMsg
 		}
@@ -85,10 +87,12 @@ func parseDueDateParams(dueAfter, dueBefore *string, exampleArgs string) (*time.
 	if dueBefore != nil {
 		parsedTime, ok := core.ExtractTimeFromText(*dueBefore, now, now.Location())
 		if !ok {
+			content := newActionError("invalid_due_before", "could not parse due_before date", exampleArgs)
 			errMsg := assistant.Message{
 				Role:         assistant.ChatRole_Tool,
 				ActionCallID: nil,
-				Content:      newActionError("invalid_due_before", "could not parse due_before date", exampleArgs),
+				Content:      content,
+				ActionError:  &content,
 			}
 			return nil, nil, &errMsg
 		}

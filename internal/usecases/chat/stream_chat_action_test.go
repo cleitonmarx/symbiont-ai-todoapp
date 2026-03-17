@@ -2,7 +2,10 @@ package chat
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"log"
 	"testing"
 	"time"
 
@@ -36,6 +39,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 		"success-with-action-call": {
 			userMessage: "Call an action",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -90,49 +94,50 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				assist.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(
-						actionFunctionCallback(userMsgID, assistantMsgID, fixedTime),
+						actionFunctionCallback(),
 					)
 
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "Call an action",
-						ID:              &userMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
-						ActionCallsLen:  1,
-						HasActionCallID: false,
-						FirstActionCallText: func() *string {
-							msg := "calling list_todos"
-							return &msg
-						}(),
-					},
-					{
-						Role:            assistant.ChatRole_Tool,
-						Content:         "",
-						ActionCallsLen:  0,
-						HasActionCallID: true,
-						ActionExecuted:  common.Ptr(true),
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "Action called successfully.",
-						ID:              &assistantMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-				})
+			},
+			persistExpectations: []persistCallExpectation{
+				{
+					Role:            assistant.ChatRole_User,
+					Content:         "Call an action",
+					ID:              &userMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
+				{
+					Role:            assistant.ChatRole_Assistant,
+					Content:         "",
+					ActionCallsLen:  1,
+					HasActionCallID: false,
+					FirstActionCallText: func() *string {
+						msg := "calling list_todos"
+						return &msg
+					}(),
+				},
+				{
+					Role:            assistant.ChatRole_Tool,
+					Content:         "",
+					ActionCallsLen:  0,
+					HasActionCallID: true,
+					ActionExecuted:  common.Ptr(true),
+				},
+				{
+					Role:            assistant.ChatRole_Assistant,
+					Content:         "Action called successfully.",
+					ID:              &assistantMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
 			},
 			expectErr:       false,
 			expectedContent: "",
 		},
-		"success-with-renderer-bypasses-follow-up-runturn": {
+		"success-with-renderer-continues-follow-up-runturn": {
 			userMessage: "Rename my todo",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -198,63 +203,80 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 
 				expectNowCalls(timeProvider, fixedTime, 6)
 
+				runTurnCalls := 0
 				assist.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
-							return err
+						runTurnCalls++
+						switch runTurnCalls {
+						case 1:
+							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
+								return err
+							}
+							return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
+								ID:    "func-123",
+								Name:  "update_todos",
+								Input: `{"todos":[{"id":"1","title":"Updated"}]}`,
+							})
+						case 2:
+							if len(req.Messages) == 0 {
+								return fmt.Errorf("expected follow-up request messages")
+							}
+							lastMessage := req.Messages[len(req.Messages)-1]
+							if lastMessage.Role != assistant.ChatRole_Assistant || lastMessage.Content != "**Updated** (Due: Jan 25, 2026) - OPEN." {
+								return fmt.Errorf("expected rendered assistant message in follow-up request, got role=%s content=%q", lastMessage.Role, lastMessage.Content)
+							}
+							if err := onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "\nAnything else?"}); err != nil {
+								return err
+							}
+							return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
+						default:
+							return fmt.Errorf("unexpected RunTurn call %d", runTurnCalls)
 						}
-						return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
-							ID:    "func-123",
-							Name:  "update_todos",
-							Input: `{"todos":[{"id":"1","title":"Updated"}]}`,
-						})
 					}).
-					Once()
+					Twice()
 
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "Rename my todo",
-						ID:              &userMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
-						ActionCallsLen:  1,
-						HasActionCallID: false,
-						FirstActionCallText: func() *string {
-							msg := "updating todos...\n"
-							return &msg
-						}(),
-					},
-					{
-						Role:            assistant.ChatRole_Tool,
-						Content:         "todos[1]{id,title,due_date,status}\n1,Updated,2026-01-25,OPEN",
-						ActionCallsLen:  0,
-						HasActionCallID: true,
-						ActionExecuted:  common.Ptr(true),
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "**Updated** (Due: Jan 25, 2026) - OPEN.",
-						ID:              &assistantMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-				})
+			},
+			persistExpectations: []persistCallExpectation{
+				{
+					Role:            assistant.ChatRole_User,
+					Content:         "Rename my todo",
+					ID:              &userMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
+				{
+					Role:            assistant.ChatRole_Assistant,
+					Content:         "",
+					ActionCallsLen:  1,
+					HasActionCallID: false,
+					FirstActionCallText: func() *string {
+						msg := "updating todos...\n"
+						return &msg
+					}(),
+				},
+				{
+					Role:            assistant.ChatRole_Tool,
+					Content:         "todos[1]{id,title,due_date,status}\n1,Updated,2026-01-25,OPEN",
+					ActionCallsLen:  0,
+					HasActionCallID: true,
+					ActionExecuted:  common.Ptr(true),
+				},
+				{
+					Role:            assistant.ChatRole_Assistant,
+					Content:         "**Updated** (Due: Jan 25, 2026) - OPEN.\nAnything else?",
+					ID:              &assistantMsgID,
+					ActionCallsLen:  0,
+					HasActionCallID: false,
+				},
 			},
 			expectErr:       false,
-			expectedContent: "updating todos...\n**Updated** (Due: Jan 25, 2026) - OPEN.",
+			expectedContent: "updating todos...\n**Updated** (Due: Jan 25, 2026) - OPEN.\nAnything else?",
 		},
 		"action-message-marked-as-failed-when-content-has-error": {
 			userMessage: "Call failing action",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -297,7 +319,12 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 							return len(msgs) > 0 && msgs[len(msgs)-1].Content == "Call failing action"
 						}),
 					).
-					Return(assistant.Message{Role: assistant.ChatRole_Tool, ActionCallID: common.Ptr("func-error"), Content: "error: failing_action unavailable"})
+					Return(assistant.Message{
+						Role:         assistant.ChatRole_Tool,
+						ActionCallID: common.Ptr("func-error"),
+						Content:      "error: failing_action unavailable",
+						ActionError:  common.Ptr("error: failing_action unavailable"),
+					})
 
 				chatRepo.EXPECT().
 					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
@@ -312,10 +339,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
 						if callCount == 0 {
 							callCount++
-							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-								UserMessageID:      userMsgID,
-								AssistantMessageID: assistantMsgID,
-							}); err != nil {
+							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 								return err
 							}
 							return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
@@ -328,15 +352,14 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						if err := onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "I could not complete that action call."}); err != nil {
 							return err
 						}
-						return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-							AssistantMessageID: assistantMsgID.String(),
-							CompletedAt:        fixedTime.Format(time.RFC3339),
-						})
+						return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
 					}).
 					Times(2)
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				actionErr := "error: failing_action unavailable"
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
+				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
 						Content:         "Call failing action",
@@ -370,202 +393,15 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
-				})
-			},
+				}
+			}(),
 			expectErr:       false,
 			expectedContent: "calling failing_action...\nI could not complete that action call.",
-		},
-		"onEvent-action-call-error": {
-			userMessage: "Call action",
-			model:       "test-model",
-			options: []StreamChatOption{
-				WithConversationID(conversationID),
-			},
-			setExpectations: func(
-				chatRepo *assistant.MockChatMessageRepository,
-				summaryRepo *assistant.MockConversationSummaryRepository,
-				conversationRepo *assistant.MockConversationRepository,
-				timeProvider *core.MockCurrentTimeProvider,
-				assist *assistant.MockAssistant,
-				actionRegistry *assistant.MockActionRegistry,
-				skillRegistry *assistant.MockSkillRegistry,
-				uow *transaction.MockUnitOfWork,
-				outbox *outbox.MockRepository,
-			) {
-				skillRegistry.EXPECT().
-					ListRelevant(mock.Anything, mock.Anything).
-					Return([]assistant.SkillDefinition{}).
-					Once()
-
-				conversationRepo.EXPECT().
-					GetConversation(mock.Anything, conversationID).
-					Return(assistant.Conversation{
-						ID: conversationID,
-					}, true, nil).
-					Once()
-				actionRegistry.EXPECT().
-					StatusMessage("fetch_todos").
-					Return("calling fetch_todos...\n")
-
-				expectNowCalls(timeProvider, fixedTime, 4)
-
-				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
-					Return([]assistant.ChatMessage{}, false, nil).
-					Once()
-
-				assist.EXPECT().
-					RunTurn(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
-							return err
-						}
-						return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
-							ID:    "func-1",
-							Name:  "fetch_todos",
-							Input: `{"page": 1}`,
-						})
-					})
-
-				onEventErr := "onEvent error"
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "Call action",
-						ID:              &userMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
-						ActionCallsLen:  1,
-						HasActionCallID: false,
-						FirstActionCallText: func() *string {
-							msg := "calling fetch_todos...\n"
-							return &msg
-						}(),
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
-						ID:              &assistantMsgID,
-						MessageState:    assistant.ChatMessageState_Failed,
-						ErrorMessage:    &onEventErr,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-				})
-			},
-			expectErr:      true,
-			onEventErrType: assistant.EventType_ActionStarted,
-		},
-		"onEvent-action-call-finished-error": {
-			userMessage: "Call action",
-			model:       "test-model",
-			options: []StreamChatOption{
-				WithConversationID(conversationID),
-			},
-			setExpectations: func(
-				chatRepo *assistant.MockChatMessageRepository,
-				summaryRepo *assistant.MockConversationSummaryRepository,
-				conversationRepo *assistant.MockConversationRepository,
-				timeProvider *core.MockCurrentTimeProvider,
-				assist *assistant.MockAssistant,
-				actionRegistry *assistant.MockActionRegistry,
-				skillRegistry *assistant.MockSkillRegistry,
-				uow *transaction.MockUnitOfWork,
-				outbox *outbox.MockRepository,
-			) {
-				skillRegistry.EXPECT().
-					ListRelevant(mock.Anything, mock.Anything).
-					Return([]assistant.SkillDefinition{}).
-					Once()
-
-				conversationRepo.EXPECT().
-					GetConversation(mock.Anything, conversationID).
-					Return(assistant.Conversation{
-						ID: conversationID,
-					}, true, nil).
-					Once()
-				actionRegistry.EXPECT().
-					StatusMessage("fetch_todos").
-					Return("calling fetch_todos...\n")
-
-				actionRegistry.EXPECT().
-					Execute(mock.Anything, mock.Anything, mock.Anything).
-					Return(assistant.Message{Role: assistant.ChatRole_Tool, ActionCallID: common.Ptr("func-1"), Content: "action result"}).
-					Once()
-
-				expectNowCalls(timeProvider, fixedTime, 5)
-
-				chatRepo.EXPECT().
-					ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
-					Return([]assistant.ChatMessage{}, false, nil).
-					Once()
-
-				assist.EXPECT().
-					RunTurn(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
-							return err
-						}
-						return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
-							ID:    "func-1",
-							Name:  "fetch_todos",
-							Input: `{"page": 1}`,
-						})
-					})
-
-				onEventErr := "onEvent error"
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
-					{
-						Role:            assistant.ChatRole_User,
-						Content:         "Call action",
-						ID:              &userMsgID,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
-						ActionCallsLen:  1,
-						HasActionCallID: false,
-						FirstActionCallText: func() *string {
-							msg := "calling fetch_todos...\n"
-							return &msg
-						}(),
-					},
-					{
-						Role:            assistant.ChatRole_Tool,
-						Content:         "action result",
-						ActionCallsLen:  0,
-						HasActionCallID: true,
-						ActionExecuted:  common.Ptr(true),
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
-						ID:              &assistantMsgID,
-						MessageState:    assistant.ChatMessageState_Failed,
-						ErrorMessage:    &onEventErr,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
-					},
-				})
-			},
-			expectErr:      true,
-			onEventErrType: assistant.EventType_ActionCompleted,
 		},
 		"max-action-cycles-exceeded": {
 			userMessage: "Keep calling actions",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -613,10 +449,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
 						if callCount == 0 {
-							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-								UserMessageID:      userMsgID,
-								AssistantMessageID: assistantMsgID,
-							}); err != nil {
+							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 								return err
 							}
 						}
@@ -630,6 +463,8 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					}).
 					Times(8)
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				expectations := []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
@@ -662,14 +497,15 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					ActionCallsLen:  0,
 					HasActionCallID: false,
 				})
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, expectations)
-			},
+				return expectations
+			}(),
 			expectErr:       false,
 			expectedContent: "calling action...\ncalling action...\ncalling action...\ncalling action...\ncalling action...\ncalling action...\ncalling action...\nSorry, I could not process your request. Please try again.\n",
 		},
 		"repeated-action-call-loop": {
 			userMessage: "Call the same action repeatedly",
 			model:       "test-model",
+			fixedTime:   fixedTime,
 			options: []StreamChatOption{
 				WithConversationID(conversationID),
 			},
@@ -717,10 +553,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
 						if callCount == 0 {
-							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-								UserMessageID:      userMsgID,
-								AssistantMessageID: assistantMsgID,
-							}); err != nil {
+							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 								return err
 							}
 						}
@@ -734,6 +567,8 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					}).
 					Times(6)
 
+			},
+			persistExpectations: func() []persistCallExpectation {
 				expectations := []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
@@ -766,8 +601,8 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					ActionCallsLen:  0,
 					HasActionCallID: false,
 				})
-				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, expectations)
-			},
+				return expectations
+			}(),
 			expectErr:       false,
 			expectedContent: "calling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\ncalling fetch_todos...\nSorry, I could not process your request. Please try again.\n",
 		},
@@ -777,5 +612,250 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			testStreamChatImpl(t, tt)
 		})
+	}
+}
+
+func TestStreamChatImpl_Execute_CanceledTurnRepairsDanglingActionCall(t *testing.T) {
+	t.Parallel()
+
+	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	fixedTime := time.Date(2026, 1, 24, 15, 0, 0, 0, time.UTC)
+	actionCallID := "func-123"
+
+	chatRepo := assistant.NewMockChatMessageRepository(t)
+	summaryRepo := assistant.NewMockConversationSummaryRepository(t)
+	conversationRepo := assistant.NewMockConversationRepository(t)
+	timeProvider := core.NewMockCurrentTimeProvider(t)
+	assist := assistant.NewMockAssistant(t)
+	actionRegistry := assistant.NewMockActionRegistry(t)
+	skillRegistry := assistant.NewMockSkillRegistry(t)
+	uow := transaction.NewMockUnitOfWork(t)
+	outboxRepo := outbox.NewMockRepository(t)
+
+	conversation := assistant.Conversation{ID: conversationID, CreatedAt: fixedTime.Add(-time.Minute)}
+
+	skillRegistry.EXPECT().
+		ListRelevant(mock.Anything, mock.Anything).
+		Return([]assistant.SkillDefinition{}).
+		Once()
+
+	conversationRepo.EXPECT().
+		GetConversation(mock.Anything, conversationID).
+		Return(conversation, true, nil).
+		Once()
+
+	summaryRepo.EXPECT().
+		GetConversationSummary(mock.Anything, conversationID).
+		Return(assistant.ConversationSummary{}, false, nil).
+		Once()
+
+	chatRepo.EXPECT().
+		ListChatMessages(mock.Anything, conversationID, 1, MAX_CHAT_HISTORY_MESSAGES).
+		Return([]assistant.ChatMessage{}, false, nil).
+		Once()
+
+	expectNowCalls(timeProvider, fixedTime, 2)
+
+	actionRegistry.EXPECT().
+		StatusMessage("list_todos").
+		Return("calling list_todos").
+		Once()
+
+	assistantActionCallMessageID := uuid.Nil
+	userMessageID := uuid.Nil
+	turnID := uuid.Nil
+
+	createScope1 := transaction.NewMockScope(t)
+	createScope2 := transaction.NewMockScope(t)
+	repairScope := transaction.NewMockScope(t)
+
+	uow.EXPECT().
+		Execute(mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
+			return fn(ctx, createScope1)
+		}).
+		Once()
+	uow.EXPECT().
+		Execute(mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
+			return fn(ctx, createScope2)
+		}).
+		Once()
+	uow.EXPECT().
+		Execute(mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
+			return fn(ctx, repairScope)
+		}).
+		Once()
+
+	createScope1.EXPECT().ChatMessage().Return(chatRepo).Once()
+	createScope1.EXPECT().Outbox().Return(outboxRepo).Once()
+	createScope1.EXPECT().Conversation().Return(conversationRepo).Once()
+
+	createScope2.EXPECT().ChatMessage().Return(chatRepo).Once()
+	createScope2.EXPECT().Outbox().Return(outboxRepo).Once()
+	createScope2.EXPECT().Conversation().Return(conversationRepo).Once()
+
+	repairScope.EXPECT().ChatMessage().Return(chatRepo).Twice()
+	repairScope.EXPECT().Conversation().Return(conversationRepo).Twice()
+
+	chatRepo.EXPECT().
+		CreateChatMessages(mock.Anything, mock.MatchedBy(func(msgs []assistant.ChatMessage) bool {
+			if len(msgs) != 1 {
+				return false
+			}
+			msg := msgs[0]
+			if msg.ChatRole != assistant.ChatRole_User || msg.Content != "Call an action" {
+				return false
+			}
+			userMessageID = msg.ID
+			return true
+		})).
+		Return(nil).
+		Once()
+
+	outboxRepo.EXPECT().
+		CreateChatEvent(mock.Anything, mock.MatchedBy(func(event outbox.ChatMessageEvent) bool {
+			return event.ChatRole == assistant.ChatRole_User && event.ChatMessageID == userMessageID
+		})).
+		Return(nil).
+		Once()
+
+	conversationRepo.EXPECT().
+		UpdateConversation(mock.Anything, mock.MatchedBy(func(conv assistant.Conversation) bool {
+			return conv.ID == conversationID && conv.LastMessageAt != nil && conv.LastMessageAt.Equal(fixedTime) && conv.UpdatedAt.Equal(fixedTime)
+		})).
+		Return(nil).
+		Once()
+
+	chatRepo.EXPECT().
+		CreateChatMessages(mock.Anything, mock.MatchedBy(func(msgs []assistant.ChatMessage) bool {
+			if len(msgs) != 1 {
+				return false
+			}
+			msg := msgs[0]
+			if msg.ChatRole != assistant.ChatRole_Assistant || len(msg.ActionCalls) != 1 || msg.ActionCalls[0].ID != actionCallID {
+				return false
+			}
+			assistantActionCallMessageID = msg.ID
+			return true
+		})).
+		Return(nil).
+		Once()
+
+	outboxRepo.EXPECT().
+		CreateChatEvent(mock.Anything, mock.MatchedBy(func(event outbox.ChatMessageEvent) bool {
+			return event.ChatRole == assistant.ChatRole_Assistant && event.ChatMessageID == assistantActionCallMessageID
+		})).
+		Return(nil).
+		Once()
+
+	conversationRepo.EXPECT().
+		UpdateConversation(mock.Anything, mock.MatchedBy(func(conv assistant.Conversation) bool {
+			return conv.ID == conversationID && conv.LastMessageAt != nil && conv.LastMessageAt.Equal(fixedTime) && conv.UpdatedAt.Equal(fixedTime)
+		})).
+		Return(nil).
+		Once()
+
+	assist.EXPECT().
+		RunTurn(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
+			return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
+				ID:    actionCallID,
+				Name:  "list_todos",
+				Input: `{"page": 1}`,
+			})
+		}).
+		Once()
+
+	chatRepo.EXPECT().
+		ListChatMessages(mock.Anything, conversationID, 1, 0).
+		RunAndReturn(func(ctx context.Context, conversationID uuid.UUID, page int, pageSize int, options ...assistant.ListChatMessagesOption) ([]assistant.ChatMessage, bool, error) {
+			return []assistant.ChatMessage{
+				{
+					ID:             userMessageID,
+					ConversationID: conversationID,
+					TurnID:         turnID,
+					ChatRole:       assistant.ChatRole_User,
+					Content:        "Call an action",
+					CreatedAt:      fixedTime,
+				},
+				{
+					ID:             assistantActionCallMessageID,
+					ConversationID: conversationID,
+					TurnID:         turnID,
+					ChatRole:       assistant.ChatRole_Assistant,
+					ActionCalls: []assistant.ActionCall{
+						{ID: actionCallID, Name: "list_todos"},
+					},
+					CreatedAt: fixedTime,
+				},
+			}, false, nil
+		}).
+		Once()
+
+	chatRepo.EXPECT().
+		DeleteChatMessages(mock.Anything, mock.MatchedBy(func(ids []uuid.UUID) bool {
+			return len(ids) == 1 && ids[0] == assistantActionCallMessageID
+		})).
+		Return(nil).
+		Once()
+
+	conversationRepo.EXPECT().
+		GetConversation(mock.Anything, conversationID).
+		Return(assistant.Conversation{
+			ID:          conversationID,
+			Title:       "Fresh title",
+			TitleSource: assistant.ConversationTitleSource_LLM,
+			CreatedAt:   fixedTime.Add(-time.Minute),
+			UpdatedAt:   fixedTime,
+		}, true, nil).
+		Once()
+
+	conversationRepo.EXPECT().
+		UpdateConversation(mock.Anything, mock.MatchedBy(func(conv assistant.Conversation) bool {
+			return conv.ID == conversationID &&
+				conv.Title == "Fresh title" &&
+				conv.TitleSource == assistant.ConversationTitleSource_LLM &&
+				conv.LastMessageAt != nil &&
+				conv.LastMessageAt.Equal(fixedTime) &&
+				conv.UpdatedAt.Equal(fixedTime)
+		})).
+		Return(nil).
+		Once()
+
+	useCase := newTestStreamChatUseCase(
+		log.New(io.Discard, "", 0),
+		chatRepo,
+		summaryRepo,
+		nil,
+		conversationRepo,
+		timeProvider,
+		nil,
+		assist,
+		actionRegistry,
+		skillRegistry,
+		nil,
+		uow,
+		7,
+		8000,
+		DEFAULT_CONTEXT_COMPACTION_TIMEOUT,
+	)
+
+	err := useCase.Execute(t.Context(), "Call an action", "test-model", func(_ context.Context, eventType assistant.EventType, data any) error {
+		if eventType == assistant.EventType_TurnStarted {
+			turnID = data.(assistant.TurnStarted).TurnID
+		}
+		if eventType == assistant.EventType_ActionStarted {
+			return context.Canceled
+		}
+		return nil
+	}, WithConversationID(conversationID))
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+	if turnID == uuid.Nil {
+		t.Fatal("expected a turn id to be emitted before cancellation")
 	}
 }

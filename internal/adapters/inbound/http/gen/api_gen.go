@@ -191,6 +191,9 @@ type ChatStreamRequest struct {
 
 // Conversation A conversation between the user and the AI assistant.
 type Conversation struct {
+	// ContextCompactionTriggerTokens Configured token threshold that triggers synchronous context compaction.
+	ContextCompactionTriggerTokens int64 `json:"context_compaction_trigger_tokens"`
+
 	// CreatedAt Timestamp when the conversation was created.
 	CreatedAt time.Time `json:"created_at"`
 
@@ -202,6 +205,9 @@ type Conversation struct {
 
 	// TitleSource Source of the conversation title.
 	TitleSource ConversationTitleSource `json:"title_source"`
+
+	// TotalTokensUsed Estimated current context tokens since the last summarized message checkpoint.
+	TotalTokensUsed int64 `json:"total_tokens_used"`
 
 	// UpdatedAt Timestamp when the conversation was last updated.
 	UpdatedAt time.Time `json:"updated_at"`

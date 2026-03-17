@@ -80,7 +80,6 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: "world"}}}, Usage: &Usage{PromptTokens: 5, CompletionTokens: 5, TotalTokens: 10}},
 			},
 			expectedEvents: []assistant.EventType{
-				assistant.EventType_TurnStarted,
 				assistant.EventType_MessageDelta,
 				assistant.EventType_MessageDelta,
 				assistant.EventType_MessageDelta,
@@ -94,7 +93,6 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 				{Choices: []StreamChunkChoice{{Delta: StreamChunkDelta{Content: ""}}}},
 			},
 			expectedEvents: []assistant.EventType{
-				assistant.EventType_TurnStarted,
 				assistant.EventType_TurnCompleted,
 			},
 			expectedContent: "",
@@ -151,7 +149,6 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 			},
 
 			expectedEvents: []assistant.EventType{
-				assistant.EventType_TurnStarted,
 				assistant.EventType_ActionRequested,
 				assistant.EventType_TurnCompleted,
 			},
@@ -164,8 +161,8 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 			server := createStreamingServer(tt.chunks)
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
+			adapter := NewAssistantClient(client)
 
 			eventTypes, deltaTexts, _, err := collectStreamEvents(t.Context(), adapter, tt.req)
 
@@ -192,8 +189,8 @@ func TestAssistantClientAdapter_RunTurn_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewDRMAPIClient(server.URL, "", server.Client())
-	adapter := NewAssistantClientAdapter(client)
+	client := NewOpenAICompatClient(server.URL, "", server.Client())
+	adapter := NewAssistantClient(client)
 
 	req := assistant.TurnRequest{
 		Model: "test-model",
@@ -308,8 +305,8 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
+			adapter := NewAssistantClient(client)
 
 			resp, err := adapter.RunTurnSync(t.Context(), tt.req)
 
@@ -336,8 +333,8 @@ func TestAssistantClientAdapter_RunTurnSync_ValidationErrors(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewDRMAPIClient(server.URL, "", server.Client())
-	adapter := NewAssistantClientAdapter(client)
+	client := NewOpenAICompatClient(server.URL, "", server.Client())
+	adapter := NewAssistantClient(client)
 
 	tests := map[string]struct {
 		req assistant.TurnRequest
@@ -405,8 +402,8 @@ func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
+			adapter := NewAssistantClient(client)
 
 			models, err := adapter.ListAvailableModels(t.Context())
 
@@ -494,8 +491,8 @@ func TestAssistantClientAdapter_ListModels(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
+			adapter := NewAssistantClient(client)
 
 			models, err := adapter.ListModels(t.Context())
 

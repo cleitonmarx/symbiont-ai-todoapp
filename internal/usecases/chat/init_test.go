@@ -23,16 +23,16 @@ func TestInitDeleteConversation_Initialize(t *testing.T) {
 
 }
 
-func TestInitGenerateChatSummary_Initialize(t *testing.T) {
+func TestInitConversationCompactor_Initialize(t *testing.T) {
 	t.Parallel()
 
-	i := InitGenerateChatSummary{}
+	i := InitConversationCompactor{}
 
 	ctx, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
-	uc, err := depend.Resolve[GenerateChatSummary]()
+	uc, err := depend.Resolve[ConversationCompactor]()
 	assert.NoError(t, err)
 	assert.NotNil(t, uc)
 }
@@ -107,6 +107,54 @@ func TestInitStreamChat_Initialize(t *testing.T) {
 	streamChatUseCase, err := depend.Resolve[StreamChat]()
 	assert.NoError(t, err)
 	assert.NotNil(t, streamChatUseCase)
+}
+
+func TestInitConversationTranscriptWriter_Initialize(t *testing.T) {
+	t.Parallel()
+
+	i := InitConversationTranscriptWriter{}
+	_, err := i.Initialize(t.Context())
+	assert.NoError(t, err)
+
+	component, err := depend.Resolve[ConversationTranscriptWriter]()
+	assert.NoError(t, err)
+	assert.NotNil(t, component)
+}
+
+func TestInitActionPipeline_Initialize(t *testing.T) {
+	t.Parallel()
+
+	i := InitActionPipeline{}
+	_, err := i.Initialize(t.Context())
+	assert.NoError(t, err)
+
+	component, err := depend.Resolve[ActionPipeline]()
+	assert.NoError(t, err)
+	assert.NotNil(t, component)
+}
+
+func TestInitTurnRunner_Initialize(t *testing.T) {
+	t.Parallel()
+
+	i := InitTurnRunner{}
+	_, err := i.Initialize(t.Context())
+	assert.NoError(t, err)
+
+	component, err := depend.Resolve[TurnRunner]()
+	assert.NoError(t, err)
+	assert.NotNil(t, component)
+}
+
+func TestInitTurnStateBuilder_Initialize(t *testing.T) {
+	t.Parallel()
+
+	i := InitTurnStateBuilder{}
+	_, err := i.Initialize(t.Context())
+	assert.NoError(t, err)
+
+	component, err := depend.Resolve[TurnStateBuilder]()
+	assert.NoError(t, err)
+	assert.NotNil(t, component)
 }
 
 func TestInitSubmitActionApproval_Initialize(t *testing.T) {

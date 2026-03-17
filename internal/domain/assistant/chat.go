@@ -71,6 +71,7 @@ type ChatMessage struct {
 	PromptTokens           int
 	CompletionTokens       int
 	TotalTokens            int
+	ContextTokensEstimate  int
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 }
@@ -125,6 +126,9 @@ type ChatMessageRepository interface {
 
 	// ListChatMessages retrieves paginated chat messages for a conversation, with optional filters.
 	ListChatMessages(ctx context.Context, conversationID uuid.UUID, page int, pageSize int, options ...ListChatMessagesOption) ([]ChatMessage, bool, error)
+
+	// DeleteChatMessages removes specific chat messages by ID.
+	DeleteChatMessages(ctx context.Context, messageIDs []uuid.UUID) error
 
 	// DeleteConversationMessages removes all messages for a conversation.
 	DeleteConversationMessages(ctx context.Context, conversationID uuid.UUID) error

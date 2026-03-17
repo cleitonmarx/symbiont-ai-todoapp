@@ -27,6 +27,12 @@ const (
 	EventType_ActionCompleted EventType = "action_completed"
 	// EventType_TurnCompleted indicates a chat turn finished.
 	EventType_TurnCompleted EventType = "turn_completed"
+	// EventType_ContextCompactionStarted indicates context compaction has started.
+	EventType_ContextCompactionStarted EventType = "context_compaction_started"
+	// EventType_ContextCompactionCompleted indicates context compaction has completed.
+	EventType_ContextCompactionCompleted EventType = "context_compaction_completed"
+	// EventType_ContextCompactionFailed indicates context compaction has failed.
+	EventType_ContextCompactionFailed EventType = "context_compaction_failed"
 )
 
 // Usage contains token usage for one assistant turn.
@@ -39,8 +45,6 @@ type Usage struct {
 // TurnStarted contains metadata for a streaming assistant session.
 type TurnStarted struct {
 	ConversationID      uuid.UUID       `json:"conversation_id"`
-	UserMessageID       uuid.UUID       `json:"user_message_id"`
-	AssistantMessageID  uuid.UUID       `json:"assistant_message_id"`
 	ConversationCreated bool            `json:"conversation_created"`
 	TurnID              uuid.UUID       `json:"turn_id"`
 	SelectedSkills      []SelectedSkill `json:"selected_skills,omitempty"`
@@ -89,9 +93,43 @@ type ActionCompleted struct {
 
 // TurnCompleted contains completion metadata and usage.
 type TurnCompleted struct {
-	Usage              Usage  `json:"usage"`
-	AssistantMessageID string `json:"assistant_message_id"`
-	CompletedAt        string `json:"completed_at"`
+	Usage Usage `json:"usage"`
+}
+
+// ContextCompactionReason identifies why compaction was triggered.
+type ContextCompactionReason string
+
+const (
+	// ContextCompactionReasonNone indicates no compaction trigger matched.
+	ContextCompactionReasonNone ContextCompactionReason = "none"
+	// ContextCompactionReasonTokenCountThreshold indicates the unsummarized token threshold matched.
+	ContextCompactionReasonTokenCountThreshold ContextCompactionReason = "token_count_threshold"
+)
+
+// ContextCompactionStarted indicates the compaction process has started.
+type ContextCompactionStarted struct {
+	ConversationID           uuid.UUID               `json:"conversation_id"`
+	UnsummarizedMessageCount int                     `json:"unsummarized_message_count"`
+	UnsummarizedTotalTokens  int                     `json:"unsummarized_total_tokens"`
+	Reason                   ContextCompactionReason `json:"reason"`
+}
+
+// ContextCompactionCompleted indicates the compaction process finished successfully.
+type ContextCompactionCompleted struct {
+	ConversationID           uuid.UUID               `json:"conversation_id"`
+	UnsummarizedMessageCount int                     `json:"unsummarized_message_count"`
+	UnsummarizedTotalTokens  int                     `json:"unsummarized_total_tokens"`
+	Reason                   ContextCompactionReason `json:"reason"`
+	CompactedAt              string                  `json:"compacted_at"`
+}
+
+// ContextCompactionFailed indicates compaction failed but chat execution can continue.
+type ContextCompactionFailed struct {
+	ConversationID           uuid.UUID               `json:"conversation_id"`
+	UnsummarizedMessageCount int                     `json:"unsummarized_message_count"`
+	UnsummarizedTotalTokens  int                     `json:"unsummarized_total_tokens"`
+	Reason                   ContextCompactionReason `json:"reason"`
+	Error                    string                  `json:"error"`
 }
 
 // EventCallback is called for each assistant turn event.

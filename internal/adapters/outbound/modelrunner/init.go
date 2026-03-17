@@ -11,15 +11,15 @@ import (
 
 // InitAssistantClient initializes assistant/chat-model dependencies.
 type InitAssistantClient struct {
-	HttpClient *http.Client `resolve:""`
+	HttpClient *http.Client `resolve:"streaming"`
 	ModelHost  string       `config:"LLM_MODEL_HOST"`
 	APIKey     string       `config:"LLM_API_KEY" default:""`
 }
 
 // Initialize creates and registers assistant/model-catalog interfaces in the dependency container.
 func (i InitAssistantClient) Initialize(ctx context.Context) (context.Context, error) {
-	adapter := NewAssistantClientAdapter(
-		NewDRMAPIClient(i.ModelHost, i.APIKey, i.HttpClient),
+	adapter := NewAssistantClient(
+		NewOpenAICompatClient(i.ModelHost, i.APIKey, i.HttpClient),
 	)
 	depend.Register[assistant.Assistant](adapter)
 	depend.Register[assistant.ModelCatalog](adapter)
@@ -28,7 +28,7 @@ func (i InitAssistantClient) Initialize(ctx context.Context) (context.Context, e
 
 // InitEncoderClient initializes embedding-model dependencies.
 type InitEncoderClient struct {
-	HttpClient         *http.Client `resolve:""`
+	HttpClient         *http.Client `resolve:"streaming"`
 	EmbeddingModelHost string       `config:"LLM_EMBEDDING_MODEL_HOST"`
 	EmbeddingAPIKey    string       `config:"LLM_EMBEDDING_API_KEY" default:""`
 }
@@ -36,7 +36,7 @@ type InitEncoderClient struct {
 // Initialize creates and registers the semantic encoder interface in the dependency container.
 func (i InitEncoderClient) Initialize(ctx context.Context) (context.Context, error) {
 	adapter := NewSemanticEncoder(
-		NewDRMAPIClient(i.EmbeddingModelHost, i.EmbeddingAPIKey, i.HttpClient),
+		NewOpenAICompatClient(i.EmbeddingModelHost, i.EmbeddingAPIKey, i.HttpClient),
 	)
 	depend.Register[semantic.Encoder](adapter)
 	return ctx, nil

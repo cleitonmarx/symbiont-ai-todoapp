@@ -89,11 +89,12 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 	fixedUUID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	newTitle := "Updated Conversation Title"
+	contextCompactionTriggerTokens := 8000
 
 	tests := map[string]struct {
 		conversationID       openapi_types.UUID
 		requestBody          []byte
-		setExpectations      func(uc *chat.MockUpdateConversation)
+		setExpectations      func(uc *chat.MockUpdateConversation, repo *assistant.MockConversationRepository)
 		expectedStatusCode   int
 		expectedResponseBody any
 		expectedErr          bool
@@ -101,7 +102,7 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 		"success-update-title": {
 			conversationID: openapi_types.UUID(fixedUUID),
 			requestBody:    serializeJSON(t, gen.UpdateConversationRequest{Title: newTitle}),
-			setExpectations: func(uc *chat.MockUpdateConversation) {
+			setExpectations: func(uc *chat.MockUpdateConversation, repo *assistant.MockConversationRepository) {
 				uc.EXPECT().Execute(mock.Anything, fixedUUID, newTitle).Return(
 					assistant.Conversation{
 						ID:          fixedUUID,
@@ -110,6 +111,9 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 						CreatedAt:   fixedTime,
 						UpdatedAt:   fixedTime,
 					}, nil)
+				repo.EXPECT().
+					GetConversationContextTokenUsage(mock.Anything, []uuid.UUID{fixedUUID}).
+					Return(map[uuid.UUID]int64{fixedUUID: 84}, nil)
 			},
 			expectedStatusCode: http.StatusOK,
 			expectedErr:        false,
@@ -117,21 +121,21 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 		"malformed-json": {
 			conversationID:     openapi_types.UUID(fixedUUID),
 			requestBody:        []byte(`{invalid json}`),
-			setExpectations:    func(uc *chat.MockUpdateConversation) {},
+			setExpectations:    func(uc *chat.MockUpdateConversation, repo *assistant.MockConversationRepository) {},
 			expectedStatusCode: http.StatusBadRequest,
 			expectedErr:        false,
 		},
 		"empty-request-body": {
 			conversationID:     openapi_types.UUID(fixedUUID),
 			requestBody:        []byte(``),
-			setExpectations:    func(uc *chat.MockUpdateConversation) {},
+			setExpectations:    func(uc *chat.MockUpdateConversation, repo *assistant.MockConversationRepository) {},
 			expectedStatusCode: http.StatusBadRequest,
 			expectedErr:        false,
 		},
 		"conversation-not-found": {
 			conversationID: openapi_types.UUID(fixedUUID),
 			requestBody:    serializeJSON(t, gen.UpdateConversationRequest{Title: newTitle}),
-			setExpectations: func(uc *chat.MockUpdateConversation) {
+			setExpectations: func(uc *chat.MockUpdateConversation, repo *assistant.MockConversationRepository) {
 				uc.EXPECT().Execute(mock.Anything, fixedUUID, newTitle).Return(
 					assistant.Conversation{},
 					core.NewNotFoundErr("conversation not found"))
@@ -142,7 +146,7 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 		"validation-error": {
 			conversationID: openapi_types.UUID(fixedUUID),
 			requestBody:    serializeJSON(t, gen.UpdateConversationRequest{Title: ""}),
-			setExpectations: func(uc *chat.MockUpdateConversation) {
+			setExpectations: func(uc *chat.MockUpdateConversation, repo *assistant.MockConversationRepository) {
 				uc.EXPECT().Execute(mock.Anything, fixedUUID, "").Return(
 					assistant.Conversation{},
 					core.NewValidationErr("conversation title cannot be empty"))
@@ -153,10 +157,29 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 		"use-case-error": {
 			conversationID: openapi_types.UUID(fixedUUID),
 			requestBody:    serializeJSON(t, gen.UpdateConversationRequest{Title: newTitle}),
-			setExpectations: func(uc *chat.MockUpdateConversation) {
+			setExpectations: func(uc *chat.MockUpdateConversation, repo *assistant.MockConversationRepository) {
 				uc.EXPECT().Execute(mock.Anything, fixedUUID, newTitle).Return(
 					assistant.Conversation{},
 					errors.New("internal server error"))
+			},
+			expectedStatusCode: http.StatusInternalServerError,
+			expectedErr:        false,
+		},
+		"context-token-usage-error": {
+			conversationID: openapi_types.UUID(fixedUUID),
+			requestBody:    serializeJSON(t, gen.UpdateConversationRequest{Title: newTitle}),
+			setExpectations: func(uc *chat.MockUpdateConversation, repo *assistant.MockConversationRepository) {
+				uc.EXPECT().Execute(mock.Anything, fixedUUID, newTitle).Return(
+					assistant.Conversation{
+						ID:          fixedUUID,
+						Title:       newTitle,
+						TitleSource: assistant.ConversationTitleSource_User,
+						CreatedAt:   fixedTime,
+						UpdatedAt:   fixedTime,
+					}, nil)
+				repo.EXPECT().
+					GetConversationContextTokenUsage(mock.Anything, []uuid.UUID{fixedUUID}).
+					Return(nil, errors.New("usage error"))
 			},
 			expectedStatusCode: http.StatusInternalServerError,
 			expectedErr:        false,
@@ -166,13 +189,16 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			mockUC := chat.NewMockUpdateConversation(t)
+			mockRepo := assistant.NewMockConversationRepository(t)
 			if tt.setExpectations != nil {
-				tt.setExpectations(mockUC)
+				tt.setExpectations(mockUC, mockRepo)
 			}
 
 			server := TodoAppServer{
-				UpdateConversationUseCase: mockUC,
-				Logger:                    log.New(io.Discard, "", 0),
+				UpdateConversationUseCase:      mockUC,
+				ConversationRepo:               mockRepo,
+				Logger:                         log.New(io.Discard, "", 0),
+				ContextCompactionTriggerTokens: contextCompactionTriggerTokens,
 			}
 
 			req := httptest.NewRequest(http.MethodPatch, "/api/conversations/"+tt.conversationID.String(), bytes.NewBuffer(tt.requestBody))
@@ -181,6 +207,13 @@ func TestTodoAppServer_UpdateConversation(t *testing.T) {
 			server.UpdateConversation(w, req, tt.conversationID)
 
 			assert.Equal(t, tt.expectedStatusCode, w.Code)
+			if w.Code == http.StatusOK {
+				var resp gen.Conversation
+				err := json.NewDecoder(w.Body).Decode(&resp)
+				assert.NoError(t, err)
+				assert.Equal(t, int64(contextCompactionTriggerTokens), resp.ContextCompactionTriggerTokens)
+				assert.Equal(t, int64(84), resp.TotalTokensUsed)
+			}
 			mockUC.AssertExpectations(t)
 		})
 	}
@@ -190,6 +223,7 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 	t.Parallel()
 
 	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	contextCompactionTriggerTokens := 8000
 
 	tests := map[string]struct {
 		page                int
@@ -212,6 +246,8 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 						CreatedAt:   fixedTime,
 						UpdatedAt:   fixedTime,
 					},
+				}, map[uuid.UUID]int64{
+					uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"): 55,
 				}, true, nil)
 			},
 			expectedStatusCode:  http.StatusOK,
@@ -231,6 +267,8 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 						CreatedAt:   fixedTime,
 						UpdatedAt:   fixedTime,
 					},
+				}, map[uuid.UUID]int64{
+					uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"): 77,
 				}, true, nil)
 			},
 			expectedStatusCode:  http.StatusOK,
@@ -250,6 +288,8 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 						CreatedAt:   fixedTime,
 						UpdatedAt:   fixedTime,
 					},
+				}, map[uuid.UUID]int64{
+					uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"): 12,
 				}, false, nil)
 			},
 			expectedStatusCode:  http.StatusOK,
@@ -261,7 +301,7 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 			page:     1,
 			pageSize: 10,
 			setExpectations: func(uc *chat.MockListConversations) {
-				uc.EXPECT().Query(mock.Anything, 1, 10).Return([]assistant.Conversation{}, false, nil)
+				uc.EXPECT().Query(mock.Anything, 1, 10).Return([]assistant.Conversation{}, map[uuid.UUID]int64{}, false, nil)
 			},
 			expectedStatusCode:  http.StatusOK,
 			expectedHasNextPage: false,
@@ -272,7 +312,7 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 			page:     1,
 			pageSize: 10,
 			setExpectations: func(uc *chat.MockListConversations) {
-				uc.EXPECT().Query(mock.Anything, 1, 10).Return(nil, false, errors.New("database error"))
+				uc.EXPECT().Query(mock.Anything, 1, 10).Return(nil, nil, false, errors.New("database error"))
 			},
 			expectedStatusCode:  http.StatusInternalServerError,
 			expectedHasNextPage: false,
@@ -289,8 +329,9 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 			}
 
 			server := TodoAppServer{
-				ListConversationsUseCase: mockUC,
-				Logger:                   log.New(io.Discard, "", 0),
+				ListConversationsUseCase:       mockUC,
+				Logger:                         log.New(io.Discard, "", 0),
+				ContextCompactionTriggerTokens: contextCompactionTriggerTokens,
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/api/conversations", nil)
@@ -322,6 +363,10 @@ func TestTodoAppServer_ListConversations(t *testing.T) {
 					assert.NotNil(t, resp.PreviousPage)
 				} else {
 					assert.Nil(t, resp.PreviousPage)
+				}
+
+				for _, conversation := range resp.Conversations {
+					assert.Equal(t, int64(contextCompactionTriggerTokens), conversation.ContextCompactionTriggerTokens)
 				}
 			}
 		})

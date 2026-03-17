@@ -357,6 +357,7 @@ paths:
       summary: Stream assistant response for a user message (single global chat)
       description: >
         Streams Server-Sent Events (SSE). Events: turn_started, message_delta,
+        context_compaction_started, context_compaction_completed, context_compaction_failed,
         action_approval_required, action_approval_resolved, action_started,
         action_completed, turn_completed.
       requestBody:
@@ -376,6 +377,12 @@ paths:
                 example:
                   summary: Example SSE events
                   value: |
+                    event: context_compaction_started
+                    data: {"conversation_id":"4b825f1e-8c3a-4d2b-9f1e-7c9a0b5e6d8f","unsummarized_message_count":7,"unsummarized_total_tokens":1120,"reason":"token_count_threshold"}
+
+                    event: context_compaction_completed
+                    data: {"conversation_id":"4b825f1e-8c3a-4d2b-9f1e-7c9a0b5e6d8f","unsummarized_message_count":7,"unsummarized_total_tokens":1120,"reason":"token_count_threshold","compacted_at":"2026-03-12T10:00:00Z"}
+
                     event: turn_started
                     data: {"conversation_id":"4b825f1e-8c3a-4d2b-9f1e-7c9a0b5e6d8f","user_message_id":"1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d","assistant_message_id":"0f7d6ef6-1f2a-4e0c-9f6d-7d7c7c2e1a11","turn_id":"8d1b3124-4d8a-4d8f-8b8b-2f1cc4d55aa1","conversation_created":false,"selected_skills":[{"name":"update_todos","source":"skills/update_todos.md","tools":["fetch_todos","update_todos"]}]}
 
@@ -877,7 +884,7 @@ components:
     Conversation:
       type: object
       additionalProperties: false
-      required: [id, title, title_source, created_at, updated_at]
+      required: [id, title, title_source, total_tokens_used, context_compaction_trigger_tokens, created_at, updated_at]
       description: >
         A conversation between the user and the AI assistant.
       properties:
@@ -892,6 +899,16 @@ components:
           example: "General Chat"
         title_source:
           $ref: "#/components/schemas/ConversationTitleSource"
+        total_tokens_used:
+          type: integer
+          format: int64
+          description: Estimated current context tokens since the last summarized message checkpoint.
+          example: 4321
+        context_compaction_trigger_tokens:
+          type: integer
+          format: int64
+          description: Configured token threshold that triggers synchronous context compaction.
+          example: 8000
         created_at:
           type: string
           format: date-time
@@ -1181,3 +1198,57 @@ components:
         completed_at:
           type: string
           format: date-time
+
+    ContextCompactionReason:
+      type: string
+      enum: [none, token_count_threshold]
+
+    SseContextCompactionStarted:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, unsummarized_message_count, unsummarized_total_tokens, reason]
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        unsummarized_message_count:
+          type: integer
+        unsummarized_total_tokens:
+          type: integer
+        reason:
+          $ref: "#/components/schemas/ContextCompactionReason"
+
+    SseContextCompactionCompleted:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, unsummarized_message_count, unsummarized_total_tokens, reason, compacted_at]
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        unsummarized_message_count:
+          type: integer
+        unsummarized_total_tokens:
+          type: integer
+        reason:
+          $ref: "#/components/schemas/ContextCompactionReason"
+        compacted_at:
+          type: string
+          format: date-time
+
+    SseContextCompactionFailed:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, unsummarized_message_count, unsummarized_total_tokens, reason, error]
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        unsummarized_message_count:
+          type: integer
+        unsummarized_total_tokens:
+          type: integer
+        reason:
+          $ref: "#/components/schemas/ContextCompactionReason"
+        error:
+          type: string

@@ -5,17 +5,19 @@ go 1.25.0
 require (
 	cloud.google.com/go/pubsub/v2 v2.4.0
 	github.com/99designs/gqlgen v0.17.87
+	github.com/CharLemAznable/qwen-tokenizer v0.0.0-20240910052652-5491bd2bfeab
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/DataDog/go-sqllexer v0.2.0
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/XSAM/otelsql v0.41.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
-	github.com/cleitonmarx/symbiont v0.4.1
+	github.com/cleitonmarx/symbiont v0.4.2
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/hashicorp/vault/api v1.22.0
 	github.com/jackc/pgx/v5 v5.8.0
+	github.com/lib/pq v1.10.9
 	github.com/modelcontextprotocol/go-sdk v1.4.0
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/pgvector/pgvector-go v0.3.0
@@ -23,6 +25,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.41.0
 	github.com/testcontainers/testcontainers-go/modules/compose v0.41.0
+	github.com/tiktoken-go/tokenizer v0.7.0
 	github.com/toon-format/toon-go v0.0.0-20251202084852-7ca0e27c4e8c
 	github.com/vektah/gqlparser/v2 v2.5.32
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.66.0
@@ -49,6 +52,7 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -68,6 +72,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chromedp/cdproto v0.0.0-20250803210736-d308e07a266d // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
+	github.com/clbanning/mxj/v2 v2.7.0 // indirect
 	github.com/compose-spec/compose-go/v2 v2.10.1 // indirect
 	github.com/containerd/console v1.0.5 // indirect
 	github.com/containerd/containerd/api v1.10.0 // indirect
@@ -94,6 +99,7 @@ require (
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 // indirect
+	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/evanw/esbuild v0.27.2 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
@@ -113,6 +119,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/gofrs/flock v0.13.0 // indirect
+	github.com/gogf/gf/v2 v2.7.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
@@ -130,6 +137,7 @@ require (
 	github.com/grafana/sobek v0.0.0-20260121195222-d8d9202018c5 // indirect
 	github.com/grafana/xk6-dashboard v0.7.13 // indirect
 	github.com/grafana/xk6-redis v0.3.6 // indirect
+	github.com/grokify/html-strip-tags-go v0.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -164,7 +172,6 @@ require (
 	github.com/knadh/koanf/v2 v2.3.0 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
-	github.com/lib/pq v1.10.9 // indirect
 	github.com/lufia/plan9stats v0.0.0-20240226150601-1dcf7310316a // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
@@ -202,6 +209,7 @@ require (
 	github.com/oapi-codegen/oapi-codegen/v2 v2.5.1 // indirect
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
+	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onsi/gomega v1.35.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect

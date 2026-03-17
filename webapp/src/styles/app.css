@@ -1167,6 +1167,28 @@
   font-size: 0.76rem;
 }
 
+.ui-chat-context-icon {
+  --ui-context-fill: 0deg;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  position: relative;
+  display: inline-block;
+  background: conic-gradient(#536884 var(--ui-context-fill), #d3dce9 0deg);
+  box-shadow: inset 0 0 0 1px #c6d1e1;
+  cursor: default;
+}
+
+.ui-chat-context-icon::after {
+  content: "";
+  position: absolute;
+  inset: 0.17rem;
+  border-radius: 999px;
+  background: #f4f7fc;
+  box-shadow: inset 0 0 0 1px #e0e7f2;
+}
+
 .ui-chat-model-select {
   min-width: 144px;
   max-width: 220px;
@@ -1616,6 +1638,22 @@
   font-weight: 700;
 }
 
+.ui-chat-compaction-status {
+  border-color: #d0e7d8;
+  background: #edf8f0;
+  color: #1d5a2f;
+}
+
+.ui-chat-compaction-error {
+  margin: 0 0.75rem;
+  padding: 0.44rem 0.58rem;
+  border: 1px solid #efc2ba;
+  border-radius: 10px;
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger);
+  font-size: 0.76rem;
+}
+
 .ui-chat-approval {
   margin: 0.6rem 0.75rem 0;
   padding: 0.7rem 0.75rem;
@@ -1946,6 +1984,12 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.ui-chat-send-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .ui-chat-send-btn {

@@ -177,7 +177,7 @@ func TestConversationTitleGenerator_Run(t *testing.T) {
 			cancel, doneChan := run(t, ctx, ConversationTitleGenerator{
 				Logger:                    log.Default(),
 				Client:                    client,
-				Interval:                  5 * time.Second,
+				Interval:                  200 * time.Millisecond,
 				BatchSize:                 len(tt.payloads),
 				SubscriptionID:            subscriptionID,
 				GenerateConversationTitle: gct,
@@ -187,7 +187,7 @@ func TestConversationTitleGenerator_Run(t *testing.T) {
 			err := publishMessages(ctx, client, topicName, tt.payloads)
 			assert.NoError(t, err)
 
-			waitForBatchSignals(t, signalChan, 1, 1*time.Second)
+			waitForBatchSignals(t, signalChan, 1, 500*time.Millisecond)
 			cancel()
 			waitRunnableStop(t, doneChan)
 

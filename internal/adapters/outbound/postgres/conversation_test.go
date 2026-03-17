@@ -8,9 +8,15 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
-
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
+)
+
+var (
+	selectConversationQuery                  = "SELECT id, title, title_source, last_message_at, created_at, updated_at FROM conversations WHERE id = $1 LIMIT 1"
+	listConversationQuery                    = "SELECT id, title, title_source, last_message_at, created_at, updated_at FROM conversations ORDER BY last_message_at DESC NULLS LAST, updated_at DESC, created_at DESC LIMIT 3 OFFSET 0"
+	selectConversationContextTokenUsageQuery = "SELECT conversations.id AS conversation_id, COALESCE(conversation_token_usage.total_tokens_used, 0) AS total_tokens_used FROM conversations LEFT JOIN LATERAL ( SELECT COALESCE(SUM(chat_messages.context_tokens_estimate), 0)::BIGINT AS total_tokens_used FROM chat_messages LEFT JOIN conversations_summary conversation_summary ON conversation_summary.conversation_id = conversations.id LEFT JOIN chat_messages checkpoint ON checkpoint.conversation_id = conversations.id AND checkpoint.id = conversation_summary.last_summarized_message_id WHERE chat_messages.conversation_id = conversations.id AND (\n\t\t\tcheckpoint.id IS NULL\n\t\t\tOR chat_messages.created_at > checkpoint.created_at\n\t\t\tOR (\n\t\t\t\tchat_messages.created_at = checkpoint.created_at\n\t\t\t\tAND chat_messages.id > checkpoint.id\n\t\t\t)\n\t\t) ) conversation_token_usage ON TRUE WHERE conversations.id = ANY($1)"
 )
 
 func TestConversationRepository_CreateConversation(t *testing.T) {
@@ -102,7 +108,7 @@ func TestConversationRepository_GetConversation(t *testing.T) {
 			expect: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows(conversationFields).
 					AddRow(conversationID, "Trip", assistant.ConversationTitleSource_User, lastMessageAt, fixedTime, fixedTime)
-				m.ExpectQuery("SELECT id, title, title_source, last_message_at, created_at, updated_at FROM conversations WHERE id = $1 LIMIT 1").
+				m.ExpectQuery(selectConversationQuery).
 					WithArgs(conversationID).
 					WillReturnRows(rows)
 			},
@@ -119,7 +125,7 @@ func TestConversationRepository_GetConversation(t *testing.T) {
 		},
 		"not-found": {
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectQuery("SELECT id, title, title_source, last_message_at, created_at, updated_at FROM conversations WHERE id = $1 LIMIT 1").
+				m.ExpectQuery(selectConversationQuery).
 					WithArgs(conversationID).
 					WillReturnError(sql.ErrNoRows)
 			},
@@ -128,7 +134,7 @@ func TestConversationRepository_GetConversation(t *testing.T) {
 		},
 		"database-error": {
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectQuery("SELECT id, title, title_source, last_message_at, created_at, updated_at FROM conversations WHERE id = $1 LIMIT 1").
+				m.ExpectQuery(selectConversationQuery).
 					WithArgs(conversationID).
 					WillReturnError(errors.New("db error"))
 			},
@@ -152,6 +158,71 @@ func TestConversationRepository_GetConversation(t *testing.T) {
 			} else {
 				assert.NoError(t, gotErr)
 				assert.Equal(t, tt.expectedFind, found)
+				assert.Equal(t, tt.expected, got)
+			}
+
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestConversationRepository_GetConversationContextTokenUsage(t *testing.T) {
+	t.Parallel()
+
+	c1 := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	c2 := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+
+	tests := map[string]struct {
+		conversationIDs []uuid.UUID
+		expect          func(sqlmock.Sqlmock)
+		expected        map[uuid.UUID]int64
+		expectErr       bool
+	}{
+		"success": {
+			conversationIDs: []uuid.UUID{c1, c2},
+			expect: func(m sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows([]string{"conversation_id", "total_tokens_used"}).
+					AddRow(c1, int64(120)).
+					AddRow(c2, int64(55))
+				m.ExpectQuery(selectConversationContextTokenUsageQuery).
+					WithArgs(pq.Array([]uuid.UUID{c1, c2})).
+					WillReturnRows(rows)
+			},
+			expected: map[uuid.UUID]int64{
+				c1: 120,
+				c2: 55,
+			},
+		},
+		"empty-input": {
+			conversationIDs: []uuid.UUID{},
+			expect:          func(sqlmock.Sqlmock) {},
+			expected:        map[uuid.UUID]int64{},
+		},
+		"database-error": {
+			conversationIDs: []uuid.UUID{c1, c2},
+			expect: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(selectConversationContextTokenUsageQuery).
+					WithArgs(pq.Array([]uuid.UUID{c1, c2})).
+					WillReturnError(errors.New("db error"))
+			},
+			expectErr: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			assert.NoError(t, err)
+			defer db.Close() //nolint:errcheck
+
+			tt.expect(mock)
+
+			repo := NewConversationRepository(db)
+			got, gotErr := repo.GetConversationContextTokenUsage(t.Context(), tt.conversationIDs)
+			if tt.expectErr {
+				assert.Error(t, gotErr)
+			} else {
+				assert.NoError(t, gotErr)
 				assert.Equal(t, tt.expected, got)
 			}
 
@@ -254,7 +325,7 @@ func TestConversationRepository_ListConversations(t *testing.T) {
 					AddRow(c1, "C1", assistant.ConversationTitleSource_Auto, lastMessageAt, createdAt, updatedAt).
 					AddRow(c2, "C2", assistant.ConversationTitleSource_User, nil, createdAt, updatedAt).
 					AddRow(c3, "C3", assistant.ConversationTitleSource_LLM, nil, createdAt, updatedAt)
-				m.ExpectQuery("SELECT id, title, title_source, last_message_at, created_at, updated_at FROM conversations ORDER BY last_message_at DESC NULLS LAST, updated_at DESC, created_at DESC LIMIT 3 OFFSET 0").
+				m.ExpectQuery(listConversationQuery).
 					WillReturnRows(rows)
 			},
 			expected: []assistant.Conversation{
@@ -287,7 +358,7 @@ func TestConversationRepository_ListConversations(t *testing.T) {
 			page:     1,
 			pageSize: 2,
 			expect: func(m sqlmock.Sqlmock) {
-				m.ExpectQuery("SELECT id, title, title_source, last_message_at, created_at, updated_at FROM conversations ORDER BY last_message_at DESC NULLS LAST, updated_at DESC, created_at DESC LIMIT 3 OFFSET 0").
+				m.ExpectQuery(listConversationQuery).
 					WillReturnError(errors.New("db error"))
 			},
 			expectErr: true,

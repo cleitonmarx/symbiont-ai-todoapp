@@ -13,16 +13,16 @@ import (
 	"strings"
 )
 
-// DRMAPIClient is a thin client for llama.cpp OpenAI-compatible API
-type DRMAPIClient struct {
+// OpenAICompatClient is a thin client for an OpenAI-compatible API.
+type OpenAICompatClient struct {
 	baseURL string
 	apiKey  string
 	http    *http.Client
 }
 
-// NewDRMAPIClient creates a new client
-func NewDRMAPIClient(baseURL string, apiKey string, httpClient *http.Client) DRMAPIClient {
-	return DRMAPIClient{
+// NewOpenAICompatClient creates a new client.
+func NewOpenAICompatClient(baseURL string, apiKey string, httpClient *http.Client) OpenAICompatClient {
+	return OpenAICompatClient{
 		baseURL: baseURL,
 		apiKey:  apiKey,
 		http:    httpClient,
@@ -33,7 +33,7 @@ func NewDRMAPIClient(baseURL string, apiKey string, httpClient *http.Client) DRM
 type ChunkCallback func(chunk StreamChunk) error
 
 // Chat sends a non-streaming request
-func (c DRMAPIClient) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+func (c OpenAICompatClient) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
 	if req.Model == "" {
 		return nil, errors.New("model is required")
 	}
@@ -70,7 +70,7 @@ func (c DRMAPIClient) Chat(ctx context.Context, req ChatRequest) (*ChatResponse,
 }
 
 // ChatStream streams the response, calling onChunk for each SSE data packet
-func (c DRMAPIClient) ChatStream(ctx context.Context, req ChatRequest, onChunk ChunkCallback) error {
+func (c OpenAICompatClient) ChatStream(ctx context.Context, req ChatRequest, onChunk ChunkCallback) error {
 	if req.Model == "" {
 		return errors.New("model is required")
 	}
@@ -127,7 +127,7 @@ func (c DRMAPIClient) ChatStream(ctx context.Context, req ChatRequest, onChunk C
 }
 
 // Embeddings requests embeddings for the given input
-func (c DRMAPIClient) Embeddings(ctx context.Context, req EmbeddingsRequest) (*EmbeddingsResponse, error) {
+func (c OpenAICompatClient) Embeddings(ctx context.Context, req EmbeddingsRequest) (*EmbeddingsResponse, error) {
 	httpReq, err := c.newRequest(ctx, http.MethodPost, "/v1/embeddings", req)
 	if err != nil {
 		return nil, err
@@ -157,7 +157,7 @@ func (c DRMAPIClient) Embeddings(ctx context.Context, req EmbeddingsRequest) (*E
 }
 
 // AvailableModels retrieves the list of available models
-func (c DRMAPIClient) AvailableModels(ctx context.Context) (*ModelsResponse, error) {
+func (c OpenAICompatClient) AvailableModels(ctx context.Context) (*ModelsResponse, error) {
 	httpReq, err := c.newRequest(ctx, http.MethodGet, "/v1/models", nil)
 	if err != nil {
 		return nil, err
@@ -186,7 +186,7 @@ func (c DRMAPIClient) AvailableModels(ctx context.Context) (*ModelsResponse, err
 	return &out, nil
 }
 
-func (c DRMAPIClient) newRequest(ctx context.Context, method, path string, body any) (*http.Request, error) {
+func (c OpenAICompatClient) newRequest(ctx context.Context, method, path string, body any) (*http.Request, error) {
 	endpoint, err := url.JoinPath(c.baseURL, path)
 	if err != nil {
 		return nil, fmt.Errorf("invalid base URL: %w", err)

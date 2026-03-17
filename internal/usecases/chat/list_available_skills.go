@@ -7,22 +7,23 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 )
 
-// ListAvailableSkills defines the use case for listing available assistant skills.
+// ListAvailableSkills returns the assistant skills exposed to chat clients.
 type ListAvailableSkills interface {
+	// Query returns the currently available skills.
 	Query(ctx context.Context) ([]assistant.SkillDefinition, error)
 }
 
-// ListAvailableSkillsImpl implements the ListAvailableSkills use case.
+// ListAvailableSkillsImpl implements ListAvailableSkills.
 type ListAvailableSkillsImpl struct {
 	skillRegistry assistant.SkillRegistry
 }
 
-// NewListAvailableSkillsImpl creates a new ListAvailableSkillsImpl instance.
+// NewListAvailableSkillsImpl creates a ListAvailableSkillsImpl.
 func NewListAvailableSkillsImpl(skillRegistry assistant.SkillRegistry) *ListAvailableSkillsImpl {
 	return &ListAvailableSkillsImpl{skillRegistry: skillRegistry}
 }
 
-// Query retrieves the list of available skills from the configured catalog.
+// Query implements ListAvailableSkills.
 func (uc ListAvailableSkillsImpl) Query(ctx context.Context) ([]assistant.SkillDefinition, error) {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()

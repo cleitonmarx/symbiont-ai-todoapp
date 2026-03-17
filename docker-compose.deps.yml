@@ -51,7 +51,7 @@ services:
     ports:
       - "8681:8681"
     environment:
-      PUBSUB_PROJECT1: local-dev,Todo:todo_summary_generator,ChatMessages:chat_message_summary_generator:chat_message_title_generator,ActionApprovals
+      PUBSUB_PROJECT1: local-dev,Todo:todo_summary_generator,ChatMessages:chat_message_title_generator,ActionApprovals
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8681"]
       interval: 3s
@@ -82,7 +82,7 @@ services:
 models:
   qwen3:
     model: docker.io/ai/qwen3:4B-F16
-    context_size: 9000
+    context_size: 16000
     runtime_flags:
       - "--batch-size"
       - "1024"

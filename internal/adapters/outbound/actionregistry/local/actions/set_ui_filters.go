@@ -101,10 +101,12 @@ func (t SetUIFiltersAction) Execute(_ context.Context, call assistant.ActionCall
 	exampleArgs := `{"search_by_similarity":"buy milk","sort_by":"similarityAsc","page":1,"page_size":25}`
 
 	if err := unmarshalActionInput(call.Input, &params); err != nil {
+		content := newActionError("invalid_arguments", err.Error(), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 
@@ -128,10 +130,12 @@ func (t SetUIFiltersAction) Execute(_ context.Context, call assistant.ActionCall
 		Validate()
 	if err != nil {
 		code := mapTodoFilterBuildErrCode(err)
+		content := newActionError(code, err.Error(), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError(code, err.Error(), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 

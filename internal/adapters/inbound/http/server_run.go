@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/inbound/http/gen"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/board"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/usecases/chat"
@@ -21,24 +22,32 @@ import (
 
 var _ gen.ServerInterface = (*TodoAppServer)(nil)
 
+const (
+	defaultServerReadHeaderTimeout = 5 * time.Second
+	defaultServerIdleTimeout       = 60 * time.Second
+	defaultServerMaxHeaderBytes    = 1 << 20
+)
+
 // TodoAppServer is the REST API and UI HTTP server for the TodoApp application.
 type TodoAppServer struct {
-	Port                        int                       `config:"API_SERVER_PORT" default:"8080"`
-	Logger                      *log.Logger               `resolve:""`
-	ListTodosUseCase            todo.List                 `resolve:""`
-	CreateTodoUseCase           todo.Create               `resolve:""`
-	UpdateTodoUseCase           todo.Update               `resolve:""`
-	DeleteTodoUseCase           todo.Delete               `resolve:""`
-	GetBoardSummaryUseCase      board.GetBoardSummary     `resolve:""`
-	ListConversationsUseCase    chat.ListConversations    `resolve:""`
-	UpdateConversationUseCase   chat.UpdateConversation   `resolve:""`
-	ListChatMessagesUseCase     chat.ListChatMessages     `resolve:""`
-	SubmitActionApprovalUseCase chat.SubmitActionApproval `resolve:""`
-	DeleteConversationUseCase   chat.DeleteConversation   `resolve:""`
-	ListAvailableModelsUseCase  chat.ListAvailableModels  `resolve:""`
-	ListAvailableSkillsUseCase  chat.ListAvailableSkills  `resolve:""`
-	StreamChatUseCase           chat.StreamChat           `resolve:""`
-	introspectionReport         introspection.Report
+	Port                           int                              `config:"API_SERVER_PORT" default:"8080"`
+	Logger                         *log.Logger                      `resolve:""`
+	ListTodosUseCase               todo.List                        `resolve:""`
+	CreateTodoUseCase              todo.Create                      `resolve:""`
+	UpdateTodoUseCase              todo.Update                      `resolve:""`
+	DeleteTodoUseCase              todo.Delete                      `resolve:""`
+	GetBoardSummaryUseCase         board.GetBoardSummary            `resolve:""`
+	ListConversationsUseCase       chat.ListConversations           `resolve:""`
+	UpdateConversationUseCase      chat.UpdateConversation          `resolve:""`
+	ConversationRepo               assistant.ConversationRepository `resolve:""`
+	ListChatMessagesUseCase        chat.ListChatMessages            `resolve:""`
+	SubmitActionApprovalUseCase    chat.SubmitActionApproval        `resolve:""`
+	DeleteConversationUseCase      chat.DeleteConversation          `resolve:""`
+	ListAvailableModelsUseCase     chat.ListAvailableModels         `resolve:""`
+	ListAvailableSkillsUseCase     chat.ListAvailableSkills         `resolve:""`
+	StreamChatUseCase              chat.StreamChat                  `resolve:""`
+	ContextCompactionTriggerTokens int                              `config:"CHAT_COMPACTION_TRIGGER_TOKENS"`
+	introspectionReport            introspection.Report
 }
 
 //go:embed webappdist/*
@@ -71,8 +80,11 @@ func (api TodoAppServer) Run(ctx context.Context) error {
 	h = cors.AllowAll().Handler(h)
 
 	s := &http.Server{
-		Handler: h,
-		Addr:    fmt.Sprintf(":%d", api.Port),
+		Handler:           h,
+		Addr:              fmt.Sprintf(":%d", api.Port),
+		ReadHeaderTimeout: defaultServerReadHeaderTimeout,
+		IdleTimeout:       defaultServerIdleTimeout,
+		MaxHeaderBytes:    defaultServerMaxHeaderBytes,
 	}
 
 	errCh := make(chan error, 1)

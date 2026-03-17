@@ -2,7 +2,7 @@
 
 This chart deploys:
 
-- App split workloads: `http-api`, `graphql-api`, `message-relay`, `board-summary-generator`, `chat-summary-generator`, `conversation-title-generator`
+- App split workloads: `http-api`, `graphql-api`, `message-relay`, `board-summary-generator`, `conversation-title-generator`
 - In-cluster dependencies: PostgreSQL (pgvector), Vault (dev mode), Pub/Sub emulator, MCP gateway (docker-compose parity mode)
 
 ## Key values

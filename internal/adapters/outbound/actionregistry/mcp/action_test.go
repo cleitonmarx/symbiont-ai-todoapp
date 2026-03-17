@@ -74,6 +74,8 @@ func TestMCPToolAction_Methods(t *testing.T) {
 				require.NotNil(t, msg.ActionCallID)
 				assert.Equal(t, "call-1", *msg.ActionCallID)
 				assert.Contains(t, msg.Content, "mcp_call_error")
+				require.NotNil(t, msg.ActionError)
+				assert.Equal(t, "action is not executable", *msg.ActionError)
 			},
 		},
 	}

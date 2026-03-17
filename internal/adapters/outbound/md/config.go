@@ -1,4 +1,4 @@
-package skillregistry
+package md
 
 const (
 	defaultRelevantSkillsTopK        = 2

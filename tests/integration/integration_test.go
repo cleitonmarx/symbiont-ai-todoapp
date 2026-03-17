@@ -32,11 +32,12 @@ import (
 
 // boardSummaryQueue is used to receive completed board summaries for verification in tests.
 var (
-	boardSummaryQueue        board.CompletedBoardSummaryChannel
-	conversationSummaryQueue chat.CompletedConversationSummaryChannel
-	conversationTitleQueue   chat.CompletedConversationTitleUpdateChannel
-	restCli                  *rest.ClientWithResponses
+	boardSummaryQueue      board.CompletedBoardSummaryChannel
+	conversationTitleQueue chat.CompletedConversationTitleUpdateChannel
+	restCli                *rest.ClientWithResponses
 )
+
+const contextCompactionTriggerTokens = int64(8000)
 
 func TestMain(m *testing.M) {
 	todoApp := app.NewMonolithic(
@@ -54,7 +55,6 @@ func TestMain(m *testing.M) {
 				"PUBSUB_PROJECT_ID":                          "local-dev",
 				"PUBSUB_TOPIC_ID":                            "Todo",
 				"TODO_EVENTS_SUBSCRIPTION_ID":                "todo_summary_generator",
-				"CHAT_EVENTS_SUBSCRIPTION_ID":                "chat_message_summary_generator",
 				"CHAT_TITLE_EVENTS_SUBSCRIPTION_ID":          "chat_message_title_generator",
 				"LLM_EMBEDDING_MODEL_HOST":                   "http://localhost:12434",
 				"LLM_MODEL_HOST":                             "http://localhost:12434",
@@ -64,6 +64,8 @@ func TestMain(m *testing.M) {
 				"LLM_EMBEDDING_MODEL":                        "embeddinggemma:300M-Q8_0",
 				"MCP_GATEWAY_ENDPOINT":                       "http://localhost:8811",
 				"ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX": "action_approval_dispatcher",
+				"CHAT_COMPACTION_TRIGGER_TOKENS":             fmt.Sprintf("%d", contextCompactionTriggerTokens),
+				"CHAT_COMPACTION_TIMEOUT":                    "8s",
 			},
 		},
 		&InitDockerCompose{},
@@ -71,9 +73,6 @@ func TestMain(m *testing.M) {
 
 	boardSummaryQueue = make(board.CompletedBoardSummaryChannel)
 	depend.Register(boardSummaryQueue)
-
-	conversationSummaryQueue = make(chat.CompletedConversationSummaryChannel)
-	depend.Register(conversationSummaryQueue)
 
 	conversationTitleQueue = make(chat.CompletedConversationTitleUpdateChannel)
 	depend.Register(conversationTitleQueue)
@@ -302,6 +301,7 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 
 		require.Equal(t, autoTitle, lastConversation.Title, "expected conversation title to be auto-generated based on the initial user message")
 		require.Equal(t, rest.ConversationTitleSourceAuto, lastConversation.TitleSource, "expected conversation title source to be 'auto'")
+		require.Equal(t, contextCompactionTriggerTokens, lastConversation.ContextCompactionTriggerTokens, "expected conversation response to expose compaction trigger tokens")
 	})
 
 	t.Run("chat-fetch-todo", func(t *testing.T) {
@@ -410,15 +410,6 @@ func TestTodoApp_ChatRestAPI(t *testing.T) {
 		require.GreaterOrEqual(t, actionCompletedCount, 1)
 	})
 
-	t.Run("check-conversation-summary-generated", func(t *testing.T) {
-		select {
-		case summary := <-conversationSummaryQueue:
-			require.Contains(t, summary.CurrentStateSummary, "Integration Test Todo")
-		case <-time.After(1 * time.Minute):
-			t.Fatalf("Timed out waiting for conversation summary in queue")
-		}
-	})
-
 	t.Run("check-conversation-title-update-generated", func(t *testing.T) {
 		select {
 		case titleUpdate := <-conversationTitleQueue:
@@ -442,6 +433,7 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 		require.NoError(t, err, "failed to call ListConversations endpoint")
 		require.NotNil(t, listResp.JSON200, "expected non-nil response for ListConversations")
 		require.Len(t, listResp.JSON200.Conversations, 1, "expected 1 conversation in the list")
+		require.Equal(t, contextCompactionTriggerTokens, listResp.JSON200.Conversations[0].ContextCompactionTriggerTokens, "expected conversation response to expose compaction trigger tokens")
 		conversationID = uuid.UUID(listResp.JSON200.Conversations[0].Id)
 	})
 
@@ -454,6 +446,7 @@ func TestTodoApp_ConversationRestAPI(t *testing.T) {
 		require.NotNil(t, updateResp.JSON200, "expected non-nil response for UpdateConversation")
 		require.Equal(t, newTitle, updateResp.JSON200.Title, "expected conversation title to be updated")
 		require.Equal(t, rest.ConversationTitleSourceUser, updateResp.JSON200.TitleSource, "expected conversation title source to be 'user'")
+		require.Equal(t, contextCompactionTriggerTokens, updateResp.JSON200.ContextCompactionTriggerTokens, "expected conversation response to expose compaction trigger tokens")
 	})
 
 	t.Run("list-messages-in-conversation", func(t *testing.T) {

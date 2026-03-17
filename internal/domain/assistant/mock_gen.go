@@ -990,6 +990,63 @@ func (_c *MockChatMessageRepository_CreateChatMessages_Call) RunAndReturn(run fu
 	return _c
 }
 
+// DeleteChatMessages provides a mock function for the type MockChatMessageRepository
+func (_mock *MockChatMessageRepository) DeleteChatMessages(ctx context.Context, messageIDs []uuid.UUID) error {
+	ret := _mock.Called(ctx, messageIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteChatMessages")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []uuid.UUID) error); ok {
+		r0 = returnFunc(ctx, messageIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockChatMessageRepository_DeleteChatMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteChatMessages'
+type MockChatMessageRepository_DeleteChatMessages_Call struct {
+	*mock.Call
+}
+
+// DeleteChatMessages is a helper method to define mock.On call
+//   - ctx context.Context
+//   - messageIDs []uuid.UUID
+func (_e *MockChatMessageRepository_Expecter) DeleteChatMessages(ctx interface{}, messageIDs interface{}) *MockChatMessageRepository_DeleteChatMessages_Call {
+	return &MockChatMessageRepository_DeleteChatMessages_Call{Call: _e.mock.On("DeleteChatMessages", ctx, messageIDs)}
+}
+
+func (_c *MockChatMessageRepository_DeleteChatMessages_Call) Run(run func(ctx context.Context, messageIDs []uuid.UUID)) *MockChatMessageRepository_DeleteChatMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].([]uuid.UUID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockChatMessageRepository_DeleteChatMessages_Call) Return(err error) *MockChatMessageRepository_DeleteChatMessages_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockChatMessageRepository_DeleteChatMessages_Call) RunAndReturn(run func(ctx context.Context, messageIDs []uuid.UUID) error) *MockChatMessageRepository_DeleteChatMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteConversationMessages provides a mock function for the type MockChatMessageRepository
 func (_mock *MockChatMessageRepository) DeleteConversationMessages(ctx context.Context, conversationID uuid.UUID) error {
 	ret := _mock.Called(ctx, conversationID)
@@ -1372,6 +1429,74 @@ func (_c *MockConversationRepository_GetConversation_Call) Return(conversation C
 }
 
 func (_c *MockConversationRepository_GetConversation_Call) RunAndReturn(run func(context1 context.Context, uUID uuid.UUID) (Conversation, bool, error)) *MockConversationRepository_GetConversation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetConversationContextTokenUsage provides a mock function for the type MockConversationRepository
+func (_mock *MockConversationRepository) GetConversationContextTokenUsage(context1 context.Context, uUIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+	ret := _mock.Called(context1, uUIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConversationContextTokenUsage")
+	}
+
+	var r0 map[uuid.UUID]int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []uuid.UUID) (map[uuid.UUID]int64, error)); ok {
+		return returnFunc(context1, uUIDs)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []uuid.UUID) map[uuid.UUID]int64); ok {
+		r0 = returnFunc(context1, uUIDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[uuid.UUID]int64)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []uuid.UUID) error); ok {
+		r1 = returnFunc(context1, uUIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockConversationRepository_GetConversationContextTokenUsage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetConversationContextTokenUsage'
+type MockConversationRepository_GetConversationContextTokenUsage_Call struct {
+	*mock.Call
+}
+
+// GetConversationContextTokenUsage is a helper method to define mock.On call
+//   - context1 context.Context
+//   - uUIDs []uuid.UUID
+func (_e *MockConversationRepository_Expecter) GetConversationContextTokenUsage(context1 interface{}, uUIDs interface{}) *MockConversationRepository_GetConversationContextTokenUsage_Call {
+	return &MockConversationRepository_GetConversationContextTokenUsage_Call{Call: _e.mock.On("GetConversationContextTokenUsage", context1, uUIDs)}
+}
+
+func (_c *MockConversationRepository_GetConversationContextTokenUsage_Call) Run(run func(context1 context.Context, uUIDs []uuid.UUID)) *MockConversationRepository_GetConversationContextTokenUsage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].([]uuid.UUID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockConversationRepository_GetConversationContextTokenUsage_Call) Return(uUIDToInt64 map[uuid.UUID]int64, err error) *MockConversationRepository_GetConversationContextTokenUsage_Call {
+	_c.Call.Return(uUIDToInt64, err)
+	return _c
+}
+
+func (_c *MockConversationRepository_GetConversationContextTokenUsage_Call) RunAndReturn(run func(context1 context.Context, uUIDs []uuid.UUID) (map[uuid.UUID]int64, error)) *MockConversationRepository_GetConversationContextTokenUsage_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1959,6 +2084,105 @@ func (_c *MockSkillRegistry_ListSkills_Call) Return(skillDefinitions []SkillDefi
 }
 
 func (_c *MockSkillRegistry_ListSkills_Call) RunAndReturn(run func(ctx context.Context) ([]SkillDefinition, error)) *MockSkillRegistry_ListSkills_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockTokenizer creates a new instance of MockTokenizer. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockTokenizer(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockTokenizer {
+	mock := &MockTokenizer{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockTokenizer is an autogenerated mock type for the Tokenizer type
+type MockTokenizer struct {
+	mock.Mock
+}
+
+type MockTokenizer_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockTokenizer) EXPECT() *MockTokenizer_Expecter {
+	return &MockTokenizer_Expecter{mock: &_m.Mock}
+}
+
+// CountTokens provides a mock function for the type MockTokenizer
+func (_mock *MockTokenizer) CountTokens(ctx context.Context, model string, input string) (int, error) {
+	ret := _mock.Called(ctx, model, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountTokens")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (int, error)); ok {
+		return returnFunc(ctx, model, input)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) int); ok {
+		r0 = returnFunc(ctx, model, input)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, model, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockTokenizer_CountTokens_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountTokens'
+type MockTokenizer_CountTokens_Call struct {
+	*mock.Call
+}
+
+// CountTokens is a helper method to define mock.On call
+//   - ctx context.Context
+//   - model string
+//   - input string
+func (_e *MockTokenizer_Expecter) CountTokens(ctx interface{}, model interface{}, input interface{}) *MockTokenizer_CountTokens_Call {
+	return &MockTokenizer_CountTokens_Call{Call: _e.mock.On("CountTokens", ctx, model, input)}
+}
+
+func (_c *MockTokenizer_CountTokens_Call) Run(run func(ctx context.Context, model string, input string)) *MockTokenizer_CountTokens_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockTokenizer_CountTokens_Call) Return(n int, err error) *MockTokenizer_CountTokens_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockTokenizer_CountTokens_Call) RunAndReturn(run func(ctx context.Context, model string, input string) (int, error)) *MockTokenizer_CountTokens_Call {
 	_c.Call.Return(run)
 	return _c
 }

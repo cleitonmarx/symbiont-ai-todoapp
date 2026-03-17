@@ -29,6 +29,7 @@ var chatFields = []string{
 	"prompt_tokens",
 	"completion_tokens",
 	"total_tokens",
+	"context_tokens_estimate",
 	"approval_status",
 	"approval_decision_reason",
 	"approval_decided_at",
@@ -84,6 +85,7 @@ func (r ChatMessageRepository) CreateChatMessages(ctx context.Context, messages 
 			message.PromptTokens,
 			message.CompletionTokens,
 			message.TotalTokens,
+			message.ContextTokensEstimate,
 			message.ApprovalStatus,
 			message.ApprovalDecisionReason,
 			message.ApprovalDecidedAt,
@@ -201,6 +203,7 @@ func (r ChatMessageRepository) ListChatMessages(
 			&m.PromptTokens,
 			&m.CompletionTokens,
 			&m.TotalTokens,
+			&m.ContextTokensEstimate,
 			&m.ApprovalStatus,
 			&m.ApprovalDecisionReason,
 			&m.ApprovalDecidedAt,
@@ -243,6 +246,26 @@ func (r ChatMessageRepository) ListChatMessages(
 	}
 
 	return msgs, hasMore, nil
+}
+
+// DeleteChatMessages removes specific chat messages by ID.
+func (r ChatMessageRepository) DeleteChatMessages(ctx context.Context, messageIDs []uuid.UUID) error {
+	spanCtx, span := telemetry.StartSpan(ctx)
+	defer span.End()
+
+	if len(messageIDs) == 0 {
+		return nil
+	}
+
+	_, err := r.sb.
+		Delete("chat_messages").
+		Where(sq.Eq{"id": messageIDs}).
+		ExecContext(spanCtx)
+
+	if telemetry.IsErrorRecorded(span, err) {
+		return err
+	}
+	return nil
 }
 
 // DeleteConversationMessages removes all messages for a specific conversation.

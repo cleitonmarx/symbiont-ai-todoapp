@@ -13,7 +13,7 @@
         "name": "job",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "query": "label_values(http_server_request_duration_seconds_count, job)",
+        "query": "label_values(db_sql_connection_open, job)",
         "refresh": 2,
         "hide": 0
       }

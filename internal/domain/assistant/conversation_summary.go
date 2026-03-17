@@ -20,35 +20,17 @@ type ConversationSummary struct {
 // DefaultConversationStateSummary is used when no persisted summary exists.
 const DefaultConversationStateSummary = "No current state."
 
-// ConversationSummaryGenerationReason describes why a summary generation run should happen.
-type ConversationSummaryGenerationReason string
-
-const (
-	// ConversationSummaryGenerationReason_None indicates no summary should be generated.
-	ConversationSummaryGenerationReason_None ConversationSummaryGenerationReason = "none"
-	// ConversationSummaryGenerationReason_StateChangingActionSuccess indicates summary generation was triggered
-	// by a successful state-changing action call.
-	ConversationSummaryGenerationReason_StateChangingActionSuccess ConversationSummaryGenerationReason = "state_changing_action_success"
-	// ConversationSummaryGenerationReason_MessageCountThreshold indicates summary generation was triggered
-	// by accumulated unsummarized message count.
-	ConversationSummaryGenerationReason_MessageCountThreshold ConversationSummaryGenerationReason = "message_count_threshold"
-	// ConversationSummaryGenerationReason_TokenCountThreshold indicates summary generation was triggered
-	// by accumulated unsummarized token count.
-	ConversationSummaryGenerationReason_TokenCountThreshold ConversationSummaryGenerationReason = "token_count_threshold"
-)
-
-// ConversationSummaryGenerationPolicy controls summary generation thresholds.
-type ConversationSummaryGenerationPolicy struct {
-	TriggerMessageCount int
-	TriggerTokenCount   int
+// CompactionPolicy controls compaction thresholds.
+type CompactionPolicy struct {
+	TriggerTokenCount int
 }
 
-// ConversationSummaryGenerationDecision is the output of summary generation policy evaluation.
-type ConversationSummaryGenerationDecision struct {
-	ShouldGenerate bool
-	Reason         ConversationSummaryGenerationReason
-	MessageCount   int
-	TotalTokens    int
+// CompactionDecision is the output of compaction policy evaluation.
+type CompactionDecision struct {
+	ShouldCompact bool
+	Reason        ContextCompactionReason
+	MessageCount  int
+	TotalTokens   int
 }
 
 // CurrentStateOrDefault returns the persisted current state summary, or a default string when empty.

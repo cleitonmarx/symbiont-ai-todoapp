@@ -86,17 +86,21 @@ func (a CreateTodosAction) Execute(ctx context.Context, call assistant.ActionCal
 
 	err := unmarshalActionInput(call.Input, &params)
 	if err != nil {
+		content := newActionError("invalid_arguments", err.Error(), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", err.Error(), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 	if len(params.Todos) == 0 {
+		content := newActionError("invalid_arguments", "todos must not be empty.", exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("invalid_arguments", "todos must not be empty.", exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 
@@ -109,19 +113,23 @@ func (a CreateTodosAction) Execute(ctx context.Context, call assistant.ActionCal
 	for i, td := range params.Todos {
 		title := strings.TrimSpace(td.Title)
 		if title == "" {
+			content := newActionError("invalid_title", fmt.Sprintf("todo at index %d has an empty title.", i), exampleArgs)
 			return assistant.Message{
 				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
-				Content:      newActionError("invalid_title", fmt.Sprintf("todo at index %d has an empty title.", i), exampleArgs),
+				Content:      content,
+				ActionError:  &content,
 			}
 		}
 
 		dueDate, found := extractDateParam(td.DueDate, conversationHistory, now)
 		if !found {
+			content := newActionError("invalid_due_date", fmt.Sprintf("todo at index %d has invalid due_date.", i), exampleArgs)
 			return assistant.Message{
 				Role:         assistant.ChatRole_Tool,
 				ActionCallID: &call.ID,
-				Content:      newActionError("invalid_due_date", fmt.Sprintf("todo at index %d has invalid due_date.", i), exampleArgs),
+				Content:      content,
+				ActionError:  &content,
 			}
 		}
 
@@ -140,10 +148,12 @@ func (a CreateTodosAction) Execute(ctx context.Context, call assistant.ActionCal
 		return nil
 	})
 	if err != nil {
+		content := newActionError("create_todos_error", err.Error(), exampleArgs)
 		return assistant.Message{
 			Role:         assistant.ChatRole_Tool,
 			ActionCallID: &call.ID,
-			Content:      newActionError("create_todos_error", err.Error(), exampleArgs),
+			Content:      content,
+			ActionError:  &content,
 		}
 	}
 

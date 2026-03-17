@@ -69,13 +69,15 @@ func (tui UpdaterImpl) Update(ctx context.Context, scope transaction.Scope, id u
 		return domain.Todo{}, err
 	}
 
-	resp, err := tui.encoder.VectorizeTodo(ctx, tui.model, td)
-	if err != nil {
-		return domain.Todo{}, err
-	}
+	if title != nil || len(td.Embedding) == 0 {
+		resp, err := tui.encoder.VectorizeTodo(ctx, tui.model, td)
+		if err != nil {
+			return domain.Todo{}, err
+		}
 
-	metrics.RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
-	td.Embedding = resp.Vector
+		metrics.RecordLLMTokensEmbedding(ctx, resp.TotalTokens)
+		td.Embedding = resp.Vector
+	}
 
 	if err := scope.Todo().UpdateTodo(ctx, td); err != nil {
 		return domain.Todo{}, err

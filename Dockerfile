@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     set -eux; \ 
     CGO_ENABLED=0 GOOS=linux go build -trimpath -v -o /out/healthchecker ./cmd/health-checker;\
-    for cmd in monolithic http-api graphql-api message-relay board-summary-generator chat-summary-generator conversation-title-generator; do \
+    for cmd in monolithic http-api graphql-api message-relay board-summary-generator conversation-title-generator; do \
       CGO_ENABLED=0 GOOS=linux go build -trimpath -v -o /out/${cmd} ./cmd/${cmd}; \
     done
 

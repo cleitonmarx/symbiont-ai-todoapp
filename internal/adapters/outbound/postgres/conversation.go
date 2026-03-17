@@ -11,6 +11,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -120,6 +121,69 @@ func (r ConversationRepository) GetConversation(
 	}
 
 	return conversation, true, nil
+}
+
+// GetConversationContextTokenUsage returns the current unsummarized context token usage for the given conversations.
+func (r ConversationRepository) GetConversationContextTokenUsage(
+	ctx context.Context,
+	conversationIDs []uuid.UUID,
+) (map[uuid.UUID]int64, error) {
+	spanCtx, span := telemetry.StartSpan(ctx)
+	defer span.End()
+
+	usageByConversationID := make(map[uuid.UUID]int64, len(conversationIDs))
+	if len(conversationIDs) == 0 {
+		return usageByConversationID, nil
+	}
+
+	conversationTokenUsageSubquery := r.sb.
+		Select(
+			"COALESCE(SUM(chat_messages.context_tokens_estimate), 0)::BIGINT AS total_tokens_used",
+		).
+		From("chat_messages").
+		LeftJoin("conversations_summary conversation_summary ON conversation_summary.conversation_id = conversations.id").
+		LeftJoin("chat_messages checkpoint ON checkpoint.conversation_id = conversations.id AND checkpoint.id = conversation_summary.last_summarized_message_id").
+		Where("chat_messages.conversation_id = conversations.id").
+		Where(`(
+			checkpoint.id IS NULL
+			OR chat_messages.created_at > checkpoint.created_at
+			OR (
+				chat_messages.created_at = checkpoint.created_at
+				AND chat_messages.id > checkpoint.id
+			)
+		)`).
+		Prefix("LEFT JOIN LATERAL (").
+		Suffix(") conversation_token_usage ON TRUE")
+
+	query := r.sb.
+		Select(
+			"conversations.id AS conversation_id",
+			"COALESCE(conversation_token_usage.total_tokens_used, 0) AS total_tokens_used",
+		).
+		From("conversations").
+		JoinClause(conversationTokenUsageSubquery).
+		//Where(squirrel.Eq{"conversations.id": conversationIDs})
+		Where(squirrel.Expr("conversations.id = ANY(?)", pq.Array(conversationIDs)))
+
+	rows, err := query.QueryContext(spanCtx)
+	if telemetry.IsErrorRecorded(span, err) {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+
+	for rows.Next() {
+		var conversationID uuid.UUID
+		var totalTokensUsed int64
+		if err := rows.Scan(&conversationID, &totalTokensUsed); telemetry.IsErrorRecorded(span, err) {
+			return nil, err
+		}
+		usageByConversationID[conversationID] = totalTokensUsed
+	}
+	if err := rows.Err(); telemetry.IsErrorRecorded(span, err) {
+		return nil, err
+	}
+
+	return usageByConversationID, nil
 }
 
 // UpdateConversation updates mutable fields for one conversation.

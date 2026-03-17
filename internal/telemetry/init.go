@@ -21,6 +21,20 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
+const (
+	defaultHTTPClientTimeout         = 30 * time.Second
+	defaultHTTPMaxIdleConns          = 200
+	defaultHTTPMaxIdleConnsPerHost   = 50
+	defaultHTTPMaxConnsPerHost       = 100
+	defaultHTTPIdleConnTimeout       = 90 * time.Second
+	defaultHTTPTLSHandshakeTimeout   = 5 * time.Second
+	defaultHTTPResponseHeaderTimeout = 15 * time.Second
+	defaultHTTPExpectContinueTimeout = 1 * time.Second
+	streamingHTTPMaxIdleConns        = 100
+	streamingHTTPMaxIdleConnsPerHost = 20
+	streamingHTTPMaxConnsPerHost     = 50
+)
+
 // InitOpenTelemetry is a component that sets up OpenTelemetry tracing.
 type InitOpenTelemetry struct {
 	Logger          *log.Logger `resolve:""`
@@ -52,6 +66,7 @@ func (o *InitOpenTelemetry) Initialize(ctx context.Context) (context.Context, er
 			return ctx, err
 		}
 		otel.SetTracerProvider(o.tp)
+		tracer = otel.Tracer(tracerName)
 	}
 
 	if o.MetricsEndpoint != "" {
@@ -89,28 +104,87 @@ func (o *InitOpenTelemetry) Close() {
 	}
 }
 
-// InitHttpClient initializes an HTTP client instrumented with OpenTelemetry
-// and with retry capabilities.
+// InitHttpClient initializes instrumented outbound HTTP clients for standard and streaming workloads.
 type InitHttpClient struct {
 	Logger *log.Logger `resolve:""`
 }
 
 // Initialize registers an instrumented retryable HTTP client in the dependency container.
 func (i InitHttpClient) Initialize(ctx context.Context) (context.Context, error) {
+	stdRetryClient := newRetryClient(
+		i.Logger,
+		defaultHTTPMaxIdleConns,
+		defaultHTTPMaxIdleConnsPerHost,
+		defaultHTTPMaxConnsPerHost,
+		defaultHTTPResponseHeaderTimeout,
+		defaultHTTPClientTimeout,
+		3,
+	)
+	stdClient := stdRetryClient.StandardClient()
+	stdClient.Timeout = defaultHTTPClientTimeout
+
+	streamingRetryClient := newRetryClient(
+		i.Logger,
+		streamingHTTPMaxIdleConns,
+		streamingHTTPMaxIdleConnsPerHost,
+		streamingHTTPMaxConnsPerHost,
+		0,
+		0,
+		0,
+	)
+	streamingClient := streamingRetryClient.StandardClient()
+
+	depend.RegisterNamed(stdClient, "standard")
+	depend.RegisterNamed(streamingClient, "streaming")
+	return ctx, nil
+}
+
+// newRetryClient creates a retryable HTTP client with an instrumented transport.
+func newRetryClient(
+	logger *log.Logger,
+	maxIdleConns int,
+	maxIdleConnsPerHost int,
+	maxConnsPerHost int,
+	responseHeaderTimeout time.Duration,
+	timeout time.Duration,
+	retryMax int,
+) *retryablehttp.Client {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryWaitMax = 5 * time.Second
-	retryClient.RetryMax = 3
+	retryClient.RetryMax = retryMax
 	retryClient.CheckRetry = dontRetry500StatusPolicy(retryablehttp.ErrorPropagatedRetryPolicy)
-	retryClient.Logger = i.Logger
-
-	stdClient := retryClient.StandardClient()
-	stdClient.Transport = otelhttp.NewTransport(
-		stdClient.Transport,
+	retryClient.Logger = logger
+	retryClient.HTTPClient.Transport = otelhttp.NewTransport(
+		newHTTPTransport(
+			maxIdleConns,
+			maxIdleConnsPerHost,
+			maxConnsPerHost,
+			responseHeaderTimeout,
+		),
 		otelhttp.WithSpanNameFormatter(SpanNameFormatter),
 	)
+	retryClient.HTTPClient.Timeout = timeout
+	return retryClient
+}
 
-	depend.Register(stdClient)
-	return ctx, nil
+// newHTTPTransport creates the shared outbound transport baseline for high-concurrency workloads.
+func newHTTPTransport(
+	maxIdleConns int,
+	maxIdleConnsPerHost int,
+	maxConnsPerHost int,
+	responseHeaderTimeout time.Duration,
+) *http.Transport {
+	return &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          maxIdleConns,
+		MaxIdleConnsPerHost:   maxIdleConnsPerHost,
+		MaxConnsPerHost:       maxConnsPerHost,
+		IdleConnTimeout:       defaultHTTPIdleConnTimeout,
+		TLSHandshakeTimeout:   defaultHTTPTLSHandshakeTimeout,
+		ExpectContinueTimeout: defaultHTTPExpectContinueTimeout,
+		ResponseHeaderTimeout: responseHeaderTimeout,
+	}
 }
 
 // newPropagator creates a new composite text map propagator.

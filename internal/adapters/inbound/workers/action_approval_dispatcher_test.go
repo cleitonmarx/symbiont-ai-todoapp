@@ -120,7 +120,7 @@ func TestActionApprovalDispatcher_Run(t *testing.T) {
 			err := publishMessages(ctx, client, topicName, [][]byte{tc.payload})
 			assert.NoError(t, err)
 
-			waitForBatchSignals(t, signalChan, 1, 1*time.Second)
+			waitForBatchSignals(t, signalChan, 1, 500*time.Millisecond)
 
 			cancel()
 			waitRunnableStop(t, doneChan)

@@ -13,33 +13,33 @@ import (
 	"github.com/google/uuid"
 )
 
-// ConversationCreator owns message creation and related conversation side effects.
-type ConversationCreator interface {
-	// CreateMessage stores one chat message and related side effects.
-	CreateMessage(ctx context.Context, conversation assistant.Conversation, message assistant.ChatMessage) error
-	// RepairTurn deletes dangling assistant action-call messages left by a failed turn.
-	RepairTurn(ctx context.Context, conversation assistant.Conversation, turnID uuid.UUID) error
+// ConversationTranscriptWriter persists chat transcript entries and repairs persisted turn history when needed.
+type ConversationTranscriptWriter interface {
+	// WriteMessage persists one chat message and its related conversation side effects.
+	WriteMessage(ctx context.Context, conversation assistant.Conversation, message assistant.ChatMessage) error
+	// RepairTurnTranscript removes dangling persisted action-call history from a failed turn.
+	RepairTurnTranscript(ctx context.Context, conversationID uuid.UUID, turnID uuid.UUID) error
 }
 
-// ConversationCreatorImpl implements the ConversationCreator interface, coordinating message persistence, outbox event creation, and conversation timestamp updates.
-type ConversationCreatorImpl struct {
+// ConversationTranscriptWriterImpl implements ConversationTranscriptWriter.
+type ConversationTranscriptWriterImpl struct {
 	uow       transaction.UnitOfWork
 	tokenizer assistant.Tokenizer
 }
 
-// NewConversationCreatorImpl builds the default conversation creator for stream chat.
-func NewConversationCreatorImpl(
+// NewConversationTranscriptWriterImpl creates a ConversationTranscriptWriterImpl.
+func NewConversationTranscriptWriterImpl(
 	uow transaction.UnitOfWork,
 	tokenizer assistant.Tokenizer,
-) ConversationCreatorImpl {
-	return ConversationCreatorImpl{
+) ConversationTranscriptWriterImpl {
+	return ConversationTranscriptWriterImpl{
 		uow:       uow,
 		tokenizer: tokenizer,
 	}
 }
 
-// CreateMessage stores one chat message together with its outbox event and conversation timestamp updates.
-func (p ConversationCreatorImpl) CreateMessage(
+// WriteMessage implements ConversationTranscriptWriter.
+func (p ConversationTranscriptWriterImpl) WriteMessage(
 	ctx context.Context,
 	conversation assistant.Conversation,
 	message assistant.ChatMessage,
@@ -79,17 +79,17 @@ func (p ConversationCreatorImpl) CreateMessage(
 	})
 }
 
-// RepairTurn removes unmatched assistant tool-call messages so future turns do not replay invalid history.
-func (p ConversationCreatorImpl) RepairTurn(
+// RepairTurnTranscript implements ConversationTranscriptWriter.
+func (p ConversationTranscriptWriterImpl) RepairTurnTranscript(
 	ctx context.Context,
-	conversation assistant.Conversation,
+	conversationID uuid.UUID,
 	turnID uuid.UUID,
 ) error {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
 	return p.uow.Execute(spanCtx, func(uowCtx context.Context, scope transaction.Scope) error {
-		messages, _, err := scope.ChatMessage().ListChatMessages(uowCtx, conversation.ID, 1, 0)
+		messages, _, err := scope.ChatMessage().ListChatMessages(uowCtx, conversationID, 1, 0)
 		if err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func (p ConversationCreatorImpl) RepairTurn(
 			return err
 		}
 
-		refreshedConversation, found, err := scope.Conversation().GetConversation(uowCtx, conversation.ID)
+		refreshedConversation, found, err := scope.Conversation().GetConversation(uowCtx, conversationID)
 		if err != nil {
 			return err
 		}
@@ -121,7 +121,7 @@ func (p ConversationCreatorImpl) RepairTurn(
 }
 
 // estimateContextTokens computes the persisted context footprint for a chat message.
-func (p ConversationCreatorImpl) estimateContextTokens(ctx context.Context, message assistant.ChatMessage) int {
+func (p ConversationTranscriptWriterImpl) estimateContextTokens(ctx context.Context, message assistant.ChatMessage) int {
 	input := assistant.BuildChatMessageTokenizationInput(message)
 	if strings.TrimSpace(input) == "" {
 		return 0

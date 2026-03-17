@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestConversationCreator_CreateMessage(t *testing.T) {
+func TestConversationTranscriptWriter_WriteMessage(t *testing.T) {
 	t.Parallel()
 
 	fixedTime := time.Date(2026, 3, 14, 10, 0, 0, 0, time.UTC)
@@ -40,7 +40,7 @@ func TestConversationCreator_CreateMessage(t *testing.T) {
 		},
 	})
 
-	creator := NewConversationCreatorImpl(uow, nil)
+	writer := NewConversationTranscriptWriterImpl(uow, nil)
 	state := NewTurnState(conversation, false, nil, assistant.TurnRequest{Model: "test-model"}, 7)
 
 	userMessage := assistant.ChatMessage{
@@ -55,8 +55,8 @@ func TestConversationCreator_CreateMessage(t *testing.T) {
 		CreatedAt:      fixedTime,
 		UpdatedAt:      fixedTime,
 	}
-	if err := creator.CreateMessage(t.Context(), conversation, userMessage); err != nil {
-		t.Fatalf("CreateMessage for user returned error: %v", err)
+	if err := writer.WriteMessage(t.Context(), conversation, userMessage); err != nil {
+		t.Fatalf("WriteMessage for user returned error: %v", err)
 	}
 
 	failureMessage := assistant.ChatMessage{
@@ -72,12 +72,12 @@ func TestConversationCreator_CreateMessage(t *testing.T) {
 		CreatedAt:      fixedTime,
 		UpdatedAt:      fixedTime,
 	}
-	if err := creator.CreateMessage(t.Context(), conversation, failureMessage); err != nil {
-		t.Fatalf("CreateMessage for failure returned error: %v", err)
+	if err := writer.WriteMessage(t.Context(), conversation, failureMessage); err != nil {
+		t.Fatalf("WriteMessage for failure returned error: %v", err)
 	}
 }
 
-func TestConversationCreator_RepairTurn(t *testing.T) {
+func TestConversationTranscriptWriter_RepairTurnTranscript(t *testing.T) {
 	t.Parallel()
 
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
@@ -165,13 +165,9 @@ func TestConversationCreator_RepairTurn(t *testing.T) {
 		Return(nil).
 		Once()
 
-	creator := NewConversationCreatorImpl(uow, nil)
-	err := creator.RepairTurn(t.Context(), assistant.Conversation{
-		ID:        conversationID,
-		CreatedAt: userCreatedAt.Add(-time.Minute),
-		UpdatedAt: danglingCreatedAt,
-	}, turnID)
+	writer := NewConversationTranscriptWriterImpl(uow, nil)
+	err := writer.RepairTurnTranscript(t.Context(), conversationID, turnID)
 	if err != nil {
-		t.Fatalf("RepairTurn returned error: %v", err)
+		t.Fatalf("RepairTurnTranscript returned error: %v", err)
 	}
 }

@@ -3,9 +3,14 @@ include:
 
 x-app-env: &app-env
   OTEL_SERVICE_NAME: todoapp
+  OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://prometheus:9090/api/v1/otlp/v1/metrics
+  OTEL_SEMCONV_STABILITY_OPT_IN: database
   DB_HOST: postgres
   DB_PORT: "5432"
   DB_NAME: todoappdb
+  DB_MAX_OPEN_CONNS: "4"
+  DB_MIN_CONNS: "1"
+  DB_MAX_IDLE_CONNS: "2"
   VAULT_ADDR: http://vault:8200
   VAULT_TOKEN: root-token
   VAULT_MOUNT_PATH: secret
@@ -43,6 +48,37 @@ x-app-depends: &app-depends
     condition: service_started
 
 services:
+  prometheus:
+    image: prom/prometheus:v3.9.1
+    command:
+      - "--web.enable-otlp-receiver"
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        cat <<EOF > /etc/prometheus/prometheus.yml
+        global:
+          scrape_interval: 15s
+        EOF
+        /bin/prometheus --web.enable-otlp-receiver --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      prometheus:
+        condition: service_started
+
   traefik:
     image: traefik:v3.6.4
     command:
@@ -74,6 +110,9 @@ services:
     environment:
       <<: [*app-env, *assistant-llm-env, *encoder-llm-env, *http-api-env]
       OTEL_SERVICE_NAME: http-api
+      DB_MAX_OPEN_CONNS: "16"
+      DB_MIN_CONNS: "2"
+      DB_MAX_IDLE_CONNS: "6"
     models:
       - qwen3
       - embeddinggemma
@@ -104,6 +143,9 @@ services:
     environment:
       <<: [*app-env, *encoder-llm-env]
       OTEL_SERVICE_NAME: graphql-api
+      DB_MAX_OPEN_CONNS: "16"
+      DB_MIN_CONNS: "2"
+      DB_MAX_IDLE_CONNS: "6"
     models:
       - embeddinggemma
     healthcheck:
@@ -131,6 +173,9 @@ services:
     environment:
       <<: [*app-env]
       OTEL_SERVICE_NAME: message-relay
+      DB_MAX_OPEN_CONNS: "8"
+      DB_MIN_CONNS: "1"
+      DB_MAX_IDLE_CONNS: "3"
     depends_on: *app-depends
 
   board-summary-generator:
@@ -142,6 +187,9 @@ services:
     environment:
       <<: [*app-env, *assistant-llm-env]
       OTEL_SERVICE_NAME: board-summary-generator
+      DB_MAX_OPEN_CONNS: "6"
+      DB_MIN_CONNS: "1"
+      DB_MAX_IDLE_CONNS: "2"
       SUMMARY_BATCH_INTERVAL: 5s
       SUMMARY_BATCH_SIZE: 300
     models:
@@ -157,6 +205,9 @@ services:
     environment:
       <<: [*app-env, *assistant-llm-env]
       OTEL_SERVICE_NAME: conversation-title-generator
+      DB_MAX_OPEN_CONNS: "6"
+      DB_MIN_CONNS: "1"
+      DB_MAX_IDLE_CONNS: "2"
     models:
       - qwen3
     depends_on: *app-depends

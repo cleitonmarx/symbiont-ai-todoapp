@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/XSAM/otelsql"
 	"github.com/stretchr/testify/assert"
@@ -71,4 +72,37 @@ func Test_withQueryAttributes(t *testing.T) {
 
 		})
 	}
+}
+
+func TestInitDB_poolSettings(t *testing.T) {
+	t.Parallel()
+
+	t.Run("defaults", func(t *testing.T) {
+		settings := (InitDB{}).poolSettings()
+
+		assert.Equal(t, defaultDBMaxOpenConns, settings.MaxOpenConns)
+		assert.Equal(t, defaultDBMinConns, settings.MinConns)
+		assert.Equal(t, defaultDBMaxIdleConns, settings.MaxIdleConns)
+		assert.Equal(t, defaultDBConnMaxLifetime, settings.ConnMaxLifetime)
+		assert.Equal(t, defaultDBConnMaxIdleTime, settings.ConnMaxIdleTime)
+		assert.Equal(t, defaultDBHealthCheckPeriod, settings.HealthCheckPeriod)
+	})
+
+	t.Run("caps idle and min connections by max open connections", func(t *testing.T) {
+		settings := (InitDB{
+			DBMaxOpenConns:      10,
+			DBMinConns:          20,
+			DBMaxIdleConns:      30,
+			DBConnMaxLifetime:   45 * time.Minute,
+			DBConnMaxIdleTime:   7 * time.Minute,
+			DBHealthCheckPeriod: 2 * time.Minute,
+		}).poolSettings()
+
+		assert.Equal(t, 10, settings.MaxOpenConns)
+		assert.Equal(t, 10, settings.MinConns)
+		assert.Equal(t, 10, settings.MaxIdleConns)
+		assert.Equal(t, 45*time.Minute, settings.ConnMaxLifetime)
+		assert.Equal(t, 7*time.Minute, settings.ConnMaxIdleTime)
+		assert.Equal(t, 2*time.Minute, settings.HealthCheckPeriod)
+	})
 }

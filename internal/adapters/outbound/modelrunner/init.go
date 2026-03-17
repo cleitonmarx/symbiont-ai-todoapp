@@ -11,7 +11,7 @@ import (
 
 // InitAssistantClient initializes assistant/chat-model dependencies.
 type InitAssistantClient struct {
-	HttpClient *http.Client `resolve:""`
+	HttpClient *http.Client `resolve:"streaming"`
 	ModelHost  string       `config:"LLM_MODEL_HOST"`
 	APIKey     string       `config:"LLM_API_KEY" default:""`
 }
@@ -28,7 +28,7 @@ func (i InitAssistantClient) Initialize(ctx context.Context) (context.Context, e
 
 // InitEncoderClient initializes embedding-model dependencies.
 type InitEncoderClient struct {
-	HttpClient         *http.Client `resolve:""`
+	HttpClient         *http.Client `resolve:"streaming"`
 	EmbeddingModelHost string       `config:"LLM_EMBEDDING_MODEL_HOST"`
 	EmbeddingAPIKey    string       `config:"LLM_EMBEDDING_API_KEY" default:""`
 }

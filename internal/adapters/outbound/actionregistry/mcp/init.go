@@ -15,7 +15,7 @@ import (
 // InitActionRegistry registers the MCP-backed assistant action registry.
 type InitActionRegistry struct {
 	Logger         *log.Logger   `resolve:""`
-	HttpClient     *http.Client  `resolve:""`
+	HttpClient     *http.Client  `resolve:"standard"`
 	Endpoint       string        `config:"MCP_GATEWAY_ENDPOINT"`
 	APIKey         string        `config:"MCP_GATEWAY_API_KEY" default:""`
 	APIKeyHeader   string        `config:"MCP_GATEWAY_API_KEY_HEADER" default:""`

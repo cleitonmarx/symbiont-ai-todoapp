@@ -11,10 +11,10 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/approvaldispatcher"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/config"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/log"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/md"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/modelrunner"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/postgres"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/pubsub"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/skillregistry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/time"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/tokenizer"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
@@ -52,7 +52,7 @@ func NewMonolithic(initializers ...symbiont.Initializer) *symbiont.App {
 			&tokenizer.InitTokenizer{},
 			&approvaldispatcher.InitDispatcher{},
 			&pubsub.InitPublisher{},
-			&skillregistry.InitLocalSkillRegistry{},
+			&md.InitSkillRegistry{},
 			&todo.InitCreator{},
 			&todo.InitDeleter{},
 			&todo.InitUpdater{},
@@ -115,7 +115,7 @@ func NewHTTPAPI() *symbiont.App {
 			&tokenizer.InitTokenizer{},
 			&approvaldispatcher.InitDispatcher{},
 			&pubsub.InitPublisher{},
-			&skillregistry.InitLocalSkillRegistry{},
+			&md.InitSkillRegistry{},
 			&todo.InitCreator{},
 			&todo.InitDeleter{},
 			&todo.InitUpdater{},

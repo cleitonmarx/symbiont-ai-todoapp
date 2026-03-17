@@ -1,4 +1,4 @@
-package skillregistry
+package md
 
 import (
 	"testing"
@@ -39,7 +39,7 @@ func TestNewSkillRegistry_ValidatesDependencies(t *testing.T) {
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			_, err := NewSkillRegistry(t.Context(), []assistant.SkillDefinition{{Name: "x", Content: "y"}}, tt.enc, tt.model, Config{})
+			_, err := NewRegistry(t.Context(), []assistant.SkillDefinition{{Name: "x", Content: "y"}}, tt.enc, tt.model, Config{})
 			tt.assert(t, err)
 		})
 	}
@@ -110,7 +110,7 @@ Build a simple plan in steps.
 		},
 	})
 
-	registry, err := NewSkillRegistry(t.Context(), skills, encoder, "embed-model", Config{
+	registry, err := NewRegistry(t.Context(), skills, encoder, "embed-model", Config{
 		RelevantSkillsTopK:     2,
 		RelevantSkillsMinScore: 0.10,
 		AvoidPenaltyWeight:     0.80,
@@ -174,7 +174,7 @@ Use safe mutation flow.
 		},
 	})
 
-	registry, err := NewSkillRegistry(t.Context(), skills, encoder, "embed-model", Config{
+	registry, err := NewRegistry(t.Context(), skills, encoder, "embed-model", Config{
 		RelevantSkillsTopK:     2,
 		RelevantSkillsMinScore: 0.10,
 	})

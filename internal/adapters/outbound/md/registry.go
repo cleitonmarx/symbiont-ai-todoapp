@@ -1,4 +1,4 @@
-package skillregistry
+package md
 
 import (
 	"context"
@@ -28,17 +28,17 @@ type Registry struct {
 //go:embed skills/*.md
 var skillDirectory embed.FS
 
-// NewSkillRegistryFromFS builds a skill registry by loading markdown files from the given filesystem.
-func NewSkillRegistryFromFS(ctx context.Context, encoder semantic.Encoder, embeddingModel string, cfg Config) (Registry, error) {
+// NewRegistryFromFS builds a skill registry by loading markdown files from the given filesystem.
+func NewRegistryFromFS(ctx context.Context, encoder semantic.Encoder, embeddingModel string, cfg Config) (Registry, error) {
 	skills, err := LoadSkillsFromFS(skillDirectory)
 	if err != nil {
 		return Registry{}, err
 	}
-	return NewSkillRegistry(ctx, skills, encoder, embeddingModel, cfg)
+	return NewRegistry(ctx, skills, encoder, embeddingModel, cfg)
 }
 
-// NewSkillRegistry builds an embedding-backed registry from pre-loaded skill definitions.
-func NewSkillRegistry(ctx context.Context, skills []assistant.SkillDefinition, encoder semantic.Encoder, embeddingModel string, cfg Config) (Registry, error) {
+// NewRegistry builds an embedding-backed registry from pre-loaded skill definitions.
+func NewRegistry(ctx context.Context, skills []assistant.SkillDefinition, encoder semantic.Encoder, embeddingModel string, cfg Config) (Registry, error) {
 	if encoder == nil {
 		return Registry{}, errors.New("semantic encoder is required")
 	}

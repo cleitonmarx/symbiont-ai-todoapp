@@ -1,4 +1,4 @@
-package skillregistry
+package md
 
 import (
 	"testing"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestInitLocalSkillRegistry_Initialize(t *testing.T) {
+func TestInitLSkillRegistry_Initialize(t *testing.T) {
 	t.Parallel()
 
 	enc := semantic.NewMockEncoder(t)
@@ -18,7 +18,7 @@ func TestInitLocalSkillRegistry_Initialize(t *testing.T) {
 		VectorizeSkillDefinition(mock.Anything, "test-embedding-model", mock.Anything).
 		Return(semantic.EmbeddingVector{Vector: []float64{1, 0}}, semantic.EmbeddingVector{Vector: []float64{0, 1}}, nil)
 
-	i := InitLocalSkillRegistry{
+	i := InitSkillRegistry{
 		Encoder:        enc,
 		EmbeddingModel: "test-embedding-model",
 	}

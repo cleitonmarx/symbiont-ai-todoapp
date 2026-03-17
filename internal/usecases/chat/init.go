@@ -130,7 +130,7 @@ type InitStreamChat struct {
 	CompactionTimeout       time.Duration                    `config:"CHAT_COMPACTION_TIMEOUT" default:"20s"`
 	StateBuilder            TurnStateBuilder                 `resolve:""`
 	TurnRunner              TurnRunner                       `resolve:""`
-	ConversationCreator     ConversationCreator              `resolve:""`
+	TranscriptWriter        ConversationTranscriptWriter     `resolve:""`
 	MaxActionCycles         int                              `config:"LLM_MAX_ACTION_CYCLES" default:"50"`
 }
 
@@ -146,21 +146,21 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 		i.MaxActionCycles,
 		i.StateBuilder,
 		i.TurnRunner,
-		i.ConversationCreator,
+		i.TranscriptWriter,
 	)
 	depend.Register[StreamChat](useCase)
 	return ctx, nil
 }
 
-// InitConversationCreator is the initializer for the ConversationCreator component.
-type InitConversationCreator struct {
+// InitConversationTranscriptWriter is the initializer for the ConversationTranscriptWriter component.
+type InitConversationTranscriptWriter struct {
 	Uow       transaction.UnitOfWork `resolve:""`
 	Tokenizer assistant.Tokenizer    `resolve:""`
 }
 
-// Initialize registers the ConversationCreator component in the dependency container.
-func (i InitConversationCreator) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[ConversationCreator](NewConversationCreatorImpl(
+// Initialize registers the ConversationTranscriptWriter component in the dependency container.
+func (i InitConversationTranscriptWriter) Initialize(ctx context.Context) (context.Context, error) {
+	depend.Register[ConversationTranscriptWriter](NewConversationTranscriptWriterImpl(
 		i.Uow,
 		i.Tokenizer,
 	))
@@ -169,10 +169,10 @@ func (i InitConversationCreator) Initialize(ctx context.Context) (context.Contex
 
 // InitActionPipeline is the initializer for the ActionPipeline component.
 type InitActionPipeline struct {
-	ActionRegistry      assistant.ActionRegistry           `resolve:""`
-	ApprovalDispatcher  assistant.ActionApprovalDispatcher `resolve:""`
-	ConversationCreator ConversationCreator                `resolve:""`
-	TimeProvider        core.CurrentTimeProvider           `resolve:""`
+	ActionRegistry     assistant.ActionRegistry           `resolve:""`
+	ApprovalDispatcher assistant.ActionApprovalDispatcher `resolve:""`
+	TranscriptWriter   ConversationTranscriptWriter       `resolve:""`
+	TimeProvider       core.CurrentTimeProvider           `resolve:""`
 }
 
 // Initialize registers the ActionPipeline component in the dependency container.
@@ -180,7 +180,7 @@ func (i InitActionPipeline) Initialize(ctx context.Context) (context.Context, er
 	depend.Register[ActionPipeline](NewActionPipelineImpl(
 		i.ActionRegistry,
 		i.ApprovalDispatcher,
-		i.ConversationCreator,
+		i.TranscriptWriter,
 		i.TimeProvider,
 	))
 	return ctx, nil

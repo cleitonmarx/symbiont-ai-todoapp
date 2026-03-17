@@ -15,9 +15,9 @@ import (
 	"github.com/toon-format/toon-go"
 )
 
-// ActionPipeline processes action requests during the streaming turn.
+// ActionPipeline handles assistant-requested actions within an in-flight streamed turn.
 type ActionPipeline interface {
-	// Handle executes the full lifecycle of one requested action.
+	// Handle processes one requested action and reports whether the turn should continue.
 	Handle(
 		ctx context.Context,
 		actionCall assistant.ActionCall,
@@ -26,32 +26,30 @@ type ActionPipeline interface {
 	) (bool, error)
 }
 
-// ActionPipelineImpl implements the ActionPipeline interface with a default
-// set of behaviors for streamed tool calls, including optional approval handling.
+// ActionPipelineImpl implements ActionPipeline.
 type ActionPipelineImpl struct {
-	actionRegistry      assistant.ActionRegistry
-	approvalDispatcher  assistant.ActionApprovalDispatcher
-	conversationCreator ConversationCreator
-	timeProvider        core.CurrentTimeProvider
+	actionRegistry     assistant.ActionRegistry
+	approvalDispatcher assistant.ActionApprovalDispatcher
+	transcriptWriter   ConversationTranscriptWriter
+	timeProvider       core.CurrentTimeProvider
 }
 
-// NewActionPipelineImpl creates a new ActionPipelineImpl with the given dependencies.
+// NewActionPipelineImpl creates an ActionPipelineImpl.
 func NewActionPipelineImpl(
 	actionRegistry assistant.ActionRegistry,
 	approvalDispatcher assistant.ActionApprovalDispatcher,
-	conversationCreator ConversationCreator,
+	transcriptWriter ConversationTranscriptWriter,
 	timeProvider core.CurrentTimeProvider,
 ) ActionPipelineImpl {
 	return ActionPipelineImpl{
-		actionRegistry:      actionRegistry,
-		approvalDispatcher:  approvalDispatcher,
-		conversationCreator: conversationCreator,
-		timeProvider:        timeProvider,
+		actionRegistry:     actionRegistry,
+		approvalDispatcher: approvalDispatcher,
+		transcriptWriter:   transcriptWriter,
+		timeProvider:       timeProvider,
 	}
 }
 
-// Handle executes the full lifecycle of one requested action within the current turn
-// and returns whether the turn should continue streaming after handling this action.
+// Handle implements ActionPipeline.
 func (p ActionPipelineImpl) Handle(
 	ctx context.Context,
 	actionCall assistant.ActionCall,
@@ -79,10 +77,9 @@ func (p ActionPipelineImpl) Handle(
 		CreatedAt:      p.timeProvider.Now(),
 	}
 	assistantActionCallMsg.UpdatedAt = assistantActionCallMsg.CreatedAt
-	if err := p.conversationCreator.CreateMessage(spanCtx, conversation, assistantActionCallMsg); err != nil {
+	if err := p.transcriptWriter.WriteMessage(spanCtx, conversation, assistantActionCallMsg); err != nil {
 		return false, err
 	}
-	state.MarkActionCallPersisted()
 
 	approvalDecision, blockedByApproval, approvalErr := p.requestApprovalIfRequired(
 		spanCtx,
@@ -130,7 +127,7 @@ func (p ActionPipelineImpl) Handle(
 		actionChatMsg.ApprovalDecidedAt = common.Ptr(approvalDecision.DecidedAt)
 	}
 
-	if err := p.conversationCreator.CreateMessage(spanCtx, conversation, actionChatMsg); err != nil {
+	if err := p.transcriptWriter.WriteMessage(spanCtx, conversation, actionChatMsg); err != nil {
 		return false, err
 	}
 
@@ -231,7 +228,7 @@ func (p ActionPipelineImpl) handleBlockedAction(
 		UpdatedAt:              now,
 	}
 
-	if err := p.conversationCreator.CreateMessage(ctx, conversation, actionChatMsg); err != nil {
+	if err := p.transcriptWriter.WriteMessage(ctx, conversation, actionChatMsg); err != nil {
 		return false, err
 	}
 

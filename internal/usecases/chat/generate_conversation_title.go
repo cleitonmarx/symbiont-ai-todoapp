@@ -43,13 +43,13 @@ var conversationTitlePrompt embed.FS
 // CompletedConversationTitleUpdateChannel carries updated conversations after title generation.
 type CompletedConversationTitleUpdateChannel chan assistant.Conversation
 
-// GenerateConversationTitle defines the interface for generating an LLM title for auto-named conversations.
+// GenerateConversationTitle refreshes auto-generated conversation titles after assistant replies.
 type GenerateConversationTitle interface {
 	// Execute tries to generate and persist a better title for the given conversation event.
 	Execute(ctx context.Context, event outbox.ChatMessageEvent) error
 }
 
-// GenerateConversationTitleImpl is the implementation of GenerateConversationTitle.
+// GenerateConversationTitleImpl implements GenerateConversationTitle.
 type GenerateConversationTitleImpl struct {
 	conversationRepo        assistant.ConversationRepository
 	conversationSummaryRepo assistant.ConversationSummaryRepository
@@ -61,7 +61,7 @@ type GenerateConversationTitleImpl struct {
 	completedTitleCh        CompletedConversationTitleUpdateChannel
 }
 
-// NewGenerateConversationTitleImpl creates a new instance of GenerateConversationTitleImpl.
+// NewGenerateConversationTitleImpl creates a GenerateConversationTitleImpl.
 func NewGenerateConversationTitleImpl(
 	conversationRepo assistant.ConversationRepository,
 	conversationSummaryRepo assistant.ConversationSummaryRepository,
@@ -84,7 +84,7 @@ func NewGenerateConversationTitleImpl(
 	}
 }
 
-// Execute tries to update only auto-named conversations with an LLM-generated title.
+// Execute implements GenerateConversationTitle.
 func (gct GenerateConversationTitleImpl) Execute(ctx context.Context, event outbox.ChatMessageEvent) error {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()

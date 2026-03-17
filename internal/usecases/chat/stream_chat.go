@@ -37,13 +37,13 @@ func WithConversationID(conversationID uuid.UUID) StreamChatOption {
 	}
 }
 
-// StreamChat defines the interface for the StreamChat use case
+// StreamChat streams one assistant turn and persists the resulting conversation state.
 type StreamChat interface {
-	// Execute streams a chat response and persists the conversation
+	// Execute runs one streamed turn for the supplied user message.
 	Execute(ctx context.Context, userMessage, model string, onEvent assistant.EventCallback, opts ...StreamChatOption) error
 }
 
-// StreamChatImpl is the implementation of the StreamChat use case
+// StreamChatImpl implements StreamChat.
 type StreamChatImpl struct {
 	logger                *log.Logger
 	timeProvider          core.CurrentTimeProvider
@@ -54,10 +54,10 @@ type StreamChatImpl struct {
 	maxActionCycles       int
 	stateBuilder          TurnStateBuilder
 	turnRunner            TurnRunner
-	conversationCreator   ConversationCreator
+	transcriptWriter      ConversationTranscriptWriter
 }
 
-// NewStreamChatImpl creates a new instance of StreamChatImpl
+// NewStreamChatImpl creates a StreamChatImpl.
 func NewStreamChatImpl(
 	logger *log.Logger,
 	timeProvider core.CurrentTimeProvider,
@@ -68,7 +68,7 @@ func NewStreamChatImpl(
 	maxActionCycles int,
 	stateBuilder TurnStateBuilder,
 	turnRunner TurnRunner,
-	conversationCreator ConversationCreator,
+	transcriptWriter ConversationTranscriptWriter,
 ) StreamChatImpl {
 	return StreamChatImpl{
 		logger:                logger,
@@ -80,11 +80,11 @@ func NewStreamChatImpl(
 		maxActionCycles:       maxActionCycles,
 		stateBuilder:          stateBuilder,
 		turnRunner:            turnRunner,
-		conversationCreator:   conversationCreator,
+		transcriptWriter:      transcriptWriter,
 	}
 }
 
-// Execute streams a chat response and persists the conversation
+// Execute implements StreamChat.
 func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string, onEvent assistant.EventCallback, opts ...StreamChatOption) error {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
@@ -111,7 +111,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return err
 	}
 
-	state, err := sc.stateBuilder.Build(spanCtx, BuildSessionParams{
+	state, err := sc.stateBuilder.Build(spanCtx, BuildTurnStateParams{
 		UserMessage:         userMessage,
 		Model:               model,
 		MaxActionCycles:     sc.maxActionCycles,
@@ -135,21 +135,20 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if err := sc.conversationCreator.CreateMessage(spanCtx, state.Conversation(), userChatMessage); telemetry.IsErrorRecorded(span, err) {
+	if err := sc.transcriptWriter.WriteMessage(spanCtx, state.Conversation(), userChatMessage); telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
 	if err := sc.turnRunner.Run(spanCtx, state, onEvent); telemetry.IsErrorRecorded(span, err) {
-		if state.HasPersistedActionCall() {
-			if repairErr := sc.repairFailedTurn(ctx, state); telemetry.IsErrorRecorded(span, repairErr) {
-				return errors.Join(err, repairErr)
-			}
+		if repairErr := sc.repairFailedTurn(ctx, state); telemetry.IsErrorRecorded(span, repairErr) {
+			return errors.Join(err, repairErr)
 		}
 		if isCanceledTurnError(err) {
 			return err
 		}
 		failedAt := sc.timeProvider.Now()
-		if persistErr := sc.conversationCreator.CreateMessage(spanCtx, state.Conversation(), sc.buildFailureAssistantMessage(state, failedAt, err)); telemetry.IsErrorRecorded(span, persistErr) {
+		failureMsg := sc.buildFailureAssistantMessage(state, failedAt, err)
+		if persistErr := sc.transcriptWriter.WriteMessage(spanCtx, state.Conversation(), failureMsg); telemetry.IsErrorRecorded(span, persistErr) {
 			return persistErr
 		}
 		return err
@@ -184,7 +183,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		}
 	}
 
-	err = sc.conversationCreator.CreateMessage(spanCtx, state.Conversation(), assistantMsg)
+	err = sc.transcriptWriter.WriteMessage(spanCtx, state.Conversation(), assistantMsg)
 	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
@@ -205,7 +204,7 @@ func (sc StreamChatImpl) repairFailedTurn(ctx context.Context, state TurnState) 
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), DEFAULT_CANCELED_TURN_REPAIR_TIMEOUT)
 	defer cancel()
 
-	return sc.conversationCreator.RepairTurn(cleanupCtx, state.Conversation(), state.TurnID())
+	return sc.transcriptWriter.RepairTurnTranscript(cleanupCtx, state.Conversation().ID, state.TurnID())
 }
 
 // isCanceledTurnError reports whether the turn ended due to cancellation rather than an internal assistant failure.

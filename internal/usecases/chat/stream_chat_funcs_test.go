@@ -35,8 +35,8 @@ func newTestStreamChatUseCase(
 	compactionTriggerTokens int,
 	compactionTimeout time.Duration,
 ) StreamChatImpl {
-	conversationCreator := NewConversationCreatorImpl(uow, tokenizer)
-	actionPipeline := NewActionPipelineImpl(actionRegistry, approvalDispatcher, conversationCreator, timeProvider)
+	transcriptWriter := NewConversationTranscriptWriterImpl(uow, tokenizer)
+	actionPipeline := NewActionPipelineImpl(actionRegistry, approvalDispatcher, transcriptWriter, timeProvider)
 	turnRunner := NewTurnRunnerImpl(logger, assist, actionPipeline)
 	stateBuilder := NewTurnStateBuilderImpl(
 		summaryRepo,
@@ -55,7 +55,7 @@ func newTestStreamChatUseCase(
 		maxActionCycles,
 		stateBuilder,
 		turnRunner,
-		conversationCreator,
+		transcriptWriter,
 	)
 }
 
@@ -408,4 +408,29 @@ func expectPersistSequence(
 			Return(nil).
 			Times(successCount)
 	}
+}
+
+// expectRepairTurnNoOp validates the no-op repair transaction executed after failed turns with no dangling action calls.
+func expectRepairTurnNoOp(
+	t *testing.T,
+	chatRepo *assistant.MockChatMessageRepository,
+	uow *transaction.MockUnitOfWork,
+	conversationID uuid.UUID,
+) {
+	t.Helper()
+
+	scope := transaction.NewMockScope(t)
+	scope.EXPECT().ChatMessage().Return(chatRepo).Once()
+
+	uow.EXPECT().
+		Execute(mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, fn func(context.Context, transaction.Scope) error) error {
+			return fn(ctx, scope)
+		}).
+		Once()
+
+	chatRepo.EXPECT().
+		ListChatMessages(mock.Anything, conversationID, 1, 0).
+		Return([]assistant.ChatMessage{}, false, nil).
+		Once()
 }

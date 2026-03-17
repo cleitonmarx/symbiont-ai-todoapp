@@ -76,7 +76,7 @@ func TestTurnStateBuilder_Build(t *testing.T) {
 		actionRegistry,
 	)
 
-	state, err := builder.Build(t.Context(), BuildSessionParams{
+	state, err := builder.Build(t.Context(), BuildTurnStateParams{
 		UserMessage:         "Update my todos",
 		Model:               "test-model",
 		MaxActionCycles:     7,

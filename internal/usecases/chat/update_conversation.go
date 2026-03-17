@@ -10,19 +10,19 @@ import (
 	"github.com/google/uuid"
 )
 
-// UpdateConversation defines the interface for the UpdateConversation use case
+// UpdateConversation applies user-driven updates to a conversation.
 type UpdateConversation interface {
 	// Execute partially updates a conversation, such as the title.
 	Execute(ctx context.Context, conversationID uuid.UUID, title string) (assistant.Conversation, error)
 }
 
-// UpdateConversationImpl is the implementation of the UpdateConversation use case
+// UpdateConversationImpl implements UpdateConversation.
 type UpdateConversationImpl struct {
 	uow          transaction.UnitOfWork
 	timeProvider core.CurrentTimeProvider
 }
 
-// NewUpdateConversationImpl creates a new instance of UpdateConversationImpl
+// NewUpdateConversationImpl creates an UpdateConversationImpl.
 func NewUpdateConversationImpl(uow transaction.UnitOfWork, timeProvider core.CurrentTimeProvider) *UpdateConversationImpl {
 	return &UpdateConversationImpl{
 		uow:          uow,
@@ -30,7 +30,7 @@ func NewUpdateConversationImpl(uow transaction.UnitOfWork, timeProvider core.Cur
 	}
 }
 
-// Execute partially updates a conversation, such as the title.
+// Execute implements UpdateConversation.
 func (uc *UpdateConversationImpl) Execute(ctx context.Context, conversationID uuid.UUID, title string) (assistant.Conversation, error) {
 	var updatedConv assistant.Conversation
 	err := uc.uow.Execute(ctx, func(uowCtx context.Context, scope transaction.Scope) error {

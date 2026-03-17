@@ -9,24 +9,25 @@ import (
 	"github.com/google/uuid"
 )
 
-// ListChatMessages defines the interface for the ListChatMessages use case
+// ListChatMessages returns user-facing chat history for a conversation.
 type ListChatMessages interface {
+	// Query returns projected chat messages and whether more pages are available.
 	Query(ctx context.Context, conversationID uuid.UUID, page int, pageSize int) ([]assistant.ChatMessage, bool, error)
 }
 
-// ListChatMessagesImpl is the implementation of the ListChatMessages use case
+// ListChatMessagesImpl implements ListChatMessages.
 type ListChatMessagesImpl struct {
 	ChatMessageRepo assistant.ChatMessageRepository `resolve:""`
 }
 
-// NewListChatMessagesImpl creates a new instance of ListChatMessagesImpl
+// NewListChatMessagesImpl creates a ListChatMessagesImpl.
 func NewListChatMessagesImpl(chatMessageRepo assistant.ChatMessageRepository) ListChatMessagesImpl {
 	return ListChatMessagesImpl{
 		ChatMessageRepo: chatMessageRepo,
 	}
 }
 
-// Query retrieves chat messages with pagination support
+// Query implements ListChatMessages.
 func (lcm ListChatMessagesImpl) Query(ctx context.Context, conversationID uuid.UUID, page int, pageSize int) ([]assistant.ChatMessage, bool, error) {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()

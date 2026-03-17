@@ -109,14 +109,14 @@ func TestInitStreamChat_Initialize(t *testing.T) {
 	assert.NotNil(t, streamChatUseCase)
 }
 
-func TestInitConversationCreator_Initialize(t *testing.T) {
+func TestInitConversationTranscriptWriter_Initialize(t *testing.T) {
 	t.Parallel()
 
-	i := InitConversationCreator{}
+	i := InitConversationTranscriptWriter{}
 	_, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 
-	component, err := depend.Resolve[ConversationCreator]()
+	component, err := depend.Resolve[ConversationTranscriptWriter]()
 	assert.NoError(t, err)
 	assert.NotNil(t, component)
 }

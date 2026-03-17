@@ -43,26 +43,22 @@ const (
 	MAX_COMPACTED_CONTEXT_CHARS = 2400
 )
 
-// CompletedConversationSummaryChannel is a channel type for sending processed assistant.ConversationSummary items.
-// It is used in integration tests to verify context compaction.
-// type CompletedConversationSummaryChannel chan assistant.ConversationSummary
-
 //go:embed prompts/chat-summary.yml
 var chatSummaryPrompt embed.FS
 
-// ConversationCompactor defines synchronous conversation compaction operations.
+// ConversationCompactor evaluates and refreshes compacted conversation memory.
 type ConversationCompactor interface {
-	// EvaluateConversationCompaction returns whether the conversation should be compacted.
+	// EvaluateConversationCompaction reports whether a conversation should be compacted now.
 	EvaluateConversationCompaction(
 		ctx context.Context,
 		conversationID uuid.UUID,
 		policy assistant.CompactionPolicy,
 	) (assistant.CompactionDecision, error)
-	// Compact compacts conversation memory using unsummarized messages.
+	// Compact refreshes the persisted compacted memory from unsummarized messages.
 	Compact(ctx context.Context, conversationID uuid.UUID) error
 }
 
-// ConversationCompactorImpl compacts unsummarized conversation messages into persisted compact memory.
+// ConversationCompactorImpl implements ConversationCompactor.
 type ConversationCompactorImpl struct {
 	chatMessageRepo         assistant.ChatMessageRepository
 	conversationSummaryRepo assistant.ConversationSummaryRepository
@@ -71,7 +67,7 @@ type ConversationCompactorImpl struct {
 	model                   string
 }
 
-// NewConversationCompactorImpl creates a new instance of ConversationCompactorImpl.
+// NewConversationCompactorImpl creates a ConversationCompactorImpl.
 func NewConversationCompactorImpl(
 	chatMessageRepo assistant.ChatMessageRepository,
 	conversationSummaryRepo assistant.ConversationSummaryRepository,
@@ -88,7 +84,7 @@ func NewConversationCompactorImpl(
 	}
 }
 
-// EvaluateConversationCompaction evaluates whether unsummarized conversation messages should be compacted.
+// EvaluateConversationCompaction implements ConversationCompactor.
 func (gcs ConversationCompactorImpl) EvaluateConversationCompaction(
 	ctx context.Context,
 	conversationID uuid.UUID,
@@ -123,7 +119,7 @@ func (gcs ConversationCompactorImpl) EvaluateConversationCompaction(
 	return gcs.determineCompactionDecision(span, unsummarizedMessages, policy), nil
 }
 
-// Compact generates and persists refreshed compacted context for the given conversation.
+// Compact implements ConversationCompactor.
 func (gcs ConversationCompactorImpl) Compact(ctx context.Context, conversationID uuid.UUID) error {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()

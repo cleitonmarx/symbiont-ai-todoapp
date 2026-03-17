@@ -397,7 +397,6 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 
 			},
 			persistExpectations: func() []persistCallExpectation {
-				onEventErr := "onEvent error"
 				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
@@ -406,6 +405,23 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
+				}
+			}(),
+			setAfterPersistExpectations: func(
+				chatRepo *assistant.MockChatMessageRepository,
+				summaryRepo *assistant.MockConversationSummaryRepository,
+				conversationRepo *assistant.MockConversationRepository,
+				timeProvider *core.MockCurrentTimeProvider,
+				assist *assistant.MockAssistant,
+				actionRegistry *assistant.MockActionRegistry,
+				skillRegistry *assistant.MockSkillRegistry,
+				uow *transaction.MockUnitOfWork,
+				outbox *outbox.MockRepository,
+			) {
+				expectRepairTurnNoOp(t, chatRepo, uow, conversationID)
+				onEventErr := "onEvent error"
+				turnSequence := int64(1)
+				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_Assistant,
 						Content:         "Sorry, I could not process your request. Please try again.",
@@ -414,9 +430,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						ErrorMessage:    &onEventErr,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
+						TurnSequence:    &turnSequence,
 					},
-				}
-			}(),
+				})
+			},
 			expectErr:      true,
 			onEventErrType: assistant.EventType_TurnStarted,
 		},
@@ -467,7 +484,6 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 
 			},
 			persistExpectations: func() []persistCallExpectation {
-				onEventErr := "onEvent error"
 				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
@@ -476,6 +492,23 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 					},
+				}
+			}(),
+			setAfterPersistExpectations: func(
+				chatRepo *assistant.MockChatMessageRepository,
+				summaryRepo *assistant.MockConversationSummaryRepository,
+				conversationRepo *assistant.MockConversationRepository,
+				timeProvider *core.MockCurrentTimeProvider,
+				assist *assistant.MockAssistant,
+				actionRegistry *assistant.MockActionRegistry,
+				skillRegistry *assistant.MockSkillRegistry,
+				uow *transaction.MockUnitOfWork,
+				outbox *outbox.MockRepository,
+			) {
+				expectRepairTurnNoOp(t, chatRepo, uow, conversationID)
+				onEventErr := "onEvent error"
+				turnSequence := int64(1)
+				expectPersistSequence(t, chatRepo, conversationRepo, uow, outbox, fixedTime, []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_Assistant,
 						Content:         "Hi",
@@ -484,9 +517,10 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						ErrorMessage:    &onEventErr,
 						ActionCallsLen:  0,
 						HasActionCallID: false,
+						TurnSequence:    &turnSequence,
 					},
-				}
-			}(),
+				})
+			},
 			expectErr:      true,
 			onEventErrType: assistant.EventType_MessageDelta,
 		},

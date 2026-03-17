@@ -13,20 +13,20 @@ const (
 	MAX_RECOVERY_MESSAGES = 8
 )
 
-// TurnRunner executes the assistant turn loop, including recovery retries.
+// TurnRunner drives the assistant streaming loop for one turn state.
 type TurnRunner interface {
-	// Run executes the streaming loop until the turn completes or fails.
+	// Run streams the turn until it completes, fails, or exhausts recovery.
 	Run(ctx context.Context, state TurnState, onEvent assistant.EventCallback) error
 }
 
-// TurnRunnerImpl implements the TurnRunner interface.
+// TurnRunnerImpl implements TurnRunner.
 type TurnRunnerImpl struct {
 	logger         *log.Logger
 	assistant      assistant.Assistant
 	actionPipeline ActionPipeline
 }
 
-// NewTurnRunnerImpl builds the default streamed turn runner.
+// NewTurnRunnerImpl creates a TurnRunnerImpl.
 func NewTurnRunnerImpl(
 	logger *log.Logger,
 	assistantClient assistant.Assistant,
@@ -39,7 +39,7 @@ func NewTurnRunnerImpl(
 	}
 }
 
-// Run executes the assistant stream loop until completion, failure, or recovery exhaustion.
+// Run implements TurnRunner.
 func (r TurnRunnerImpl) Run(ctx context.Context, state TurnState, onEvent assistant.EventCallback) error {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
@@ -99,7 +99,7 @@ func (r TurnRunnerImpl) handleStreamEvent(
 		return false, onEvent(ctx, assistant.EventType_MessageDelta, delta)
 	case assistant.EventType_TurnCompleted:
 		done := data.(assistant.TurnCompleted)
-		state.AddTokenUsage(done.Usage)
+		state.AccumulateTokenUsage(done.Usage)
 		return false, nil
 	default:
 		return false, nil

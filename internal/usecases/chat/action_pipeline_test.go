@@ -20,7 +20,7 @@ func TestActionPipeline_Handle_SuccessWithRenderer(t *testing.T) {
 	fixedTime := time.Date(2026, 3, 14, 14, 0, 0, 0, time.UTC)
 	actionRegistry := assistant.NewMockActionRegistry(t)
 	renderer := assistant.NewMockActionResultRenderer(t)
-	conversationCreator := NewMockConversationCreator(t)
+	transcriptWriter := NewMockConversationTranscriptWriter(t)
 	timeProvider := core.NewMockCurrentTimeProvider(t)
 
 	actionRegistry.EXPECT().StatusMessage("list_todos").Return("Listing todos").Once()
@@ -56,7 +56,7 @@ func TestActionPipeline_Handle_SuccessWithRenderer(t *testing.T) {
 	pipeline := NewActionPipelineImpl(
 		actionRegistry,
 		nil,
-		conversationCreator,
+		transcriptWriter,
 		timeProvider,
 	)
 
@@ -73,8 +73,8 @@ func TestActionPipeline_Handle_SuccessWithRenderer(t *testing.T) {
 
 	var persistedMessages []assistant.ChatMessage
 	timeProvider.EXPECT().Now().Return(fixedTime).Twice()
-	conversationCreator.EXPECT().
-		CreateMessage(mock.Anything, state.Conversation(), mock.Anything).
+	transcriptWriter.EXPECT().
+		WriteMessage(mock.Anything, state.Conversation(), mock.Anything).
 		Run(func(_ context.Context, _ assistant.Conversation, message assistant.ChatMessage) {
 			persistedMessages = append(persistedMessages, message)
 		}).

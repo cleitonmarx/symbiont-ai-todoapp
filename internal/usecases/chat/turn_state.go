@@ -12,7 +12,7 @@ const (
 	MAX_REPEATED_ACTION_CALL_HIT = 5
 )
 
-// TurnState encapsulates the mutable state and operations for a single assistant turn, including recovery and action loop tracking.
+// TurnState owns the mutable in-memory state for one streamed assistant turn.
 type TurnState interface {
 	// Conversation returns the target conversation for the turn.
 	Conversation() assistant.Conversation
@@ -30,8 +30,8 @@ type TurnState interface {
 	SelectedSkills() []assistant.SelectedSkill
 	// TokenUsage returns the accumulated token usage for the turn.
 	TokenUsage() assistant.Usage
-	// AddTokenUsage accumulates token usage into the current turn totals.
-	AddTokenUsage(usage assistant.Usage)
+	// AccumulateTokenUsage accumulates token usage into the current turn totals.
+	AccumulateTokenUsage(usage assistant.Usage)
 	// TurnID returns the current turn identifier.
 	TurnID() uuid.UUID
 	// NextTurnSequence returns the current sequence and increments it.
@@ -40,10 +40,6 @@ type TurnState interface {
 	AppendAssistantContent(text string)
 	// AssistantContent returns the accumulated assistant response content for the turn.
 	AssistantContent() string
-	// MarkActionCallPersisted records that an assistant action-call message was stored for this turn.
-	MarkActionCallPersisted()
-	// HasPersistedActionCall reports whether the turn stored any assistant action-call message.
-	HasPersistedActionCall() bool
 	// HasExceededMaxActionCycles increments the action cycle counter and reports whether the limit was exceeded.
 	HasExceededMaxActionCycles() bool
 	// HasExceededRepeatedActionCalls reports whether the same action signature repeated too many times.
@@ -61,11 +57,10 @@ type turnState struct {
 	turnID                  uuid.UUID
 	turnSequence            int64
 	assistantMessageContent strings.Builder
-	actionCallPersisted     bool
 	tracker                 *actionCycleTracker
 }
 
-// NewTurnState initializes the prepared request and mutable state used while streaming a response.
+// NewTurnState creates the default TurnState implementation.
 func NewTurnState(
 	conversation assistant.Conversation,
 	conversationCreated bool,
@@ -103,16 +98,6 @@ func (s *turnState) AppendAssistantContent(text string) {
 // AssistantContent returns the accumulated assistant response content for the turn.
 func (s *turnState) AssistantContent() string {
 	return s.assistantMessageContent.String()
-}
-
-// MarkActionCallPersisted records that an assistant action-call message was stored for this turn.
-func (s *turnState) MarkActionCallPersisted() {
-	s.actionCallPersisted = true
-}
-
-// HasPersistedActionCall reports whether the turn stored any assistant action-call message.
-func (s *turnState) HasPersistedActionCall() bool {
-	return s.actionCallPersisted
 }
 
 // HasExceededMaxActionCycles increments the action cycle count and reports whether the limit was exceeded.
@@ -174,8 +159,8 @@ func (s *turnState) TokenUsage() assistant.Usage {
 	return s.tokenUsage
 }
 
-// AddTokenUsage accumulates token usage into the current turn totals.
-func (s *turnState) AddTokenUsage(usage assistant.Usage) {
+// AccumulateTokenUsage accumulates token usage into the current turn totals.
+func (s *turnState) AccumulateTokenUsage(usage assistant.Usage) {
 	s.tokenUsage.CompletionTokens += usage.CompletionTokens
 	s.tokenUsage.PromptTokens += usage.PromptTokens
 	s.tokenUsage.TotalTokens += usage.TotalTokens

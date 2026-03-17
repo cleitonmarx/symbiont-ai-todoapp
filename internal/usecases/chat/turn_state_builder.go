@@ -28,11 +28,11 @@ const (
 	CHAT_TOP_P = 0.7
 
 	// MAX_SKILLS_PROMPT_CHARS is the maximum size of injected skill prompt content.
-	MAX_SKILLS_PROMPT_CHARS = 4000
+	MAX_SKILLS_PROMPT_CHARS = 6000
 )
 
-// BuildSessionParams contains the inputs required to prepare a streaming turn.
-type BuildSessionParams struct {
+// BuildTurnStateParams contains the inputs required to prepare a turn state.
+type BuildTurnStateParams struct {
 	UserMessage         string
 	Model               string
 	MaxActionCycles     int
@@ -40,13 +40,13 @@ type BuildSessionParams struct {
 	ConversationCreated bool
 }
 
-// TurnStateBuilder prepares the conversation, history, skills, and turn request.
+// TurnStateBuilder assembles the initial TurnState before streaming begins.
 type TurnStateBuilder interface {
-	// Build assembles all pre-turn context needed to start streaming.
-	Build(ctx context.Context, params BuildSessionParams) (TurnState, error)
+	// Build loads the pre-turn context and returns a ready-to-run turn state.
+	Build(ctx context.Context, params BuildTurnStateParams) (TurnState, error)
 }
 
-// TurnStateBuilderImpl implements the TurnStateBuilder interface.
+// TurnStateBuilderImpl implements TurnStateBuilder.
 type TurnStateBuilderImpl struct {
 	conversationSummaryRepo assistant.ConversationSummaryRepository
 	chatMessageRepo         assistant.ChatMessageRepository
@@ -55,7 +55,7 @@ type TurnStateBuilderImpl struct {
 	actionRegistry          assistant.ActionRegistry
 }
 
-// NewTurnStateBuilderImpl builds the default state builder for stream chat.
+// NewTurnStateBuilderImpl creates a TurnStateBuilderImpl.
 func NewTurnStateBuilderImpl(
 	conversationSummaryRepo assistant.ConversationSummaryRepository,
 	chatMessageRepo assistant.ChatMessageRepository,
@@ -72,8 +72,8 @@ func NewTurnStateBuilderImpl(
 	}
 }
 
-// Build assembles the target conversation, prompt history, selected skills, and turn request.
-func (b TurnStateBuilderImpl) Build(ctx context.Context, params BuildSessionParams) (TurnState, error) {
+// Build implements TurnStateBuilder.
+func (b TurnStateBuilderImpl) Build(ctx context.Context, params BuildTurnStateParams) (TurnState, error) {
 	spanCtx, span := telemetry.StartSpan(ctx)
 	defer span.End()
 
@@ -256,7 +256,6 @@ func buildSkillsPrompt(skills []assistant.SkillDefinition) string {
 	var builder strings.Builder
 	builder.WriteString("Skill runbooks for this turn:\n")
 	builder.WriteString("- Follow these workflows when deciding and calling tools.\n")
-	builder.WriteString("- Use strict JSON for tool arguments and match tool schemas exactly.\n\n")
 
 	for _, skill := range skills {
 		name := strings.TrimSpace(skill.Name)

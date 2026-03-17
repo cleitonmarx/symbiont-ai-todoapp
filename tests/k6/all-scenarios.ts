@@ -131,15 +131,32 @@ function selectScenarios(): NonNullable<Options["scenarios"]> {
     return createRegularScenarios();
   }
 
-  const scenarioConfig = scenarioConfigs[selectedScenarioRaw];
-  if (!scenarioConfig) {
-    console.warn(
-      `Unknown K6_LOAD_TEST_SCENARIO='${selectedScenarioRaw}', falling back to 'regular'`,
-    );
+  const requestedScenarioKeys = selectedScenarioRaw
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  if (requestedScenarioKeys.length === 0) {
     return createRegularScenarios();
   }
 
-  return createScenarioSet(scenarioConfig, "0s").scenarios;
+  const scenarios: NonNullable<Options["scenarios"]> = {};
+  for (const scenarioKey of requestedScenarioKeys) {
+    const scenarioConfig = scenarioConfigs[scenarioKey];
+    if (!scenarioConfig) {
+      console.warn(
+        `Unknown K6_LOAD_TEST_SCENARIO='${scenarioKey}', falling back to 'regular'`,
+      );
+      return createRegularScenarios();
+    }
+
+    const created = createScenarioSet(scenarioConfig, "0s");
+    for (const [scenarioName, scenario] of Object.entries(created.scenarios)) {
+      scenarios[scenarioName] = scenario;
+    }
+  }
+
+  return scenarios;
 }
 
 /**

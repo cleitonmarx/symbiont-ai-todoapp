@@ -140,9 +140,9 @@ export interface ConversationListResp {
 
 export interface ChatStreamMeta {
   conversation_id: string;
-  user_message_id: string;
-  assistant_message_id: string;
   conversation_created: boolean;
+  turn_id: string;
+  selected_skills?: SelectedSkill[];
 }
 
 export interface ChatStreamDelta {
@@ -150,8 +150,6 @@ export interface ChatStreamDelta {
 }
 
 export interface ChatStreamDone {
-  assistant_message_id: string;
-  completed_at: string;
   usage: {
     prompt_tokens: number;
     completion_tokens: number;

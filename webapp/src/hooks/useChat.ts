@@ -73,8 +73,6 @@ const TODO_SORT_OPTIONS = new Set([
 
 interface StreamTurnStartedEventData {
   conversation_id?: string;
-  user_message_id?: string;
-  assistant_message_id?: string;
   turn_id?: string;
   selected_skills?: unknown;
   conversation_created?: boolean;
@@ -125,8 +123,11 @@ interface StreamActionApprovalResolvedEventData {
 }
 
 interface StreamTurnCompletedEventData {
-  assistant_message_id?: string;
-  completed_at?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
 }
 
 interface StreamContextCompactionStartedEventData {
@@ -434,17 +435,6 @@ const updateMessageById = (
   const next = [...messages];
   next[index] = updater(next[index]);
   return next;
-};
-
-const renameMessageId = (messages: ChatMessage[], previousId: string, nextId: string): ChatMessage[] => {
-  if (!previousId || previousId === nextId) {
-    return messages;
-  }
-
-  return updateMessageById(messages, previousId, (message) => ({
-    ...message,
-    id: nextId,
-  }));
 };
 
 const upsertActionDetail = (
@@ -803,7 +793,6 @@ export const useChat = ({
         readerRef.current = response.body.getReader();
         const decoder = new TextDecoder();
         let assistantContent = '';
-        let assistantMessageId = '';
         let currentAssistantMessageId = '';
         let streamConversationId: string | null = activeConversationRef.current;
         let assistantCompleted = false;
@@ -847,27 +836,6 @@ export const useChat = ({
                 activeConversationRef.current = data.conversation_id;
                 setActiveConversationId(data.conversation_id);
               }
-              if (data.user_message_id) {
-                const userMessageId = data.user_message_id;
-                setMessages((prev) => {
-                  const next = [...prev];
-                  for (let i = next.length - 1; i >= 0; i--) {
-                    if (next[i].role === 'user') {
-                      next[i] = { ...next[i], id: userMessageId };
-                      break;
-                    }
-                  }
-                  return next;
-                });
-              }
-              if (data.assistant_message_id) {
-                const previousAssistantMessageId = currentAssistantMessageId;
-                assistantMessageId = data.assistant_message_id;
-                currentAssistantMessageId = data.assistant_message_id;
-                setMessages((prev) =>
-                  renameMessageId(prev, previousAssistantMessageId, data.assistant_message_id as string),
-                );
-              }
               setMessages((prev) =>
                 updateMessageById(prev, currentAssistantMessageId, (message) => ({
                   ...message,
@@ -892,11 +860,9 @@ export const useChat = ({
               assistantContent += data.text;
 
               setMessages((prev) => {
-                const nextAssistantMessageId = assistantMessageId || currentAssistantMessageId;
-                currentAssistantMessageId = nextAssistantMessageId;
-                return updateMessageById(prev, nextAssistantMessageId, (message) => ({
+                return updateMessageById(prev, currentAssistantMessageId, (message) => ({
                   ...message,
-                  id: nextAssistantMessageId,
+                  id: currentAssistantMessageId,
                   content: assistantContent,
                 }));
               });
@@ -1059,16 +1025,8 @@ export const useChat = ({
             }
 
             if (eventType === 'turn_completed') {
-              const data = rawData as StreamTurnCompletedEventData;
+              const _data = rawData as StreamTurnCompletedEventData;
               assistantCompleted = true;
-              if (data.assistant_message_id) {
-                const previousAssistantMessageId = currentAssistantMessageId;
-                assistantMessageId = data.assistant_message_id;
-                currentAssistantMessageId = data.assistant_message_id;
-                setMessages((prev) =>
-                  renameMessageId(prev, previousAssistantMessageId, data.assistant_message_id as string),
-                );
-              }
               clearPendingApproval();
               resetToolActivity();
               setContextCompactionStatus((current) => (current === 'failed' ? current : 'idle'));
@@ -1133,14 +1091,6 @@ export const useChat = ({
             }
             processEvent(evt);
           }
-        }
-
-        if (assistantMessageId) {
-          setMessages((prev) => {
-            const previousAssistantMessageId = currentAssistantMessageId;
-            currentAssistantMessageId = assistantMessageId;
-            return renameMessageId(prev, previousAssistantMessageId, assistantMessageId);
-          });
         }
 
         setLoading(false);

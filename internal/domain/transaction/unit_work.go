@@ -10,15 +10,15 @@ import (
 
 // Scope provides repository access for operations executed inside a unit of work.
 type Scope interface {
-	// Todo returns the todo repository.
+	// Todo returns the todo repository for the current transaction scope.
 	Todo() todo.Repository
-	// Conversation returns the conversation repository.
+	// Conversation returns the conversation repository for the current transaction scope.
 	Conversation() assistant.ConversationRepository
-	// ChatMessage returns the chat message repository.
+	// ChatMessage returns the chat message repository for the current transaction scope.
 	ChatMessage() assistant.ChatMessageRepository
-	// ConversationSummary returns the conversation summary repository.
+	// ConversationSummary returns the conversation summary repository for the current transaction scope.
 	ConversationSummary() assistant.ConversationSummaryRepository
-	// Outbox returns the outbox repository.
+	// Outbox returns the outbox repository for the current transaction scope.
 	Outbox() outbox.Repository
 }
 

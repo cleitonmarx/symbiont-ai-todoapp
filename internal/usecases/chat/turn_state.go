@@ -22,8 +22,9 @@ type TurnState interface {
 	Request() assistant.TurnRequest
 	// AppendRequestMessages appends follow-up messages to the current turn request.
 	AppendRequestMessages(messages ...assistant.Message)
-	// ApplyRecoveryPolicy prepares the request for one recovery-only retry after an internal turn failure.
-	ApplyRecoveryPolicy(runErr error, maxMessages int)
+	// PrepareFallbackResponseRequest rewrites the request into a text-only fallback response after an internal turn failure.
+	// It removes available actions, trims the retained context window, and appends one system instruction for the retry.
+	PrepareFallbackResponseRequest(runErr error, maxMessages int)
 	// Model returns the current request model name.
 	Model() string
 	// SelectedSkills returns the skills selected for the turn.
@@ -130,8 +131,8 @@ func (s *turnState) AppendRequestMessages(messages ...assistant.Message) {
 	s.request.Messages = append(s.request.Messages, messages...)
 }
 
-// ApplyRecoveryPolicy removes tools, compacts recent context, and appends one recovery instruction.
-func (s *turnState) ApplyRecoveryPolicy(runErr error, maxMessages int) {
+// PrepareFallbackResponseRequest removes available actions, trims recent context, and appends one fallback system instruction.
+func (s *turnState) PrepareFallbackResponseRequest(runErr error, maxMessages int) {
 	s.request.AvailableActions = nil
 	s.request.Messages = compactToLastMessages(s.request.Messages, maxMessages)
 	s.request.Messages = append(s.request.Messages, assistant.Message{

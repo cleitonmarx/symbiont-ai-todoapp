@@ -112,7 +112,7 @@ func prepareRunTurnRecovery(runErr error, state TurnState, attempted *bool) bool
 		return false
 	}
 	*attempted = true
-	state.ApplyRecoveryPolicy(runErr, MAX_RECOVERY_MESSAGES)
+	state.PrepareFallbackResponseRequest(runErr, MAX_RECOVERY_MESSAGES)
 
 	return true
 }

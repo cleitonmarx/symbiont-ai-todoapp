@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
+	md "github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/md"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/modelrunner"
-	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/adapters/outbound/skillregistry"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,13 +51,13 @@ func newSkillMatrixRegistry(t *testing.T) assistant.SkillRegistry {
 
 	ctx := t.Context()
 
-	skills, err := skillregistry.LoadSkillsFromFS(os.DirFS("../../internal/adapters/outbound/skillregistry/skills"))
+	skills, err := md.LoadSkillsFromFS(os.DirFS("../../internal/adapters/outbound/md/skills"))
 	require.NoError(t, err)
 
-	drmClient := modelrunner.NewDRMAPIClient("http://localhost:12434", "", http.DefaultClient)
+	drmClient := modelrunner.NewOpenAICompatClient("http://localhost:12434", "", http.DefaultClient)
 	encoder := modelrunner.NewSemanticEncoder(drmClient)
 
-	registry, err := skillregistry.NewSkillRegistry(ctx, skills, encoder, "embeddinggemma:300M-Q8_0", skillregistry.Config{
+	registry, err := md.NewRegistry(ctx, skills, encoder, "embeddinggemma:300M-Q8_0", md.Config{
 		RelevantSkillsTopK:     2,
 		RelevantSkillsMinScore: 0.23,
 		AvoidPenaltyWeight:     0.70,

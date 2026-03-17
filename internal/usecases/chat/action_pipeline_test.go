@@ -53,17 +53,16 @@ func TestActionPipeline_Handle_SuccessWithRenderer(t *testing.T) {
 		Return(assistant.Message{Role: assistant.ChatRole_Assistant, Content: "Found 2 todos."}, true).
 		Once()
 
-	pipeline := newActionPipeline(
+	pipeline := NewActionPipelineImpl(
 		actionRegistry,
 		nil,
 		conversationCreator,
 		timeProvider,
 	)
 
-	session := NewTurnSession(
+	state := NewTurnState(
 		assistant.Conversation{ID: uuid.MustParse("00000000-0000-0000-0000-000000000001")},
 		false,
-		"List todos",
 		nil,
 		assistant.TurnRequest{
 			Model:    "test-model",
@@ -75,7 +74,7 @@ func TestActionPipeline_Handle_SuccessWithRenderer(t *testing.T) {
 	var persistedMessages []assistant.ChatMessage
 	timeProvider.EXPECT().Now().Return(fixedTime).Twice()
 	conversationCreator.EXPECT().
-		CreateMessage(mock.Anything, session.Conversation(), mock.Anything).
+		CreateMessage(mock.Anything, state.Conversation(), mock.Anything).
 		Run(func(_ context.Context, _ assistant.Conversation, message assistant.ChatMessage) {
 			persistedMessages = append(persistedMessages, message)
 		}).
@@ -86,7 +85,7 @@ func TestActionPipeline_Handle_SuccessWithRenderer(t *testing.T) {
 	continueStreaming, err := pipeline.Handle(
 		t.Context(),
 		assistant.ActionCall{ID: "call-1", Name: "list_todos", Input: `{"page":1}`},
-		session,
+		state,
 		func(_ context.Context, eventType assistant.EventType, _ any) error {
 			eventTypes = append(eventTypes, eventType)
 			return nil
@@ -103,10 +102,7 @@ func TestActionPipeline_Handle_SuccessWithRenderer(t *testing.T) {
 		assistant.EventType_ActionCompleted,
 		assistant.EventType_MessageDelta,
 	}, eventTypes)
-	assert.Equal(t, "Found 2 todos.", session.BuildFinalAssistantMessage(fixedTime).Content)
-	var request assistant.TurnRequest
-	session.UpdateRequest(func(current *assistant.TurnRequest) {
-		request = *current
-	})
+	assert.Equal(t, "Found 2 todos.", state.AssistantContent())
+	request := state.Request()
 	assert.Len(t, request.Messages, 4)
 }

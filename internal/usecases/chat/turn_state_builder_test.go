@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTurnSessionBuilder_Build(t *testing.T) {
+func TestTurnStateBuilder_Build(t *testing.T) {
 	t.Parallel()
 
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
@@ -68,7 +68,7 @@ func TestTurnSessionBuilder_Build(t *testing.T) {
 		Return(assistant.ActionDefinition{Name: "todo_lookup"}, true).
 		Once()
 
-	builder := newTurnSessionBuilder(
+	builder := NewTurnStateBuilderImpl(
 		summaryRepo,
 		chatRepo,
 		timeProvider,
@@ -76,7 +76,7 @@ func TestTurnSessionBuilder_Build(t *testing.T) {
 		actionRegistry,
 	)
 
-	session, err := builder.Build(t.Context(), BuildSessionParams{
+	state, err := builder.Build(t.Context(), BuildSessionParams{
 		UserMessage:         "Update my todos",
 		Model:               "test-model",
 		MaxActionCycles:     7,
@@ -84,14 +84,11 @@ func TestTurnSessionBuilder_Build(t *testing.T) {
 		ConversationCreated: false,
 	})
 	require.NoError(t, err)
-	var request assistant.TurnRequest
-	session.UpdateRequest(func(current *assistant.TurnRequest) {
-		request = *current
-	})
-	assert.Equal(t, conversationID, session.Conversation().ID)
-	assert.False(t, session.ConversationCreated())
-	assert.Len(t, session.SelectedSkills(), 1)
-	assert.Equal(t, "todo-skill", session.SelectedSkills()[0].Name)
+	request := state.Request()
+	assert.Equal(t, conversationID, state.Conversation().ID)
+	assert.False(t, state.ConversationCreated())
+	assert.Len(t, state.SelectedSkills(), 1)
+	assert.Equal(t, "todo-skill", state.SelectedSkills()[0].Name)
 	assert.Len(t, request.AvailableActions, 1)
 	assert.Equal(t, "todo_lookup", request.AvailableActions[0].Name)
 	assert.Len(t, request.Messages, 4)

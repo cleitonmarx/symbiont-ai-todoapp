@@ -7,6 +7,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/outbox"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/transaction"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 )
 
 // ConversationCreator owns message creation and related conversation side effects.
@@ -15,32 +16,35 @@ type ConversationCreator interface {
 	CreateMessage(ctx context.Context, conversation assistant.Conversation, message assistant.ChatMessage) error
 }
 
-// conversationCreator persists chat messages, outbox events, and token estimates.
-type conversationCreator struct {
+// ConversationCreatorImpl implements the ConversationCreator interface, coordinating message persistence, outbox event creation, and conversation timestamp updates.
+type ConversationCreatorImpl struct {
 	uow       transaction.UnitOfWork
 	tokenizer assistant.Tokenizer
 }
 
-// newConversationCreator builds the default conversation creator for stream chat.
-func newConversationCreator(
+// NewConversationCreatorImpl builds the default conversation creator for stream chat.
+func NewConversationCreatorImpl(
 	uow transaction.UnitOfWork,
 	tokenizer assistant.Tokenizer,
-) ConversationCreator {
-	return conversationCreator{
+) ConversationCreatorImpl {
+	return ConversationCreatorImpl{
 		uow:       uow,
 		tokenizer: tokenizer,
 	}
 }
 
 // CreateMessage stores one chat message together with its outbox event and conversation timestamp updates.
-func (p conversationCreator) CreateMessage(
+func (p ConversationCreatorImpl) CreateMessage(
 	ctx context.Context,
 	conversation assistant.Conversation,
 	message assistant.ChatMessage,
 ) error {
-	message.ContextTokensEstimate = p.estimateContextTokens(ctx, message)
+	spanCtx, span := telemetry.StartSpan(ctx)
+	defer span.End()
 
-	return p.uow.Execute(ctx, func(uowCtx context.Context, scope transaction.Scope) error {
+	message.ContextTokensEstimate = p.estimateContextTokens(spanCtx, message)
+
+	return p.uow.Execute(spanCtx, func(uowCtx context.Context, scope transaction.Scope) error {
 		if err := scope.ChatMessage().CreateChatMessages(uowCtx, []assistant.ChatMessage{message}); err != nil {
 			return err
 		}
@@ -71,7 +75,7 @@ func (p conversationCreator) CreateMessage(
 }
 
 // estimateContextTokens computes the persisted context footprint for a chat message.
-func (p conversationCreator) estimateContextTokens(ctx context.Context, message assistant.ChatMessage) int {
+func (p ConversationCreatorImpl) estimateContextTokens(ctx context.Context, message assistant.ChatMessage) int {
 	input := assistant.BuildChatMessageTokenizationInput(message)
 	if strings.TrimSpace(input) == "" {
 		return 0

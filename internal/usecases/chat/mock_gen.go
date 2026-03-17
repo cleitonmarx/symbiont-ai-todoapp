@@ -42,8 +42,8 @@ func (_m *MockActionPipeline) EXPECT() *MockActionPipeline_Expecter {
 }
 
 // Handle provides a mock function for the type MockActionPipeline
-func (_mock *MockActionPipeline) Handle(ctx context.Context, actionCall assistant.ActionCall, session TurnSession, onEvent assistant.EventCallback) (bool, error) {
-	ret := _mock.Called(ctx, actionCall, session, onEvent)
+func (_mock *MockActionPipeline) Handle(ctx context.Context, actionCall assistant.ActionCall, state TurnState, onEvent assistant.EventCallback) (bool, error) {
+	ret := _mock.Called(ctx, actionCall, state, onEvent)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Handle")
@@ -51,16 +51,16 @@ func (_mock *MockActionPipeline) Handle(ctx context.Context, actionCall assistan
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, assistant.ActionCall, TurnSession, assistant.EventCallback) (bool, error)); ok {
-		return returnFunc(ctx, actionCall, session, onEvent)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, assistant.ActionCall, TurnState, assistant.EventCallback) (bool, error)); ok {
+		return returnFunc(ctx, actionCall, state, onEvent)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, assistant.ActionCall, TurnSession, assistant.EventCallback) bool); ok {
-		r0 = returnFunc(ctx, actionCall, session, onEvent)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, assistant.ActionCall, TurnState, assistant.EventCallback) bool); ok {
+		r0 = returnFunc(ctx, actionCall, state, onEvent)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, assistant.ActionCall, TurnSession, assistant.EventCallback) error); ok {
-		r1 = returnFunc(ctx, actionCall, session, onEvent)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, assistant.ActionCall, TurnState, assistant.EventCallback) error); ok {
+		r1 = returnFunc(ctx, actionCall, state, onEvent)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -75,13 +75,13 @@ type MockActionPipeline_Handle_Call struct {
 // Handle is a helper method to define mock.On call
 //   - ctx context.Context
 //   - actionCall assistant.ActionCall
-//   - session TurnSession
+//   - state TurnState
 //   - onEvent assistant.EventCallback
-func (_e *MockActionPipeline_Expecter) Handle(ctx interface{}, actionCall interface{}, session interface{}, onEvent interface{}) *MockActionPipeline_Handle_Call {
-	return &MockActionPipeline_Handle_Call{Call: _e.mock.On("Handle", ctx, actionCall, session, onEvent)}
+func (_e *MockActionPipeline_Expecter) Handle(ctx interface{}, actionCall interface{}, state interface{}, onEvent interface{}) *MockActionPipeline_Handle_Call {
+	return &MockActionPipeline_Handle_Call{Call: _e.mock.On("Handle", ctx, actionCall, state, onEvent)}
 }
 
-func (_c *MockActionPipeline_Handle_Call) Run(run func(ctx context.Context, actionCall assistant.ActionCall, session TurnSession, onEvent assistant.EventCallback)) *MockActionPipeline_Handle_Call {
+func (_c *MockActionPipeline_Handle_Call) Run(run func(ctx context.Context, actionCall assistant.ActionCall, state TurnState, onEvent assistant.EventCallback)) *MockActionPipeline_Handle_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -91,9 +91,9 @@ func (_c *MockActionPipeline_Handle_Call) Run(run func(ctx context.Context, acti
 		if args[1] != nil {
 			arg1 = args[1].(assistant.ActionCall)
 		}
-		var arg2 TurnSession
+		var arg2 TurnState
 		if args[2] != nil {
-			arg2 = args[2].(TurnSession)
+			arg2 = args[2].(TurnState)
 		}
 		var arg3 assistant.EventCallback
 		if args[3] != nil {
@@ -114,7 +114,7 @@ func (_c *MockActionPipeline_Handle_Call) Return(b bool, err error) *MockActionP
 	return _c
 }
 
-func (_c *MockActionPipeline_Handle_Call) RunAndReturn(run func(ctx context.Context, actionCall assistant.ActionCall, session TurnSession, onEvent assistant.EventCallback) (bool, error)) *MockActionPipeline_Handle_Call {
+func (_c *MockActionPipeline_Handle_Call) RunAndReturn(run func(ctx context.Context, actionCall assistant.ActionCall, state TurnState, onEvent assistant.EventCallback) (bool, error)) *MockActionPipeline_Handle_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1162,16 +1162,16 @@ func (_m *MockTurnRunner) EXPECT() *MockTurnRunner_Expecter {
 }
 
 // Run provides a mock function for the type MockTurnRunner
-func (_mock *MockTurnRunner) Run(ctx context.Context, session TurnSession, onEvent assistant.EventCallback) error {
-	ret := _mock.Called(ctx, session, onEvent)
+func (_mock *MockTurnRunner) Run(ctx context.Context, state TurnState, onEvent assistant.EventCallback) error {
+	ret := _mock.Called(ctx, state, onEvent)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Run")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, TurnSession, assistant.EventCallback) error); ok {
-		r0 = returnFunc(ctx, session, onEvent)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, TurnState, assistant.EventCallback) error); ok {
+		r0 = returnFunc(ctx, state, onEvent)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1185,21 +1185,21 @@ type MockTurnRunner_Run_Call struct {
 
 // Run is a helper method to define mock.On call
 //   - ctx context.Context
-//   - session TurnSession
+//   - state TurnState
 //   - onEvent assistant.EventCallback
-func (_e *MockTurnRunner_Expecter) Run(ctx interface{}, session interface{}, onEvent interface{}) *MockTurnRunner_Run_Call {
-	return &MockTurnRunner_Run_Call{Call: _e.mock.On("Run", ctx, session, onEvent)}
+func (_e *MockTurnRunner_Expecter) Run(ctx interface{}, state interface{}, onEvent interface{}) *MockTurnRunner_Run_Call {
+	return &MockTurnRunner_Run_Call{Call: _e.mock.On("Run", ctx, state, onEvent)}
 }
 
-func (_c *MockTurnRunner_Run_Call) Run(run func(ctx context.Context, session TurnSession, onEvent assistant.EventCallback)) *MockTurnRunner_Run_Call {
+func (_c *MockTurnRunner_Run_Call) Run(run func(ctx context.Context, state TurnState, onEvent assistant.EventCallback)) *MockTurnRunner_Run_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 TurnSession
+		var arg1 TurnState
 		if args[1] != nil {
-			arg1 = args[1].(TurnSession)
+			arg1 = args[1].(TurnState)
 		}
 		var arg2 assistant.EventCallback
 		if args[2] != nil {
@@ -1219,18 +1219,18 @@ func (_c *MockTurnRunner_Run_Call) Return(err error) *MockTurnRunner_Run_Call {
 	return _c
 }
 
-func (_c *MockTurnRunner_Run_Call) RunAndReturn(run func(ctx context.Context, session TurnSession, onEvent assistant.EventCallback) error) *MockTurnRunner_Run_Call {
+func (_c *MockTurnRunner_Run_Call) RunAndReturn(run func(ctx context.Context, state TurnState, onEvent assistant.EventCallback) error) *MockTurnRunner_Run_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// NewMockTurnSession creates a new instance of MockTurnSession. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// NewMockTurnState creates a new instance of MockTurnState. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
-func NewMockTurnSession(t interface {
+func NewMockTurnState(t interface {
 	mock.TestingT
 	Cleanup(func())
-}) *MockTurnSession {
-	mock := &MockTurnSession{}
+}) *MockTurnState {
+	mock := &MockTurnState{}
 	mock.Mock.Test(t)
 
 	t.Cleanup(func() { mock.AssertExpectations(t) })
@@ -1238,37 +1238,37 @@ func NewMockTurnSession(t interface {
 	return mock
 }
 
-// MockTurnSession is an autogenerated mock type for the TurnSession type
-type MockTurnSession struct {
+// MockTurnState is an autogenerated mock type for the TurnState type
+type MockTurnState struct {
 	mock.Mock
 }
 
-type MockTurnSession_Expecter struct {
+type MockTurnState_Expecter struct {
 	mock *mock.Mock
 }
 
-func (_m *MockTurnSession) EXPECT() *MockTurnSession_Expecter {
-	return &MockTurnSession_Expecter{mock: &_m.Mock}
+func (_m *MockTurnState) EXPECT() *MockTurnState_Expecter {
+	return &MockTurnState_Expecter{mock: &_m.Mock}
 }
 
-// AddTokenUsage provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) AddTokenUsage(usage assistant.Usage) {
+// AddTokenUsage provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) AddTokenUsage(usage assistant.Usage) {
 	_mock.Called(usage)
 	return
 }
 
-// MockTurnSession_AddTokenUsage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddTokenUsage'
-type MockTurnSession_AddTokenUsage_Call struct {
+// MockTurnState_AddTokenUsage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddTokenUsage'
+type MockTurnState_AddTokenUsage_Call struct {
 	*mock.Call
 }
 
 // AddTokenUsage is a helper method to define mock.On call
 //   - usage assistant.Usage
-func (_e *MockTurnSession_Expecter) AddTokenUsage(usage interface{}) *MockTurnSession_AddTokenUsage_Call {
-	return &MockTurnSession_AddTokenUsage_Call{Call: _e.mock.On("AddTokenUsage", usage)}
+func (_e *MockTurnState_Expecter) AddTokenUsage(usage interface{}) *MockTurnState_AddTokenUsage_Call {
+	return &MockTurnState_AddTokenUsage_Call{Call: _e.mock.On("AddTokenUsage", usage)}
 }
 
-func (_c *MockTurnSession_AddTokenUsage_Call) Run(run func(usage assistant.Usage)) *MockTurnSession_AddTokenUsage_Call {
+func (_c *MockTurnState_AddTokenUsage_Call) Run(run func(usage assistant.Usage)) *MockTurnState_AddTokenUsage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 assistant.Usage
 		if args[0] != nil {
@@ -1281,34 +1281,34 @@ func (_c *MockTurnSession_AddTokenUsage_Call) Run(run func(usage assistant.Usage
 	return _c
 }
 
-func (_c *MockTurnSession_AddTokenUsage_Call) Return() *MockTurnSession_AddTokenUsage_Call {
+func (_c *MockTurnState_AddTokenUsage_Call) Return() *MockTurnState_AddTokenUsage_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockTurnSession_AddTokenUsage_Call) RunAndReturn(run func(usage assistant.Usage)) *MockTurnSession_AddTokenUsage_Call {
+func (_c *MockTurnState_AddTokenUsage_Call) RunAndReturn(run func(usage assistant.Usage)) *MockTurnState_AddTokenUsage_Call {
 	_c.Run(run)
 	return _c
 }
 
-// AppendAssistantContent provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) AppendAssistantContent(text string) {
+// AppendAssistantContent provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) AppendAssistantContent(text string) {
 	_mock.Called(text)
 	return
 }
 
-// MockTurnSession_AppendAssistantContent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AppendAssistantContent'
-type MockTurnSession_AppendAssistantContent_Call struct {
+// MockTurnState_AppendAssistantContent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AppendAssistantContent'
+type MockTurnState_AppendAssistantContent_Call struct {
 	*mock.Call
 }
 
 // AppendAssistantContent is a helper method to define mock.On call
 //   - text string
-func (_e *MockTurnSession_Expecter) AppendAssistantContent(text interface{}) *MockTurnSession_AppendAssistantContent_Call {
-	return &MockTurnSession_AppendAssistantContent_Call{Call: _e.mock.On("AppendAssistantContent", text)}
+func (_e *MockTurnState_Expecter) AppendAssistantContent(text interface{}) *MockTurnState_AppendAssistantContent_Call {
+	return &MockTurnState_AppendAssistantContent_Call{Call: _e.mock.On("AppendAssistantContent", text)}
 }
 
-func (_c *MockTurnSession_AppendAssistantContent_Call) Run(run func(text string)) *MockTurnSession_AppendAssistantContent_Call {
+func (_c *MockTurnState_AppendAssistantContent_Call) Run(run func(text string)) *MockTurnState_AppendAssistantContent_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -1321,18 +1321,18 @@ func (_c *MockTurnSession_AppendAssistantContent_Call) Run(run func(text string)
 	return _c
 }
 
-func (_c *MockTurnSession_AppendAssistantContent_Call) Return() *MockTurnSession_AppendAssistantContent_Call {
+func (_c *MockTurnState_AppendAssistantContent_Call) Return() *MockTurnState_AppendAssistantContent_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockTurnSession_AppendAssistantContent_Call) RunAndReturn(run func(text string)) *MockTurnSession_AppendAssistantContent_Call {
+func (_c *MockTurnState_AppendAssistantContent_Call) RunAndReturn(run func(text string)) *MockTurnState_AppendAssistantContent_Call {
 	_c.Run(run)
 	return _c
 }
 
-// AssistantMessageID provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) AssistantMessageID() uuid.UUID {
+// AssistantMessageID provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) AssistantMessageID() uuid.UUID {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -1350,35 +1350,35 @@ func (_mock *MockTurnSession) AssistantMessageID() uuid.UUID {
 	return r0
 }
 
-// MockTurnSession_AssistantMessageID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AssistantMessageID'
-type MockTurnSession_AssistantMessageID_Call struct {
+// MockTurnState_AssistantMessageID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AssistantMessageID'
+type MockTurnState_AssistantMessageID_Call struct {
 	*mock.Call
 }
 
 // AssistantMessageID is a helper method to define mock.On call
-func (_e *MockTurnSession_Expecter) AssistantMessageID() *MockTurnSession_AssistantMessageID_Call {
-	return &MockTurnSession_AssistantMessageID_Call{Call: _e.mock.On("AssistantMessageID")}
+func (_e *MockTurnState_Expecter) AssistantMessageID() *MockTurnState_AssistantMessageID_Call {
+	return &MockTurnState_AssistantMessageID_Call{Call: _e.mock.On("AssistantMessageID")}
 }
 
-func (_c *MockTurnSession_AssistantMessageID_Call) Run(run func()) *MockTurnSession_AssistantMessageID_Call {
+func (_c *MockTurnState_AssistantMessageID_Call) Run(run func()) *MockTurnState_AssistantMessageID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockTurnSession_AssistantMessageID_Call) Return(uUID uuid.UUID) *MockTurnSession_AssistantMessageID_Call {
+func (_c *MockTurnState_AssistantMessageID_Call) Return(uUID uuid.UUID) *MockTurnState_AssistantMessageID_Call {
 	_c.Call.Return(uUID)
 	return _c
 }
 
-func (_c *MockTurnSession_AssistantMessageID_Call) RunAndReturn(run func() uuid.UUID) *MockTurnSession_AssistantMessageID_Call {
+func (_c *MockTurnState_AssistantMessageID_Call) RunAndReturn(run func() uuid.UUID) *MockTurnState_AssistantMessageID_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// BuildFailureMessage provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) BuildFailureMessage(now time.Time, streamErr error) assistant.ChatMessage {
+// BuildFailureMessage provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) BuildFailureMessage(now time.Time, streamErr error) assistant.ChatMessage {
 	ret := _mock.Called(now, streamErr)
 
 	if len(ret) == 0 {
@@ -1394,19 +1394,19 @@ func (_mock *MockTurnSession) BuildFailureMessage(now time.Time, streamErr error
 	return r0
 }
 
-// MockTurnSession_BuildFailureMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildFailureMessage'
-type MockTurnSession_BuildFailureMessage_Call struct {
+// MockTurnState_BuildFailureMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildFailureMessage'
+type MockTurnState_BuildFailureMessage_Call struct {
 	*mock.Call
 }
 
 // BuildFailureMessage is a helper method to define mock.On call
 //   - now time.Time
 //   - streamErr error
-func (_e *MockTurnSession_Expecter) BuildFailureMessage(now interface{}, streamErr interface{}) *MockTurnSession_BuildFailureMessage_Call {
-	return &MockTurnSession_BuildFailureMessage_Call{Call: _e.mock.On("BuildFailureMessage", now, streamErr)}
+func (_e *MockTurnState_Expecter) BuildFailureMessage(now interface{}, streamErr interface{}) *MockTurnState_BuildFailureMessage_Call {
+	return &MockTurnState_BuildFailureMessage_Call{Call: _e.mock.On("BuildFailureMessage", now, streamErr)}
 }
 
-func (_c *MockTurnSession_BuildFailureMessage_Call) Run(run func(now time.Time, streamErr error)) *MockTurnSession_BuildFailureMessage_Call {
+func (_c *MockTurnState_BuildFailureMessage_Call) Run(run func(now time.Time, streamErr error)) *MockTurnState_BuildFailureMessage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 time.Time
 		if args[0] != nil {
@@ -1424,18 +1424,18 @@ func (_c *MockTurnSession_BuildFailureMessage_Call) Run(run func(now time.Time, 
 	return _c
 }
 
-func (_c *MockTurnSession_BuildFailureMessage_Call) Return(chatMessage assistant.ChatMessage) *MockTurnSession_BuildFailureMessage_Call {
+func (_c *MockTurnState_BuildFailureMessage_Call) Return(chatMessage assistant.ChatMessage) *MockTurnState_BuildFailureMessage_Call {
 	_c.Call.Return(chatMessage)
 	return _c
 }
 
-func (_c *MockTurnSession_BuildFailureMessage_Call) RunAndReturn(run func(now time.Time, streamErr error) assistant.ChatMessage) *MockTurnSession_BuildFailureMessage_Call {
+func (_c *MockTurnState_BuildFailureMessage_Call) RunAndReturn(run func(now time.Time, streamErr error) assistant.ChatMessage) *MockTurnState_BuildFailureMessage_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// BuildFinalAssistantMessage provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) BuildFinalAssistantMessage(now time.Time) assistant.ChatMessage {
+// BuildFinalAssistantMessage provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) BuildFinalAssistantMessage(now time.Time) assistant.ChatMessage {
 	ret := _mock.Called(now)
 
 	if len(ret) == 0 {
@@ -1451,18 +1451,18 @@ func (_mock *MockTurnSession) BuildFinalAssistantMessage(now time.Time) assistan
 	return r0
 }
 
-// MockTurnSession_BuildFinalAssistantMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildFinalAssistantMessage'
-type MockTurnSession_BuildFinalAssistantMessage_Call struct {
+// MockTurnState_BuildFinalAssistantMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildFinalAssistantMessage'
+type MockTurnState_BuildFinalAssistantMessage_Call struct {
 	*mock.Call
 }
 
 // BuildFinalAssistantMessage is a helper method to define mock.On call
 //   - now time.Time
-func (_e *MockTurnSession_Expecter) BuildFinalAssistantMessage(now interface{}) *MockTurnSession_BuildFinalAssistantMessage_Call {
-	return &MockTurnSession_BuildFinalAssistantMessage_Call{Call: _e.mock.On("BuildFinalAssistantMessage", now)}
+func (_e *MockTurnState_Expecter) BuildFinalAssistantMessage(now interface{}) *MockTurnState_BuildFinalAssistantMessage_Call {
+	return &MockTurnState_BuildFinalAssistantMessage_Call{Call: _e.mock.On("BuildFinalAssistantMessage", now)}
 }
 
-func (_c *MockTurnSession_BuildFinalAssistantMessage_Call) Run(run func(now time.Time)) *MockTurnSession_BuildFinalAssistantMessage_Call {
+func (_c *MockTurnState_BuildFinalAssistantMessage_Call) Run(run func(now time.Time)) *MockTurnState_BuildFinalAssistantMessage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 time.Time
 		if args[0] != nil {
@@ -1475,18 +1475,18 @@ func (_c *MockTurnSession_BuildFinalAssistantMessage_Call) Run(run func(now time
 	return _c
 }
 
-func (_c *MockTurnSession_BuildFinalAssistantMessage_Call) Return(chatMessage assistant.ChatMessage) *MockTurnSession_BuildFinalAssistantMessage_Call {
+func (_c *MockTurnState_BuildFinalAssistantMessage_Call) Return(chatMessage assistant.ChatMessage) *MockTurnState_BuildFinalAssistantMessage_Call {
 	_c.Call.Return(chatMessage)
 	return _c
 }
 
-func (_c *MockTurnSession_BuildFinalAssistantMessage_Call) RunAndReturn(run func(now time.Time) assistant.ChatMessage) *MockTurnSession_BuildFinalAssistantMessage_Call {
+func (_c *MockTurnState_BuildFinalAssistantMessage_Call) RunAndReturn(run func(now time.Time) assistant.ChatMessage) *MockTurnState_BuildFinalAssistantMessage_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Conversation provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) Conversation() assistant.Conversation {
+// Conversation provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) Conversation() assistant.Conversation {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -1502,35 +1502,35 @@ func (_mock *MockTurnSession) Conversation() assistant.Conversation {
 	return r0
 }
 
-// MockTurnSession_Conversation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Conversation'
-type MockTurnSession_Conversation_Call struct {
+// MockTurnState_Conversation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Conversation'
+type MockTurnState_Conversation_Call struct {
 	*mock.Call
 }
 
 // Conversation is a helper method to define mock.On call
-func (_e *MockTurnSession_Expecter) Conversation() *MockTurnSession_Conversation_Call {
-	return &MockTurnSession_Conversation_Call{Call: _e.mock.On("Conversation")}
+func (_e *MockTurnState_Expecter) Conversation() *MockTurnState_Conversation_Call {
+	return &MockTurnState_Conversation_Call{Call: _e.mock.On("Conversation")}
 }
 
-func (_c *MockTurnSession_Conversation_Call) Run(run func()) *MockTurnSession_Conversation_Call {
+func (_c *MockTurnState_Conversation_Call) Run(run func()) *MockTurnState_Conversation_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockTurnSession_Conversation_Call) Return(conversation assistant.Conversation) *MockTurnSession_Conversation_Call {
+func (_c *MockTurnState_Conversation_Call) Return(conversation assistant.Conversation) *MockTurnState_Conversation_Call {
 	_c.Call.Return(conversation)
 	return _c
 }
 
-func (_c *MockTurnSession_Conversation_Call) RunAndReturn(run func() assistant.Conversation) *MockTurnSession_Conversation_Call {
+func (_c *MockTurnState_Conversation_Call) RunAndReturn(run func() assistant.Conversation) *MockTurnState_Conversation_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// ConversationCreated provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) ConversationCreated() bool {
+// ConversationCreated provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) ConversationCreated() bool {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -1546,35 +1546,35 @@ func (_mock *MockTurnSession) ConversationCreated() bool {
 	return r0
 }
 
-// MockTurnSession_ConversationCreated_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConversationCreated'
-type MockTurnSession_ConversationCreated_Call struct {
+// MockTurnState_ConversationCreated_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConversationCreated'
+type MockTurnState_ConversationCreated_Call struct {
 	*mock.Call
 }
 
 // ConversationCreated is a helper method to define mock.On call
-func (_e *MockTurnSession_Expecter) ConversationCreated() *MockTurnSession_ConversationCreated_Call {
-	return &MockTurnSession_ConversationCreated_Call{Call: _e.mock.On("ConversationCreated")}
+func (_e *MockTurnState_Expecter) ConversationCreated() *MockTurnState_ConversationCreated_Call {
+	return &MockTurnState_ConversationCreated_Call{Call: _e.mock.On("ConversationCreated")}
 }
 
-func (_c *MockTurnSession_ConversationCreated_Call) Run(run func()) *MockTurnSession_ConversationCreated_Call {
+func (_c *MockTurnState_ConversationCreated_Call) Run(run func()) *MockTurnState_ConversationCreated_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockTurnSession_ConversationCreated_Call) Return(b bool) *MockTurnSession_ConversationCreated_Call {
+func (_c *MockTurnState_ConversationCreated_Call) Return(b bool) *MockTurnState_ConversationCreated_Call {
 	_c.Call.Return(b)
 	return _c
 }
 
-func (_c *MockTurnSession_ConversationCreated_Call) RunAndReturn(run func() bool) *MockTurnSession_ConversationCreated_Call {
+func (_c *MockTurnState_ConversationCreated_Call) RunAndReturn(run func() bool) *MockTurnState_ConversationCreated_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// HasExceededMaxActionCycles provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) HasExceededMaxActionCycles() bool {
+// HasExceededMaxActionCycles provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) HasExceededMaxActionCycles() bool {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -1590,35 +1590,35 @@ func (_mock *MockTurnSession) HasExceededMaxActionCycles() bool {
 	return r0
 }
 
-// MockTurnSession_HasExceededMaxActionCycles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExceededMaxActionCycles'
-type MockTurnSession_HasExceededMaxActionCycles_Call struct {
+// MockTurnState_HasExceededMaxActionCycles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExceededMaxActionCycles'
+type MockTurnState_HasExceededMaxActionCycles_Call struct {
 	*mock.Call
 }
 
 // HasExceededMaxActionCycles is a helper method to define mock.On call
-func (_e *MockTurnSession_Expecter) HasExceededMaxActionCycles() *MockTurnSession_HasExceededMaxActionCycles_Call {
-	return &MockTurnSession_HasExceededMaxActionCycles_Call{Call: _e.mock.On("HasExceededMaxActionCycles")}
+func (_e *MockTurnState_Expecter) HasExceededMaxActionCycles() *MockTurnState_HasExceededMaxActionCycles_Call {
+	return &MockTurnState_HasExceededMaxActionCycles_Call{Call: _e.mock.On("HasExceededMaxActionCycles")}
 }
 
-func (_c *MockTurnSession_HasExceededMaxActionCycles_Call) Run(run func()) *MockTurnSession_HasExceededMaxActionCycles_Call {
+func (_c *MockTurnState_HasExceededMaxActionCycles_Call) Run(run func()) *MockTurnState_HasExceededMaxActionCycles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockTurnSession_HasExceededMaxActionCycles_Call) Return(b bool) *MockTurnSession_HasExceededMaxActionCycles_Call {
+func (_c *MockTurnState_HasExceededMaxActionCycles_Call) Return(b bool) *MockTurnState_HasExceededMaxActionCycles_Call {
 	_c.Call.Return(b)
 	return _c
 }
 
-func (_c *MockTurnSession_HasExceededMaxActionCycles_Call) RunAndReturn(run func() bool) *MockTurnSession_HasExceededMaxActionCycles_Call {
+func (_c *MockTurnState_HasExceededMaxActionCycles_Call) RunAndReturn(run func() bool) *MockTurnState_HasExceededMaxActionCycles_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// HasExceededRepeatedActionCalls provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) HasExceededRepeatedActionCalls(functionName string, arguments string) bool {
+// HasExceededRepeatedActionCalls provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) HasExceededRepeatedActionCalls(functionName string, arguments string) bool {
 	ret := _mock.Called(functionName, arguments)
 
 	if len(ret) == 0 {
@@ -1634,19 +1634,19 @@ func (_mock *MockTurnSession) HasExceededRepeatedActionCalls(functionName string
 	return r0
 }
 
-// MockTurnSession_HasExceededRepeatedActionCalls_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExceededRepeatedActionCalls'
-type MockTurnSession_HasExceededRepeatedActionCalls_Call struct {
+// MockTurnState_HasExceededRepeatedActionCalls_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExceededRepeatedActionCalls'
+type MockTurnState_HasExceededRepeatedActionCalls_Call struct {
 	*mock.Call
 }
 
 // HasExceededRepeatedActionCalls is a helper method to define mock.On call
 //   - functionName string
 //   - arguments string
-func (_e *MockTurnSession_Expecter) HasExceededRepeatedActionCalls(functionName interface{}, arguments interface{}) *MockTurnSession_HasExceededRepeatedActionCalls_Call {
-	return &MockTurnSession_HasExceededRepeatedActionCalls_Call{Call: _e.mock.On("HasExceededRepeatedActionCalls", functionName, arguments)}
+func (_e *MockTurnState_Expecter) HasExceededRepeatedActionCalls(functionName interface{}, arguments interface{}) *MockTurnState_HasExceededRepeatedActionCalls_Call {
+	return &MockTurnState_HasExceededRepeatedActionCalls_Call{Call: _e.mock.On("HasExceededRepeatedActionCalls", functionName, arguments)}
 }
 
-func (_c *MockTurnSession_HasExceededRepeatedActionCalls_Call) Run(run func(functionName string, arguments string)) *MockTurnSession_HasExceededRepeatedActionCalls_Call {
+func (_c *MockTurnState_HasExceededRepeatedActionCalls_Call) Run(run func(functionName string, arguments string)) *MockTurnState_HasExceededRepeatedActionCalls_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -1664,18 +1664,18 @@ func (_c *MockTurnSession_HasExceededRepeatedActionCalls_Call) Run(run func(func
 	return _c
 }
 
-func (_c *MockTurnSession_HasExceededRepeatedActionCalls_Call) Return(b bool) *MockTurnSession_HasExceededRepeatedActionCalls_Call {
+func (_c *MockTurnState_HasExceededRepeatedActionCalls_Call) Return(b bool) *MockTurnState_HasExceededRepeatedActionCalls_Call {
 	_c.Call.Return(b)
 	return _c
 }
 
-func (_c *MockTurnSession_HasExceededRepeatedActionCalls_Call) RunAndReturn(run func(functionName string, arguments string) bool) *MockTurnSession_HasExceededRepeatedActionCalls_Call {
+func (_c *MockTurnState_HasExceededRepeatedActionCalls_Call) RunAndReturn(run func(functionName string, arguments string) bool) *MockTurnState_HasExceededRepeatedActionCalls_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Model provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) Model() string {
+// Model provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) Model() string {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -1691,35 +1691,35 @@ func (_mock *MockTurnSession) Model() string {
 	return r0
 }
 
-// MockTurnSession_Model_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Model'
-type MockTurnSession_Model_Call struct {
+// MockTurnState_Model_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Model'
+type MockTurnState_Model_Call struct {
 	*mock.Call
 }
 
 // Model is a helper method to define mock.On call
-func (_e *MockTurnSession_Expecter) Model() *MockTurnSession_Model_Call {
-	return &MockTurnSession_Model_Call{Call: _e.mock.On("Model")}
+func (_e *MockTurnState_Expecter) Model() *MockTurnState_Model_Call {
+	return &MockTurnState_Model_Call{Call: _e.mock.On("Model")}
 }
 
-func (_c *MockTurnSession_Model_Call) Run(run func()) *MockTurnSession_Model_Call {
+func (_c *MockTurnState_Model_Call) Run(run func()) *MockTurnState_Model_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockTurnSession_Model_Call) Return(s string) *MockTurnSession_Model_Call {
+func (_c *MockTurnState_Model_Call) Return(s string) *MockTurnState_Model_Call {
 	_c.Call.Return(s)
 	return _c
 }
 
-func (_c *MockTurnSession_Model_Call) RunAndReturn(run func() string) *MockTurnSession_Model_Call {
+func (_c *MockTurnState_Model_Call) RunAndReturn(run func() string) *MockTurnState_Model_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// NextTurnSequence provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) NextTurnSequence() int64 {
+// NextTurnSequence provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) NextTurnSequence() int64 {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -1735,35 +1735,35 @@ func (_mock *MockTurnSession) NextTurnSequence() int64 {
 	return r0
 }
 
-// MockTurnSession_NextTurnSequence_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NextTurnSequence'
-type MockTurnSession_NextTurnSequence_Call struct {
+// MockTurnState_NextTurnSequence_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NextTurnSequence'
+type MockTurnState_NextTurnSequence_Call struct {
 	*mock.Call
 }
 
 // NextTurnSequence is a helper method to define mock.On call
-func (_e *MockTurnSession_Expecter) NextTurnSequence() *MockTurnSession_NextTurnSequence_Call {
-	return &MockTurnSession_NextTurnSequence_Call{Call: _e.mock.On("NextTurnSequence")}
+func (_e *MockTurnState_Expecter) NextTurnSequence() *MockTurnState_NextTurnSequence_Call {
+	return &MockTurnState_NextTurnSequence_Call{Call: _e.mock.On("NextTurnSequence")}
 }
 
-func (_c *MockTurnSession_NextTurnSequence_Call) Run(run func()) *MockTurnSession_NextTurnSequence_Call {
+func (_c *MockTurnState_NextTurnSequence_Call) Run(run func()) *MockTurnState_NextTurnSequence_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockTurnSession_NextTurnSequence_Call) Return(n int64) *MockTurnSession_NextTurnSequence_Call {
+func (_c *MockTurnState_NextTurnSequence_Call) Return(n int64) *MockTurnState_NextTurnSequence_Call {
 	_c.Call.Return(n)
 	return _c
 }
 
-func (_c *MockTurnSession_NextTurnSequence_Call) RunAndReturn(run func() int64) *MockTurnSession_NextTurnSequence_Call {
+func (_c *MockTurnState_NextTurnSequence_Call) RunAndReturn(run func() int64) *MockTurnState_NextTurnSequence_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SelectedSkills provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) SelectedSkills() []assistant.SelectedSkill {
+// SelectedSkills provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) SelectedSkills() []assistant.SelectedSkill {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -1781,51 +1781,51 @@ func (_mock *MockTurnSession) SelectedSkills() []assistant.SelectedSkill {
 	return r0
 }
 
-// MockTurnSession_SelectedSkills_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SelectedSkills'
-type MockTurnSession_SelectedSkills_Call struct {
+// MockTurnState_SelectedSkills_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SelectedSkills'
+type MockTurnState_SelectedSkills_Call struct {
 	*mock.Call
 }
 
 // SelectedSkills is a helper method to define mock.On call
-func (_e *MockTurnSession_Expecter) SelectedSkills() *MockTurnSession_SelectedSkills_Call {
-	return &MockTurnSession_SelectedSkills_Call{Call: _e.mock.On("SelectedSkills")}
+func (_e *MockTurnState_Expecter) SelectedSkills() *MockTurnState_SelectedSkills_Call {
+	return &MockTurnState_SelectedSkills_Call{Call: _e.mock.On("SelectedSkills")}
 }
 
-func (_c *MockTurnSession_SelectedSkills_Call) Run(run func()) *MockTurnSession_SelectedSkills_Call {
+func (_c *MockTurnState_SelectedSkills_Call) Run(run func()) *MockTurnState_SelectedSkills_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockTurnSession_SelectedSkills_Call) Return(selectedSkills []assistant.SelectedSkill) *MockTurnSession_SelectedSkills_Call {
+func (_c *MockTurnState_SelectedSkills_Call) Return(selectedSkills []assistant.SelectedSkill) *MockTurnState_SelectedSkills_Call {
 	_c.Call.Return(selectedSkills)
 	return _c
 }
 
-func (_c *MockTurnSession_SelectedSkills_Call) RunAndReturn(run func() []assistant.SelectedSkill) *MockTurnSession_SelectedSkills_Call {
+func (_c *MockTurnState_SelectedSkills_Call) RunAndReturn(run func() []assistant.SelectedSkill) *MockTurnState_SelectedSkills_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SetAssistantMessageID provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) SetAssistantMessageID(id uuid.UUID) {
+// SetAssistantMessageID provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) SetAssistantMessageID(id uuid.UUID) {
 	_mock.Called(id)
 	return
 }
 
-// MockTurnSession_SetAssistantMessageID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetAssistantMessageID'
-type MockTurnSession_SetAssistantMessageID_Call struct {
+// MockTurnState_SetAssistantMessageID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetAssistantMessageID'
+type MockTurnState_SetAssistantMessageID_Call struct {
 	*mock.Call
 }
 
 // SetAssistantMessageID is a helper method to define mock.On call
 //   - id uuid.UUID
-func (_e *MockTurnSession_Expecter) SetAssistantMessageID(id interface{}) *MockTurnSession_SetAssistantMessageID_Call {
-	return &MockTurnSession_SetAssistantMessageID_Call{Call: _e.mock.On("SetAssistantMessageID", id)}
+func (_e *MockTurnState_Expecter) SetAssistantMessageID(id interface{}) *MockTurnState_SetAssistantMessageID_Call {
+	return &MockTurnState_SetAssistantMessageID_Call{Call: _e.mock.On("SetAssistantMessageID", id)}
 }
 
-func (_c *MockTurnSession_SetAssistantMessageID_Call) Run(run func(id uuid.UUID)) *MockTurnSession_SetAssistantMessageID_Call {
+func (_c *MockTurnState_SetAssistantMessageID_Call) Run(run func(id uuid.UUID)) *MockTurnState_SetAssistantMessageID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 uuid.UUID
 		if args[0] != nil {
@@ -1838,34 +1838,34 @@ func (_c *MockTurnSession_SetAssistantMessageID_Call) Run(run func(id uuid.UUID)
 	return _c
 }
 
-func (_c *MockTurnSession_SetAssistantMessageID_Call) Return() *MockTurnSession_SetAssistantMessageID_Call {
+func (_c *MockTurnState_SetAssistantMessageID_Call) Return() *MockTurnState_SetAssistantMessageID_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockTurnSession_SetAssistantMessageID_Call) RunAndReturn(run func(id uuid.UUID)) *MockTurnSession_SetAssistantMessageID_Call {
+func (_c *MockTurnState_SetAssistantMessageID_Call) RunAndReturn(run func(id uuid.UUID)) *MockTurnState_SetAssistantMessageID_Call {
 	_c.Run(run)
 	return _c
 }
 
-// SetRequest provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) SetRequest(apply func(request *assistant.TurnRequest)) {
+// SetRequest provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) SetRequest(apply func(request *assistant.TurnRequest)) {
 	_mock.Called(apply)
 	return
 }
 
-// MockTurnSession_SetRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetRequest'
-type MockTurnSession_SetRequest_Call struct {
+// MockTurnState_SetRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetRequest'
+type MockTurnState_SetRequest_Call struct {
 	*mock.Call
 }
 
 // SetRequest is a helper method to define mock.On call
 //   - apply func(request *assistant.TurnRequest)
-func (_e *MockTurnSession_Expecter) SetRequest(apply interface{}) *MockTurnSession_SetRequest_Call {
-	return &MockTurnSession_SetRequest_Call{Call: _e.mock.On("SetRequest", apply)}
+func (_e *MockTurnState_Expecter) SetRequest(apply interface{}) *MockTurnState_SetRequest_Call {
+	return &MockTurnState_SetRequest_Call{Call: _e.mock.On("SetRequest", apply)}
 }
 
-func (_c *MockTurnSession_SetRequest_Call) Run(run func(apply func(request *assistant.TurnRequest))) *MockTurnSession_SetRequest_Call {
+func (_c *MockTurnState_SetRequest_Call) Run(run func(apply func(request *assistant.TurnRequest))) *MockTurnState_SetRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 func(request *assistant.TurnRequest)
 		if args[0] != nil {
@@ -1878,34 +1878,34 @@ func (_c *MockTurnSession_SetRequest_Call) Run(run func(apply func(request *assi
 	return _c
 }
 
-func (_c *MockTurnSession_SetRequest_Call) Return() *MockTurnSession_SetRequest_Call {
+func (_c *MockTurnState_SetRequest_Call) Return() *MockTurnState_SetRequest_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockTurnSession_SetRequest_Call) RunAndReturn(run func(apply func(request *assistant.TurnRequest))) *MockTurnSession_SetRequest_Call {
+func (_c *MockTurnState_SetRequest_Call) RunAndReturn(run func(apply func(request *assistant.TurnRequest))) *MockTurnState_SetRequest_Call {
 	_c.Run(run)
 	return _c
 }
 
-// SetUserMessage provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) SetUserMessage(apply func(message *assistant.ChatMessage)) {
+// SetUserMessage provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) SetUserMessage(apply func(message *assistant.ChatMessage)) {
 	_mock.Called(apply)
 	return
 }
 
-// MockTurnSession_SetUserMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetUserMessage'
-type MockTurnSession_SetUserMessage_Call struct {
+// MockTurnState_SetUserMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetUserMessage'
+type MockTurnState_SetUserMessage_Call struct {
 	*mock.Call
 }
 
 // SetUserMessage is a helper method to define mock.On call
 //   - apply func(message *assistant.ChatMessage)
-func (_e *MockTurnSession_Expecter) SetUserMessage(apply interface{}) *MockTurnSession_SetUserMessage_Call {
-	return &MockTurnSession_SetUserMessage_Call{Call: _e.mock.On("SetUserMessage", apply)}
+func (_e *MockTurnState_Expecter) SetUserMessage(apply interface{}) *MockTurnState_SetUserMessage_Call {
+	return &MockTurnState_SetUserMessage_Call{Call: _e.mock.On("SetUserMessage", apply)}
 }
 
-func (_c *MockTurnSession_SetUserMessage_Call) Run(run func(apply func(message *assistant.ChatMessage))) *MockTurnSession_SetUserMessage_Call {
+func (_c *MockTurnState_SetUserMessage_Call) Run(run func(apply func(message *assistant.ChatMessage))) *MockTurnState_SetUserMessage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 func(message *assistant.ChatMessage)
 		if args[0] != nil {
@@ -1918,18 +1918,18 @@ func (_c *MockTurnSession_SetUserMessage_Call) Run(run func(apply func(message *
 	return _c
 }
 
-func (_c *MockTurnSession_SetUserMessage_Call) Return() *MockTurnSession_SetUserMessage_Call {
+func (_c *MockTurnState_SetUserMessage_Call) Return() *MockTurnState_SetUserMessage_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockTurnSession_SetUserMessage_Call) RunAndReturn(run func(apply func(message *assistant.ChatMessage))) *MockTurnSession_SetUserMessage_Call {
+func (_c *MockTurnState_SetUserMessage_Call) RunAndReturn(run func(apply func(message *assistant.ChatMessage))) *MockTurnState_SetUserMessage_Call {
 	_c.Run(run)
 	return _c
 }
 
-// TokenUsage provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) TokenUsage() assistant.Usage {
+// TokenUsage provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) TokenUsage() assistant.Usage {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -1945,35 +1945,35 @@ func (_mock *MockTurnSession) TokenUsage() assistant.Usage {
 	return r0
 }
 
-// MockTurnSession_TokenUsage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TokenUsage'
-type MockTurnSession_TokenUsage_Call struct {
+// MockTurnState_TokenUsage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TokenUsage'
+type MockTurnState_TokenUsage_Call struct {
 	*mock.Call
 }
 
 // TokenUsage is a helper method to define mock.On call
-func (_e *MockTurnSession_Expecter) TokenUsage() *MockTurnSession_TokenUsage_Call {
-	return &MockTurnSession_TokenUsage_Call{Call: _e.mock.On("TokenUsage")}
+func (_e *MockTurnState_Expecter) TokenUsage() *MockTurnState_TokenUsage_Call {
+	return &MockTurnState_TokenUsage_Call{Call: _e.mock.On("TokenUsage")}
 }
 
-func (_c *MockTurnSession_TokenUsage_Call) Run(run func()) *MockTurnSession_TokenUsage_Call {
+func (_c *MockTurnState_TokenUsage_Call) Run(run func()) *MockTurnState_TokenUsage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockTurnSession_TokenUsage_Call) Return(usage assistant.Usage) *MockTurnSession_TokenUsage_Call {
+func (_c *MockTurnState_TokenUsage_Call) Return(usage assistant.Usage) *MockTurnState_TokenUsage_Call {
 	_c.Call.Return(usage)
 	return _c
 }
 
-func (_c *MockTurnSession_TokenUsage_Call) RunAndReturn(run func() assistant.Usage) *MockTurnSession_TokenUsage_Call {
+func (_c *MockTurnState_TokenUsage_Call) RunAndReturn(run func() assistant.Usage) *MockTurnState_TokenUsage_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// TryBuildUserMessage provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) TryBuildUserMessage(now time.Time) (assistant.ChatMessage, bool) {
+// TryBuildUserMessage provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) TryBuildUserMessage(now time.Time) (assistant.ChatMessage, bool) {
 	ret := _mock.Called(now)
 
 	if len(ret) == 0 {
@@ -1998,18 +1998,18 @@ func (_mock *MockTurnSession) TryBuildUserMessage(now time.Time) (assistant.Chat
 	return r0, r1
 }
 
-// MockTurnSession_TryBuildUserMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryBuildUserMessage'
-type MockTurnSession_TryBuildUserMessage_Call struct {
+// MockTurnState_TryBuildUserMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryBuildUserMessage'
+type MockTurnState_TryBuildUserMessage_Call struct {
 	*mock.Call
 }
 
 // TryBuildUserMessage is a helper method to define mock.On call
 //   - now time.Time
-func (_e *MockTurnSession_Expecter) TryBuildUserMessage(now interface{}) *MockTurnSession_TryBuildUserMessage_Call {
-	return &MockTurnSession_TryBuildUserMessage_Call{Call: _e.mock.On("TryBuildUserMessage", now)}
+func (_e *MockTurnState_Expecter) TryBuildUserMessage(now interface{}) *MockTurnState_TryBuildUserMessage_Call {
+	return &MockTurnState_TryBuildUserMessage_Call{Call: _e.mock.On("TryBuildUserMessage", now)}
 }
 
-func (_c *MockTurnSession_TryBuildUserMessage_Call) Run(run func(now time.Time)) *MockTurnSession_TryBuildUserMessage_Call {
+func (_c *MockTurnState_TryBuildUserMessage_Call) Run(run func(now time.Time)) *MockTurnState_TryBuildUserMessage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 time.Time
 		if args[0] != nil {
@@ -2022,18 +2022,18 @@ func (_c *MockTurnSession_TryBuildUserMessage_Call) Run(run func(now time.Time))
 	return _c
 }
 
-func (_c *MockTurnSession_TryBuildUserMessage_Call) Return(chatMessage assistant.ChatMessage, b bool) *MockTurnSession_TryBuildUserMessage_Call {
+func (_c *MockTurnState_TryBuildUserMessage_Call) Return(chatMessage assistant.ChatMessage, b bool) *MockTurnState_TryBuildUserMessage_Call {
 	_c.Call.Return(chatMessage, b)
 	return _c
 }
 
-func (_c *MockTurnSession_TryBuildUserMessage_Call) RunAndReturn(run func(now time.Time) (assistant.ChatMessage, bool)) *MockTurnSession_TryBuildUserMessage_Call {
+func (_c *MockTurnState_TryBuildUserMessage_Call) RunAndReturn(run func(now time.Time) (assistant.ChatMessage, bool)) *MockTurnState_TryBuildUserMessage_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// TryMarkRunTurnRecoveryAttempted provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) TryMarkRunTurnRecoveryAttempted() bool {
+// TryMarkRunTurnRecoveryAttempted provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) TryMarkRunTurnRecoveryAttempted() bool {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -2049,35 +2049,35 @@ func (_mock *MockTurnSession) TryMarkRunTurnRecoveryAttempted() bool {
 	return r0
 }
 
-// MockTurnSession_TryMarkRunTurnRecoveryAttempted_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryMarkRunTurnRecoveryAttempted'
-type MockTurnSession_TryMarkRunTurnRecoveryAttempted_Call struct {
+// MockTurnState_TryMarkRunTurnRecoveryAttempted_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryMarkRunTurnRecoveryAttempted'
+type MockTurnState_TryMarkRunTurnRecoveryAttempted_Call struct {
 	*mock.Call
 }
 
 // TryMarkRunTurnRecoveryAttempted is a helper method to define mock.On call
-func (_e *MockTurnSession_Expecter) TryMarkRunTurnRecoveryAttempted() *MockTurnSession_TryMarkRunTurnRecoveryAttempted_Call {
-	return &MockTurnSession_TryMarkRunTurnRecoveryAttempted_Call{Call: _e.mock.On("TryMarkRunTurnRecoveryAttempted")}
+func (_e *MockTurnState_Expecter) TryMarkRunTurnRecoveryAttempted() *MockTurnState_TryMarkRunTurnRecoveryAttempted_Call {
+	return &MockTurnState_TryMarkRunTurnRecoveryAttempted_Call{Call: _e.mock.On("TryMarkRunTurnRecoveryAttempted")}
 }
 
-func (_c *MockTurnSession_TryMarkRunTurnRecoveryAttempted_Call) Run(run func()) *MockTurnSession_TryMarkRunTurnRecoveryAttempted_Call {
+func (_c *MockTurnState_TryMarkRunTurnRecoveryAttempted_Call) Run(run func()) *MockTurnState_TryMarkRunTurnRecoveryAttempted_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockTurnSession_TryMarkRunTurnRecoveryAttempted_Call) Return(b bool) *MockTurnSession_TryMarkRunTurnRecoveryAttempted_Call {
+func (_c *MockTurnState_TryMarkRunTurnRecoveryAttempted_Call) Return(b bool) *MockTurnState_TryMarkRunTurnRecoveryAttempted_Call {
 	_c.Call.Return(b)
 	return _c
 }
 
-func (_c *MockTurnSession_TryMarkRunTurnRecoveryAttempted_Call) RunAndReturn(run func() bool) *MockTurnSession_TryMarkRunTurnRecoveryAttempted_Call {
+func (_c *MockTurnState_TryMarkRunTurnRecoveryAttempted_Call) RunAndReturn(run func() bool) *MockTurnState_TryMarkRunTurnRecoveryAttempted_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// TurnID provides a mock function for the type MockTurnSession
-func (_mock *MockTurnSession) TurnID() uuid.UUID {
+// TurnID provides a mock function for the type MockTurnState
+func (_mock *MockTurnState) TurnID() uuid.UUID {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -2095,40 +2095,40 @@ func (_mock *MockTurnSession) TurnID() uuid.UUID {
 	return r0
 }
 
-// MockTurnSession_TurnID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TurnID'
-type MockTurnSession_TurnID_Call struct {
+// MockTurnState_TurnID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TurnID'
+type MockTurnState_TurnID_Call struct {
 	*mock.Call
 }
 
 // TurnID is a helper method to define mock.On call
-func (_e *MockTurnSession_Expecter) TurnID() *MockTurnSession_TurnID_Call {
-	return &MockTurnSession_TurnID_Call{Call: _e.mock.On("TurnID")}
+func (_e *MockTurnState_Expecter) TurnID() *MockTurnState_TurnID_Call {
+	return &MockTurnState_TurnID_Call{Call: _e.mock.On("TurnID")}
 }
 
-func (_c *MockTurnSession_TurnID_Call) Run(run func()) *MockTurnSession_TurnID_Call {
+func (_c *MockTurnState_TurnID_Call) Run(run func()) *MockTurnState_TurnID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockTurnSession_TurnID_Call) Return(uUID uuid.UUID) *MockTurnSession_TurnID_Call {
+func (_c *MockTurnState_TurnID_Call) Return(uUID uuid.UUID) *MockTurnState_TurnID_Call {
 	_c.Call.Return(uUID)
 	return _c
 }
 
-func (_c *MockTurnSession_TurnID_Call) RunAndReturn(run func() uuid.UUID) *MockTurnSession_TurnID_Call {
+func (_c *MockTurnState_TurnID_Call) RunAndReturn(run func() uuid.UUID) *MockTurnState_TurnID_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// NewMockTurnSessionBuilder creates a new instance of MockTurnSessionBuilder. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// NewMockTurnStateBuilder creates a new instance of MockTurnStateBuilder. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
-func NewMockTurnSessionBuilder(t interface {
+func NewMockTurnStateBuilder(t interface {
 	mock.TestingT
 	Cleanup(func())
-}) *MockTurnSessionBuilder {
-	mock := &MockTurnSessionBuilder{}
+}) *MockTurnStateBuilder {
+	mock := &MockTurnStateBuilder{}
 	mock.Mock.Test(t)
 
 	t.Cleanup(func() { mock.AssertExpectations(t) })
@@ -2136,37 +2136,37 @@ func NewMockTurnSessionBuilder(t interface {
 	return mock
 }
 
-// MockTurnSessionBuilder is an autogenerated mock type for the TurnSessionBuilder type
-type MockTurnSessionBuilder struct {
+// MockTurnStateBuilder is an autogenerated mock type for the TurnStateBuilder type
+type MockTurnStateBuilder struct {
 	mock.Mock
 }
 
-type MockTurnSessionBuilder_Expecter struct {
+type MockTurnStateBuilder_Expecter struct {
 	mock *mock.Mock
 }
 
-func (_m *MockTurnSessionBuilder) EXPECT() *MockTurnSessionBuilder_Expecter {
-	return &MockTurnSessionBuilder_Expecter{mock: &_m.Mock}
+func (_m *MockTurnStateBuilder) EXPECT() *MockTurnStateBuilder_Expecter {
+	return &MockTurnStateBuilder_Expecter{mock: &_m.Mock}
 }
 
-// Build provides a mock function for the type MockTurnSessionBuilder
-func (_mock *MockTurnSessionBuilder) Build(ctx context.Context, params BuildSessionParams) (TurnSession, error) {
+// Build provides a mock function for the type MockTurnStateBuilder
+func (_mock *MockTurnStateBuilder) Build(ctx context.Context, params BuildSessionParams) (TurnState, error) {
 	ret := _mock.Called(ctx, params)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Build")
 	}
 
-	var r0 TurnSession
+	var r0 TurnState
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, BuildSessionParams) (TurnSession, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, BuildSessionParams) (TurnState, error)); ok {
 		return returnFunc(ctx, params)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, BuildSessionParams) TurnSession); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, BuildSessionParams) TurnState); ok {
 		r0 = returnFunc(ctx, params)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(TurnSession)
+			r0 = ret.Get(0).(TurnState)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, BuildSessionParams) error); ok {
@@ -2177,19 +2177,19 @@ func (_mock *MockTurnSessionBuilder) Build(ctx context.Context, params BuildSess
 	return r0, r1
 }
 
-// MockTurnSessionBuilder_Build_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Build'
-type MockTurnSessionBuilder_Build_Call struct {
+// MockTurnStateBuilder_Build_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Build'
+type MockTurnStateBuilder_Build_Call struct {
 	*mock.Call
 }
 
 // Build is a helper method to define mock.On call
 //   - ctx context.Context
 //   - params BuildSessionParams
-func (_e *MockTurnSessionBuilder_Expecter) Build(ctx interface{}, params interface{}) *MockTurnSessionBuilder_Build_Call {
-	return &MockTurnSessionBuilder_Build_Call{Call: _e.mock.On("Build", ctx, params)}
+func (_e *MockTurnStateBuilder_Expecter) Build(ctx interface{}, params interface{}) *MockTurnStateBuilder_Build_Call {
+	return &MockTurnStateBuilder_Build_Call{Call: _e.mock.On("Build", ctx, params)}
 }
 
-func (_c *MockTurnSessionBuilder_Build_Call) Run(run func(ctx context.Context, params BuildSessionParams)) *MockTurnSessionBuilder_Build_Call {
+func (_c *MockTurnStateBuilder_Build_Call) Run(run func(ctx context.Context, params BuildSessionParams)) *MockTurnStateBuilder_Build_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -2207,12 +2207,12 @@ func (_c *MockTurnSessionBuilder_Build_Call) Run(run func(ctx context.Context, p
 	return _c
 }
 
-func (_c *MockTurnSessionBuilder_Build_Call) Return(turnSession TurnSession, err error) *MockTurnSessionBuilder_Build_Call {
-	_c.Call.Return(turnSession, err)
+func (_c *MockTurnStateBuilder_Build_Call) Return(turnState TurnState, err error) *MockTurnStateBuilder_Build_Call {
+	_c.Call.Return(turnState, err)
 	return _c
 }
 
-func (_c *MockTurnSessionBuilder_Build_Call) RunAndReturn(run func(ctx context.Context, params BuildSessionParams) (TurnSession, error)) *MockTurnSessionBuilder_Build_Call {
+func (_c *MockTurnStateBuilder_Build_Call) RunAndReturn(run func(ctx context.Context, params BuildSessionParams) (TurnState, error)) *MockTurnStateBuilder_Build_Call {
 	_c.Call.Return(run)
 	return _c
 }

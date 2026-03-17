@@ -10,6 +10,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/google/uuid"
 	"github.com/toon-format/toon-go"
 )
@@ -20,27 +21,28 @@ type ActionPipeline interface {
 	Handle(
 		ctx context.Context,
 		actionCall assistant.ActionCall,
-		session TurnSession,
+		state TurnState,
 		onEvent assistant.EventCallback,
 	) (bool, error)
 }
 
-// actionPipeline coordinates approval, execution, rendering, and persistence for action calls.
-type actionPipeline struct {
+// ActionPipelineImpl implements the ActionPipeline interface with a default
+// set of behaviors for streamed tool calls, including optional approval handling.
+type ActionPipelineImpl struct {
 	actionRegistry      assistant.ActionRegistry
 	approvalDispatcher  assistant.ActionApprovalDispatcher
 	conversationCreator ConversationCreator
 	timeProvider        core.CurrentTimeProvider
 }
 
-// newActionPipeline builds the default action pipeline for streamed tool calls.
-func newActionPipeline(
+// NewActionPipelineImpl creates a new ActionPipelineImpl with the given dependencies.
+func NewActionPipelineImpl(
 	actionRegistry assistant.ActionRegistry,
 	approvalDispatcher assistant.ActionApprovalDispatcher,
 	conversationCreator ConversationCreator,
 	timeProvider core.CurrentTimeProvider,
-) ActionPipeline {
-	return actionPipeline{
+) ActionPipelineImpl {
+	return ActionPipelineImpl{
 		actionRegistry:      actionRegistry,
 		approvalDispatcher:  approvalDispatcher,
 		conversationCreator: conversationCreator,
@@ -50,38 +52,41 @@ func newActionPipeline(
 
 // Handle executes the full lifecycle of one requested action within the current turn
 // and returns whether the turn should continue streaming after handling this action.
-func (p actionPipeline) Handle(
+func (p ActionPipelineImpl) Handle(
 	ctx context.Context,
 	actionCall assistant.ActionCall,
-	session TurnSession,
+	state TurnState,
 	onEvent assistant.EventCallback,
 ) (bool, error) {
-	if session.HasExceededMaxActionCycles() || session.HasExceededRepeatedActionCalls(actionCall.Name, actionCall.Input) {
+	spanCtx, span := telemetry.StartSpan(ctx)
+	defer span.End()
+
+	if state.HasExceededMaxActionCycles() || state.HasExceededRepeatedActionCalls(actionCall.Name, actionCall.Input) {
 		return false, nil
 	}
 	actionCall.Text = p.actionRegistry.StatusMessage(actionCall.Name)
 
-	conversation := session.Conversation()
+	conversation := state.Conversation()
 	assistantActionCallMsg := assistant.ChatMessage{
 		ID:             uuid.New(),
 		ConversationID: conversation.ID,
-		TurnID:         session.TurnID(),
-		TurnSequence:   session.NextTurnSequence(),
+		TurnID:         state.TurnID(),
+		TurnSequence:   state.NextTurnSequence(),
 		ChatRole:       assistant.ChatRole_Assistant,
 		ActionCalls:    []assistant.ActionCall{actionCall},
-		Model:          session.Model(),
+		Model:          state.Model(),
 		MessageState:   assistant.ChatMessageState_Completed,
 		CreatedAt:      p.timeProvider.Now(),
 	}
 	assistantActionCallMsg.UpdatedAt = assistantActionCallMsg.CreatedAt
-	if err := p.conversationCreator.CreateMessage(ctx, conversation, assistantActionCallMsg); err != nil {
+	if err := p.conversationCreator.CreateMessage(spanCtx, conversation, assistantActionCallMsg); err != nil {
 		return false, err
 	}
 
 	approvalDecision, blockedByApproval, approvalErr := p.requestApprovalIfRequired(
-		ctx,
+		spanCtx,
 		actionCall,
-		session,
+		state,
 		onEvent,
 	)
 	if approvalErr != nil {
@@ -89,26 +94,26 @@ func (p actionPipeline) Handle(
 	}
 
 	if blockedByApproval {
-		return p.handleBlockedAction(ctx, actionCall, session, onEvent, approvalDecision)
+		return p.handleBlockedAction(spanCtx, actionCall, state, onEvent, approvalDecision)
 	}
 
-	if err := onEvent(ctx, assistant.EventType_ActionStarted, actionCall); err != nil {
+	if err := onEvent(spanCtx, assistant.EventType_ActionStarted, actionCall); err != nil {
 		return false, err
 	}
 
-	request := session.Request()
-	actionMessage := p.actionRegistry.Execute(ctx, actionCall, request.Messages)
+	request := state.Request()
+	actionMessage := p.actionRegistry.Execute(spanCtx, actionCall, request.Messages)
 	actionSucceeded := actionMessage.IsActionCallSuccess()
 	now := p.timeProvider.Now()
 	actionChatMsg := assistant.ChatMessage{
 		ID:             uuid.New(),
 		ConversationID: conversation.ID,
-		TurnID:         session.TurnID(),
-		TurnSequence:   session.NextTurnSequence(),
+		TurnID:         state.TurnID(),
+		TurnSequence:   state.NextTurnSequence(),
 		ChatRole:       assistant.ChatRole_Tool,
 		ActionCallID:   &actionCall.ID,
 		Content:        actionMessage.Content,
-		Model:          session.Model(),
+		Model:          state.Model(),
 		MessageState:   assistant.ChatMessageState_Completed,
 		ActionExecuted: common.Ptr(true),
 		CreatedAt:      now,
@@ -124,7 +129,7 @@ func (p actionPipeline) Handle(
 		actionChatMsg.ApprovalDecidedAt = common.Ptr(approvalDecision.DecidedAt)
 	}
 
-	if err := p.conversationCreator.CreateMessage(ctx, conversation, actionChatMsg); err != nil {
+	if err := p.conversationCreator.CreateMessage(spanCtx, conversation, actionChatMsg); err != nil {
 		return false, err
 	}
 
@@ -141,60 +146,57 @@ func (p actionPipeline) Handle(
 	if !actionSucceeded {
 		actionCompleted.Error = resolveActionErrorMessage(actionMessage)
 	}
-	if err := onEvent(ctx, assistant.EventType_ActionCompleted, actionCompleted); err != nil {
+	if err := onEvent(spanCtx, assistant.EventType_ActionCompleted, actionCompleted); err != nil {
 		return false, err
 	}
 
 	if actionSucceeded {
 		if renderedMessage, ok := p.renderActionResult(actionCall, actionMessage); ok {
-			session.UpdateRequest(func(request *assistant.TurnRequest) {
-				request.Messages = append(request.Messages,
-					assistant.Message{
-						Role:        assistant.ChatRole_Assistant,
-						ActionCalls: []assistant.ActionCall{actionCall},
-					},
-					actionMessage,
-					renderedMessage,
-				)
-			})
-			if err := p.streamRenderedMessage(ctx, renderedMessage, session, onEvent); err != nil {
+			state.AppendRequestMessages(
+				assistant.Message{
+					Role:        assistant.ChatRole_Assistant,
+					ActionCalls: []assistant.ActionCall{actionCall},
+				},
+				actionMessage,
+				renderedMessage,
+			)
+			if err := p.streamRenderedMessage(spanCtx, renderedMessage, state, onEvent); err != nil {
 				return false, err
 			}
 			return true, nil
 		}
 	}
 
-	session.UpdateRequest(func(request *assistant.TurnRequest) {
-		request.Messages = append(request.Messages,
-			assistant.Message{
-				Role:        assistant.ChatRole_Assistant,
-				ActionCalls: []assistant.ActionCall{actionCall},
-			},
-			assistant.Message{
-				Role:         actionMessage.Role,
-				Content:      actionMessage.Content,
-				ActionCallID: actionMessage.ActionCallID,
-				ActionCalls:  actionMessage.ActionCalls,
-				ActionError:  actionMessage.ActionError,
-			},
-		)
-		if !actionSucceeded {
-			request.Messages = append(request.Messages, assistant.Message{
-				Role: assistant.ChatRole_System,
-				Content: "Tool call failed. Read the tool error details/example, then retry with corrected arguments or another tool. " +
-					"If updating/deleting todos failed due to missing or unmatched IDs, fetch todos first to resolve UUIDs, then retry.",
-			})
-		}
-	})
+	messages := []assistant.Message{
+		{
+			Role:        assistant.ChatRole_Assistant,
+			ActionCalls: []assistant.ActionCall{actionCall},
+		},
+		{
+			Role:         actionMessage.Role,
+			Content:      actionMessage.Content,
+			ActionCallID: actionMessage.ActionCallID,
+			ActionCalls:  actionMessage.ActionCalls,
+			ActionError:  actionMessage.ActionError,
+		},
+	}
+	if !actionSucceeded {
+		messages = append(messages, assistant.Message{
+			Role: assistant.ChatRole_System,
+			Content: "Tool call failed. Read the tool error details/example, then retry with corrected arguments or another tool. " +
+				"If updating/deleting todos failed due to missing or unmatched IDs, fetch todos first to resolve UUIDs, then retry.",
+		})
+	}
+	state.AppendRequestMessages(messages...)
 
 	return true, nil
 }
 
 // handleBlockedAction persists and emits the synthetic tool result produced when approval blocks execution.
-func (p actionPipeline) handleBlockedAction(
+func (p ActionPipelineImpl) handleBlockedAction(
 	ctx context.Context,
 	actionCall assistant.ActionCall,
-	session TurnSession,
+	state TurnState,
 	onEvent assistant.EventCallback,
 	approvalDecision assistant.ActionApprovalDecision,
 ) (bool, error) {
@@ -208,16 +210,16 @@ func (p actionPipeline) handleBlockedAction(
 		ActionError:  common.Ptr(reason),
 	}
 	now := p.timeProvider.Now()
-	conversation := session.Conversation()
+	conversation := state.Conversation()
 	actionChatMsg := assistant.ChatMessage{
 		ID:                     uuid.New(),
 		ConversationID:         conversation.ID,
-		TurnID:                 session.TurnID(),
-		TurnSequence:           session.NextTurnSequence(),
+		TurnID:                 state.TurnID(),
+		TurnSequence:           state.NextTurnSequence(),
 		ChatRole:               assistant.ChatRole_Tool,
 		ActionCallID:           &actionCall.ID,
 		Content:                actionContent,
-		Model:                  session.Model(),
+		Model:                  state.Model(),
 		MessageState:           assistant.ChatMessageState_Failed,
 		ErrorMessage:           &reason,
 		ApprovalStatus:         &approvalDecision.Status,
@@ -247,15 +249,13 @@ func (p actionPipeline) handleBlockedAction(
 		return false, err
 	}
 
-	session.UpdateRequest(func(request *assistant.TurnRequest) {
-		request.Messages = append(request.Messages,
-			assistant.Message{
-				Role:        assistant.ChatRole_Assistant,
-				ActionCalls: []assistant.ActionCall{actionCall},
-			},
-			actionMessage,
-		)
-	})
+	state.AppendRequestMessages(
+		assistant.Message{
+			Role:        assistant.ChatRole_Assistant,
+			ActionCalls: []assistant.ActionCall{actionCall},
+		},
+		actionMessage,
+	)
 
 	return true, nil
 }
@@ -351,10 +351,10 @@ func approvalBlockedActionContent(
 }
 
 // requestApprovalIfRequired emits approval events and waits for a decision when the action requires approval.
-func (p actionPipeline) requestApprovalIfRequired(
+func (p ActionPipelineImpl) requestApprovalIfRequired(
 	ctx context.Context,
 	actionCall assistant.ActionCall,
-	session TurnSession,
+	state TurnState,
 	onEvent assistant.EventCallback,
 ) (assistant.ActionApprovalDecision, bool, error) {
 	if p.approvalDispatcher == nil {
@@ -366,10 +366,10 @@ func (p actionPipeline) requestApprovalIfRequired(
 		return assistant.ActionApprovalDecision{}, false, nil
 	}
 
-	conversation := session.Conversation()
+	conversation := state.Conversation()
 	approvalEvent := assistant.ActionApprovalRequired{
 		ConversationID: conversation.ID,
-		TurnID:         session.TurnID(),
+		TurnID:         state.TurnID(),
 		ActionCallID:   actionCall.ID,
 		Name:           actionCall.Name,
 		Input:          actionCall.Input,
@@ -385,14 +385,14 @@ func (p actionPipeline) requestApprovalIfRequired(
 	decision := p.awaitActionApproval(
 		ctx,
 		conversation.ID,
-		session.TurnID(),
+		state.TurnID(),
 		actionCall,
 		definition.Approval.Timeout,
 	)
 
 	resolved := assistant.ActionApprovalResolved{
 		ConversationID: conversation.ID,
-		TurnID:         session.TurnID(),
+		TurnID:         state.TurnID(),
 		ActionCallID:   actionCall.ID,
 		Name:           actionCall.Name,
 		Status:         decision.Status,
@@ -406,7 +406,7 @@ func (p actionPipeline) requestApprovalIfRequired(
 }
 
 // awaitActionApproval waits for one approval decision and synthesizes timeout or cancellation fallbacks.
-func (p actionPipeline) awaitActionApproval(
+func (p ActionPipelineImpl) awaitActionApproval(
 	ctx context.Context,
 	conversationID uuid.UUID,
 	turnID uuid.UUID,
@@ -458,7 +458,7 @@ func (p actionPipeline) awaitActionApproval(
 }
 
 // renderActionResult converts a successful tool result into a deterministic assistant message when available.
-func (p actionPipeline) renderActionResult(
+func (p ActionPipelineImpl) renderActionResult(
 	actionCall assistant.ActionCall,
 	actionMessage assistant.Message,
 ) (assistant.Message, bool) {
@@ -471,17 +471,17 @@ func (p actionPipeline) renderActionResult(
 }
 
 // streamRenderedMessage emits a deterministic assistant message and stores its content for final persistence.
-func (p actionPipeline) streamRenderedMessage(
+func (p ActionPipelineImpl) streamRenderedMessage(
 	ctx context.Context,
 	rendered assistant.Message,
-	session TurnSession,
+	state TurnState,
 	onEvent assistant.EventCallback,
 ) error {
 	if rendered.Role != assistant.ChatRole_Assistant || rendered.Content == "" {
 		return nil
 	}
 
-	session.AppendAssistantContent(rendered.Content)
+	state.AppendAssistantContent(rendered.Content)
 	return onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{
 		Text: rendered.Content,
 	})

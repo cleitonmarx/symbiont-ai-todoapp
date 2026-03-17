@@ -16,21 +16,6 @@ import (
 )
 
 const (
-	// MAX_CHAT_HISTORY_MESSAGES is the maximum number of prior messages included in chat context.
-	MAX_CHAT_HISTORY_MESSAGES = 100
-
-	// MAX_REPEATED_ACTION_CALL_HIT is the limit for repeated action-call detections before aborting.
-	MAX_REPEATED_ACTION_CALL_HIT = 5
-
-	// CHAT_TEMPERATURE controls generation randomness for streamed chat turns.
-	CHAT_TEMPERATURE = 0.2
-	// CHAT_TOP_P controls nucleus sampling for streamed chat turns.
-	CHAT_TOP_P = 0.7
-
-	// MAX_SKILLS_PROMPT_CHARS is the maximum size of injected skill prompt content.
-	MAX_SKILLS_PROMPT_CHARS = 4000
-	// MAX_RECOVERY_MESSAGES is the maximum number of recovery messages retained in loops.
-	MAX_RECOVERY_MESSAGES = 8
 	// DEFAULT_CONTEXT_COMPACTION_TIMEOUT bounds synchronous pre-turn compaction.
 	DEFAULT_CONTEXT_COMPACTION_TIMEOUT = 20 * time.Second
 )
@@ -65,7 +50,7 @@ type StreamChatImpl struct {
 	compactionPolicy      assistant.CompactionPolicy
 	compactionTimeout     time.Duration
 	maxActionCycles       int
-	sessionBuilder        TurnSessionBuilder
+	stateBuilder          TurnStateBuilder
 	turnRunner            TurnRunner
 	conversationCreator   ConversationCreator
 }
@@ -79,7 +64,7 @@ func NewStreamChatImpl(
 	compactionPolicy assistant.CompactionPolicy,
 	compactionTimeout time.Duration,
 	maxActionCycles int,
-	sessionBuilder TurnSessionBuilder,
+	stateBuilder TurnStateBuilder,
 	turnRunner TurnRunner,
 	conversationCreator ConversationCreator,
 ) StreamChatImpl {
@@ -91,7 +76,7 @@ func NewStreamChatImpl(
 		compactionPolicy:      compactionPolicy,
 		compactionTimeout:     compactionTimeout,
 		maxActionCycles:       maxActionCycles,
-		sessionBuilder:        sessionBuilder,
+		stateBuilder:          stateBuilder,
 		turnRunner:            turnRunner,
 		conversationCreator:   conversationCreator,
 	}
@@ -124,7 +109,7 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return err
 	}
 
-	session, err := sc.sessionBuilder.Build(spanCtx, BuildSessionParams{
+	state, err := sc.stateBuilder.Build(spanCtx, BuildSessionParams{
 		UserMessage:         userMessage,
 		Model:               model,
 		MaxActionCycles:     sc.maxActionCycles,
@@ -135,20 +120,48 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		return err
 	}
 
-	if err := sc.turnRunner.Run(spanCtx, session, onEvent); telemetry.IsErrorRecorded(span, err) {
+	now := sc.timeProvider.Now()
+	userChatMessage := assistant.ChatMessage{
+		ID:             uuid.New(),
+		ConversationID: conversation.ID,
+		TurnID:         state.TurnID(),
+		TurnSequence:   state.NextTurnSequence(),
+		ChatRole:       assistant.ChatRole_User,
+		Content:        userMessage,
+		Model:          model,
+		MessageState:   assistant.ChatMessageState_Completed,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	if err := sc.conversationCreator.CreateMessage(spanCtx, state.Conversation(), userChatMessage); telemetry.IsErrorRecorded(span, err) {
+		return err
+	}
+
+	if err := sc.turnRunner.Run(spanCtx, state, onEvent); telemetry.IsErrorRecorded(span, err) {
 		failedAt := sc.timeProvider.Now()
-		if userMessage, ok := session.TryBuildUserMessage(uuid.Nil, failedAt); ok {
-			if persistErr := sc.conversationCreator.CreateMessage(spanCtx, session.Conversation(), userMessage); telemetry.IsErrorRecorded(span, persistErr) {
-				return persistErr
-			}
-		}
-		if persistErr := sc.conversationCreator.CreateMessage(spanCtx, session.Conversation(), session.BuildFailureMessage(failedAt, err)); telemetry.IsErrorRecorded(span, persistErr) {
+		if persistErr := sc.conversationCreator.CreateMessage(spanCtx, state.Conversation(), sc.buildFailureAssistantMessage(state, failedAt, err)); telemetry.IsErrorRecorded(span, persistErr) {
 			return persistErr
 		}
 		return err
 	}
 
-	assistantMsg := session.BuildFinalAssistantMessage(sc.timeProvider.Now())
+	completedAt := sc.timeProvider.Now()
+	assistantMsg := assistant.ChatMessage{
+		ID:               uuid.New(),
+		ConversationID:   state.Conversation().ID,
+		TurnID:           state.TurnID(),
+		TurnSequence:     state.NextTurnSequence(),
+		ChatRole:         assistant.ChatRole_Assistant,
+		Content:          state.AssistantContent(),
+		SelectedSkills:   state.SelectedSkills(),
+		Model:            state.Model(),
+		MessageState:     assistant.ChatMessageState_Completed,
+		PromptTokens:     state.TokenUsage().PromptTokens,
+		CompletionTokens: state.TokenUsage().CompletionTokens,
+		TotalTokens:      state.TokenUsage().TotalTokens,
+		CreatedAt:        completedAt,
+		UpdatedAt:        completedAt,
+	}
 
 	if assistantMsg.Content == "" {
 		assistantMsg.Content = "Sorry, I could not process your request. Please try again."
@@ -161,22 +174,53 @@ func (sc StreamChatImpl) Execute(ctx context.Context, userMessage, model string,
 		}
 	}
 
-	err = sc.conversationCreator.CreateMessage(spanCtx, session.Conversation(), assistantMsg)
+	err = sc.conversationCreator.CreateMessage(spanCtx, state.Conversation(), assistantMsg)
 	if telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 
-	tokenUsage := session.TokenUsage()
+	tokenUsage := state.TokenUsage()
 	metrics.RecordLLMTokensUsed(spanCtx, tokenUsage.PromptTokens, tokenUsage.CompletionTokens)
 
 	if err := onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-		AssistantMessageID: assistantMsg.ID.String(),
-		CompletedAt:        sc.timeProvider.Now().Format(time.RFC3339),
-		Usage:              tokenUsage,
+		Usage: tokenUsage,
 	}); telemetry.IsErrorRecorded(span, err) {
 		return err
 	}
 	return nil
+}
+
+// buildFailureAssistantMessage creates the persisted assistant failure message from the use-case-owned turn state.
+func (sc StreamChatImpl) buildFailureAssistantMessage(
+	state TurnState,
+	now time.Time,
+	streamErr error,
+) assistant.ChatMessage {
+	content := strings.TrimSpace(state.AssistantContent())
+	if content == "" {
+		content = "Sorry, I could not process your request. Please try again."
+	}
+
+	errorMessage := streamErr.Error()
+	tokenUsage := state.TokenUsage()
+
+	return assistant.ChatMessage{
+		ID:               uuid.New(),
+		ConversationID:   state.Conversation().ID,
+		TurnID:           state.TurnID(),
+		TurnSequence:     state.NextTurnSequence(),
+		ChatRole:         assistant.ChatRole_Assistant,
+		Content:          content,
+		SelectedSkills:   state.SelectedSkills(),
+		Model:            state.Model(),
+		MessageState:     assistant.ChatMessageState_Failed,
+		ErrorMessage:     &errorMessage,
+		PromptTokens:     tokenUsage.PromptTokens,
+		CompletionTokens: tokenUsage.CompletionTokens,
+		TotalTokens:      tokenUsage.TotalTokens,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
 }
 
 // createOrRetrieveConversation resolves the target conversation and creates one when no conversation ID is supplied.

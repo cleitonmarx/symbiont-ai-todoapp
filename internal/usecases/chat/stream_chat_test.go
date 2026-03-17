@@ -97,16 +97,11 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						assert.True(t, foundSummaryContext)
 
 						// Simulate events
-						_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						})
+						_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{})
 						_ = onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "I'm "})
 						_ = onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "doing "})
 						_ = onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "great!"})
 						_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-							AssistantMessageID: assistantMsgID.String(),
-							CompletedAt:        fixedTime.Format(time.RFC3339),
 							Usage: assistant.Usage{
 								PromptTokens:     promptTokens,
 								CompletionTokens: completionTokens,
@@ -211,16 +206,11 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						assert.True(t, foundSummaryContext)
 
 						// Simulate events
-						_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						})
+						_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{})
 						_ = onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "I'm "})
 						_ = onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "doing "})
 						_ = onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "great!"})
 						_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-							AssistantMessageID: assistantMsgID.String(),
-							CompletedAt:        fixedTime.Format(time.RFC3339),
 							Usage: assistant.Usage{
 								PromptTokens:     promptTokens,
 								CompletionTokens: completionTokens,
@@ -292,14 +282,8 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				assist.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					Run(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) {
-						_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						})
-						_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-							AssistantMessageID: assistantMsgID.String(),
-							CompletedAt:        fixedTime.Format(time.RFC3339),
-						})
+						_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{})
+						_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
 					}).
 					Return(nil)
 
@@ -411,15 +395,6 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Return([]assistant.ChatMessage{}, false, nil).
 					Once()
 
-				assist.EXPECT().
-					RunTurn(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						return onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						})
-					})
-
 			},
 			persistExpectations: func() []persistCallExpectation {
 				onEventErr := "onEvent error"
@@ -433,7 +408,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					},
 					{
 						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
+						Content:         "Sorry, I could not process your request. Please try again.",
 						ID:              &assistantMsgID,
 						MessageState:    assistant.ChatMessageState_Failed,
 						ErrorMessage:    &onEventErr,
@@ -484,10 +459,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				assist.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
+						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 							return err
 						}
 						return onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "Hi"})
@@ -506,7 +478,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					},
 					{
 						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
+						Content:         "Hi",
 						ID:              &assistantMsgID,
 						MessageState:    assistant.ChatMessageState_Failed,
 						ErrorMessage:    &onEventErr,
@@ -570,10 +542,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						assert.Equal(t, assistant.ChatRole_System, lastMsg.Role)
 						assert.Contains(t, lastMsg.Content, "The previous assistant turn failed due to an internal processing issue")
 
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
+						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 							return err
 						}
 						if err := onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{
@@ -581,10 +550,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						}); err != nil {
 							return err
 						}
-						return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-							AssistantMessageID: assistantMsgID.String(),
-							CompletedAt:        fixedTime.Format(time.RFC3339),
-						})
+						return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
 					}).
 					Times(2)
 
@@ -608,7 +574,7 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 			expectErr:       false,
 			expectedContent: "I hit an internal error while processing your request. Please retry with a smaller scope.",
 		},
-		"chatstream-without-meta-persists-only-assistant": {
+		"chatstream-without-meta-persists-user-and-assistant": {
 			userMessage: "No meta",
 			model:       "test-model",
 			fixedTime:   fixedTime,
@@ -648,17 +614,22 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					Run(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) {
 						_ = onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "Hello from model"})
-						_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-							AssistantMessageID: "",
-							CompletedAt:        fixedTime.Format(time.RFC3339),
-						})
+						_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
 					}).
 					Return(nil)
 
 			},
 			persistExpectations: func() []persistCallExpectation {
+				userTurnSequence := int64(0)
 				assistantTurnSequence := int64(1)
 				return []persistCallExpectation{
+					{
+						Role:            assistant.ChatRole_User,
+						Content:         "No meta",
+						TurnSequence:    &userTurnSequence,
+						ActionCallsLen:  0,
+						HasActionCallID: false,
+					},
 					{
 						Role:            assistant.ChatRole_Assistant,
 						Content:         "Hello from model",
@@ -707,28 +678,9 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 					Return([]assistant.ChatMessage{}, false, nil).
 					Once()
 
-				assist.EXPECT().
-					RunTurn(mock.Anything, mock.Anything, mock.Anything).
-					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
-							return err
-						}
-						if err := onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "OK"}); err != nil {
-							return err
-						}
-						return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-							AssistantMessageID: assistantMsgID.String(),
-							CompletedAt:        fixedTime.Format(time.RFC3339),
-						})
-					})
-
 			},
 			persistExpectations: func() []persistCallExpectation {
 				dbErr := errors.New("db error")
-				dbErrText := dbErr.Error()
 				return []persistCallExpectation{
 					{
 						Role:            assistant.ChatRole_User,
@@ -737,15 +689,6 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 						ActionCallsLen:  0,
 						HasActionCallID: false,
 						CreateErr:       dbErr,
-					},
-					{
-						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
-						ID:              &assistantMsgID,
-						MessageState:    assistant.ChatMessageState_Failed,
-						ErrorMessage:    &dbErrText,
-						ActionCallsLen:  0,
-						HasActionCallID: false,
 					},
 				}
 			}(),
@@ -790,19 +733,13 @@ func TestStreamChatImpl_Execute(t *testing.T) {
 				assist.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
+						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 							return err
 						}
 						if err := onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "OK"}); err != nil {
 							return err
 						}
-						return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-							AssistantMessageID: assistantMsgID.String(),
-							CompletedAt:        fixedTime.Format(time.RFC3339),
-						})
+						return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
 					})
 
 			},
@@ -905,15 +842,9 @@ func TestStreamChatImpl_Execute_PersistsSelectedSkillsAndEmitsTurnMetadata(t *te
 		RunTurn(mock.Anything, mock.Anything, mock.Anything).
 		Run(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) {
 			assert.Len(t, req.AvailableActions, 2)
-			_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-				UserMessageID:      userMsgID,
-				AssistantMessageID: assistantMsgID,
-			})
+			_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{})
 			_ = onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "Done."})
-			_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-				AssistantMessageID: assistantMsgID.String(),
-				CompletedAt:        fixedTime.Format(time.RFC3339),
-			})
+			_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
 		}).
 		Return(nil)
 
@@ -963,8 +894,6 @@ func TestStreamChatImpl_Execute_PersistsSelectedSkillsAndEmitsTurnMetadata(t *te
 
 	assert.NoError(t, err)
 	assert.Equal(t, conversationID, turnStarted.ConversationID)
-	assert.Equal(t, userMsgID, turnStarted.UserMessageID)
-	assert.Equal(t, assistantMsgID, turnStarted.AssistantMessageID)
 	assert.NotEqual(t, uuid.Nil, turnStarted.TurnID)
 	assert.Equal(t, expectedSkills, turnStarted.SelectedSkills)
 }
@@ -1062,15 +991,9 @@ func TestStreamChatImpl_Execute_UsesUnsummarizedHistoryAfterSummaryCheckpoint(t 
 				Content: "Most recent assistant reply",
 			})
 
-			_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-				UserMessageID:      userMsgID,
-				AssistantMessageID: assistantMsgID,
-			})
+			_ = onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{})
 			_ = onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "Done."})
-			_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-				AssistantMessageID: assistantMsgID.String(),
-				CompletedAt:        fixedTime.Format(time.RFC3339),
-			})
+			_ = onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
 		}).
 		Return(nil)
 

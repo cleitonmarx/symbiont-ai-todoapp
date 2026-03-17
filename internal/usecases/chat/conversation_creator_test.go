@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -31,7 +30,7 @@ func TestConversationCreator_CreateMessage(t *testing.T) {
 		},
 		{
 			Role:            assistant.ChatRole_Assistant,
-			Content:         "",
+			Content:         "Sorry, I could not process your request. Please try again.",
 			MessageState:    assistant.ChatMessageState_Failed,
 			ErrorMessage:    &expectedErr,
 			ActionCallsLen:  0,
@@ -39,18 +38,38 @@ func TestConversationCreator_CreateMessage(t *testing.T) {
 		},
 	})
 
-	creator := newConversationCreator(uow, nil)
-	session := NewTurnSession(conversation, false, "Hello", nil, assistant.TurnRequest{Model: "test-model"}, 7)
+	creator := NewConversationCreatorImpl(uow, nil)
+	state := NewTurnState(conversation, false, nil, assistant.TurnRequest{Model: "test-model"}, 7)
 
-	userMessage, ok := session.TryBuildUserMessage(uuid.Nil, fixedTime)
-	if !ok {
-		t.Fatal("TryBuildUserMessage returned false")
+	userMessage := assistant.ChatMessage{
+		ID:             uuid.New(),
+		ConversationID: conversation.ID,
+		TurnID:         state.TurnID(),
+		TurnSequence:   state.NextTurnSequence(),
+		ChatRole:       assistant.ChatRole_User,
+		Content:        "Hello",
+		Model:          "test-model",
+		MessageState:   assistant.ChatMessageState_Completed,
+		CreatedAt:      fixedTime,
+		UpdatedAt:      fixedTime,
 	}
 	if err := creator.CreateMessage(t.Context(), conversation, userMessage); err != nil {
 		t.Fatalf("CreateMessage for user returned error: %v", err)
 	}
 
-	failureMessage := session.BuildFailureMessage(fixedTime, errors.New(expectedErr))
+	failureMessage := assistant.ChatMessage{
+		ID:             uuid.New(),
+		ConversationID: conversation.ID,
+		TurnID:         state.TurnID(),
+		TurnSequence:   state.NextTurnSequence(),
+		ChatRole:       assistant.ChatRole_Assistant,
+		Content:        "Sorry, I could not process your request. Please try again.",
+		Model:          state.Model(),
+		MessageState:   assistant.ChatMessageState_Failed,
+		ErrorMessage:   &expectedErr,
+		CreatedAt:      fixedTime,
+		UpdatedAt:      fixedTime,
+	}
 	if err := creator.CreateMessage(t.Context(), conversation, failureMessage); err != nil {
 		t.Fatalf("CreateMessage for failure returned error: %v", err)
 	}

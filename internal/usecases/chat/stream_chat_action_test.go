@@ -91,7 +91,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				assist.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(
-						actionFunctionCallback(userMsgID, assistantMsgID, fixedTime),
+						actionFunctionCallback(),
 					)
 
 			},
@@ -207,10 +207,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						runTurnCalls++
 						switch runTurnCalls {
 						case 1:
-							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-								UserMessageID:      userMsgID,
-								AssistantMessageID: assistantMsgID,
-							}); err != nil {
+							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 								return err
 							}
 							return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
@@ -229,10 +226,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 							if err := onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "\nAnything else?"}); err != nil {
 								return err
 							}
-							return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-								AssistantMessageID: assistantMsgID.String(),
-								CompletedAt:        fixedTime.Format(time.RFC3339),
-							})
+							return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
 						default:
 							return fmt.Errorf("unexpected RunTurn call %d", runTurnCalls)
 						}
@@ -342,10 +336,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
 						if callCount == 0 {
 							callCount++
-							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-								UserMessageID:      userMsgID,
-								AssistantMessageID: assistantMsgID,
-							}); err != nil {
+							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 								return err
 							}
 							return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
@@ -358,10 +349,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 						if err := onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "I could not complete that action call."}); err != nil {
 							return err
 						}
-						return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{
-							AssistantMessageID: assistantMsgID.String(),
-							CompletedAt:        fixedTime.Format(time.RFC3339),
-						})
+						return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
 					}).
 					Times(2)
 
@@ -450,10 +438,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				assist.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
+						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 							return err
 						}
 						return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
@@ -486,7 +471,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					},
 					{
 						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
+						Content:         "Sorry, I could not process your request. Please try again.",
 						ID:              &assistantMsgID,
 						MessageState:    assistant.ChatMessageState_Failed,
 						ErrorMessage:    &onEventErr,
@@ -546,10 +531,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				assist.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-							UserMessageID:      userMsgID,
-							AssistantMessageID: assistantMsgID,
-						}); err != nil {
+						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 							return err
 						}
 						return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
@@ -589,7 +571,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					},
 					{
 						Role:            assistant.ChatRole_Assistant,
-						Content:         "",
+						Content:         "Sorry, I could not process your request. Please try again.",
 						ID:              &assistantMsgID,
 						MessageState:    assistant.ChatMessageState_Failed,
 						ErrorMessage:    &onEventErr,
@@ -652,10 +634,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
 						if callCount == 0 {
-							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-								UserMessageID:      userMsgID,
-								AssistantMessageID: assistantMsgID,
-							}); err != nil {
+							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 								return err
 							}
 						}
@@ -759,10 +738,7 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
 						if callCount == 0 {
-							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{
-								UserMessageID:      userMsgID,
-								AssistantMessageID: assistantMsgID,
-							}); err != nil {
+							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
 								return err
 							}
 						}

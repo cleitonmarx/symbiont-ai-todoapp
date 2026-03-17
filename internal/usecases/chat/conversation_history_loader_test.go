@@ -175,7 +175,7 @@ func TestTruncateToFirstChars(t *testing.T) {
 	}
 }
 
-func TestTurnSessionBuilder_LoadMessagesHistory(t *testing.T) {
+func TestTurnStateBuilder_LoadMessagesHistory(t *testing.T) {
 	t.Parallel()
 
 	conversationID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
@@ -215,13 +215,15 @@ func TestTurnSessionBuilder_LoadMessagesHistory(t *testing.T) {
 		Once()
 
 	timeProvider.EXPECT().Now().Return(fixedTime).Once()
-	builder := newTurnSessionBuilder(
+
+	builder := NewTurnStateBuilderImpl(
 		summaryRepo,
 		chatRepo,
 		timeProvider,
 		nil,
 		nil,
-	).(turnSessionBuilder)
+	)
+
 	messages, summaryContext, err := builder.loadMessagesHistory(context.Background(), conversationID)
 	require.NoError(t, err)
 	assert.Equal(t, "Summary state", summaryContext)

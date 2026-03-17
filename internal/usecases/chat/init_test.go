@@ -145,14 +145,14 @@ func TestInitTurnRunner_Initialize(t *testing.T) {
 	assert.NotNil(t, component)
 }
 
-func TestInitTurnSessionBuilder_Initialize(t *testing.T) {
+func TestInitTurnStateBuilder_Initialize(t *testing.T) {
 	t.Parallel()
 
-	i := InitTurnSessionBuilder{}
+	i := InitTurnStateBuilder{}
 	_, err := i.Initialize(t.Context())
 	assert.NoError(t, err)
 
-	component, err := depend.Resolve[TurnSessionBuilder]()
+	component, err := depend.Resolve[TurnStateBuilder]()
 	assert.NoError(t, err)
 	assert.NotNil(t, component)
 }

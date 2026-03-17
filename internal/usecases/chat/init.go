@@ -128,7 +128,7 @@ type InitStreamChat struct {
 	ConversationCompactor   ConversationCompactor            `resolve:""`
 	CompactionTriggerTokens int                              `config:"CHAT_COMPACTION_TRIGGER_TOKENS"`
 	CompactionTimeout       time.Duration                    `config:"CHAT_COMPACTION_TIMEOUT" default:"20s"`
-	SessionBuilder          TurnSessionBuilder               `resolve:""`
+	StateBuilder            TurnStateBuilder                 `resolve:""`
 	TurnRunner              TurnRunner                       `resolve:""`
 	ConversationCreator     ConversationCreator              `resolve:""`
 	MaxActionCycles         int                              `config:"LLM_MAX_ACTION_CYCLES" default:"50"`
@@ -144,7 +144,7 @@ func (i InitStreamChat) Initialize(ctx context.Context) (context.Context, error)
 		assistant.CompactionPolicy{TriggerTokenCount: i.CompactionTriggerTokens},
 		i.CompactionTimeout,
 		i.MaxActionCycles,
-		i.SessionBuilder,
+		i.StateBuilder,
 		i.TurnRunner,
 		i.ConversationCreator,
 	)
@@ -160,7 +160,7 @@ type InitConversationCreator struct {
 
 // Initialize registers the ConversationCreator component in the dependency container.
 func (i InitConversationCreator) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[ConversationCreator](newConversationCreator(
+	depend.Register[ConversationCreator](NewConversationCreatorImpl(
 		i.Uow,
 		i.Tokenizer,
 	))
@@ -177,7 +177,7 @@ type InitActionPipeline struct {
 
 // Initialize registers the ActionPipeline component in the dependency container.
 func (i InitActionPipeline) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[ActionPipeline](newActionPipeline(
+	depend.Register[ActionPipeline](NewActionPipelineImpl(
 		i.ActionRegistry,
 		i.ApprovalDispatcher,
 		i.ConversationCreator,
@@ -188,27 +188,23 @@ func (i InitActionPipeline) Initialize(ctx context.Context) (context.Context, er
 
 // InitTurnRunner is the initializer for the TurnRunner component.
 type InitTurnRunner struct {
-	Logger              *log.Logger              `resolve:""`
-	Assistant           assistant.Assistant      `resolve:""`
-	TimeProvider        core.CurrentTimeProvider `resolve:""`
-	ConversationCreator ConversationCreator      `resolve:""`
-	ActionPipeline      ActionPipeline           `resolve:""`
+	Logger         *log.Logger         `resolve:""`
+	Assistant      assistant.Assistant `resolve:""`
+	ActionPipeline ActionPipeline      `resolve:""`
 }
 
 // Initialize registers the TurnRunner component in the dependency container.
 func (i InitTurnRunner) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[TurnRunner](newTurnRunner(
+	depend.Register[TurnRunner](NewTurnRunnerImpl(
 		i.Logger,
 		i.Assistant,
-		i.TimeProvider,
-		i.ConversationCreator,
 		i.ActionPipeline,
 	))
 	return ctx, nil
 }
 
-// InitTurnSessionBuilder is the initializer for the TurnSessionBuilder component.
-type InitTurnSessionBuilder struct {
+// InitTurnStateBuilder is the initializer for the TurnStateBuilder component.
+type InitTurnStateBuilder struct {
 	ConversationSummaryRepo assistant.ConversationSummaryRepository `resolve:""`
 	ChatMessageRepo         assistant.ChatMessageRepository         `resolve:""`
 	TimeProvider            core.CurrentTimeProvider                `resolve:""`
@@ -216,9 +212,9 @@ type InitTurnSessionBuilder struct {
 	ActionRegistry          assistant.ActionRegistry                `resolve:""`
 }
 
-// Initialize registers the TurnSessionBuilder component in the dependency container.
-func (i InitTurnSessionBuilder) Initialize(ctx context.Context) (context.Context, error) {
-	depend.Register[TurnSessionBuilder](newTurnSessionBuilder(
+// Initialize registers the TurnStateBuilder component in the dependency container.
+func (i InitTurnStateBuilder) Initialize(ctx context.Context) (context.Context, error) {
+	depend.Register[TurnStateBuilder](NewTurnStateBuilderImpl(
 		i.ConversationSummaryRepo,
 		i.ChatMessageRepo,
 		i.TimeProvider,

@@ -10,12 +10,26 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/common"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/core"
+	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 	"github.com/google/uuid"
 	"go.yaml.in/yaml/v3"
 )
 
 //go:embed prompts/chat.yml
 var chatPrompt embed.FS
+
+const (
+	// MAX_CHAT_HISTORY_MESSAGES is the maximum number of prior messages included in chat context.
+	MAX_CHAT_HISTORY_MESSAGES = 100
+
+	// CHAT_TEMPERATURE controls generation randomness for streamed chat turns.
+	CHAT_TEMPERATURE = 0.2
+	// CHAT_TOP_P controls nucleus sampling for streamed chat turns.
+	CHAT_TOP_P = 0.7
+
+	// MAX_SKILLS_PROMPT_CHARS is the maximum size of injected skill prompt content.
+	MAX_SKILLS_PROMPT_CHARS = 4000
+)
 
 // BuildSessionParams contains the inputs required to prepare a streaming turn.
 type BuildSessionParams struct {
@@ -26,14 +40,14 @@ type BuildSessionParams struct {
 	ConversationCreated bool
 }
 
-// TurnSessionBuilder prepares the conversation, history, skills, and turn request.
-type TurnSessionBuilder interface {
+// TurnStateBuilder prepares the conversation, history, skills, and turn request.
+type TurnStateBuilder interface {
 	// Build assembles all pre-turn context needed to start streaming.
-	Build(ctx context.Context, params BuildSessionParams) (TurnSession, error)
+	Build(ctx context.Context, params BuildSessionParams) (TurnState, error)
 }
 
-// turnSessionBuilder prepares conversation context and request payloads for streaming.
-type turnSessionBuilder struct {
+// TurnStateBuilderImpl implements the TurnStateBuilder interface.
+type TurnStateBuilderImpl struct {
 	conversationSummaryRepo assistant.ConversationSummaryRepository
 	chatMessageRepo         assistant.ChatMessageRepository
 	timeProvider            core.CurrentTimeProvider
@@ -41,15 +55,15 @@ type turnSessionBuilder struct {
 	actionRegistry          assistant.ActionRegistry
 }
 
-// newTurnSessionBuilder builds the default session builder for stream chat.
-func newTurnSessionBuilder(
+// NewTurnStateBuilderImpl builds the default state builder for stream chat.
+func NewTurnStateBuilderImpl(
 	conversationSummaryRepo assistant.ConversationSummaryRepository,
 	chatMessageRepo assistant.ChatMessageRepository,
 	timeProvider core.CurrentTimeProvider,
 	skillRegistry assistant.SkillRegistry,
 	actionRegistry assistant.ActionRegistry,
-) TurnSessionBuilder {
-	return turnSessionBuilder{
+) TurnStateBuilderImpl {
+	return TurnStateBuilderImpl{
 		conversationSummaryRepo: conversationSummaryRepo,
 		chatMessageRepo:         chatMessageRepo,
 		timeProvider:            timeProvider,
@@ -59,8 +73,11 @@ func newTurnSessionBuilder(
 }
 
 // Build assembles the target conversation, prompt history, selected skills, and turn request.
-func (b turnSessionBuilder) Build(ctx context.Context, params BuildSessionParams) (TurnSession, error) {
-	messagesHistory, summaryContext, err := b.loadMessagesHistory(ctx, params.Conversation.ID)
+func (b TurnStateBuilderImpl) Build(ctx context.Context, params BuildSessionParams) (TurnState, error) {
+	spanCtx, span := telemetry.StartSpan(ctx)
+	defer span.End()
+
+	messagesHistory, summaryContext, err := b.loadMessagesHistory(spanCtx, params.Conversation.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +87,7 @@ func (b turnSessionBuilder) Build(ctx context.Context, params BuildSessionParams
 		Content: params.UserMessage,
 	})
 
-	skills := b.skillRegistry.ListRelevant(ctx, assistant.SkillQueryContext{
+	skills := b.skillRegistry.ListRelevant(spanCtx, assistant.SkillQueryContext{
 		Messages:            messagesHistory,
 		ConversationSummary: summaryContext,
 	})
@@ -105,10 +122,9 @@ func (b turnSessionBuilder) Build(ctx context.Context, params BuildSessionParams
 		AvailableActions: relevantActions,
 	}
 
-	return NewTurnSession(
+	return NewTurnState(
 		params.Conversation,
 		params.ConversationCreated,
-		params.UserMessage,
 		selectedSkills,
 		request,
 		params.MaxActionCycles,
@@ -116,7 +132,7 @@ func (b turnSessionBuilder) Build(ctx context.Context, params BuildSessionParams
 }
 
 // loadMessagesHistory combines the current system prompt with recent non-system conversation history.
-func (b turnSessionBuilder) loadMessagesHistory(ctx context.Context, conversationID uuid.UUID) ([]assistant.Message, string, error) {
+func (b TurnStateBuilderImpl) loadMessagesHistory(ctx context.Context, conversationID uuid.UUID) ([]assistant.Message, string, error) {
 	systemPrompt, summaryContext, lastSummarizedMessageID, err := b.buildSystemPrompt(ctx, conversationID)
 	if err != nil {
 		return nil, "", err
@@ -155,7 +171,7 @@ func (b turnSessionBuilder) loadMessagesHistory(ctx context.Context, conversatio
 }
 
 // buildSystemPrompt loads the base prompt template and appends the latest conversation summary context.
-func (b turnSessionBuilder) buildSystemPrompt(
+func (b TurnStateBuilderImpl) buildSystemPrompt(
 	ctx context.Context,
 	conversationID uuid.UUID,
 ) ([]assistant.Message, string, *uuid.UUID, error) {

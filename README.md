@@ -285,6 +285,8 @@ Split stack URLs:
 
 - HTTP API + embedded UI (via Traefik): `http://localhost:18080`
 - GraphQL playground (via Traefik): `http://localhost:18085`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (admin/admin)
 
 ## Kubernetes (Docker Desktop) with Terraform + Helm
 
@@ -432,6 +434,13 @@ K6_LOAD_TEST_SCENARIO=todo-rest-create-update-delete \
 go tool k6 run tests/k6/all-scenarios.ts
 ```
 
+Run multiple suite scenarios in one invocation:
+
+```bash
+K6_LOAD_TEST_SCENARIO=todo-flow-rest-graphql,todo-rest-create-update-delete \
+go tool k6 run tests/k6/all-scenarios.ts
+```
+
 Available `K6_LOAD_TEST_SCENARIO` values:
 
 - `regular`
@@ -458,7 +467,7 @@ Optional load tuning variables:
 
 - `K6_REST_BASE_URL` (default: `http://localhost:8080`)
 - `K6_GRAPHQL_ENDPOINT` (default: `http://localhost:8085/v1/query`)
-- `K6_LOAD_TEST_SCENARIO` for `tests/k6/all-scenarios.ts` (default: `regular`)
+- `K6_LOAD_TEST_SCENARIO` for `tests/k6/all-scenarios.ts` (default: `regular`; accepts one scenario key or a comma-separated list)
 - `K6_LOAD_RUN_ALL_SCENARIOS_PARALLEL` (default: `false`; when `true`, all `regular` suite scenarios start at `0s`)
 - `K6_LOAD_EXECUTION_STRATEGY` (default: `regular`; options: `regular`, `smoke`, `spike`, `stress`)
 - `K6_LOAD_START_VUS` (default: `1`)
@@ -500,6 +509,8 @@ Required or commonly tuned variables:
 - `GRAPHQL_SERVER_PORT` (default: `8085`)
 - `DB_HOST`, `DB_PORT` (default: `5432`), `DB_NAME`
 - `DB_USER`, `DB_PASS` (can be sourced from Vault)
+- `DB_MAX_OPEN_CONNS` (default: `50`), `DB_MIN_CONNS` (default: `5`), `DB_MAX_IDLE_CONNS` (default: `25`)
+- `DB_CONN_MAX_LIFETIME` (default: `30m`), `DB_CONN_MAX_IDLE_TIME` (default: `5m`), `DB_HEALTH_CHECK_PERIOD` (default: `1m`)
 - `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_MOUNT_PATH`, `VAULT_SECRET_PATH`
 - `PUBSUB_PROJECT_ID`, `PUBSUB_EMULATOR_HOST` (for local emulator), `PUBSUB_TOPIC_ID`, `TODO_EVENTS_SUBSCRIPTION_ID`, `CHAT_TITLE_EVENTS_SUBSCRIPTION_ID`, `ACTION_APPROVAL_EVENTS_SUBSCRIPTION_PREFIX`
 - `LLM_MODEL_HOST`, `LLM_EMBEDDING_MODEL_HOST`, `LLM_API_KEY`, `LLM_EMBEDDING_API_KEY`, `LLM_SUMMARY_MODEL`, `LLM_CHAT_SUMMARY_MODEL`, `LLM_CHAT_TITLE_MODEL`, `LLM_EMBEDDING_MODEL`

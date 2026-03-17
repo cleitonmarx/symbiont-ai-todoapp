@@ -9,6 +9,8 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 )
 
+const outboxRelayBatchSize = 100
+
 // Relay defines the interface for relaying outbox events
 type Relay interface {
 	// Execute processes pending outbox events and relays them
@@ -39,21 +41,24 @@ func (r RelayImpl) Execute(ctx context.Context) error {
 	err := r.Uow.Execute(spanCtx, func(uowCtx context.Context, scope transaction.Scope) error {
 		outboxRepo := scope.Outbox()
 
-		events, err := outboxRepo.FetchPendingEvents(uowCtx, 100)
-		if err != nil {
-			return err
-		}
+		for {
+			events, err := outboxRepo.FetchPendingEvents(uowCtx, outboxRelayBatchSize)
+			if err != nil {
+				return err
+			}
 
-		if len(events) > 0 {
+			if len(events) == 0 {
+				return nil
+			}
+
 			r.Logger.Printf("Fetched %d pending outbox events", len(events))
-		}
 
-		for _, event := range events {
-			if err := r.relayEvent(uowCtx, outboxRepo, event); err != nil {
-				r.Logger.Printf("relay failed for event %s: %v", event.ID, err)
+			for _, event := range events {
+				if err := r.relayEvent(uowCtx, outboxRepo, event); err != nil {
+					r.Logger.Printf("relay failed for event %s: %v", event.ID, err)
+				}
 			}
 		}
-		return nil
 	})
 	if telemetry.IsErrorRecorded(span, err) {
 		return err

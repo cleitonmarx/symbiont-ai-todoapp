@@ -161,8 +161,8 @@ func TestAssistantClientAdapter_RunTurn(t *testing.T) {
 			server := createStreamingServer(tt.chunks)
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
+			adapter := NewAssistantClient(client)
 
 			eventTypes, deltaTexts, _, err := collectStreamEvents(t.Context(), adapter, tt.req)
 
@@ -189,8 +189,8 @@ func TestAssistantClientAdapter_RunTurn_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewDRMAPIClient(server.URL, "", server.Client())
-	adapter := NewAssistantClientAdapter(client)
+	client := NewOpenAICompatClient(server.URL, "", server.Client())
+	adapter := NewAssistantClient(client)
 
 	req := assistant.TurnRequest{
 		Model: "test-model",
@@ -305,8 +305,8 @@ func TestAssistantClientAdapter_RunTurnSync(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
+			adapter := NewAssistantClient(client)
 
 			resp, err := adapter.RunTurnSync(t.Context(), tt.req)
 
@@ -333,8 +333,8 @@ func TestAssistantClientAdapter_RunTurnSync_ValidationErrors(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewDRMAPIClient(server.URL, "", server.Client())
-	adapter := NewAssistantClientAdapter(client)
+	client := NewOpenAICompatClient(server.URL, "", server.Client())
+	adapter := NewAssistantClient(client)
 
 	tests := map[string]struct {
 		req assistant.TurnRequest
@@ -402,8 +402,8 @@ func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
+			adapter := NewAssistantClient(client)
 
 			models, err := adapter.ListAvailableModels(t.Context())
 
@@ -491,8 +491,8 @@ func TestAssistantClientAdapter_ListModels(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
-			adapter := NewAssistantClientAdapter(client)
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
+			adapter := NewAssistantClient(client)
 
 			models, err := adapter.ListModels(t.Context())
 

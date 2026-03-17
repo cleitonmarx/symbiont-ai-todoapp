@@ -18,8 +18,8 @@ type InitAssistantClient struct {
 
 // Initialize creates and registers assistant/model-catalog interfaces in the dependency container.
 func (i InitAssistantClient) Initialize(ctx context.Context) (context.Context, error) {
-	adapter := NewAssistantClientAdapter(
-		NewDRMAPIClient(i.ModelHost, i.APIKey, i.HttpClient),
+	adapter := NewAssistantClient(
+		NewOpenAICompatClient(i.ModelHost, i.APIKey, i.HttpClient),
 	)
 	depend.Register[assistant.Assistant](adapter)
 	depend.Register[assistant.ModelCatalog](adapter)
@@ -36,7 +36,7 @@ type InitEncoderClient struct {
 // Initialize creates and registers the semantic encoder interface in the dependency container.
 func (i InitEncoderClient) Initialize(ctx context.Context) (context.Context, error) {
 	adapter := NewSemanticEncoder(
-		NewDRMAPIClient(i.EmbeddingModelHost, i.EmbeddingAPIKey, i.HttpClient),
+		NewOpenAICompatClient(i.EmbeddingModelHost, i.EmbeddingAPIKey, i.HttpClient),
 	)
 	depend.Register[semantic.Encoder](adapter)
 	return ctx, nil

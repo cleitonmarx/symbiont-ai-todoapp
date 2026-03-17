@@ -10,13 +10,13 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/telemetry"
 )
 
-// AssistantClient adapts DRMAPIClient to domain assistant/model interfaces.
+// AssistantClient adapts OpenAICompatClient to domain assistant/model interfaces.
 type AssistantClient struct {
-	client DRMAPIClient
+	client OpenAICompatClient
 }
 
-// NewAssistantClientAdapter creates a new adapter.
-func NewAssistantClientAdapter(client DRMAPIClient) AssistantClient {
+// NewAssistantClient creates a new AssistantClient.
+func NewAssistantClient(client OpenAICompatClient) AssistantClient {
 	return AssistantClient{client: client}
 }
 

@@ -100,7 +100,7 @@ func TestSemanticEncoder_VectorizeTodo(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
 			adapter := NewSemanticEncoder(client)
 
 			vec, err := adapter.VectorizeTodo(t.Context(), tt.model, todo)
@@ -204,7 +204,7 @@ func TestSemanticEncoder_VectorizeQuery(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
 			adapter := NewSemanticEncoder(client)
 
 			vec, err := adapter.VectorizeQuery(t.Context(), tt.model, searchInput)
@@ -316,7 +316,7 @@ func TestSemanticEncoder_VectorizeSkillDefinition(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewDRMAPIClient(server.URL, "", server.Client())
+			client := NewOpenAICompatClient(server.URL, "", server.Client())
 			adapter := NewSemanticEncoder(client)
 
 			useVec, avoidVec, err := adapter.VectorizeSkillDefinition(t.Context(), tt.model, tt.skill)

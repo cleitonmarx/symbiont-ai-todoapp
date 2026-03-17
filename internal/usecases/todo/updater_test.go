@@ -84,6 +84,49 @@ func TestUpdaterImpl_Update(t *testing.T) {
 			expectedTodo: todo,
 			expectedErr:  nil,
 		},
+		"success-without-title-change-skips-embedding": {
+			id:     fixedUUID,
+			status: common.Ptr(domain.Status_DONE),
+			setExpectations: func(
+				scope *transaction.MockScope,
+				timeProvider *core.MockCurrentTimeProvider,
+				semanticEncoder *semantic.MockEncoder,
+			) {
+				timeProvider.EXPECT().Now().Return(fixedTime)
+
+				repo := domain.NewMockRepository(t)
+				outboxRepo := outbox.NewMockRepository(t)
+
+				scope.EXPECT().Todo().Return(repo)
+				scope.EXPECT().Outbox().Return(outboxRepo)
+
+				repo.EXPECT().GetTodo(mock.Anything, fixedUUID).Return(todo, true, nil)
+				repo.EXPECT().UpdateTodo(mock.Anything, mock.MatchedBy(func(t domain.Todo) bool {
+					return t.ID == fixedUUID &&
+						t.Status == domain.Status_DONE &&
+						t.Title == todo.Title &&
+						t.UpdatedAt.Equal(fixedTime) &&
+						assert.ObjectsAreEqual(t.Embedding, todo.Embedding)
+				})).Return(nil)
+
+				outboxRepo.EXPECT().CreateTodoEvent(
+					mock.Anything,
+					outbox.TodoEvent{
+						Type:      outbox.EventType_TODO_UPDATED,
+						TodoID:    fixedUUID,
+						CreatedAt: fixedTime,
+					},
+				).Return(nil)
+			},
+			expectedTodo: domain.Todo{
+				ID:        fixedUUID,
+				Title:     "Updated Todo",
+				Status:    domain.Status_DONE,
+				Embedding: []float64{0.4, 0.5, 0.6},
+				DueDate:   fixedTime,
+			},
+			expectedErr: nil,
+		},
 		"invalid-update-data": {
 			id:    fixedUUID,
 			title: common.Ptr(""),
@@ -165,7 +208,8 @@ func TestUpdaterImpl_Update(t *testing.T) {
 			expectedErr:  errors.New("database error"),
 		},
 		"update-fails": {
-			id: fixedUUID,
+			id:    fixedUUID,
+			title: &todo.Title,
 			setExpectations: func(
 				scope *transaction.MockScope,
 				timeProvider *core.MockCurrentTimeProvider,

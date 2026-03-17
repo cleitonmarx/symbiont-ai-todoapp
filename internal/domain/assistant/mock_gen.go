@@ -990,6 +990,63 @@ func (_c *MockChatMessageRepository_CreateChatMessages_Call) RunAndReturn(run fu
 	return _c
 }
 
+// DeleteChatMessages provides a mock function for the type MockChatMessageRepository
+func (_mock *MockChatMessageRepository) DeleteChatMessages(ctx context.Context, messageIDs []uuid.UUID) error {
+	ret := _mock.Called(ctx, messageIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteChatMessages")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []uuid.UUID) error); ok {
+		r0 = returnFunc(ctx, messageIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockChatMessageRepository_DeleteChatMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteChatMessages'
+type MockChatMessageRepository_DeleteChatMessages_Call struct {
+	*mock.Call
+}
+
+// DeleteChatMessages is a helper method to define mock.On call
+//   - ctx context.Context
+//   - messageIDs []uuid.UUID
+func (_e *MockChatMessageRepository_Expecter) DeleteChatMessages(ctx interface{}, messageIDs interface{}) *MockChatMessageRepository_DeleteChatMessages_Call {
+	return &MockChatMessageRepository_DeleteChatMessages_Call{Call: _e.mock.On("DeleteChatMessages", ctx, messageIDs)}
+}
+
+func (_c *MockChatMessageRepository_DeleteChatMessages_Call) Run(run func(ctx context.Context, messageIDs []uuid.UUID)) *MockChatMessageRepository_DeleteChatMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].([]uuid.UUID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockChatMessageRepository_DeleteChatMessages_Call) Return(err error) *MockChatMessageRepository_DeleteChatMessages_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockChatMessageRepository_DeleteChatMessages_Call) RunAndReturn(run func(ctx context.Context, messageIDs []uuid.UUID) error) *MockChatMessageRepository_DeleteChatMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteConversationMessages provides a mock function for the type MockChatMessageRepository
 func (_mock *MockChatMessageRepository) DeleteConversationMessages(ctx context.Context, conversationID uuid.UUID) error {
 	ret := _mock.Called(ctx, conversationID)

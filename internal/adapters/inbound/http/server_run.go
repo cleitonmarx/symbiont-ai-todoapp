@@ -22,6 +22,12 @@ import (
 
 var _ gen.ServerInterface = (*TodoAppServer)(nil)
 
+const (
+	defaultServerReadHeaderTimeout = 5 * time.Second
+	defaultServerIdleTimeout       = 60 * time.Second
+	defaultServerMaxHeaderBytes    = 1 << 20
+)
+
 // TodoAppServer is the REST API and UI HTTP server for the TodoApp application.
 type TodoAppServer struct {
 	Port                           int                              `config:"API_SERVER_PORT" default:"8080"`
@@ -74,8 +80,11 @@ func (api TodoAppServer) Run(ctx context.Context) error {
 	h = cors.AllowAll().Handler(h)
 
 	s := &http.Server{
-		Handler: h,
-		Addr:    fmt.Sprintf(":%d", api.Port),
+		Handler:           h,
+		Addr:              fmt.Sprintf(":%d", api.Port),
+		ReadHeaderTimeout: defaultServerReadHeaderTimeout,
+		IdleTimeout:       defaultServerIdleTimeout,
+		MaxHeaderBytes:    defaultServerMaxHeaderBytes,
 	}
 
 	errCh := make(chan error, 1)

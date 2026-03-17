@@ -17,6 +17,12 @@ import (
 	"github.com/rs/cors"
 )
 
+const (
+	defaultServerReadHeaderTimeout = 5 * time.Second
+	defaultServerIdleTimeout       = 60 * time.Second
+	defaultServerMaxHeaderBytes    = 1 << 20
+)
+
 // TodoGraphQLServer is the GraphQL Server for the TodoApp application.
 type TodoGraphQLServer struct {
 	Logger            *log.Logger `resolve:""`
@@ -46,8 +52,11 @@ func (s *TodoGraphQLServer) Run(ctx context.Context) error {
 	mux.Handle("/", playground.Handler("TodoApp GraphQL", "/v1/query"))
 
 	svr := &http.Server{
-		Handler: mux,
-		Addr:    fmt.Sprintf(":%d", s.Port),
+		Handler:           mux,
+		Addr:              fmt.Sprintf(":%d", s.Port),
+		ReadHeaderTimeout: defaultServerReadHeaderTimeout,
+		IdleTimeout:       defaultServerIdleTimeout,
+		MaxHeaderBytes:    defaultServerMaxHeaderBytes,
 	}
 
 	errCh := make(chan error, 1)

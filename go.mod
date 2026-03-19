@@ -19,7 +19,7 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/lib/pq v1.10.9
 	github.com/modelcontextprotocol/go-sdk v1.4.0
-	github.com/oapi-codegen/runtime v1.1.2
+	github.com/oapi-codegen/runtime v1.3.0
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.11.1

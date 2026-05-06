@@ -156,12 +156,11 @@ func (p ActionPipelineImpl) Handle(
 					ActionCalls: []assistant.ActionCall{actionCall},
 				},
 				actionMessage,
-				renderedMessage,
 			)
 			if err := p.streamRenderedMessage(spanCtx, renderedMessage, state, onEvent); err != nil {
 				return false, err
 			}
-			return true, nil
+			return false, nil
 		}
 	}
 

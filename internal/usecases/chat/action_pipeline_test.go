@@ -93,7 +93,7 @@ func TestActionPipeline_Handle_SuccessWithRenderer(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	assert.True(t, continueStreaming)
+	assert.False(t, continueStreaming)
 	assert.Len(t, persistedMessages, 2)
 	assert.Equal(t, assistant.ChatRole_Assistant, persistedMessages[0].ChatRole)
 	assert.Equal(t, assistant.ChatRole_Tool, persistedMessages[1].ChatRole)
@@ -104,5 +104,5 @@ func TestActionPipeline_Handle_SuccessWithRenderer(t *testing.T) {
 	}, eventTypes)
 	assert.Equal(t, "Found 2 todos.", state.AssistantContent())
 	request := state.Request()
-	assert.Len(t, request.Messages, 4)
+	assert.Len(t, request.Messages, 3)
 }

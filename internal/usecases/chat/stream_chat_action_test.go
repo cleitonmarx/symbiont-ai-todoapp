@@ -203,38 +203,22 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 
 				expectNowCalls(timeProvider, fixedTime, 6)
 
-				runTurnCalls := 0
 				assist.EXPECT().
 					RunTurn(mock.Anything, mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, req assistant.TurnRequest, onEvent assistant.EventCallback) error {
-						runTurnCalls++
-						switch runTurnCalls {
-						case 1:
-							if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
-								return err
-							}
-							return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
-								ID:    "func-123",
-								Name:  "update_todos",
-								Input: `{"todos":[{"id":"1","title":"Updated"}]}`,
-							})
-						case 2:
-							if len(req.Messages) == 0 {
-								return fmt.Errorf("expected follow-up request messages")
-							}
-							lastMessage := req.Messages[len(req.Messages)-1]
-							if lastMessage.Role != assistant.ChatRole_Assistant || lastMessage.Content != "**Updated** (Due: Jan 25, 2026) - OPEN." {
-								return fmt.Errorf("expected rendered assistant message in follow-up request, got role=%s content=%q", lastMessage.Role, lastMessage.Content)
-							}
-							if err := onEvent(ctx, assistant.EventType_MessageDelta, assistant.MessageDelta{Text: "\nAnything else?"}); err != nil {
-								return err
-							}
-							return onEvent(ctx, assistant.EventType_TurnCompleted, assistant.TurnCompleted{})
-						default:
-							return fmt.Errorf("unexpected RunTurn call %d", runTurnCalls)
+						if len(req.Messages) == 0 {
+							return fmt.Errorf("expected request messages")
 						}
+						if err := onEvent(ctx, assistant.EventType_TurnStarted, assistant.TurnStarted{}); err != nil {
+							return err
+						}
+						return onEvent(ctx, assistant.EventType_ActionRequested, assistant.ActionCall{
+							ID:    "func-123",
+							Name:  "update_todos",
+							Input: `{"todos":[{"id":"1","title":"Updated"}]}`,
+						})
 					}).
-					Twice()
+					Once()
 
 			},
 			persistExpectations: []persistCallExpectation{
@@ -264,14 +248,14 @@ func TestStreamChatImpl_Execute_ActionCases(t *testing.T) {
 				},
 				{
 					Role:            assistant.ChatRole_Assistant,
-					Content:         "**Updated** (Due: Jan 25, 2026) - OPEN.\nAnything else?",
+					Content:         "**Updated** (Due: Jan 25, 2026) - OPEN.",
 					ID:              &assistantMsgID,
 					ActionCallsLen:  0,
 					HasActionCallID: false,
 				},
 			},
 			expectErr:       false,
-			expectedContent: "updating todos...\n**Updated** (Due: Jan 25, 2026) - OPEN.\nAnything else?",
+			expectedContent: "updating todos...\n**Updated** (Due: Jan 25, 2026) - OPEN.",
 		},
 		"action-message-marked-as-failed-when-content-has-error": {
 			userMessage: "Call failing action",

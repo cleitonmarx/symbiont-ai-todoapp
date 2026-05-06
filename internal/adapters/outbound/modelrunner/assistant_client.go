@@ -226,7 +226,7 @@ func toChatRequest(req assistant.TurnRequest) ChatRequest {
 // handling nested fields for object types.
 func mapActionFieldToSchema(field assistant.ActionField) ToolFuncParameterDetail {
 	schema := ToolFuncParameterDetail{
-		Type:        field.Type,
+		Type:        normalizeSchemaType(field.Type),
 		Description: field.Description,
 		Format:      field.Format,
 		Enum:        field.Enum,
@@ -259,4 +259,42 @@ func mapActionFieldToSchema(field assistant.ActionField) ToolFuncParameterDetail
 	}
 
 	return schema
+}
+
+// normalizeSchemaType converts the domain's compact pipe-separated type unions
+// into JSON Schema forms accepted by OpenAI-compatible tool parsers.
+func normalizeSchemaType(raw string) any {
+	parts := strings.Split(raw, "|")
+	if len(parts) == 1 {
+		return raw
+	}
+
+	seen := make(map[string]bool, len(parts))
+	types := make([]string, 0, len(parts))
+	for _, part := range parts {
+		typ := strings.TrimSpace(part)
+		if typ == "" || seen[typ] {
+			continue
+		}
+		seen[typ] = true
+		types = append(types, typ)
+	}
+	if len(types) == 0 {
+		return ""
+	}
+	if len(types) == 1 {
+		return types[0]
+	}
+
+	nonNullTypes := make([]string, 0, len(types))
+	for _, typ := range types {
+		if typ != "null" {
+			nonNullTypes = append(nonNullTypes, typ)
+		}
+	}
+	if len(nonNullTypes) == 1 {
+		return nonNullTypes[0]
+	}
+
+	return types
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/cleitonmarx/symbiont-ai-todoapp/internal/domain/assistant"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // createStreamingServer creates a test server that sends OpenAI-style streaming chunks
@@ -349,6 +350,38 @@ func TestAssistantClientAdapter_RunTurnSync_ValidationErrors(t *testing.T) {
 			assert.Error(t, err)
 		})
 	}
+}
+
+func TestToChatRequestNormalizesNullableActionFieldTypes(t *testing.T) {
+	t.Parallel()
+
+	req := assistant.TurnRequest{
+		Model: "test-model",
+		Messages: []assistant.Message{
+			{Role: "user", Content: "search"},
+		},
+		AvailableActions: []assistant.ActionDefinition{
+			{
+				Name:        "search_web",
+				Description: "Search the web.",
+				Input: assistant.ActionInput{
+					Type: "object",
+					Fields: map[string]assistant.ActionField{
+						"query": {
+							Type:        "null|string",
+							Description: "Search query.",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	got := toChatRequest(req)
+
+	require.Len(t, got.Tools, 1)
+	query := got.Tools[0].Function.Parameters.Properties["query"]
+	assert.Equal(t, "string", query.Type)
 }
 
 func TestAssistantClientAdapter_ListAvailableModels(t *testing.T) {
